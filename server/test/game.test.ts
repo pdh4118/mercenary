@@ -6,6 +6,9 @@ import {
   CAMP_FIRST_SPAWN_SEC,
   CAMP_USE_RADIUS,
   CAVALRY,
+  CHARGE_DURATION_SEC,
+  CHARGE_MAX_DISTANCE,
+  DISMISS_REFUND,
   ENEMY_GOLD,
   ENEMY_MAX,
   ENEMY_SPAWN_DISTANCE,
@@ -21,6 +24,8 @@ import {
   SHIELD,
   SPEAR,
   START_GOLD,
+  START_LEADERSHIP,
+  UNIT_COST,
   TICK_RATE,
   WORLD_SIZE,
   mercPrice,
@@ -299,10 +304,65 @@ test("고용 검증: 금화 부족·거리·잘못된 선택·보유 한도", ()
   live.gold = 0;
   assert.equal(g.buy(a, near, 0).ok, false);
   assert.equal(g.countMercs(a), 0);
-  // 한도
+  // 통솔력: 시작 통솔력만큼만 보유할 수 있다
   live.gold = 100000;
-  for (let i = 0; i < MAX_MERCS_PER_PLAYER; i++) assert.equal(g.buy(a, near, 1).ok, true);
+  for (let i = 0; i < START_LEADERSHIP; i++) assert.equal(g.buy(a, near, 1).ok, true);
+  const refused = g.buy(a, near, 1);
+  assert.equal(refused.ok, false);
+  // 통솔력을 늘리면 더 고용할 수 있고, 개체 수 안전 한도는 그대로 지킨다
+  g.addLeadership(a, 100);
+  for (let i = START_LEADERSHIP; i < MAX_MERCS_PER_PLAYER; i++) assert.equal(g.buy(a, near, 1).ok, true);
   assert.equal(g.buy(a, near, 1).ok, false);
+});
+
+test("통솔력 비용: 기병만 2, 나머지는 1", () => {
+  assert.deepEqual([...UNIT_COST], [2, 1, 1, 1, 1]);
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const camp = g.spawnCampAt(p.x + 10, p.y, [CAVALRY, SPEAR, SHIELD]);
+  g.getPlayer(a)!.gold = 100000;
+  assert.equal(g.buy(a, camp, 0).ok, true); // 기병 → 2
+  assert.equal(g.buy(a, camp, 0).ok, true); // 기병 → 4
+  assert.equal(g.leadershipUsed(a), 4);
+  const third = g.buy(a, camp, 0); // 6 > 5
+  assert.equal(third.ok, false);
+  assert.equal(g.buy(a, camp, 1).ok, true); // 창병 → 5
+  assert.equal(g.leadershipUsed(a), 5);
+  assert.equal(g.buy(a, camp, 1).ok, false);
+});
+
+test("해고: 캠프 근처에서만, 지불한 금화의 절반을 돌려받고, 쓰러지거나 약한 용병부터 나간다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  assert.equal(g.dismiss(a, SPEAR).ok, false); // 캠프 없음
+  const camp = g.spawnCampAt(p.x + 10, p.y, [SPEAR, ARCHER, SHIELD]);
+  const live = g.getPlayer(a)!;
+  assert.equal(g.dismiss(a, SPEAR).ok, false); // 해당 병종 없음
+  live.gold = 1000;
+  assert.equal(g.buy(a, camp, 0).ok, true);
+  assert.equal(live.gold, 1000 - mercPrice(SPEAR, 0));
+  assert.equal(g.dismiss(a, SPEAR).ok, true);
+  assert.equal(live.gold, 1000 - mercPrice(SPEAR, 0) + Math.floor(mercPrice(SPEAR, 0) * DISMISS_REFUND));
+  assert.equal(g.leadershipUsed(a), 0);
+
+  // 체력이 낮은 쪽이 먼저 나간다
+  const strong = g.addMerc(a, SPEAR, p.x, p.y);
+  const weak = g.addMerc(a, SPEAR, p.x, p.y);
+  (g.getMerc(weak) as { hp: number }).hp = 5;
+  assert.equal(g.dismiss(a, SPEAR).ok, true);
+  assert.ok(g.getMerc(strong));
+  assert.equal(g.getMerc(weak), undefined);
+});
+
+test("캠프에서 멀면 해고할 수 없다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  g.spawnCampAt(p.x + CAMP_USE_RADIUS + 100, p.y, [SPEAR, ARCHER, SHIELD]);
+  g.addMerc(a, SPEAR, p.x, p.y);
+  assert.equal(g.dismiss(a, SPEAR).ok, false);
 });
 
 // --- 용병 ------------------------------------------------------------------
@@ -370,7 +430,7 @@ test("용병도 체력이 0이면 쓰러졌다가 일정 시간 뒤 부활한다
   // 남은 적을 치워 다시 쓰러지지 않게 한다
   const q = me(g, a);
   (g as unknown as { enemies: Map<number, unknown> }).enemies.clear();
-  run(g, MERC_RESPAWN_SEC + 0.5);
+  run(g, MERC_RESPAWN_SEC[ARCHER] + 0.5);
   const m = g.getMerc(merc)!;
   assert.equal(m.respawn, 0);
   assert.equal(m.hp, MERC_STATS[ARCHER]!.hp);
@@ -386,4 +446,119 @@ test("주인공이 나가면 그 용병도 사라진다", () => {
   g.removePlayer(a);
   assert.equal(g.countMercs(a), 0);
   assert.equal(g.countMercs(b), 1);
+});
+
+// --- 기병 ------------------------------------------------------------------
+
+test("기병은 주인공 양옆 날개에 번갈아 선다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const c1 = g.addMerc(a, CAVALRY, p.x, p.y);
+  const c2 = g.addMerc(a, CAVALRY, p.x, p.y);
+  const slots = g.formationSlots(a);
+  const s1 = slots.get(c1)!;
+  const s2 = slots.get(c2)!;
+  // 기본 방향은 +x. 옆(y)으로 서로 반대편에 150 떨어지고, 약간 앞에 선다.
+  assert.ok(Math.abs(Math.abs(s1[1] - p.y) - 150) < 1e-6);
+  assert.ok(Math.sign(s1[1] - p.y) !== Math.sign(s2[1] - p.y));
+  assert.ok(s1[0] - p.x > 0);
+});
+
+test("기병은 오래 걸리는 부활 시간을 가진다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const c = g.addMerc(a, CAVALRY, p.x + 300, p.y);
+  const spear = g.addMerc(a, SPEAR, p.x - 300, p.y);
+  for (let i = 0; i < 400 && (g.getMerc(c)!.respawn === 0 || g.getMerc(spear)!.respawn === 0); i++) {
+    if (i % 4 === 0) {
+      g.spawnEnemyAt(g.getMerc(c)!.x, g.getMerc(c)!.y, BLUNT);
+      g.spawnEnemyAt(g.getMerc(spear)!.x, g.getMerc(spear)!.y, BLUNT);
+    }
+    g.step();
+  }
+  assert.ok(g.getMerc(c)!.respawn > MERC_RESPAWN_SEC[SPEAR]);
+  assert.ok(g.getMerc(spear)!.respawn <= MERC_RESPAWN_SEC[SPEAR]);
+});
+
+test("기병은 가까운 창병 적을 피해 다른 적을 노린다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const home = { x: p.x + 30, y: p.y + 150 }; // 첫 기병의 날개 자리
+  const c = g.addMerc(a, CAVALRY, home.x, home.y);
+  g.spawnEnemyAt(home.x + 130, home.y, SPEAR); // 가깝지만 창병(상성 불리)
+  g.spawnEnemyAt(home.x, home.y + 200, SHIELD); // 더 멀지만 상성이 유리
+  run(g, 0.25);
+  const m = g.getMerc(c)!;
+  assert.ok(m.y - home.y > 5, "검방병 쪽(아래)으로 움직인다");
+  assert.ok(m.x - home.x <= 0.5, "창병 쪽(오른쪽)으로는 다가가지 않는다");
+});
+
+test("기병은 더 가까운 적이 있어도 궁병을 먼저 노린다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const home = { x: p.x + 30, y: p.y + 150 };
+  const c = g.addMerc(a, CAVALRY, home.x, home.y);
+  g.spawnEnemyAt(home.x + 80, home.y, SHIELD);
+  g.spawnEnemyAt(home.x - 140, home.y, ARCHER);
+  run(g, 0.25);
+  assert.ok(g.getMerc(c)!.x - home.x < -2, "궁병(왼쪽) 쪽으로 움직인다");
+});
+
+test("기병은 공격한 뒤 잠깐 물러난다(치고 빠지기)", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const home = { x: p.x + 30, y: p.y + 150 };
+  const c = g.addMerc(a, CAVALRY, home.x, home.y);
+  const e = g.spawnEnemyAt(home.x + 30, home.y, SHIELD);
+  for (let i = 0; i < 20 && g.getEnemy(e)!.hp === ENEMY_STATS[SHIELD]!.hp; i++) g.step(); // 공격이 들어갈 때까지
+  assert.ok(g.getEnemy(e)!.hp < ENEMY_STATS[SHIELD]!.hp);
+  const x0 = g.getMerc(c)!.x;
+  run(g, 0.3);
+  assert.ok(x0 - g.getMerc(c)!.x > 15, "공격 방향의 반대쪽으로 물러난다");
+});
+
+// --- 우클릭 돌격 지시 ---------------------------------------------------------
+
+test("돌격 지시: 기병만 활동 범위를 넘어 지점으로 달려가고, 시간이 지나면 복귀한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = { ...me(g, a) };
+  const cav = g.addMerc(a, CAVALRY, p.x, p.y);
+  const shield = g.addMerc(a, SHIELD, p.x, p.y);
+  g.charge(a, p.x + 700, p.y);
+  assert.ok(me(g, a).chargeLeft > 0);
+  run(g, 4);
+  assert.ok(g.getMerc(cav)!.x - p.x > 500, "기병은 멀리 나간다");
+  assert.ok(g.getMerc(shield)!.x - p.x < 200, "다른 병종은 진형을 지킨다");
+  run(g, CHARGE_DURATION_SEC + 6);
+  assert.equal(me(g, a).chargeLeft, 0);
+  assert.ok(Math.hypot(g.getMerc(cav)!.x - p.x, g.getMerc(cav)!.y - p.y) < 300, "지시가 끝나면 복귀한다");
+});
+
+test("돌격 지점은 주인공 가까이로 제한되고 잘못된 값은 무시된다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = { ...me(g, a) };
+  g.charge(a, p.x + 99999, p.y);
+  assert.ok(Math.abs(me(g, a).chargeX - p.x) <= CHARGE_MAX_DISTANCE + 1e-6);
+  const g2 = quiet();
+  const b = g2.addPlayer("b")!;
+  g2.charge(b, Number.NaN, "x");
+  assert.equal(me(g2, b).chargeLeft, 0);
+});
+
+test("돌격 중인 기병은 지점 근처의 적을 공격한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = { ...me(g, a) };
+  g.addMerc(a, CAVALRY, p.x, p.y);
+  const e = g.spawnEnemyAt(p.x + 600, p.y, ARCHER);
+  g.charge(a, p.x + 600, p.y);
+  run(g, 6);
+  assert.equal(g.getEnemy(e), undefined, "궁병이 처치되어야 한다");
 });

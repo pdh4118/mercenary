@@ -3,11 +3,11 @@ import {
   BULLET_RADIUS,
   CAMP_USE_RADIUS,
   ENEMY_STATS,
-  MAX_MERCS_PER_PLAYER,
   MERC_STATS,
   PLAYER_MAX_HP,
   PLAYER_RADIUS,
   TICK_RATE,
+  UNIT_COST,
   UNIT_NAMES,
   UNIT_TYPES,
   WORLD_SIZE,
@@ -133,7 +133,11 @@ async function main() {
   const bulletLayer = new Container();
   const mercLayer = new Container();
   const playerLayer = new Container();
-  world.addChild(campLayer, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer);
+  const chargeMark = new Graphics();
+  const chargeLabel = new Text({ text: "돌격", style: { fill: 0xffc27a, fontSize: 13 } });
+  chargeLabel.anchor.set(0.5, 1);
+  chargeMark.visible = chargeLabel.visible = false;
+  world.addChild(campLayer, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, chargeMark, chargeLabel);
 
   const enemies = new Pool<Tracked & { sprite: Sprite }, EnemyWire>(
     (w) => {
@@ -238,7 +242,7 @@ async function main() {
   campPanel.addChild(campPanelBg, campPanelText);
   campPanel.visible = false;
   const toast = new Text({ text: "", style: { fill: 0xffb4a8, fontSize: 16, stroke: { color: 0x000000, width: 3 } } });
-  toast.anchor.set(0.5, 1);
+  toast.anchor.set(0.5, 0);
 
   // 도움말: 병종 모양·색과 상성
   const legend = new Container();
@@ -259,7 +263,14 @@ async function main() {
   });
   legendText.position.set(12, 26);
   legend.addChild(legendText);
-  legendBg.rect(0, 0, Math.max(lx, legendText.width + 24), 46).fill({ color: 0x000000, alpha: 0.35 });
+  const helpText = new Text({
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고",
+    style: { fill: 0x9aa1b0, fontSize: 12 },
+  });
+  helpText.position.set(12, 44);
+  legend.addChild(helpText);
+  const LEGEND_H = 64;
+  legendBg.rect(0, 0, Math.max(lx, legendText.width + 24, helpText.width + 24), LEGEND_H).fill({ color: 0x000000, alpha: 0.35 });
   hud.addChild(hudText, deadText, campPanel, toast, legend);
 
   let latest: Extract<ServerMsg, { t: "state" }> | null = null;
@@ -306,8 +317,10 @@ async function main() {
   };
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
-    if (!e.repeat && (k === "1" || k === "2" || k === "3") && nearCampId >= 0) {
-      send({ t: "buy", camp: nearCampId, slot: Number(k) - 1 });
+    if (!e.repeat && nearCampId >= 0) {
+      if (!e.shiftKey && (k === "1" || k === "2" || k === "3")) send({ t: "buy", camp: nearCampId, slot: Number(k) - 1 });
+      const digit = /^Digit([1-5])$/.exec(e.code);
+      if (e.shiftKey && digit) send({ t: "dismiss", type: Number(digit[1]) - 1 });
     }
     keys.add(k);
     pushInput();
@@ -315,7 +328,18 @@ async function main() {
   window.addEventListener("keyup", (e) => (keys.delete(e.key.toLowerCase()), pushInput()));
   window.addEventListener("blur", () => ((keys.clear(), (firing = false)), pushInput()));
   app.canvas.addEventListener("pointermove", (e) => ((mouseX = e.offsetX), (mouseY = e.offsetY), pushInput()));
-  app.canvas.addEventListener("pointerdown", (e) => ((mouseX = e.offsetX), (mouseY = e.offsetY), (firing = true), pushInput()));
+  app.canvas.addEventListener("pointerdown", (e) => {
+    mouseX = e.offsetX;
+    mouseY = e.offsetY;
+    if (e.button === 2) {
+      // 우클릭: 커서가 가리키는 월드 위치로 기병 돌격 지시
+      const me = latest?.players.find((p) => p.id === myId);
+      if (me) send({ t: "charge", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2 });
+      return;
+    }
+    firing = true;
+    pushInput();
+  });
   window.addEventListener("pointerup", () => ((firing = false), pushInput()));
   app.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   setInterval(() => pushInput(true), 1000 / TICK_RATE);
@@ -385,6 +409,19 @@ async function main() {
     // 카메라와 HUD
     const me = players.views.get(myId);
     const meState = latest.players.find((p) => p.id === myId);
+    const charging = !!meState && meState.chargeLeft > 0;
+    chargeMark.visible = chargeLabel.visible = charging;
+    if (charging && meState) {
+      const pulse = 1 + 0.12 * Math.sin(performance.now() / 120);
+      chargeMark
+        .clear()
+        .circle(0, 0, 26 * pulse)
+        .stroke({ width: 3, color: 0xffa043, alpha: 0.4 + 0.5 * Math.min(1, meState.chargeLeft / 2) })
+        .circle(0, 0, 4)
+        .fill(0xffa043);
+      chargeMark.position.set(meState.chargeX, meState.chargeY);
+      chargeLabel.position.set(meState.chargeX, meState.chargeY - 32);
+    }
     if (me) world.position.set(app.screen.width / 2 - me.x, app.screen.height / 2 - me.y);
     nearCampId = -1;
     if (meState) {
@@ -392,9 +429,10 @@ async function main() {
       const s = Math.floor(latest.time % 60).toString().padStart(2, "0");
       const mine = latest.mercs.filter((w) => w[5] === myId);
       const down = mine.filter((w) => w[8] > 0).length;
+      const used = mine.reduce((sum, w) => sum + UNIT_COST[w[4]]!, 0);
       hudText.text =
         `HP ${Math.ceil(meState.hp)}/${PLAYER_MAX_HP}   금화 ${meState.gold}   처치 ${meState.kills}   ${m}:${s}\n` +
-        `용병 ${mine.length}/${MAX_MERCS_PER_PLAYER}` +
+        `통솔력 ${used}/${meState.leadership}   용병 ${mine.length}명` +
         (down > 0 ? `  (쓰러짐 ${down}명, 부활 대기)` : "");
       deadText.text = meState.respawn > 0 ? `쓰러졌습니다 - ${Math.ceil(meState.respawn)}초 뒤 부활` : "";
 
@@ -411,11 +449,20 @@ async function main() {
       if (best && meState.respawn <= 0) {
         nearCampId = best[0];
         const owned = mine.length;
-        const lines = ["캠프 - 숫자 키로 고용"];
+        const lines = ["캠프 - 고용 (숫자 키)"];
         [best[4], best[5], best[6]].forEach((t, i) => {
           const price = mercPrice(t, owned);
-          lines.push(`[${i + 1}] ${UNIT_NAMES[t]}  ${price}G${meState.gold < price ? "  (금화 부족)" : ""}`);
+          const noLeader = used + UNIT_COST[t]! > meState.leadership;
+          lines.push(
+            `[${i + 1}] ${UNIT_NAMES[t]}  ${price}G  통솔 ${UNIT_COST[t]}` +
+              (noLeader ? "  (통솔력 부족)" : meState.gold < price ? "  (금화 부족)" : ""),
+          );
         });
+        const counts = UNIT_TYPES.map((t) => mine.filter((w) => w[4] === t).length);
+        if (counts.some((c) => c > 0)) {
+          lines.push("해고 (Shift+숫자, 절반 환급)");
+          UNIT_TYPES.forEach((t) => counts[t]! > 0 && lines.push(`[Shift+${t + 1}] ${UNIT_NAMES[t]} x${counts[t]}`));
+        }
         campPanelText.text = lines.join("\n");
         campPanelBg.clear().roundRect(0, 0, campPanelText.width + 28, campPanelText.height + 20, 8).fill({ color: 0x000000, alpha: 0.6 }).stroke({ width: 1, color: 0xe0c05d });
         campPanel.visible = true;
@@ -426,9 +473,9 @@ async function main() {
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 80);
-    campPanel.position.set(app.screen.width / 2 - campPanel.width / 2, app.screen.height - campPanel.height - 70);
-    toast.position.set(app.screen.width / 2, app.screen.height - campPanel.height - 80);
-    legend.position.set(0, app.screen.height - 50);
+    campPanel.position.set(app.screen.width / 2 - campPanel.width / 2, app.screen.height - campPanel.height - 84);
+    toast.position.set(app.screen.width / 2, 74);
+    legend.position.set(0, app.screen.height - LEGEND_H);
   });
 }
 

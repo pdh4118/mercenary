@@ -47,7 +47,7 @@ export interface UnitStats {
 const deg = (d: number) => (d * Math.PI) / 180;
 
 export const MERC_STATS: readonly UnitStats[] = [
-  { hp: 70, speed: 150, reach: 30, damage: 14, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 260 },
+  { hp: 70, speed: 150, reach: 30, damage: 14, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 450 },
   { hp: 60, speed: 95, reach: 58, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(25), ranged: false, radius: 13, leash: 150 },
   { hp: 40, speed: 95, reach: 280, damage: 8, windup: 0.25, cooldown: 1.0, arc: 0, ranged: true, radius: 12, leash: 0 },
   { hp: 120, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 120 },
@@ -73,14 +73,31 @@ export const ENEMY_ARROW_SPEED = 260;
 // 용병 고용
 export const MERC_BASE_PRICE = [70, 40, 45, 50, 60] as const;
 export const MERC_PRICE_GROWTH = 0.3; // 이미 가진 용병 1명당 가격 +30%
-export const MAX_MERCS_PER_PLAYER = 8;
-export const MERC_RESPAWN_SEC = 15;
+/** 통솔력 비용: 보유 용병의 비용 합이 통솔력(최대 병력 규모)을 넘을 수 없다. 기병만 2. */
+export const UNIT_COST = [2, 1, 1, 1, 1] as const;
+export const START_LEADERSHIP = 5;
+/** 통솔력과 별개로 개체 수를 묶어 두는 안전 한도 */
+export const MAX_MERCS_PER_PLAYER = 16;
+/** 쓰러진 뒤 부활까지(초). 기병은 유지 부담으로 더 오래 걸린다. */
+export const MERC_RESPAWN_SEC = [25, 15, 15, 15, 15] as const;
+export const DISMISS_REFUND = 0.5; // 해고하면 지불한 금화의 이 비율을 돌려받는다
 export const START_GOLD = 100;
 
 export function mercPrice(type: number, owned: number): number {
   const base = MERC_BASE_PRICE[type] ?? 0;
   return Math.round(base * (1 + MERC_PRICE_GROWTH * owned));
 }
+
+// 기병 운용
+export const CAV_EVADE_SEC = 0.5; // 공격한 뒤 이 시간 동안 물러난다(치고 빠지기)
+export const CAV_FLANK_MAX_SEC = 3; // 우회 접근에 쓰는 최대 시간. 넘으면 곧장 돌격한다
+export const CAV_SELF_DEFENSE = 70; // 창병 적이 이 거리 안으로 오면 어쩔 수 없이 맞서 싸운다
+export const CAV_RETREAT_HP = 0.4; // 체력이 이 비율 아래면 모험을 멈추고 복귀한다
+export const SPEAR_AVOID_RADIUS = 150; // 기병이 창병 적을 피해 도는 거리
+// 우클릭 돌격 지시
+export const CHARGE_DURATION_SEC = 6;
+export const CHARGE_MAX_DISTANCE = 900; // 주인공으로부터 이 거리까지만 지정할 수 있다
+export const CHARGE_TARGET_RADIUS = 300; // 돌격 지점 주변에서 대상을 찾는 반경
 
 // 캠프(용병을 고용할 수 있는 곳)
 export const CAMP_OFFERS = 3;
@@ -90,9 +107,11 @@ export const CAMP_SPAWN_INTERVAL_SEC = 18;
 export const CAMP_USE_RADIUS = 120;
 export const CAMP_MAX = 4;
 
-// 진형: 주인공이 바라보는 방향 기준의 줄. 0=앞, 1=중간, 2=뒤
-export const FORMATION_ROW_OF_TYPE = [1, 1, 2, 0, 0] as const;
+// 진형: 주인공이 바라보는 방향 기준의 줄. 0=앞, 1=중간, 2=뒤, -1=양옆 날개(기병)
+export const FORMATION_ROW_OF_TYPE = [-1, 1, 2, 0, 0] as const;
 export const FORMATION_ROW_OFFSET = [85, 15, -60] as const;
+export const FORMATION_WING_LATERAL = 150; // 기병은 주인공 양옆 이만큼 바깥에서 대기한다
+export const FORMATION_WING_FORWARD = 30;
 export const FORMATION_LATERAL_SPACING = 34;
 export const FORMATION_ROW_WRAP = 5; // 한 줄에 이 수를 넘으면 뒤에 다음 줄을 만든다
 export const FORMATION_TURN_RATE = 4; // 진형이 조준 방향을 따라 도는 최대 속도(rad/s)

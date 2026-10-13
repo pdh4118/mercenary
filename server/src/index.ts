@@ -36,6 +36,14 @@ wss.on("connection", (ws) => {
       if (id === undefined) return;
       const result = game.buy(id, Number(msg.camp), Number(msg.slot));
       if (!result.ok) send(ws, { t: "notice", text: result.reason });
+    } else if (msg.t === "dismiss") {
+      const id = ids.get(ws);
+      if (id === undefined) return;
+      const result = game.dismiss(id, Number(msg.type));
+      if (!result.ok) send(ws, { t: "notice", text: result.reason });
+    } else if (msg.t === "charge") {
+      const id = ids.get(ws);
+      if (id !== undefined) game.charge(id, msg.x, msg.y);
     }
   });
   ws.on("close", () => {

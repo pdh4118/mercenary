@@ -35,6 +35,10 @@ export interface PlayerState {
   aim: number; // 조준 방향(라디안)
   kills: number;
   gold: number;
+  leadership: number; // 통솔력(보유할 수 있는 용병 비용 합의 최대치)
+  chargeLeft: number; // 기병 돌격 지시가 남은 시간(초), 지시 중이 아니면 0
+  chargeX: number;
+  chargeY: number;
   respawn: number; // 사망 시 부활까지 남은 초, 생존 중이면 0
 }
 
@@ -67,7 +71,9 @@ export interface PlayerInput {
 export type ClientMsg =
   | { t: "join"; name: string }
   | { t: "input"; dx: number; dy: number; aim: number; fire: boolean }
-  | { t: "buy"; camp: number; slot: number };
+  | { t: "buy"; camp: number; slot: number }
+  | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
+  | { t: "charge"; x: number; y: number }; // 기병 돌격 지시(월드 좌표)
 
 export type ServerMsg =
   | { t: "welcome"; id: number; tick: number }

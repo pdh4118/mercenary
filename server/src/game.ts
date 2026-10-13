@@ -1,14 +1,24 @@
 import {
+  ARCHER,
   BULLET_DAMAGE,
   BULLET_RADIUS,
   BULLET_RANGE,
   BULLET_SPEED,
   CAMP_FIRST_SPAWN_SEC,
+  CAV_EVADE_SEC,
+  CAV_FLANK_MAX_SEC,
+  CAV_RETREAT_HP,
+  CAV_SELF_DEFENSE,
+  CAVALRY,
+  CHARGE_DURATION_SEC,
+  CHARGE_MAX_DISTANCE,
+  CHARGE_TARGET_RADIUS,
   CAMP_LIFETIME_SEC,
   CAMP_MAX,
   CAMP_OFFERS,
   CAMP_SPAWN_INTERVAL_SEC,
   CAMP_USE_RADIUS,
+  DISMISS_REFUND,
   ENEMY_ARROW_SPEED,
   ENEMY_GOLD,
   ENEMY_MAX,
@@ -22,6 +32,8 @@ import {
   FORMATION_ROW_OF_TYPE,
   FORMATION_ROW_OFFSET,
   FORMATION_ROW_WRAP,
+  FORMATION_WING_FORWARD,
+  FORMATION_WING_LATERAL,
   FORMATION_TURN_RATE,
   MAX_MERCS_PER_PLAYER,
   MAX_PLAYERS,
@@ -34,8 +46,12 @@ import {
   PLAYER_RADIUS,
   PLAYER_RESPAWN_SEC,
   PLAYER_SPEED,
+  SPEAR,
+  SPEAR_AVOID_RADIUS,
   START_GOLD,
+  START_LEADERSHIP,
   TICK_RATE,
+  UNIT_COST,
   UNIT_TYPES,
   WORLD_SIZE,
   angleDiff,
@@ -67,6 +83,7 @@ interface Fighter {
   hp: number;
   atkT: number; // 공격 예비 동작 남은 시간(0이면 공격 중 아님)
   atkAng: number;
+  face: number; // 바라보는 방향(마지막으로 이동·공격한 방향)
   cd: number;
 }
 
@@ -74,6 +91,9 @@ type Enemy = Fighter;
 interface Merc extends Fighter {
   owner: number;
   respawn: number;
+  paid: number; // 고용에 쓴 금화(해고 환급 기준)
+  evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
+  flankT: number; // 기병이 우회 접근에 쓴 시간
 }
 
 interface Bullet {
@@ -140,7 +160,7 @@ export class Game {
     const id = this.nextId++;
     const clean = name.trim().slice(0, NAME_MAX_LENGTH) || `용병단${id}`;
     const slot: Slot = {
-      state: { id, name: clean, x: 0, y: 0, hp: PLAYER_MAX_HP, aim: 0, kills: 0, gold: START_GOLD, respawn: 0 },
+      state: { id, name: clean, x: 0, y: 0, hp: PLAYER_MAX_HP, aim: 0, kills: 0, gold: START_GOLD, leadership: START_LEADERSHIP, chargeLeft: 0, chargeX: 0, chargeY: 0, respawn: 0 },
       input: { dx: 0, dy: 0, aim: 0, fire: false },
       fireCd: 0,
       facing: 0,
@@ -173,11 +193,58 @@ export class Game {
     if (type === undefined) return { ok: false, reason: "잘못된 선택입니다" };
     const owned = this.countMercs(playerId);
     if (owned >= MAX_MERCS_PER_PLAYER) return { ok: false, reason: `용병은 최대 ${MAX_MERCS_PER_PLAYER}명입니다` };
+    if (this.leadershipUsed(playerId) + UNIT_COST[type]! > s.state.leadership) {
+      return { ok: false, reason: `통솔력이 부족합니다 (${UNIT_COST[type]} 필요)` };
+    }
     const price = mercPrice(type, owned);
     if (s.state.gold < price) return { ok: false, reason: `금화가 부족합니다 (${price}G 필요)` };
     s.state.gold -= price;
-    this.addMerc(playerId, type, s.state.x, s.state.y);
+    this.addMerc(playerId, type, s.state.x, s.state.y, price);
     return { ok: true };
+  }
+
+  /** 캠프 근처에서 용병 1명을 해고하고 지불한 금화의 일부를 돌려받는다. 쓰러진 용병, 체력이 낮은 용병 순으로 내보낸다. */
+  dismiss(playerId: number, type: number): BuyResult {
+    const s = this.slots.get(playerId);
+    if (!s || s.state.respawn > 0) return { ok: false, reason: "지금은 해고할 수 없습니다" };
+    const nearCamp = [...this.camps.values()].some((c) => Math.hypot(c.x - s.state.x, c.y - s.state.y) <= CAMP_USE_RADIUS);
+    if (!nearCamp) return { ok: false, reason: "캠프 근처에서만 해고할 수 있습니다" };
+    let pick: Merc | null = null;
+    for (const m of this.mercs.values()) {
+      if (m.owner !== playerId || m.type !== type) continue;
+      const rank = (x: Merc) => (x.respawn > 0 ? -1 : x.hp);
+      if (!pick || rank(m) < rank(pick)) pick = m;
+    }
+    if (!pick) return { ok: false, reason: "해당 병종 용병이 없습니다" };
+    this.mercs.delete(pick.id);
+    s.state.gold += Math.floor(pick.paid * DISMISS_REFUND);
+    return { ok: true };
+  }
+
+  /** 기병에게 돌격 지점을 지시한다. 주인공 가까운 곳으로 제한하고, 일정 시간 뒤 자동으로 해제된다. */
+  charge(playerId: number, x: unknown, y: unknown): void {
+    const s = this.slots.get(playerId);
+    if (!s || s.state.respawn > 0 || typeof x !== "number" || typeof y !== "number") return;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const dx = x - s.state.x;
+    const dy = y - s.state.y;
+    const d = Math.hypot(dx, dy);
+    const k = d > CHARGE_MAX_DISTANCE ? CHARGE_MAX_DISTANCE / d : 1;
+    s.state.chargeX = clampToWorld(s.state.x + dx * k, 20);
+    s.state.chargeY = clampToWorld(s.state.y + dy * k, 20);
+    s.state.chargeLeft = CHARGE_DURATION_SEC;
+  }
+
+  leadershipUsed(owner: number): number {
+    let n = 0;
+    for (const m of this.mercs.values()) if (m.owner === owner) n += UNIT_COST[m.type]!;
+    return n;
+  }
+
+  /** 통솔력 증가(레벨업 선택지 등에서 호출) */
+  addLeadership(playerId: number, amount: number): void {
+    const s = this.slots.get(playerId);
+    if (s) s.state.leadership += amount;
   }
 
   step(): void {
@@ -268,13 +335,13 @@ export class Game {
 
   spawnEnemyAt(x: number, y: number, type = 1): number {
     const id = this.nextEntityId++;
-    this.enemies.set(id, { id, type, x, y, hp: ENEMY_STATS[type]!.hp, atkT: 0, atkAng: 0, cd: 0 });
+    this.enemies.set(id, { id, type, x, y, hp: ENEMY_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0 });
     return id;
   }
 
-  addMerc(owner: number, type: number, x: number, y: number): number {
+  addMerc(owner: number, type: number, x: number, y: number, paid = 0): number {
     const id = this.nextEntityId++;
-    this.mercs.set(id, { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, cd: 0, respawn: 0 });
+    this.mercs.set(id, { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0 });
     return id;
   }
 
@@ -302,13 +369,24 @@ export class Game {
     const out = new Map<number, [number, number]>();
     if (!s) return out;
     const rows: Merc[][] = [[], [], []];
+    const wing: Merc[] = [];
     for (const m of this.mercs.values()) {
-      if (m.owner === owner && m.respawn <= 0) rows[FORMATION_ROW_OF_TYPE[m.type]!]!.push(m);
+      if (m.owner !== owner || m.respawn > 0) continue;
+      const row = FORMATION_ROW_OF_TYPE[m.type]!;
+      if (row < 0) wing.push(m);
+      else rows[row]!.push(m);
     }
     const fx = Math.cos(s.facing);
     const fy = Math.sin(s.facing);
     const lx = -fy;
     const ly = fx;
+    // 기병은 양옆 바깥 날개에 번갈아 선다
+    wing.sort((a, b) => a.id - b.id);
+    wing.forEach((m, i) => {
+      const side = i % 2 === 0 ? 1 : -1;
+      const lateral = side * (FORMATION_WING_LATERAL + Math.floor(i / 2) * FORMATION_LATERAL_SPACING);
+      out.set(m.id, [s.state.x + fx * FORMATION_WING_FORWARD + lx * lateral, s.state.y + fy * FORMATION_WING_FORWARD + ly * lateral]);
+    });
     rows.forEach((row, r) => {
       row.sort((a, b) => a.id - b.id);
       row.forEach((m, i) => {
@@ -340,6 +418,7 @@ export class Game {
     for (const s of this.slots.values()) {
       const p = s.state;
       if (p.respawn > 0) {
+        p.chargeLeft = 0;
         p.respawn = Math.max(0, p.respawn - dt);
         if (p.respawn === 0) {
           p.hp = PLAYER_MAX_HP;
@@ -348,6 +427,7 @@ export class Game {
         continue;
       }
       s.fireCd = Math.max(0, s.fireCd - dt);
+      p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       p.x = clampToWorld(p.x + s.input.dx * PLAYER_SPEED * dt, PLAYER_RADIUS);
       p.y = clampToWorld(p.y + s.input.dy * PLAYER_SPEED * dt, PLAYER_RADIUS);
       p.aim = s.input.aim;
@@ -457,7 +537,7 @@ export class Game {
           m.hp -= amount;
           if (m.hp <= 0) {
             m.hp = 0;
-            m.respawn = MERC_RESPAWN_SEC;
+            m.respawn = MERC_RESPAWN_SEC[m.type]!;
             m.atkT = 0;
           }
         },
@@ -469,6 +549,7 @@ export class Game {
   private stepMercs(dt: number): void {
     const slotsByOwner = new Map<number, Map<number, [number, number]>>();
     for (const owner of this.slots.keys()) slotsByOwner.set(owner, this.formationSlots(owner));
+    const spears = [...this.enemies.values()].filter((e) => e.type === SPEAR);
 
     for (const m of this.mercs.values()) {
       const st = MERC_STATS[m.type]!;
@@ -497,6 +578,11 @@ export class Game {
 
       const home = slotsByOwner.get(m.owner)?.get(m.id) ?? [m.x, m.y];
       const homeDist = Math.hypot(home[0] - m.x, home[1] - m.y);
+
+      if (m.type === CAVALRY) {
+        this.stepCavalry(m, st, dt, home, ownerSlot, spears);
+        continue;
+      }
 
       // 대상: 원거리는 사거리 안, 근접은 진형 자리에서 leash 안에 있는 가장 가까운 적
       let target: Enemy | null = null;
@@ -530,6 +616,94 @@ export class Game {
     }
   }
 
+  /**
+   * 기병: 진형 날개에서 대기하다가, 자신이 강한 적(특히 후방의 궁병)을 노려 옆·뒤로 돌아 들어간다.
+   * 창병 적은 피해 돌고, 공격한 뒤에는 잠깐 물러난다. 우클릭 돌격 지시 중에는 활동 범위를 넘어 지점으로 나간다.
+   */
+  private stepCavalry(m: Merc, st: UnitStats, dt: number, home: [number, number], owner: Slot | undefined, spears: Enemy[]): void {
+    if (m.evadeT > 0) {
+      m.evadeT = Math.max(0, m.evadeT - dt);
+      m.x += Math.cos(m.atkAng + Math.PI) * st.speed * dt;
+      m.y += Math.sin(m.atkAng + Math.PI) * st.speed * dt;
+      return;
+    }
+    const healthy = m.hp > st.hp * CAV_RETREAT_HP; // 체력이 낮으면 모험을 멈추고 복귀한다
+    const charging = healthy && !!owner && owner.state.chargeLeft > 0;
+    const anchor: [number, number] = charging ? [owner!.state.chargeX, owner!.state.chargeY] : home;
+
+    let target: Enemy | null = null;
+    let best = Infinity;
+    if (healthy) {
+      const radius = charging ? CHARGE_TARGET_RADIUS : st.leash;
+      for (const e of this.enemies.values()) {
+        if (Math.hypot(e.x - anchor[0], e.y - anchor[1]) > radius) continue;
+        const d = Math.hypot(e.x - m.x, e.y - m.y);
+        if (e.type === SPEAR && d > CAV_SELF_DEFENSE) continue; // 창병은 상대하지 않는다
+        // 강한 상대일수록, 특히 궁병일수록 먼저 노린다
+        const score = d / (typeMultiplier(CAVALRY, e.type) * (e.type === ARCHER ? 2 : 1));
+        if (score < best) {
+          best = score;
+          target = e;
+        }
+      }
+    }
+
+    if (target) {
+      const reachNow = st.reach + ENEMY_STATS[target.type]!.radius;
+      const d = Math.hypot(target.x - m.x, target.y - m.y);
+      if (d <= reachNow) {
+        if (m.cd <= 0) {
+          m.atkT = st.windup;
+          m.atkAng = Math.atan2(target.y - m.y, target.x - m.x);
+          m.flankT = 0;
+        }
+        return;
+      }
+      // 대상의 정면에서는 곧장 들어가지 않고, 대상 둘레를 돌아 옆·뒤로 접근한다(너무 오래 걸리면 돌격)
+      let gx = target.x;
+      let gy = target.y;
+      const theta = angleDiff(Math.atan2(m.y - target.y, m.x - target.x), target.face);
+      if (d > 70 && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
+        m.flankT += dt;
+        const phi = target.face + (theta >= 0 ? 1 : -1) * Math.min(Math.PI, Math.abs(theta) + 0.7);
+        const radius = Math.min(220, Math.max(reachNow + 40, d));
+        gx = target.x + Math.cos(phi) * radius;
+        gy = target.y + Math.sin(phi) * radius;
+      }
+      this.steer(m, gx, gy, st.speed, dt, spears, target, 0);
+      return;
+    }
+    m.flankT = 0;
+    if (charging) {
+      this.steer(m, anchor[0], anchor[1], st.speed, dt, spears, null, 20);
+      return;
+    }
+    const homeDist = Math.hypot(home[0] - m.x, home[1] - m.y);
+    this.steer(m, home[0], home[1], homeDist > 150 ? st.speed * 1.5 : st.speed, dt, spears, null, 4);
+  }
+
+  /** 목표를 향해 움직이되, 창병 적 가까이로는 들어가지 않고 비껴 돌아간다 */
+  private steer(m: Merc, gx: number, gy: number, speed: number, dt: number, spears: Enemy[], ignore: Enemy | null, stop: number): void {
+    let dx = gx - m.x;
+    let dy = gy - m.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= stop) return;
+    dx /= dist;
+    dy /= dist;
+    for (const sp of spears) {
+      if (sp === ignore) continue;
+      const sd = Math.hypot(m.x - sp.x, m.y - sp.y);
+      if (sd >= SPEAR_AVOID_RADIUS || sd < 0.001) continue;
+      const w = (1 - sd / SPEAR_AVOID_RADIUS) * 1.5;
+      dx += ((m.x - sp.x) / sd) * w;
+      dy += ((m.y - sp.y) / sd) * w;
+    }
+    const len = Math.hypot(dx, dy) || 1;
+    const step = Math.min(speed * dt, dist - stop);
+    m.x += (dx / len) * step;
+    m.y += (dy / len) * step;
+  }
+
   private moveToward(f: { x: number; y: number }, tx: number, ty: number, speed: number, dt: number, stop: number): void {
     const d = Math.hypot(tx - f.x, ty - f.y);
     if (d <= stop) return;
@@ -555,6 +729,7 @@ export class Game {
       });
       return;
     }
+    if (m.type === CAVALRY) m.evadeT = CAV_EVADE_SEC; // 치고 빠지기
     for (const e of [...this.enemies.values()]) {
       const es = ENEMY_STATS[e.type]!;
       const d = Math.hypot(e.x - m.x, e.y - m.y);
@@ -606,12 +781,14 @@ export class Game {
         if (e.cd <= 0) {
           e.atkT = st.windup;
           e.atkAng = Math.atan2(target.y - e.y, target.x - e.x);
+          e.face = e.atkAng;
           continue;
         }
         // 근접은 쿨다운 중에도 붙어서 압박하고, 원거리는 거리를 유지한다
         if (st.ranged) continue;
       }
       const stop = st.ranged ? st.reach * 0.8 : st.reach * 0.5 + target.radius;
+      e.face = Math.atan2(target.y - e.y, target.x - e.x);
       this.moveToward(e, target.x, target.y, st.speed, dt, stop);
     }
   }
