@@ -1,6 +1,7 @@
 // 서버와 클라이언트가 함께 쓰는 규칙·프로토콜. 전투 규칙은 여기에 두어 양쪽이 어긋나지 않게 한다.
 
 export * from "./rules.js";
+export * from "./cards.js";
 
 export const TICK_RATE = 20; // 서버가 초당 계산·전송하는 횟수
 export const MAX_PLAYERS = 8;
@@ -35,6 +36,13 @@ export interface PlayerState {
   aim: number; // 조준 방향(라디안)
   kills: number;
   gold: number;
+  maxHp: number;
+  level: number;
+  xp: number; // 현재 레벨에서 모은 경험치
+  xpNeed: number; // 다음 레벨까지 필요한 경험치
+  pending: number; // 아직 고르지 않은 레벨업 선택 횟수
+  offer: number[]; // 지금 고를 수 있는 카드(CARDS 인덱스). 없으면 빈 배열
+  priceMult: number; // 고용 가격 배율(할인 카드)
   leadership: number; // 통솔력(보유할 수 있는 용병 비용 합의 최대치)
   chargeLeft: number; // 기병 돌격 지시가 남은 시간(초), 지시 중이 아니면 0
   chargeX: number;
@@ -57,6 +65,7 @@ export type MercWire = [
   atk: number,
   ang: number,
   respawn: number, // 쓰러졌다면 부활까지 남은 초(0이면 생존)
+  maxHp: number,
 ];
 export type BulletWire = [id: number, x: number, y: number, team: 0 | 1]; // team 1 = 적 투사체
 export type CampWire = [id: number, x: number, y: number, left: number, offer0: number, offer1: number, offer2: number];
@@ -72,6 +81,7 @@ export type ClientMsg =
   | { t: "join"; name: string }
   | { t: "input"; dx: number; dy: number; aim: number; fire: boolean }
   | { t: "buy"; camp: number; slot: number }
+  | { t: "pick"; index: number } // 레벨업 카드 선택(0..2)
   | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number }; // 기병 돌격 지시(월드 좌표)
 

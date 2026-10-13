@@ -5,6 +5,11 @@ import {
   BLUNT,
   CAMP_FIRST_SPAWN_SEC,
   CAMP_USE_RADIUS,
+  CARDS,
+  ENEMY_XP,
+  OFFER_SIZE,
+  XP_TEAM_SHARE,
+  xpNeeded,
   CAVALRY,
   CHARGE_DURATION_SEC,
   CHARGE_MAX_DISTANCE,
@@ -561,4 +566,185 @@ test("돌격 중인 기병은 지점 근처의 적을 공격한다", () => {
   g.charge(a, p.x + 600, p.y);
   run(g, 6);
   assert.equal(g.getEnemy(e), undefined, "궁병이 처치되어야 한다");
+});
+
+// --- 경험치와 레벨업 ------------------------------------------------------------
+
+/** 한 명이 적 하나를 직접 처치하는 장면을 만든다 */
+const killOne = (g: Game, killer: number, type = SPEAR) => {
+  const p = me(g, killer);
+  g.spawnEnemyAt(p.x + 100, p.y, type);
+  g.setInput(killer, { ...idle, fire: true });
+  for (let i = 0; i < 80 && g.enemyCount > 0; i++) g.step();
+  g.setInput(killer, idle);
+};
+
+test("경험치: 혼자일 때는 처치 경험치를 전부 받는다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  killOne(g, a);
+  assert.ok(Math.abs(g.getPlayer(a)!.xp - ENEMY_XP[SPEAR]!) < 1e-9);
+});
+
+test("경험치: 처치한 사람 50%, 나머지 50%는 모두에게 똑같이 나뉜다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const b = g.addPlayer("b")!;
+  const c = g.addPlayer("c")!;
+  g.getPlayer(b)!.x = -1500; // 멀리 떨어져 있어도 팀 몫은 받는다
+  killOne(g, a);
+  const xp = ENEMY_XP[SPEAR]!;
+  const share = (xp * XP_TEAM_SHARE) / 3;
+  assert.ok(Math.abs(g.getPlayer(a)!.xp - (xp * (1 - XP_TEAM_SHARE) + share)) < 1e-9);
+  assert.ok(Math.abs(g.getPlayer(b)!.xp - share) < 1e-9);
+  assert.ok(Math.abs(g.getPlayer(c)!.xp - share) < 1e-9);
+});
+
+test("경험치: 용병이 처치해도 주인에게 개인 몫이 간다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const b = g.addPlayer("b")!;
+  const p = me(g, a);
+  g.addMerc(a, BLUNT, p.x + 60, p.y);
+  g.spawnEnemyAt(p.x + 90, p.y, ARCHER);
+  run(g, 1.5);
+  assert.equal(g.enemyCount, 0);
+  assert.ok(g.getPlayer(a)!.xp > g.getPlayer(b)!.xp);
+});
+
+test("레벨업: 경험치가 차면 레벨이 오르고 서로 다른 선택지 3장이 생긴다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.giveXp(a, xpNeeded(1) + 1);
+  const p = g.getPlayer(a)!;
+  assert.equal(p.level, 2);
+  assert.equal(p.pending, 1);
+  assert.equal(p.offer.length, OFFER_SIZE);
+  assert.equal(new Set(p.offer).size, OFFER_SIZE);
+  assert.ok(p.offer.every((i) => CARDS[i] !== undefined));
+  assert.equal(p.xpNeed, xpNeeded(2));
+});
+
+test("레벨업 선택지는 가진 병종의 카드만 나오고 한 종류로만 채워지지 않는다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.addMerc(a, SPEAR, 0, 0); // 창병만 보유
+  for (let n = 0; n < 60; n++) {
+    g.giveXp(a, 1e6); // 한꺼번에 여러 번 레벨업
+    const p = g.getPlayer(a)!;
+    for (const i of p.offer) {
+      const t = CARDS[i]!.unitType;
+      assert.ok(t === undefined || t === SPEAR, "보유하지 않은 병종 카드가 나왔다");
+    }
+    assert.ok(new Set(p.offer.map((i) => CARDS[i]!.category)).size > 1);
+    p.pending = 0;
+    p.offer = [];
+  }
+});
+
+test("레벨업 선택: 효과가 적용되고 쌓인 선택이 이어서 뜬다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.giveXp(a, xpNeeded(1) + xpNeeded(2) + 1); // 두 번 레벨업
+  const p = g.getPlayer(a)!;
+  assert.equal(p.pending, 2);
+  // 통솔력 카드를 강제로 제시해 효과를 확인한다
+  const leadershipCard = CARDS.findIndex((c) => c.effect.k === "leadership" && c.effect.v === 1);
+  p.offer = [leadershipCard, p.offer[1]!, p.offer[2]!];
+  assert.equal(g.pick(a, 0), true);
+  assert.equal(p.leadership, START_LEADERSHIP + 1);
+  assert.equal(p.pending, 1);
+  assert.equal(p.offer.length, OFFER_SIZE, "남은 선택이 이어서 뜬다");
+  assert.equal(g.pick(a, 1), true);
+  assert.equal(p.pending, 0);
+  assert.deepEqual(p.offer, []);
+  assert.equal(g.pick(a, 0), false, "고를 게 없으면 무시");
+});
+
+test("레벨업 선택: 잘못된 번호는 무시된다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.giveXp(a, xpNeeded(1));
+  for (const bad of [-1, 3, 99, 1.5, Number.NaN]) assert.equal(g.pick(a, bad), false);
+  assert.equal(g.getPlayer(a)!.pending, 1);
+});
+
+const forceCard = (g: Game, id: number, k: string, extra?: (e: Record<string, unknown>) => boolean) => {
+  g.giveXp(id, g.getPlayer(id)!.xpNeed); // 정확히 한 번 레벨업
+  const p = g.getPlayer(id)!;
+  const idx = CARDS.findIndex((c) => c.effect.k === k && (!extra || extra(c.effect as unknown as Record<string, unknown>)));
+  assert.ok(idx >= 0, k);
+  p.offer = [idx, p.offer[1]!, p.offer[2]!];
+  assert.equal(g.pick(id, 0), true);
+};
+
+test("카드 효과: 용병 체력 강화는 이미 있는 용병의 체력도 함께 올린다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const m = g.addMerc(a, SHIELD, 0, 0);
+  const before = MERC_STATS[SHIELD]!.hp;
+  forceCard(g, a, "mercHp");
+  assert.equal(g.getMerc(m)!.hp, Math.round(before * 1.15));
+  const wire = g.snapshotMercs().find((w) => w[0] === m)!;
+  assert.equal(wire[9], Math.round(before * 1.15)); // 최대 체력
+  const m2 = g.addMerc(a, SHIELD, 0, 0); // 새로 고용한 용병도 강화된 체력으로 시작
+  assert.equal(g.getMerc(m2)!.hp, Math.round(before * 1.15));
+});
+
+test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const spear = g.addMerc(a, SPEAR, 0, 0);
+  const shield = g.addMerc(a, SHIELD, 0, 0);
+  forceCard(g, a, "typeBoost", (e) => e.type === SPEAR);
+  assert.equal(g.getMerc(spear)!.hp, Math.round(MERC_STATS[SPEAR]!.hp * 1.25));
+  assert.equal(g.getMerc(shield)!.hp, MERC_STATS[SHIELD]!.hp);
+});
+
+test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  forceCard(g, a, "heroMaxHp");
+  assert.equal(g.getPlayer(a)!.maxHp, PLAYER_MAX_HP + 25);
+  assert.equal(g.getPlayer(a)!.hp, PLAYER_MAX_HP + 25);
+  forceCard(g, a, "priceMult");
+  assert.ok(Math.abs(g.getPlayer(a)!.priceMult - 0.85) < 1e-9);
+  const p = me(g, a);
+  const camp = g.spawnCampAt(p.x + 10, p.y, [SPEAR, ARCHER, SHIELD]);
+  const gold = g.getPlayer(a)!.gold;
+  assert.equal(g.buy(a, camp, 0).ok, true);
+  assert.equal(g.getPlayer(a)!.gold, gold - Math.round(mercPrice(SPEAR, 0) * 0.85));
+  forceCard(g, a, "goldMult");
+  const g0 = g.getPlayer(a)!.gold;
+  killOne(g, a, SPEAR);
+  assert.equal(g.getPlayer(a)!.gold, g0 + Math.round(ENEMY_GOLD[SPEAR]! * 1.25));
+});
+
+test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  forceCard(g, a, "heroSpeed");
+  const x0 = me(g, a).x;
+  g.setInput(a, { ...idle, dx: 1 });
+  run(g, 1);
+  assert.ok(Math.abs(me(g, a).x - x0 - PLAYER_SPEED * 1.08) < 1e-6);
+  g.setInput(a, idle);
+  forceCard(g, a, "heroRegen");
+  g.getPlayer(a)!.hp = 50;
+  run(g, 10);
+  assert.ok(Math.abs(g.getPlayer(a)!.hp - 58) < 0.01);
+});
+
+test("카드 효과: 용병 부활 시간 단축", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const m = g.addMerc(a, SPEAR, p.x + 300, p.y);
+  forceCard(g, a, "mercRespawn");
+  for (let i = 0; i < 400 && g.getMerc(m)!.respawn === 0; i++) {
+    if (i % 4 === 0) g.spawnEnemyAt(g.getMerc(m)!.x, g.getMerc(m)!.y, BLUNT);
+    g.step();
+  }
+  assert.ok(g.getMerc(m)!.respawn > 0);
+  assert.ok(g.getMerc(m)!.respawn <= MERC_RESPAWN_SEC[SPEAR] * 0.8 + 1e-9);
 });

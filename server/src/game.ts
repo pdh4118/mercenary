@@ -1,5 +1,11 @@
 import {
   ARCHER,
+  CARDS,
+  ENEMY_XP,
+  OFFER_SIZE,
+  XP_TEAM_SHARE,
+  xpNeeded,
+  type CardEffect,
   BULLET_DAMAGE,
   BULLET_RADIUS,
   BULLET_RANGE,
@@ -68,7 +74,39 @@ import {
   type UnitStats,
 } from "@mercenary/shared";
 
+/** 레벨업 카드로 쌓이는 강화 수치(배율은 1이 기본) */
+interface Mods {
+  goldMult: number;
+  mercHp: number;
+  mercDmg: number;
+  mercAtkSpeed: number;
+  mercSpeed: number;
+  mercRespawn: number;
+  typeHp: number[];
+  typeDmg: number[];
+  heroSpeed: number;
+  heroDmg: number;
+  heroFireRate: number;
+  heroRegen: number;
+}
+
+const newMods = (): Mods => ({
+  goldMult: 1,
+  mercHp: 1,
+  mercDmg: 1,
+  mercAtkSpeed: 1,
+  mercSpeed: 1,
+  mercRespawn: 1,
+  typeHp: UNIT_TYPES.map(() => 1),
+  typeDmg: UNIT_TYPES.map(() => 1),
+  heroSpeed: 1,
+  heroDmg: 1,
+  heroFireRate: 1,
+  heroRegen: 0,
+});
+
 interface Slot {
+  mods: Mods;
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
@@ -160,7 +198,29 @@ export class Game {
     const id = this.nextId++;
     const clean = name.trim().slice(0, NAME_MAX_LENGTH) || `용병단${id}`;
     const slot: Slot = {
-      state: { id, name: clean, x: 0, y: 0, hp: PLAYER_MAX_HP, aim: 0, kills: 0, gold: START_GOLD, leadership: START_LEADERSHIP, chargeLeft: 0, chargeX: 0, chargeY: 0, respawn: 0 },
+      state: {
+        id,
+        name: clean,
+        x: 0,
+        y: 0,
+        hp: PLAYER_MAX_HP,
+        maxHp: PLAYER_MAX_HP,
+        aim: 0,
+        kills: 0,
+        gold: START_GOLD,
+        level: 1,
+        xp: 0,
+        xpNeed: xpNeeded(1),
+        pending: 0,
+        offer: [],
+        priceMult: 1,
+        leadership: START_LEADERSHIP,
+        chargeLeft: 0,
+        chargeX: 0,
+        chargeY: 0,
+        respawn: 0,
+      },
+      mods: newMods(),
       input: { dx: 0, dy: 0, aim: 0, fire: false },
       fireCd: 0,
       facing: 0,
@@ -196,7 +256,7 @@ export class Game {
     if (this.leadershipUsed(playerId) + UNIT_COST[type]! > s.state.leadership) {
       return { ok: false, reason: `통솔력이 부족합니다 (${UNIT_COST[type]} 필요)` };
     }
-    const price = mercPrice(type, owned);
+    const price = Math.round(mercPrice(type, owned) * s.state.priceMult);
     if (s.state.gold < price) return { ok: false, reason: `금화가 부족합니다 (${price}G 필요)` };
     s.state.gold -= price;
     this.addMerc(playerId, type, s.state.x, s.state.y, price);
@@ -302,6 +362,7 @@ export class Game {
       progress(m, MERC_STATS),
       round(m.atkAng, 100),
       round(m.respawn, 10),
+      this.mercStats(m).hp,
     ]);
   }
 
@@ -341,7 +402,9 @@ export class Game {
 
   addMerc(owner: number, type: number, x: number, y: number, paid = 0): number {
     const id = this.nextEntityId++;
-    this.mercs.set(id, { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0 });
+    const merc: Merc = { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0 };
+    this.mercs.set(id, merc);
+    merc.hp = this.mercStats(merc).hp; // 이미 받은 강화가 반영된 체력으로 시작한다
     return id;
   }
 
@@ -421,20 +484,22 @@ export class Game {
         p.chargeLeft = 0;
         p.respawn = Math.max(0, p.respawn - dt);
         if (p.respawn === 0) {
-          p.hp = PLAYER_MAX_HP;
+          p.hp = p.maxHp;
           this.placeAtSpawn(p, p.id);
         }
         continue;
       }
       s.fireCd = Math.max(0, s.fireCd - dt);
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
-      p.x = clampToWorld(p.x + s.input.dx * PLAYER_SPEED * dt, PLAYER_RADIUS);
-      p.y = clampToWorld(p.y + s.input.dy * PLAYER_SPEED * dt, PLAYER_RADIUS);
+      const speed = PLAYER_SPEED * s.mods.heroSpeed;
+      p.hp = Math.min(p.maxHp, p.hp + s.mods.heroRegen * dt);
+      p.x = clampToWorld(p.x + s.input.dx * speed * dt, PLAYER_RADIUS);
+      p.y = clampToWorld(p.y + s.input.dy * speed * dt, PLAYER_RADIUS);
       p.aim = s.input.aim;
       const turn = FORMATION_TURN_RATE * dt;
       s.facing += Math.max(-turn, Math.min(turn, angleDiff(p.aim, s.facing)));
       if (s.input.fire && s.fireCd <= 0) {
-        s.fireCd = FIRE_COOLDOWN_SEC;
+        s.fireCd = FIRE_COOLDOWN_SEC / s.mods.heroFireRate;
         this.bullets.push({
           id: this.nextEntityId++,
           x: p.x,
@@ -443,7 +508,7 @@ export class Game {
           vy: Math.sin(p.aim) * BULLET_SPEED,
           left: BULLET_RANGE,
           hostile: false,
-          damage: BULLET_DAMAGE,
+          damage: BULLET_DAMAGE * s.mods.heroDmg,
           srcType: NO_TYPE,
           owner: p.id,
           radius: BULLET_RADIUS,
@@ -537,7 +602,7 @@ export class Game {
           m.hp -= amount;
           if (m.hp <= 0) {
             m.hp = 0;
-            m.respawn = MERC_RESPAWN_SEC[m.type]!;
+            m.respawn = MERC_RESPAWN_SEC[m.type]! * (this.slots.get(m.owner)?.mods.mercRespawn ?? 1);
             m.atkT = 0;
           }
         },
@@ -552,7 +617,7 @@ export class Game {
     const spears = [...this.enemies.values()].filter((e) => e.type === SPEAR);
 
     for (const m of this.mercs.values()) {
-      const st = MERC_STATS[m.type]!;
+      const st = this.mercStats(m);
       const ownerSlot = this.slots.get(m.owner);
       if (m.respawn > 0) {
         m.respawn = Math.max(0, m.respawn - dt);
@@ -746,8 +811,112 @@ export class Game {
     const owner = this.slots.get(ownerId);
     if (owner) {
       owner.state.kills++;
-      owner.state.gold += ENEMY_GOLD[e.type] ?? 0;
+      owner.state.gold += Math.round((ENEMY_GOLD[e.type] ?? 0) * owner.mods.goldMult);
     }
+    // 경험치: 일부는 처치한 사람에게, 나머지는 모든 플레이어에게 똑같이 나눈다
+    const xp = ENEMY_XP[e.type] ?? 0;
+    const shared = (xp * XP_TEAM_SHARE) / this.slots.size;
+    for (const s of this.slots.values()) this.giveXp(s.state.id, shared);
+    if (owner) this.giveXp(owner.state.id, xp * (1 - XP_TEAM_SHARE));
+  }
+
+  /** 경험치를 주고, 레벨업하면 선택 횟수를 쌓는다. 선택지는 한 번에 하나씩 뜬다. */
+  giveXp(playerId: number, amount: number): void {
+    const s = this.slots.get(playerId);
+    if (!s || amount <= 0) return;
+    const p = s.state;
+    p.xp += amount;
+    while (p.xp >= p.xpNeed) {
+      p.xp -= p.xpNeed;
+      p.level++;
+      p.xpNeed = xpNeeded(p.level);
+      p.pending++;
+    }
+    if (p.pending > 0 && p.offer.length === 0) p.offer = this.rollOffer(s);
+  }
+
+  /** 레벨업 카드를 고른다. 선택은 각자 하며 게임은 멈추지 않는다. */
+  pick(playerId: number, index: number): boolean {
+    const s = this.slots.get(playerId);
+    if (!s || s.state.pending <= 0 || !Number.isInteger(index)) return false;
+    const card = s.state.offer[index] !== undefined ? CARDS[s.state.offer[index]!] : undefined;
+    if (!card) return false;
+    this.applyCard(s, card.effect);
+    s.state.pending--;
+    s.state.offer = s.state.pending > 0 ? this.rollOffer(s) : [];
+    return true;
+  }
+
+  /** 서로 다른 카드 3장. 가중치로 뽑되, 가진 병종만 해당 카드가 나오고 세 장이 모두 같은 종류가 되지는 않게 한다. */
+  private rollOffer(s: Slot): number[] {
+    const owned = new Set<number>();
+    for (const m of this.mercs.values()) if (m.owner === s.state.id) owned.add(m.type);
+    const eligible = CARDS.map((c, i) => ({ c, i })).filter(
+      ({ c }) => (c.minLevel ?? 1) <= s.state.level && (c.unitType === undefined || owned.has(c.unitType)),
+    );
+    let best: number[] = [];
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const pool = [...eligible];
+      const picked: number[] = [];
+      while (picked.length < OFFER_SIZE && pool.length > 0) {
+        let roll = this.rng() * pool.reduce((sum, { c }) => sum + c.weight, 0);
+        let k = 0;
+        while (k < pool.length - 1 && roll >= pool[k]!.c.weight) roll -= pool[k++]!.c.weight;
+        picked.push(pool.splice(k, 1)[0]!.i);
+      }
+      best = picked;
+      if (new Set(picked.map((i) => CARDS[i]!.category)).size > 1) break;
+    }
+    return best;
+  }
+
+  private applyCard(s: Slot, e: CardEffect): void {
+    const m = s.mods;
+    const p = s.state;
+    // 용병 최대 체력이 바뀌면 지금 체력도 늘어난 만큼 함께 올려 준다
+    const before = new Map<number, number>();
+    for (const merc of this.mercs.values()) if (merc.owner === p.id) before.set(merc.id, this.mercStats(merc).hp);
+    switch (e.k) {
+      case "leadership": p.leadership += e.v; break;
+      case "priceMult": p.priceMult *= e.v; break;
+      case "goldMult": m.goldMult += e.v; break;
+      case "mercHp": m.mercHp += e.v; break;
+      case "mercDmg": m.mercDmg += e.v; break;
+      case "mercAtkSpeed": m.mercAtkSpeed += e.v; break;
+      case "mercSpeed": m.mercSpeed += e.v; break;
+      case "mercRespawn": m.mercRespawn *= e.v; break;
+      case "typeBoost":
+        m.typeHp[e.type]! += e.hp;
+        m.typeDmg[e.type]! += e.dmg;
+        break;
+      case "heroMaxHp":
+        p.maxHp += e.v;
+        p.hp += e.v;
+        break;
+      case "heroSpeed": m.heroSpeed += e.v; break;
+      case "heroDmg": m.heroDmg += e.v; break;
+      case "heroFireRate": m.heroFireRate += e.v; break;
+      case "heroRegen": m.heroRegen += e.v; break;
+    }
+    for (const merc of this.mercs.values()) {
+      const old = before.get(merc.id);
+      if (old === undefined || merc.respawn > 0) continue;
+      merc.hp += this.mercStats(merc).hp - old;
+    }
+  }
+
+  /** 레벨업 카드가 반영된 용병 능력치 */
+  private mercStats(m: Merc): UnitStats {
+    const base = MERC_STATS[m.type]!;
+    const mods = this.slots.get(m.owner)?.mods;
+    if (!mods) return base;
+    return {
+      ...base,
+      hp: Math.round(base.hp * mods.mercHp * mods.typeHp[m.type]!),
+      damage: base.damage * mods.mercDmg * mods.typeDmg[m.type]!,
+      cooldown: base.cooldown / mods.mercAtkSpeed,
+      speed: base.speed * mods.mercSpeed,
+    };
   }
 
   private stepEnemies(dt: number, friendlies: Friendly[]): void {

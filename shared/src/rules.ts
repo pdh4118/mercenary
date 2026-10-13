@@ -123,3 +123,10 @@ export function angleDiff(a: number, b: number): number {
   if (d < -Math.PI) d += Math.PI * 2;
   return d;
 }
+
+// 경험치와 레벨: 처치 경험치의 일부는 처치한 사람에게, 나머지는 모든 플레이어에게 똑같이 나뉜다(뒤처져도 따라갈 수 있게).
+export const ENEMY_XP = [6, 5, 5, 6, 8] as const; // 병종별 처치 경험치
+export const XP_TEAM_SHARE = 0.5; // 팀 공유 비율. 나머지(0.5)는 처치한 사람 몫
+export function xpNeeded(level: number): number {
+  return 20 + 15 * (level - 1);
+}

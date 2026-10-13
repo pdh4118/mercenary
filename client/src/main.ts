@@ -1,10 +1,11 @@
 import { Application, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
 import {
   BULLET_RADIUS,
+  CARDS,
+  CARD_CATEGORY_NAMES,
   CAMP_USE_RADIUS,
   ENEMY_STATS,
   MERC_STATS,
-  PLAYER_MAX_HP,
   PLAYER_RADIUS,
   TICK_RATE,
   UNIT_COST,
@@ -170,7 +171,7 @@ async function main() {
 
   interface MercView extends Tracked {
     bar: Graphics;
-    lastHp: number;
+    lastKey: string;
   }
   const mercs = new Pool<MercView, MercWire>(
     (w) => {
@@ -182,7 +183,7 @@ async function main() {
       const bar = new Graphics();
       node.addChild(body, bar);
       mercLayer.addChild(node);
-      return { node, bar, x: 0, y: 0, lastHp: -1 };
+      return { node, bar, x: 0, y: 0, lastKey: "" };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -271,11 +272,62 @@ async function main() {
   legend.addChild(helpText);
   const LEGEND_H = 64;
   legendBg.rect(0, 0, Math.max(lx, legendText.width + 24, helpText.width + 24), LEGEND_H).fill({ color: 0x000000, alpha: 0.35 });
-  hud.addChild(hudText, deadText, campPanel, toast, legend);
+  const xpBar = new Graphics();
+  const levelToast = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 20, stroke: { color: 0x000000, width: 3 } } });
+  levelToast.anchor.set(0.5, 0);
+
+  // 레벨업 카드: 게임을 멈추지 않는 작은 카드. Z/X/C 한 번으로 고른다.
+  const CARD_W = 244;
+  const CARD_H = 78;
+  const CARD_GAP = 8;
+  const CATEGORY_COLORS = [0xe0c05d, 0x6fd16f, 0x5da6e0];
+  const cardPanel = new Container();
+  const cardHeader = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 14 } });
+  cardPanel.addChild(cardHeader);
+  const cardViews = [0, 1, 2].map((i) => {
+    const node = new Container();
+    node.position.set(0, 26 + i * (CARD_H + CARD_GAP));
+    const bg = new Graphics();
+    const key = new Text({ text: "ZXC"[i]!, style: { fill: 0xffffff, fontSize: 22, fontWeight: "bold" } });
+    key.position.set(14, 22);
+    const title = new Text({ text: "", style: { fill: 0xffffff, fontSize: 15, fontWeight: "bold" } });
+    title.position.set(46, 8);
+    const desc = new Text({ text: "", style: { fill: 0xc8ccd6, fontSize: 12, wordWrap: true, wordWrapWidth: CARD_W - 60 } });
+    desc.position.set(46, 30);
+    node.addChild(bg, key, title, desc);
+    cardPanel.addChild(node);
+    return { node, bg, title, desc };
+  });
+  cardPanel.visible = false;
+  let shownOffer = "";
+  const showOffer = (offer: number[], pending: number) => {
+    const key = `${offer.join(",")}|${pending}`;
+    if (key === shownOffer) return;
+    shownOffer = key;
+    cardPanel.visible = offer.length > 0;
+    cardHeader.text = offer.length > 0 ? `레벨 업! 카드를 고르세요${pending > 1 ? `  (대기 ${pending}회)` : ""}` : "";
+    cardViews.forEach((v, i) => {
+      const card = offer[i] !== undefined ? CARDS[offer[i]!] : undefined;
+      v.node.visible = !!card;
+      if (!card) return;
+      v.title.text = card.name;
+      v.desc.text = `[${CARD_CATEGORY_NAMES[card.category]}] ${card.desc}`;
+      v.bg
+        .clear()
+        .roundRect(0, 0, CARD_W, CARD_H, 8)
+        .fill({ color: 0x000000, alpha: 0.7 })
+        .stroke({ width: 1, color: CATEGORY_COLORS[card.category]! })
+        .rect(0, 0, 6, CARD_H)
+        .fill(CATEGORY_COLORS[card.category]!);
+    });
+  };
+  hud.addChild(hudText, xpBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
   let latest: Extract<ServerMsg, { t: "state" }> | null = null;
   let myId = -1;
   let toastLeft = 0;
+  let levelToastLeft = 0;
+  let lastLevel = 0;
   let nearCampId = -1;
   // 자동 화면 검증용: 최신 서버 상태를 읽을 수 있게 노출한다
   Object.defineProperty(window, "__game", { get: () => ({ latest, myId }) });
@@ -317,6 +369,7 @@ async function main() {
   };
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
+    if (!e.repeat && (k === "z" || k === "x" || k === "c")) send({ t: "pick", index: "zxc".indexOf(k) });
     if (!e.repeat && nearCampId >= 0) {
       if (!e.shiftKey && (k === "1" || k === "2" || k === "3")) send({ t: "buy", camp: nearCampId, slot: Number(k) - 1 });
       const digit = /^Digit([1-5])$/.exec(e.code);
@@ -370,15 +423,16 @@ async function main() {
     bullets.update(latest.bullets, k);
     mercs.update(latest.mercs, k, (v, w) => {
       v.node.visible = w[8] <= 0; // 쓰러진 용병은 부활할 때까지 숨긴다
-      if (v.lastHp !== w[3]) {
-        v.lastHp = w[3];
-        drawBar(v.bar, w[3], MERC_STATS[w[4]]!.hp, 26, -MERC_STATS[w[4]]!.radius - 9);
+      const key = `${w[3]}/${w[9]}`;
+      if (v.lastKey !== key) {
+        v.lastKey = key;
+        drawBar(v.bar, w[3], w[9], 26, -MERC_STATS[w[4]]!.radius - 9);
       }
     });
     players.update(latest.players, k, (v, p) => {
       const dead = p.respawn > 0;
       v.node.alpha = dead ? 0.25 : 1;
-      drawBar(v.bar, p.hp, PLAYER_MAX_HP, 36, -PLAYER_RADIUS - 6);
+      drawBar(v.bar, p.hp, p.maxHp, 36, -PLAYER_RADIUS - 6);
       v.aimLine.clear();
       if (!dead) {
         v.aimLine
@@ -431,9 +485,22 @@ async function main() {
       const down = mine.filter((w) => w[8] > 0).length;
       const used = mine.reduce((sum, w) => sum + UNIT_COST[w[4]]!, 0);
       hudText.text =
-        `HP ${Math.ceil(meState.hp)}/${PLAYER_MAX_HP}   금화 ${meState.gold}   처치 ${meState.kills}   ${m}:${s}\n` +
+        `HP ${Math.ceil(meState.hp)}/${meState.maxHp}   금화 ${meState.gold}   처치 ${meState.kills}   ${m}:${s}\n` +
         `통솔력 ${used}/${meState.leadership}   용병 ${mine.length}명` +
-        (down > 0 ? `  (쓰러짐 ${down}명, 부활 대기)` : "");
+        (down > 0 ? `  (쓰러짐 ${down}명, 부활 대기)` : "") +
+        `\nLv ${meState.level}`;
+      xpBar
+        .clear()
+        .roundRect(52, 91, 160, 7, 3)
+        .fill(0x2a2d36)
+        .roundRect(52, 91, 160 * Math.min(1, meState.xp / meState.xpNeed), 7, 3)
+        .fill(0xffe08a);
+      showOffer(meState.offer, meState.pending);
+      if (lastLevel > 0 && meState.level > lastLevel) {
+        levelToast.text = `레벨 ${meState.level}!`;
+        levelToastLeft = 2;
+      }
+      lastLevel = meState.level;
       deadText.text = meState.respawn > 0 ? `쓰러졌습니다 - ${Math.ceil(meState.respawn)}초 뒤 부활` : "";
 
       // 가까운 캠프의 고용 목록
@@ -451,7 +518,7 @@ async function main() {
         const owned = mine.length;
         const lines = ["캠프 - 고용 (숫자 키)"];
         [best[4], best[5], best[6]].forEach((t, i) => {
-          const price = mercPrice(t, owned);
+          const price = Math.round(mercPrice(t, owned) * meState.priceMult);
           const noLeader = used + UNIT_COST[t]! > meState.leadership;
           lines.push(
             `[${i + 1}] ${UNIT_NAMES[t]}  ${price}G  통솔 ${UNIT_COST[t]}` +
@@ -470,6 +537,10 @@ async function main() {
         campPanel.visible = false;
       }
     }
+    levelToastLeft = Math.max(0, levelToastLeft - ticker.deltaMS / 1000);
+    levelToast.visible = levelToastLeft > 0;
+    levelToast.position.set(app.screen.width / 2, 100);
+    cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(110, app.screen.height / 2 - 130));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 80);
