@@ -5,7 +5,8 @@ import {
   CARDS,
   CARD_CATEGORY_NAMES,
   CAMP_USE_RADIUS,
-  COUNTER_MATRIX,
+  SHIELD,
+  SHIELD_FRONT_ARC,
   LEVELUP_PUSH_RADIUS,
   SWING_VISUAL_SEC,
   WEAPONS,
@@ -276,7 +277,7 @@ async function main() {
     lx += 32 + label.width + 12;
   }
   const legendText = new Text({
-    text: "상성: 창병>기병 · 궁병>창병 · 검방병>궁병 · 둔기병>검방병 · 기병>창병 제외 전부",
+    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창병은 반사",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   legendText.position.set(12, 26);
@@ -338,7 +339,7 @@ async function main() {
         .fill(CATEGORY_COLORS[card.category]!);
     });
   };
-  // 무기 바: 현재 무기와 상성(유리/불리)을 보여 준다
+  // 무기 바: 현재 무기와 그 특징(방패·돌격 규칙 등)을 보여 준다
   const SLOT_W = 76;
   const weaponBar = new Container();
   const weaponSlots = WEAPONS.map((w, i) => {
@@ -371,9 +372,7 @@ async function main() {
         .fill({ color: i === active ? darken(color, 0.55) : 0x000000, alpha: i === active ? 0.9 : 0.5 })
         .stroke({ width: i === active ? 3 : 1, color });
     });
-    const row = COUNTER_MATRIX[WEAPONS[active]!.type]!;
-    const names = (pred: (m: number) => boolean) => UNIT_TYPES.filter((t) => pred(row[t]!)).map((t) => UNIT_NAMES[t]).join("·") || "-";
-    weaponHint.text = `유리: ${names((m) => m > 1)}   불리: ${names((m) => m < 1)}`;
+    weaponHint.text = WEAPONS[active]!.note;
   };
   weaponBar.visible = false;
   hud.addChild(hudText, xpBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
@@ -552,10 +551,19 @@ async function main() {
       faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
       v.sprite.scale.set(SPRITE_SCALE * v.face, SPRITE_SCALE);
       v.node.zIndex = v.y;
-      const key = `${w[3]}/${w[9]}`;
+      const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}`;
       if (v.lastKey !== key) {
         v.lastKey = key;
-        drawBar(v.bar, w[3], w[9], 26, -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 6);
+        const top = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 6;
+        drawBar(v.bar, w[3], w[9], 26, top);
+        if (w[11] > 0) {
+          // 방패 체력: 몸 체력 막대 위에 파란색으로. 깨졌으면 비어 보인다.
+          v.bar
+            .rect(-13, top - 5, 26, 3)
+            .fill(0x2a2d36)
+            .rect(-13, top - 5, (26 * Math.max(0, w[10])) / w[11], 3)
+            .fill(0x6fb8ff);
+        }
       }
     });
     players.update(latest.players, k, (v, p) => {
@@ -591,6 +599,46 @@ async function main() {
       const v = mercs.views.get(w[0]);
       const st = MERC_STATS[w[4]]!;
       if (v) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!);
+    }
+
+    // 방패(검방병): 정면을 막는 호. 깨지면 회색으로 비고, 재생되면 다시 파랗게 돌아온다.
+    const shieldArc = (x: number, y: number, face: number, ratio: number, regen: number, radius: number, color: number) => {
+      if (ratio <= 0 && regen <= 0) return;
+      const a0 = face - SHIELD_FRONT_ARC;
+      fxLayer
+        .moveTo(x + Math.cos(a0) * radius, y + Math.sin(a0) * radius)
+        .arc(x, y, radius, a0, face + SHIELD_FRONT_ARC)
+        .stroke(ratio > 0 ? { width: 3 + 3 * ratio, color, alpha: 0.45 + 0.4 * ratio } : { width: 2, color: 0x7a8294, alpha: 0.45 });
+    };
+    for (const w of latest.enemies) {
+      if (w[4] !== SHIELD) continue;
+      const v = enemies.views.get(w[0]);
+      if (v) shieldArc(v.x, v.y, w[8], w[7] / ENEMY_STATS[SHIELD]!.shield, w[10], ENEMY_STATS[SHIELD]!.radius + 12, 0xffa89a);
+    }
+    for (const w of latest.mercs) {
+      if (w[4] !== SHIELD || w[8] > 0) continue;
+      const v = mercs.views.get(w[0]);
+      if (v) shieldArc(v.x, v.y, w[12], w[11] > 0 ? w[10] / w[11] : 0, w[14], MERC_STATS[SHIELD]!.radius + 12, 0x8fd0ff);
+    }
+    // 기병이 속도를 낼수록 뒤에 속도선이 길어진다
+    const streak = (x: number, y: number, face: number, mom: number) => {
+      if (mom < 0.4) return;
+      for (const dy of [-8, 0, 8]) {
+        fxLayer
+          .moveTo(x - face * 16, y + dy)
+          .lineTo(x - face * (16 + 34 * mom), y + dy)
+          .stroke({ width: 2, color: 0xffffff, alpha: 0.12 + 0.3 * mom });
+      }
+    };
+    for (const w of latest.enemies) {
+      if (w[4] !== 0) continue;
+      const v = enemies.views.get(w[0]);
+      if (v) streak(v.x, v.y, v.face, w[9]);
+    }
+    for (const w of latest.mercs) {
+      if (w[4] !== 0 || w[8] > 0) continue;
+      const v = mercs.views.get(w[0]);
+      if (v) streak(v.x, v.y, v.face, w[13]);
     }
 
     // 근접 무기 휘두르기 이펙트와 레벨업 밀어내기 고리

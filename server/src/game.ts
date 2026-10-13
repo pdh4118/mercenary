@@ -1,5 +1,6 @@
 import {
   ARCHER,
+  BLUNT,
   CARDS,
   ENEMY_XP,
   OFFER_SIZE,
@@ -18,6 +19,10 @@ import {
   BULLET_SPEED,
   CAMP_FIRST_SPAWN_SEC,
   CAV_EVADE_SEC,
+  CAV_EVADE_SPEED_FRAC,
+  CAV_DECAY_SEC,
+  CAV_MOMENTUM_AFTER_HIT,
+  CAV_RAMP_SEC,
   CAV_FLANK_MAX_SEC,
   CAV_RETREAT_HP,
   CAV_SELF_DEFENSE,
@@ -31,6 +36,12 @@ import {
   CAMP_SPAWN_INTERVAL_SEC,
   CAMP_USE_RADIUS,
   DISMISS_REFUND,
+  HERO_SWORD_FRONT_BLOCK,
+  SHIELD,
+  SHIELD_REGEN_SEC,
+  SPLASH_FACTOR,
+  cavSpeed,
+  chargeBonus,
   ENEMY_ARROW_SPEED,
   ENEMY_GOLD,
   ENEMY_MAX,
@@ -70,7 +81,6 @@ import {
   clampToWorld,
   mercPrice,
   sanitizeInput,
-  typeMultiplier,
   type BulletWire,
   type CampWire,
   type EnemyWire,
@@ -79,6 +89,7 @@ import {
   type PlayerState,
   type UnitStats,
 } from "@mercenary/shared";
+import { resolveHit, type Hit } from "./combat.js";
 
 /** 레벨업 카드로 쌓이는 강화 수치(배율은 1이 기본) */
 interface Mods {
@@ -129,8 +140,12 @@ interface Fighter {
   hp: number;
   atkT: number; // 공격 예비 동작 남은 시간(0이면 공격 중 아님)
   atkAng: number;
-  face: number; // 바라보는 방향(마지막으로 이동·공격한 방향)
+  face: number; // 바라보는 방향(마지막으로 이동·공격한 방향). 방패가 막는 방향이기도 하다
   cd: number;
+  shield: number; // 방패 체력(검방병). 깨지면 0
+  regenT: number; // 깨진 방패가 재생될 때까지 남은 시간(0이면 해당 없음)
+  momentum: number; // 기병의 속도 0..1. 이동하면 오르고 멈추면 줄며, 공격하면 크게 준다
+  chargeSnap: number; // 공격 예비 동작을 시작할 때 정해진 돌격 추가 피해
 }
 
 type Enemy = Fighter;
@@ -169,8 +184,9 @@ interface Friendly {
   x: number;
   y: number;
   radius: number;
-  defType: number;
-  hurt: (amount: number) => void;
+  ownerId: number; // 반사 피해로 적을 처치했을 때 보상을 받을 플레이어
+  /** 공격을 받는다. 되돌려줄 피해(창병의 돌격 반사)를 돌려준다. */
+  hit: (h: Hit) => number;
 }
 
 const SEPARATION_CELL = 32;
@@ -372,6 +388,10 @@ export class Game {
       e.type,
       progress(e, ENEMY_STATS),
       round(e.atkAng, 100),
+      Math.ceil(e.shield),
+      round(e.face, 100),
+      round(e.momentum, 100),
+      round(e.regenT, 10),
     ]);
   }
 
@@ -387,6 +407,11 @@ export class Game {
       round(m.atkAng, 100),
       round(m.respawn, 10),
       this.mercStats(m).hp,
+      Math.ceil(m.shield),
+      this.mercStats(m).shield,
+      round(m.face, 100),
+      round(m.momentum, 100),
+      round(m.regenT, 10),
     ]);
   }
 
@@ -420,15 +445,16 @@ export class Game {
 
   spawnEnemyAt(x: number, y: number, type = 1): number {
     const id = this.nextEntityId++;
-    this.enemies.set(id, { id, type, x, y, hp: ENEMY_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0 });
+    this.enemies.set(id, { id, type, x, y, hp: ENEMY_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, shield: ENEMY_STATS[type]!.shield, regenT: 0, momentum: 0, chargeSnap: 0 });
     return id;
   }
 
   addMerc(owner: number, type: number, x: number, y: number, paid = 0): number {
     const id = this.nextEntityId++;
-    const merc: Merc = { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0 };
+    const merc: Merc = { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
     this.mercs.set(id, merc);
     merc.hp = this.mercStats(merc).hp; // 이미 받은 강화가 반영된 체력으로 시작한다
+    merc.shield = this.mercStats(merc).shield;
     return id;
   }
 
@@ -528,7 +554,7 @@ export class Game {
     }
   }
 
-  /** 주인공 공격. 활은 투사체를 쏘고, 나머지는 조준 방향 부채꼴을 즉시 휘두른다. 모두 무기의 병종 상성을 받는다. */
+  /** 주인공 공격. 활은 투사체를 쏘고, 나머지는 조준 방향 부채꼴을 즉시 휘두른다. 무기마다 방패·범위 규칙이 다르다. */
   private useWeapon(s: Slot): void {
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
@@ -551,11 +577,14 @@ export class Game {
       return;
     }
     p.swing = SWING_VISUAL_SEC;
-    for (const e of [...this.enemies.values()]) {
+    const struck: Enemy[] = [];
+    for (const e of this.enemies.values()) {
       if (Math.hypot(e.x - p.x, e.y - p.y) > w.reach + ENEMY_STATS[e.type]!.radius) continue;
       if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > w.arc) continue;
-      this.damageEnemy(e, damage * typeMultiplier(w.type, e.type), p.id);
+      struck.push(e);
     }
+    for (const e of struck) this.damageEnemy(e, { damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x) }, p.id);
+    if (w.splash > 0) this.splashEnemies(struck, w.splash, damage * SPLASH_FACTOR, w.type, p.x, p.y, p.id);
   }
 
   /** 무기를 바꾼다. 바꾼 직후에는 잠깐 공격할 수 없다. */
@@ -633,13 +662,20 @@ export class Game {
         x: p.x,
         y: p.y,
         radius: PLAYER_RADIUS,
-        defType: NO_TYPE,
-        hurt: (amount) => {
-          p.hp -= amount;
+        ownerId: p.id,
+        hit: (h) => {
+          // 창을 들면 창병처럼 돌격을 반사하고, 검을 들면 정면 피해를 절반으로 막는다
+          const w = WEAPONS[p.weapon]!;
+          const r = resolveHit(
+            { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
+            h,
+          );
+          p.hp -= r.body;
           if (p.hp <= 0) {
             p.hp = 0;
             p.respawn = PLAYER_RESPAWN_SEC;
           }
+          return r.reflected;
         },
       });
     }
@@ -649,18 +685,49 @@ export class Game {
         x: m.x,
         y: m.y,
         radius: MERC_STATS[m.type]!.radius,
-        defType: m.type,
-        hurt: (amount) => {
-          m.hp -= amount;
-          if (m.hp <= 0) {
-            m.hp = 0;
-            m.respawn = MERC_RESPAWN_SEC[m.type]! * (this.slots.get(m.owner)?.mods.mercRespawn ?? 1);
-            m.atkT = 0;
-          }
+        ownerId: m.owner,
+        hit: (h) => {
+          const r = resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
+          this.applyShield(m, r.shield, r.shieldBroke);
+          this.hurtMerc(m, r.body);
+          return r.reflected;
         },
       });
     }
     return list;
+  }
+
+  /** 방패 체력을 깎는다. 다 깎이면 깨지고, 일정 시간 뒤 재생된다. */
+  private applyShield(f: Fighter, amount: number, broke: boolean): void {
+    if (amount <= 0) return;
+    f.shield = Math.max(0, f.shield - amount);
+    if (broke || f.shield <= 0) {
+      f.shield = 0;
+      f.regenT = SHIELD_REGEN_SEC;
+    }
+  }
+
+  private regenShield(f: Fighter, max: number, dt: number): void {
+    if (f.regenT <= 0) return;
+    f.regenT -= dt;
+    if (f.regenT <= 0) {
+      f.regenT = 0;
+      f.shield = max;
+    }
+  }
+
+  private hurtMerc(m: Merc, amount: number): void {
+    m.hp -= amount;
+    if (m.hp <= 0) {
+      m.hp = 0;
+      m.respawn = MERC_RESPAWN_SEC[m.type]! * (this.slots.get(m.owner)?.mods.mercRespawn ?? 1);
+      m.atkT = 0;
+    }
+  }
+
+  /** 기병의 속도: 움직이면 최대 속도를 향해 점점 오르고, 멈추면 줄어든다 */
+  private updateMomentum(f: Fighter, moved: boolean, dt: number): void {
+    f.momentum = moved ? Math.min(1, f.momentum + dt / CAV_RAMP_SEC) : Math.max(0, f.momentum - dt / CAV_DECAY_SEC);
   }
 
   private stepMercs(dt: number): void {
@@ -675,12 +742,16 @@ export class Game {
         m.respawn = Math.max(0, m.respawn - dt);
         if (m.respawn === 0) {
           m.hp = st.hp;
+          m.shield = st.shield;
+          m.regenT = 0;
+          m.momentum = 0;
           m.cd = 0;
           m.x = ownerSlot?.state.x ?? 0;
           m.y = ownerSlot?.state.y ?? 0;
         }
         continue;
       }
+      this.regenShield(m, st.shield, dt);
       m.cd = Math.max(0, m.cd - dt);
 
       if (m.atkT > 0) {
@@ -714,11 +785,12 @@ export class Game {
       }
 
       if (target) {
+        m.face = Math.atan2(target.y - m.y, target.x - m.x); // 방패는 상대를 향한다
         const reachNow = st.ranged ? st.reach : st.reach + ENEMY_STATS[target.type]!.radius;
         if (targetDist <= reachNow) {
           if (m.cd <= 0) {
             m.atkT = st.windup;
-            m.atkAng = Math.atan2(target.y - m.y, target.x - m.x);
+            m.atkAng = m.face;
           }
           continue;
         }
@@ -727,21 +799,32 @@ export class Game {
           continue;
         }
       }
-      // 진형 자리로 복귀. 멀리 떨어졌다면 따라붙도록 더 빨리 움직인다
+      // 진형 자리로 복귀. 멀리 떨어졌다면 따라붙도록 더 빨리 움직인다. 대열은 주인공이 바라보는 쪽을 향한다.
       const speed = homeDist > 150 ? st.speed * 1.5 : st.speed;
       this.moveToward(m, home[0], home[1], speed, dt, 4);
+      if (ownerSlot) m.face = ownerSlot.facing;
     }
   }
 
+  /** 기병이 노릴 가치: 후방의 궁병과 느린 둔기병을 먼저, 정면의 방패는 나중에. 창병은 아예 피한다. */
+  private cavalryWeight(type: number): number {
+    if (type === ARCHER) return 2;
+    if (type === BLUNT) return 1.3;
+    if (type === SHIELD) return 0.7;
+    return 1;
+  }
+
   /**
-   * 기병: 진형 날개에서 대기하다가, 자신이 강한 적(특히 후방의 궁병)을 노려 옆·뒤로 돌아 들어간다.
-   * 창병 적은 피해 돌고, 공격한 뒤에는 잠깐 물러난다. 우클릭 돌격 지시 중에는 활동 범위를 넘어 지점으로 나간다.
+   * 기병: 진형 날개에서 대기하다가, 후방의 궁병이나 느린 둔기병을 노려 옆·뒤로 돌아 들어간다.
+   * 창병 적은 피해 돌고(돌격이 반사된다), 방패의 정면도 피한다. 달릴수록 속도가 붙어 돌격 피해가 커지고,
+   * 공격한 뒤에는 속도를 잃고 잠깐 물러난다. 우클릭 돌격 지시 중에는 활동 범위를 넘어 지점으로 나간다.
    */
   private stepCavalry(m: Merc, st: UnitStats, dt: number, home: [number, number], owner: Slot | undefined, spears: Enemy[]): void {
     if (m.evadeT > 0) {
       m.evadeT = Math.max(0, m.evadeT - dt);
-      m.x += Math.cos(m.atkAng + Math.PI) * st.speed * dt;
-      m.y += Math.sin(m.atkAng + Math.PI) * st.speed * dt;
+      const back = st.speed * CAV_EVADE_SPEED_FRAC;
+      m.x += Math.cos(m.atkAng + Math.PI) * back * dt;
+      m.y += Math.sin(m.atkAng + Math.PI) * back * dt;
       return;
     }
     const healthy = m.hp > st.hp * CAV_RETREAT_HP; // 체력이 낮으면 모험을 멈추고 복귀한다
@@ -756,8 +839,7 @@ export class Game {
         if (Math.hypot(e.x - anchor[0], e.y - anchor[1]) > radius) continue;
         const d = Math.hypot(e.x - m.x, e.y - m.y);
         if (e.type === SPEAR && d > CAV_SELF_DEFENSE) continue; // 창병은 상대하지 않는다
-        // 강한 상대일수록, 특히 궁병일수록 먼저 노린다
-        const score = d / (typeMultiplier(CAVALRY, e.type) * (e.type === ARCHER ? 2 : 1));
+        const score = d / this.cavalryWeight(e.type);
         if (score < best) {
           best = score;
           target = e;
@@ -765,6 +847,7 @@ export class Game {
       }
     }
 
+    const speed = cavSpeed(st.speed, m.momentum);
     if (target) {
       const reachNow = st.reach + ENEMY_STATS[target.type]!.radius;
       const d = Math.hypot(target.x - m.x, target.y - m.y);
@@ -772,6 +855,8 @@ export class Game {
         if (m.cd <= 0) {
           m.atkT = st.windup;
           m.atkAng = Math.atan2(target.y - m.y, target.x - m.x);
+          m.face = m.atkAng;
+          m.chargeSnap = chargeBonus(st.speed, m.momentum); // 지금까지 붙은 속도가 돌격 피해가 된다
           m.flankT = 0;
         }
         return;
@@ -787,24 +872,26 @@ export class Game {
         gx = target.x + Math.cos(phi) * radius;
         gy = target.y + Math.sin(phi) * radius;
       }
-      this.steer(m, gx, gy, st.speed, dt, spears, target, 0);
+      this.updateMomentum(m, this.steer(m, gx, gy, speed, dt, spears, target, 0), dt);
       return;
     }
     m.flankT = 0;
     if (charging) {
-      this.steer(m, anchor[0], anchor[1], st.speed, dt, spears, null, 20);
+      this.updateMomentum(m, this.steer(m, anchor[0], anchor[1], speed, dt, spears, null, 20), dt);
       return;
     }
     const homeDist = Math.hypot(home[0] - m.x, home[1] - m.y);
-    this.steer(m, home[0], home[1], homeDist > 150 ? st.speed * 1.5 : st.speed, dt, spears, null, 4);
+    // 대열을 따라잡을 때는 최대 속도로 달린다
+    const catchUp = homeDist > 150 ? st.speed : speed;
+    this.updateMomentum(m, this.steer(m, home[0], home[1], catchUp, dt, spears, null, 4), dt);
   }
 
-  /** 목표를 향해 움직이되, 창병 적 가까이로는 들어가지 않고 비껴 돌아간다 */
-  private steer(m: Merc, gx: number, gy: number, speed: number, dt: number, spears: Enemy[], ignore: Enemy | null, stop: number): void {
+  /** 목표를 향해 움직이되, 창병 적 가까이로는 들어가지 않고 비껴 돌아간다. 움직였으면 true. */
+  private steer(m: Merc, gx: number, gy: number, speed: number, dt: number, spears: Enemy[], ignore: Enemy | null, stop: number): boolean {
     let dx = gx - m.x;
     let dy = gy - m.y;
     const dist = Math.hypot(dx, dy);
-    if (dist <= stop) return;
+    if (dist <= stop) return false;
     dx /= dist;
     dy /= dist;
     for (const sp of spears) {
@@ -819,14 +906,17 @@ export class Game {
     const step = Math.min(speed * dt, dist - stop);
     m.x += (dx / len) * step;
     m.y += (dy / len) * step;
+    return true;
   }
 
-  private moveToward(f: { x: number; y: number }, tx: number, ty: number, speed: number, dt: number, stop: number): void {
+  /** 목표를 향해 한 걸음. 움직였으면 true. */
+  private moveToward(f: { x: number; y: number }, tx: number, ty: number, speed: number, dt: number, stop: number): boolean {
     const d = Math.hypot(tx - f.x, ty - f.y);
-    if (d <= stop) return;
+    if (d <= stop) return false;
     const step = Math.min(speed * dt, d - stop);
     f.x += ((tx - f.x) / d) * step;
     f.y += ((ty - f.y) / d) * step;
+    return true;
   }
 
   private resolveMercAttack(m: Merc, st: UnitStats): void {
@@ -846,20 +936,53 @@ export class Game {
       });
       return;
     }
-    if (m.type === CAVALRY) m.evadeT = CAV_EVADE_SEC; // 치고 빠지기
-    for (const e of [...this.enemies.values()]) {
-      const es = ENEMY_STATS[e.type]!;
-      const d = Math.hypot(e.x - m.x, e.y - m.y);
-      if (d > st.reach + es.radius) continue;
+    const charge = m.type === CAVALRY ? m.chargeSnap : 0;
+    if (m.type === CAVALRY) {
+      m.evadeT = CAV_EVADE_SEC; // 치고 빠지기
+      m.momentum *= CAV_MOMENTUM_AFTER_HIT; // 부딪히면 속도를 잃는다
+    }
+    m.chargeSnap = 0;
+    const struck: Enemy[] = [];
+    for (const e of this.enemies.values()) {
+      if (Math.hypot(e.x - m.x, e.y - m.y) > st.reach + ENEMY_STATS[e.type]!.radius) continue;
       if (Math.abs(angleDiff(Math.atan2(e.y - m.y, e.x - m.x), m.atkAng)) > st.arc) continue;
-      this.damageEnemy(e, st.damage * typeMultiplier(m.type, e.type), m.owner);
+      struck.push(e);
+    }
+    let reflected = 0;
+    for (const e of struck) {
+      reflected += this.damageEnemy(e, { damage: st.damage, charge, srcType: m.type, fromAngle: Math.atan2(m.y - e.y, m.x - e.x) }, m.owner);
+    }
+    if (st.splash > 0) this.splashEnemies(struck, st.splash, st.damage * SPLASH_FACTOR, m.type, m.x, m.y, m.owner);
+    if (reflected > 0) this.hurtMerc(m, reflected); // 창병에게 돌격하면 그 피해가 자신에게 돌아온다
+  }
+
+  /** 범위 공격: 맞힌 대상들 주변의 다른 적에게 일부 피해를 준다 */
+  private splashEnemies(struck: Enemy[], radius: number, damage: number, srcType: number, fromX: number, fromY: number, ownerId: number): void {
+    const hit = new Set(struck.map((e) => e.id));
+    for (const e of [...this.enemies.values()]) {
+      if (hit.has(e.id)) continue;
+      if (!struck.some((s) => Math.hypot(s.x - e.x, s.y - e.y) <= radius)) continue;
+      this.damageEnemy(e, { damage, charge: 0, srcType, fromAngle: Math.atan2(fromY - e.y, fromX - e.x) }, ownerId);
     }
   }
 
-  private damageEnemy(e: Enemy, amount: number, ownerId: number): void {
+  /** 적이 공격을 받는다. 방패·창병 반사 규칙을 적용하고, 되돌려줄 피해를 돌려준다. */
+  private damageEnemy(e: Enemy, hit: Hit, ownerId: number): number {
+    const r = resolveHit({ type: e.type, shield: e.shield, face: e.face }, hit);
+    this.applyShield(e, r.shield, r.shieldBroke);
+    e.hp -= r.body;
+    if (e.hp <= 0) this.killEnemy(e, ownerId);
+    return r.reflected;
+  }
+
+  /** 되돌려받은 피해(방패·방어와 무관하게 몸에 직접 들어간다) */
+  private reflectToEnemy(e: Enemy, amount: number, ownerId: number): void {
     e.hp -= amount;
-    if (e.hp > 0) return;
-    this.enemies.delete(e.id);
+    if (e.hp <= 0) this.killEnemy(e, ownerId);
+  }
+
+  private killEnemy(e: Enemy, ownerId: number): void {
+    if (!this.enemies.delete(e.id)) return; // 이미 쓰러짐
     const owner = this.slots.get(ownerId);
     if (owner) {
       owner.state.kills++;
@@ -984,6 +1107,7 @@ export class Game {
     return {
       ...base,
       hp: Math.round(base.hp * mods.mercHp * mods.typeHp[m.type]!),
+      shield: Math.round(base.shield * mods.mercHp * mods.typeHp[m.type]!),
       damage: base.damage * mods.mercDmg * mods.typeDmg[m.type]!,
       cooldown: base.cooldown / mods.mercAtkSpeed,
       speed: base.speed * mods.mercSpeed,
@@ -993,6 +1117,7 @@ export class Game {
   private stepEnemies(dt: number, friendlies: Friendly[]): void {
     for (const e of this.enemies.values()) {
       const st = ENEMY_STATS[e.type]!;
+      this.regenShield(e, st.shield, dt);
       e.cd = Math.max(0, e.cd - dt);
 
       if (e.atkT > 0) {
@@ -1022,6 +1147,7 @@ export class Game {
           e.atkT = st.windup;
           e.atkAng = Math.atan2(target.y - e.y, target.x - e.x);
           e.face = e.atkAng;
+          e.chargeSnap = e.type === CAVALRY ? chargeBonus(st.speed, e.momentum) : 0;
           continue;
         }
         // 근접은 쿨다운 중에도 붙어서 압박하고, 원거리는 거리를 유지한다
@@ -1029,7 +1155,11 @@ export class Game {
       }
       const stop = st.ranged ? st.reach * 0.8 : st.reach * 0.5 + target.radius;
       e.face = Math.atan2(target.y - e.y, target.x - e.x);
-      this.moveToward(e, target.x, target.y, st.speed, dt, stop);
+      if (e.type === CAVALRY) {
+        this.updateMomentum(e, this.moveToward(e, target.x, target.y, cavSpeed(st.speed, e.momentum), dt, stop), dt);
+      } else {
+        this.moveToward(e, target.x, target.y, st.speed, dt, stop);
+      }
     }
   }
 
@@ -1050,11 +1180,26 @@ export class Game {
       });
       return;
     }
+    const charge = e.type === CAVALRY ? e.chargeSnap : 0;
+    if (e.type === CAVALRY) e.momentum *= CAV_MOMENTUM_AFTER_HIT;
+    e.chargeSnap = 0;
     // 예비 동작이 끝난 시점에 부채꼴 안에 있는 아군만 맞는다. 그 사이 피하면 맞지 않는다.
+    const struck: Friendly[] = [];
     for (const f of friendlies) {
       if (Math.hypot(f.x - e.x, f.y - e.y) > st.reach + f.radius) continue;
       if (Math.abs(angleDiff(Math.atan2(f.y - e.y, f.x - e.x), e.atkAng)) > st.arc) continue;
-      f.hurt(st.damage * typeMultiplier(e.type, f.defType));
+      struck.push(f);
+    }
+    for (const f of struck) {
+      const back = f.hit({ damage: st.damage, charge, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x) });
+      if (back > 0) this.reflectToEnemy(e, back, f.ownerId); // 창병이 돌격을 되돌려준다
+    }
+    if (st.splash > 0) {
+      for (const f of friendlies) {
+        if (struck.includes(f)) continue;
+        if (!struck.some((s) => Math.hypot(s.x - f.x, s.y - f.y) <= st.splash)) continue;
+        f.hit({ damage: st.damage * SPLASH_FACTOR, charge: 0, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x) });
+      }
     }
   }
 
@@ -1110,14 +1255,14 @@ export class Game {
         if (b.hostile) {
           for (const f of friendlies) {
             if (Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
-            f.hurt(b.damage * typeMultiplier(b.srcType, f.defType));
+            f.hit({ damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }); // 날아온 쪽이 정면인지 본다
             hit = true;
             break;
           }
         } else {
           for (const e of this.enemies.values()) {
             if (Math.hypot(e.x - px, e.y - py) > b.radius + ENEMY_STATS[e.type]!.radius) continue;
-            this.damageEnemy(e, b.damage * typeMultiplier(b.srcType, e.type), b.owner);
+            this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }, b.owner);
             hit = true;
             break;
           }

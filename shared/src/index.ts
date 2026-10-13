@@ -31,7 +31,7 @@ export const BULLET_RADIUS = 5;
 export const BULLET_DAMAGE = 10;
 
 /**
- * 주인공 무기. 무기마다 병종 속성이 있어 같은 상성표(COUNTER_MATRIX)가 적용된다.
+ * 주인공 무기. 무기마다 병종 속성이 있어 병종과 같은 규칙이 적용된다(방패에 주는 피해 배율, 창의 돌격 반사, 철퇴의 범위 공격 등).
  * 활은 원거리 투사체, 나머지는 조준 방향으로 부채꼴을 휘두르는 근접 무기다.
  */
 export interface WeaponDef {
@@ -42,13 +42,15 @@ export interface WeaponDef {
   arc: number; // 근접: 부채꼴 반각(라디안)
   damage: number;
   cooldown: number;
+  splash: number; // 범위 공격 반경(철퇴). 0이면 없음
+  note: string; // 무기 바에 보여 줄 특징
 }
 const rad = (d: number) => (d * Math.PI) / 180;
 export const WEAPONS: readonly WeaponDef[] = [
-  { name: "활", type: ARCHER, ranged: true, reach: BULLET_RANGE, arc: 0, damage: BULLET_DAMAGE, cooldown: FIRE_COOLDOWN_SEC },
-  { name: "창", type: SPEAR, ranged: false, reach: 74, arc: rad(20), damage: 17, cooldown: 0.5 },
-  { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 11, cooldown: 0.3 },
-  { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 26, cooldown: 0.85 },
+  { name: "활", type: ARCHER, ranged: true, reach: BULLET_RANGE, arc: 0, damage: BULLET_DAMAGE, cooldown: FIRE_COOLDOWN_SEC, splash: 0, note: "원거리 · 방패 정면에는 약함(25%)" },
+  { name: "창", type: SPEAR, ranged: false, reach: 74, arc: rad(20), damage: 17, cooldown: 0.5, splash: 0, note: "기병 돌격 무효·반사 · 긴 사거리" },
+  { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 11, cooldown: 0.3, splash: 0, note: "정면 피해 절반 방어 · 빠른 공격" },
+  { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 26, cooldown: 0.85, splash: 46, note: "방패 파괴(250%) · 범위 공격" },
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
 export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간
@@ -88,7 +90,19 @@ export interface PlayerState {
  * 네트워크 용량을 줄이기 위해 적·용병·투사체·캠프는 배열로 보낸다.
  * atk: 공격 예비 동작 진행도(0=공격 중 아님, 0..1=진행), ang: 그 공격의 방향(라디안)
  */
-export type EnemyWire = [id: number, x: number, y: number, hp: number, type: number, atk: number, ang: number];
+export type EnemyWire = [
+  id: number,
+  x: number,
+  y: number,
+  hp: number,
+  type: number,
+  atk: number,
+  ang: number,
+  shield: number, // 방패 체력(검방병). 깨졌으면 0
+  face: number, // 바라보는 방향(방패가 막는 방향)
+  mom: number, // 기병의 속도 0..1
+  regen: number, // 깨진 방패가 재생될 때까지 남은 초(0이면 해당 없음)
+];
 export type MercWire = [
   id: number,
   x: number,
@@ -100,6 +114,11 @@ export type MercWire = [
   ang: number,
   respawn: number, // 쓰러졌다면 부활까지 남은 초(0이면 생존)
   maxHp: number,
+  shield: number,
+  maxShield: number,
+  face: number,
+  mom: number,
+  regen: number,
 ];
 export type BulletWire = [id: number, x: number, y: number, team: 0 | 1]; // team 1 = 적 투사체
 export type CampWire = [id: number, x: number, y: number, left: number, offer0: number, offer1: number, offer2: number];

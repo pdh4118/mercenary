@@ -39,7 +39,11 @@ import {
   TICK_RATE,
   WORLD_SIZE,
   mercPrice,
-  typeMultiplier,
+  SHIELD_DAMAGE_FACTOR,
+  SHIELD_REGEN_SEC,
+  SPLASH_FACTOR,
+  HERO_SWORD_FRONT_BLOCK,
+  chargeBonus,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -57,22 +61,20 @@ const quiet = () => {
 
 // --- 상성 ------------------------------------------------------------------
 
-test("상성: 기병<창병<궁병<검방병<둔기병, 기병은 창병 외 모두에게 강하다", () => {
-  // 오른쪽이 왼쪽에게 강하다
-  assert.ok(typeMultiplier(SPEAR, CAVALRY) > 1);
-  assert.ok(typeMultiplier(ARCHER, SPEAR) > 1);
-  assert.ok(typeMultiplier(SHIELD, ARCHER) > 1);
-  assert.ok(typeMultiplier(BLUNT, SHIELD) > 1);
-  // 기병은 창병에게만 약하고 나머지에게는 강하다
-  assert.ok(typeMultiplier(CAVALRY, SPEAR) < 1);
-  for (const t of [ARCHER, SHIELD, BLUNT]) assert.ok(typeMultiplier(CAVALRY, t) > 1);
-  // 약한 쪽이 강한 쪽을 칠 때는 불리하다
-  assert.ok(typeMultiplier(CAVALRY, SPEAR) < 1);
-  assert.ok(typeMultiplier(SPEAR, ARCHER) < 1);
-  assert.ok(typeMultiplier(ARCHER, SHIELD) < 1);
-  assert.ok(typeMultiplier(SHIELD, BLUNT) < 1);
-  // 병종이 없는 공격(주인공)은 배율이 1이다
-  assert.equal(typeMultiplier(-1, SPEAR), 1);
+test("병종 규칙 상수: 기병만 통솔력 2, 방패는 검방병에만 있고 창병이 가장 길다", () => {
+  assert.ok(MERC_STATS[SHIELD]!.shield > 0);
+  assert.ok(ENEMY_STATS[SHIELD]!.shield > 0);
+  for (const t of [CAVALRY, SPEAR, ARCHER, BLUNT]) {
+    assert.equal(MERC_STATS[t]!.shield, 0);
+    assert.equal(ENEMY_STATS[t]!.shield, 0);
+  }
+  // 근접 사거리: 창병 > 둔기병 > 검방병
+  assert.ok(MERC_STATS[SPEAR]!.reach > MERC_STATS[BLUNT]!.reach);
+  assert.ok(MERC_STATS[BLUNT]!.reach > MERC_STATS[SHIELD]!.reach);
+  assert.ok(ENEMY_STATS[SPEAR]!.reach > ENEMY_STATS[BLUNT]!.reach);
+  // 범위 공격은 둔기병만
+  assert.ok(MERC_STATS[BLUNT]!.splash > 0 && ENEMY_STATS[BLUNT]!.splash > 0);
+  for (const t of [CAVALRY, SPEAR, ARCHER, SHIELD]) assert.equal(MERC_STATS[t]!.splash, 0);
 });
 
 test("용병 가격은 보유 수가 늘수록 오른다", () => {
@@ -217,22 +219,27 @@ test("공격 부채꼴 바깥에 있으면 맞지 않는다", () => {
   assert.equal(me(g, a).hp, PLAYER_MAX_HP);
 });
 
-test("적의 공격은 병종 상성에 따라 용병에게 들어가는 피해가 달라진다", () => {
-  const dmgTo = (mercType: number) => {
+test("적 기병의 돌격: 창병 용병은 돌격 피해를 받지 않고 되돌려주며, 다른 병종은 속도에 비례해 더 아프게 맞는다", () => {
+  const run1 = (mercType: number) => {
     const g = quiet();
     const a = g.addPlayer("a")!;
     const p = me(g, a);
-    const mx = p.x + 60; // 진형 자리 가까이(너무 멀면 복귀하느라 공격 범위를 벗어난다)
+    const mx = p.x + 60; // 진형 자리 가까이(너무 멀면 싸우지 않고 복귀한다). 적과 가장 가까운 아군이 이 용병이 되도록 적을 그 바로 옆에 둔다
     const merc = g.addMerc(a, mercType, mx, p.y);
-    g.spawnEnemyAt(mx + 15, p.y, CAVALRY);
+    const e = g.spawnEnemyAt(mx + 15, p.y, CAVALRY);
+    (g.getEnemy(e) as { momentum: number }).momentum = 1; // 달려온 상태
     run(g, 0.5);
-    return MERC_STATS[mercType]!.hp - g.getMerc(merc)!.hp;
+    return { lost: MERC_STATS[mercType]!.hp - g.getMerc(merc)!.hp, enemyHp: g.getEnemy(e)?.hp ?? 0 };
   };
-  // 기병은 창병에게 약하다(방어 쪽 창병이 기병의 공격을 덜 받는 게 아니라, 기병→창병 배율 0.6)
-  const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
-  assert.ok(near(dmgTo(SPEAR), ENEMY_STATS[CAVALRY]!.damage * typeMultiplier(CAVALRY, SPEAR)));
-  assert.ok(near(dmgTo(ARCHER), ENEMY_STATS[CAVALRY]!.damage * typeMultiplier(CAVALRY, ARCHER)));
-  assert.ok(dmgTo(ARCHER) > dmgTo(SPEAR));
+  const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed, 1);
+  const base = ENEMY_STATS[CAVALRY]!.damage;
+  const archer = run1(ARCHER);
+  assert.ok(Math.abs(archer.lost - (base + bonus)) < 1e-6, `궁병은 기본+돌격: ${archer.lost}`);
+  const spear = run1(SPEAR);
+  assert.ok(Math.abs(spear.lost - base) < 1e-6, `창병은 기본만: ${spear.lost}`);
+  assert.ok(spear.enemyHp <= ENEMY_STATS[CAVALRY]!.hp - bonus + 1e-6, "돌격 피해가 기병에게 되돌아간다");
+  // 속도가 없으면 돌격 피해도 적다
+  assert.ok(chargeBonus(ENEMY_STATS[CAVALRY]!.speed, 0) < bonus);
 });
 
 test("적 궁병의 화살은 날아가서 맞는다", () => {
@@ -395,24 +402,25 @@ test("용병은 진형 자리를 따라다니고, 궁병은 뒤·방패병은 �
   assert.ok(sx > px && px > ax, "앞줄(검방병) > 중간줄(창병) > 뒷줄(궁병)");
 });
 
-test("용병이 적을 공격하고, 상성에 따라 들어가는 피해가 다르다", () => {
-  const dmg = (enemyType: number) => {
+test("용병의 공격: 방패 정면은 창이 60%만 들어가고, 방패 없는 적에게는 그대로 들어간다", () => {
+  const after = (enemyType: number) => {
     const g = quiet();
     const a = g.addPlayer("a")!;
     const p = me(g, a);
     g.addMerc(a, SPEAR, p.x + 100, p.y);
     const e = g.spawnEnemyAt(p.x + 100 + 45, p.y, enemyType);
-    // 적의 반격이 끼지 않게 적의 공격 쿨다운을 길게 둔다
-    run(g, 0.2); // 창병 예비 동작(0.3초) 도중
-    assert.equal(g.getEnemy(e)!.hp, ENEMY_STATS[enemyType]!.hp, "예비 동작이 끝나기 전에는 피해가 없다");
     run(g, 0.2);
-    return ENEMY_STATS[enemyType]!.hp - g.getEnemy(e)!.hp;
+    const early = g.getEnemy(e)!;
+    assert.equal(early.hp + early.shield, ENEMY_STATS[enemyType]!.hp + ENEMY_STATS[enemyType]!.shield, "예비 동작이 끝나기 전에는 피해가 없다");
+    run(g, 0.2);
+    const e2 = g.getEnemy(e)!;
+    return { hp: e2.hp, shield: e2.shield };
   };
-  const vsCav = dmg(CAVALRY);
-  const vsArcher = dmg(ARCHER);
-  assert.equal(vsCav, MERC_STATS[SPEAR]!.damage * typeMultiplier(SPEAR, CAVALRY));
-  assert.equal(vsArcher, MERC_STATS[SPEAR]!.damage * typeMultiplier(SPEAR, ARCHER));
-  assert.ok(vsCav > vsArcher);
+  const vsArcher = after(ARCHER);
+  assert.equal(vsArcher.hp, ENEMY_STATS[ARCHER]!.hp - MERC_STATS[SPEAR]!.damage);
+  const vsShield = after(SHIELD);
+  assert.equal(vsShield.hp, ENEMY_STATS[SHIELD]!.hp, "몸은 맞지 않는다");
+  assert.ok(Math.abs(vsShield.shield - (ENEMY_STATS[SHIELD]!.shield - MERC_STATS[SPEAR]!.damage * SHIELD_DAMAGE_FACTOR[SPEAR]!)) < 1e-6);
 });
 
 test("용병이 처치하면 주인이 금화를 얻는다", () => {
@@ -525,9 +533,9 @@ test("기병은 공격한 뒤 잠깐 물러난다(치고 빠지기)", () => {
   const p = me(g, a);
   const home = { x: p.x + 30, y: p.y + 150 };
   const c = g.addMerc(a, CAVALRY, home.x, home.y);
-  const e = g.spawnEnemyAt(home.x + 30, home.y, SHIELD);
-  for (let i = 0; i < 20 && g.getEnemy(e)!.hp === ENEMY_STATS[SHIELD]!.hp; i++) g.step(); // 공격이 들어갈 때까지
-  assert.ok(g.getEnemy(e)!.hp < ENEMY_STATS[SHIELD]!.hp);
+  const e = g.spawnEnemyAt(home.x + 30, home.y, ARCHER);
+  for (let i = 0; i < 20 && g.getEnemy(e)!.hp === ENEMY_STATS[ARCHER]!.hp; i++) g.step(); // 공격이 들어갈 때까지
+  assert.ok(g.getEnemy(e)!.hp < ENEMY_STATS[ARCHER]!.hp);
   const x0 = g.getMerc(c)!.x;
   run(g, 0.3);
   assert.ok(x0 - g.getMerc(c)!.x > 15, "공격 방향의 반대쪽으로 물러난다");
@@ -771,16 +779,16 @@ test("무기 목록: 활·창·검·철퇴가 각각 궁병·창병·검방병·
   assert.equal(WEAPONS[0]!.ranged, true);
 });
 
-test("창: 정면 부채꼴의 적만 맞히고 병종 상성 배율이 적용된다", () => {
+test("창: 정면 부채꼴의 적만 맞힌다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
   g.setWeapon(a, 1);
-  const front = g.spawnEnemyAt(p.x + 60, p.y, SHIELD);
-  const behind = g.spawnEnemyAt(p.x - 40, p.y, SHIELD);
+  const front = g.spawnEnemyAt(p.x + 60, p.y, SPEAR);
+  const behind = g.spawnEnemyAt(p.x - 40, p.y, SPEAR);
   const after = swingUntilHit(g, a, front);
-  assert.equal(after, ENEMY_STATS[SHIELD]!.hp - WEAPONS[1]!.damage * typeMultiplier(SPEAR, SHIELD));
-  assert.equal(g.getEnemy(behind)!.hp, ENEMY_STATS[SHIELD]!.hp, "뒤에 있는 적은 맞지 않는다");
+  assert.equal(after, ENEMY_STATS[SPEAR]!.hp - WEAPONS[1]!.damage);
+  assert.equal(g.getEnemy(behind)!.hp, ENEMY_STATS[SPEAR]!.hp, "뒤에 있는 적은 맞지 않는다");
   assert.ok(me(g, a).swing > 0, "휘두르는 이펙트 정보가 전달된다");
 });
 
@@ -789,37 +797,50 @@ test("창은 사거리 밖의 적을 맞히지 못한다", () => {
   const a = g.addPlayer("a")!;
   const p = me(g, a);
   g.setWeapon(a, 1);
-  const far = g.spawnEnemyAt(p.x + WEAPONS[1]!.reach + 80, p.y, SHIELD);
+  const far = g.spawnEnemyAt(p.x + WEAPONS[1]!.reach + 80, p.y, SPEAR);
   g.setInput(a, { ...idle, fire: true });
   run(g, 0.3);
-  assert.equal(g.getEnemy(far)!.hp, ENEMY_STATS[SHIELD]!.hp);
+  assert.equal(g.getEnemy(far)!.hp, ENEMY_STATS[SPEAR]!.hp);
 });
 
-test("검은 궁병에게 강하고, 철퇴는 검방병에게 강하다", () => {
-  const sword = quiet();
-  const a = sword.addPlayer("a")!;
-  const pa = me(sword, a);
-  sword.setWeapon(a, 2);
-  const archer = sword.spawnEnemyAt(pa.x + 40, pa.y, ARCHER);
-  assert.equal(swingUntilHit(sword, a, archer), ENEMY_STATS[ARCHER]!.hp - WEAPONS[2]!.damage * typeMultiplier(SHIELD, ARCHER));
-  assert.ok(typeMultiplier(SHIELD, ARCHER) > 1);
-
-  const mace = quiet();
-  const b = mace.addPlayer("b")!;
-  const pb = me(mace, b);
-  mace.setWeapon(b, 3);
-  const shield = mace.spawnEnemyAt(pb.x + 40, pb.y, SHIELD);
-  assert.equal(swingUntilHit(mace, b, shield), ENEMY_STATS[SHIELD]!.hp - WEAPONS[3]!.damage * typeMultiplier(BLUNT, SHIELD));
-  assert.ok(typeMultiplier(BLUNT, SHIELD) > 1);
+test("무기와 방패: 철퇴는 방패를 단번에 깨고, 창은 60%·활은 25%만 들어간다", () => {
+  const shieldAfter = (weapon: number, dist: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = me(g, a);
+    g.setWeapon(a, weapon);
+    const e = g.spawnEnemyAt(p.x + dist, p.y, SHIELD); // 방패는 주인공을 향해 있다(정면)
+    g.setInput(a, { ...idle, fire: true });
+    for (let i = 0; i < 40; i++) {
+      g.step();
+      const cur = g.getEnemy(e)!;
+      if (cur.shield < ENEMY_STATS[SHIELD]!.shield) return { shield: cur.shield, hp: cur.hp, regen: cur.regenT };
+    }
+    return null;
+  };
+  const mace = shieldAfter(3, 40)!;
+  assert.equal(mace.shield, 0, "철퇴 한 번에 방패가 깨진다");
+  assert.ok(mace.regen > 0, "깨진 방패는 재생을 기다린다");
+  assert.ok(mace.hp < ENEMY_STATS[SHIELD]!.hp, "넘친 몫은 몸에 들어간다");
+  const spear = shieldAfter(1, 60)!;
+  assert.ok(Math.abs(spear.shield - (ENEMY_STATS[SHIELD]!.shield - WEAPONS[1]!.damage * SHIELD_DAMAGE_FACTOR[SPEAR]!)) < 1e-6);
+  assert.equal(spear.hp, ENEMY_STATS[SHIELD]!.hp);
+  const bow = shieldAfter(0, 200)!;
+  assert.ok(Math.abs(bow.shield - (ENEMY_STATS[SHIELD]!.shield - WEAPONS[0]!.damage * SHIELD_DAMAGE_FACTOR[ARCHER]!)) < 1e-6);
 });
 
-test("활도 궁병 속성이라 창병 적에게 강하다", () => {
+test("방패가 없는 적에게는 무기 피해가 그대로 들어간다(검·활)", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
-  const spear = g.spawnEnemyAt(p.x + 200, p.y, SPEAR);
-  const after = swingUntilHit(g, a, spear);
-  assert.equal(after, ENEMY_STATS[SPEAR]!.hp - WEAPONS[0]!.damage * typeMultiplier(ARCHER, SPEAR));
+  g.setWeapon(a, 2);
+  const archer = g.spawnEnemyAt(p.x + 40, p.y, ARCHER);
+  assert.equal(swingUntilHit(g, a, archer), ENEMY_STATS[ARCHER]!.hp - WEAPONS[2]!.damage);
+  const bow = quiet();
+  const b = bow.addPlayer("b")!;
+  const pb = me(bow, b);
+  const spear = bow.spawnEnemyAt(pb.x + 200, pb.y, SPEAR);
+  assert.equal(swingUntilHit(bow, b, spear), ENEMY_STATS[SPEAR]!.hp - WEAPONS[0]!.damage);
 });
 
 test("무기를 바꾼 직후에는 잠깐 공격할 수 없다", () => {
@@ -864,4 +885,126 @@ test("레벨업하면 주변 적이 밀려나고 하던 공격이 끊기며 잠�
   assert.equal(g.getEnemy(far)!.x, farX, "범위 밖의 적은 그대로");
   run(g, 0.5);
   assert.equal(me(g, a).hp, PLAYER_MAX_HP, "그 사이 피해를 입지 않는다");
+});
+
+// --- 새 병종 규칙(방패·돌격·반사·범위) ---------------------------------------------
+
+test("철퇴는 맞힌 대상 주변의 다른 적에게 절반 피해(범위 공격)를 준다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  g.setWeapon(a, 3);
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1); // 무기 교체 대기가 끝난 뒤에 적을 놓아 위치가 흐트러지지 않게 한다
+  const main = g.spawnEnemyAt(p.x + 30, p.y, SPEAR);
+  const near = g.spawnEnemyAt(p.x - 10, p.y + 20, SPEAR); // 부채꼴(반각 100도) 밖이지만 대상 가까이
+  const far = g.spawnEnemyAt(p.x + 30, p.y + 160, SPEAR); // 멀리 떨어진 적은 안 맞는다
+  g.setInput(a, { ...idle, fire: true });
+  g.step();
+  const dmg = WEAPONS[3]!.damage;
+  assert.equal(g.getEnemy(main)?.hp ?? 0, Math.max(0, ENEMY_STATS[SPEAR]!.hp - dmg), "정면의 대상은 전부 맞는다");
+  assert.ok(Math.abs(g.getEnemy(near)!.hp - (ENEMY_STATS[SPEAR]!.hp - dmg * SPLASH_FACTOR)) < 1e-6, "주변 적은 절반만 맞는다");
+  assert.equal(g.getEnemy(far)!.hp, ENEMY_STATS[SPEAR]!.hp);
+});
+
+test("검을 들면 정면 피해가 절반이고, 창을 들면 기병의 돌격이 반사된다", () => {
+  const hpLost = (weapon: number, enemyType: number, momentum = 0) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = me(g, a);
+    g.setWeapon(a, weapon);
+    g.setInput(a, { ...idle, aim: 0 }); // 동쪽을 본다
+    const e = g.spawnEnemyAt(p.x + 25, p.y, enemyType); // 정면
+    if (momentum) (g.getEnemy(e) as { momentum: number }).momentum = momentum;
+    run(g, 0.9);
+    return { lost: PLAYER_MAX_HP - me(g, a).hp, enemyHp: g.getEnemy(e)?.hp ?? 0 };
+  };
+  const bow = hpLost(0, SPEAR).lost;
+  const sword = hpLost(2, SPEAR).lost;
+  assert.equal(bow, ENEMY_STATS[SPEAR]!.damage);
+  assert.ok(Math.abs(sword - bow * HERO_SWORD_FRONT_BLOCK) < 1e-6);
+  // 기병의 돌격
+  const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed, 1);
+  const vsBow = hpLost(0, CAVALRY, 1);
+  assert.ok(Math.abs(vsBow.lost - (ENEMY_STATS[CAVALRY]!.damage + bonus)) < 1e-6);
+  const vsSpear = hpLost(1, CAVALRY, 1);
+  assert.ok(Math.abs(vsSpear.lost - ENEMY_STATS[CAVALRY]!.damage) < 1e-6, "창을 들면 돌격 피해가 없다");
+  assert.ok(vsSpear.enemyHp <= ENEMY_STATS[CAVALRY]!.hp - bonus + 1e-6, "그 피해가 기병에게 돌아간다");
+});
+
+test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며, 돌격 피해는 속도에 비례한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const c = g.addMerc(a, CAVALRY, p.x, p.y + 150);
+  g.spawnEnemyAt(p.x + 400, p.y + 150, ARCHER); // 멀리 있는 궁병을 향해 달린다
+  g.step();
+  const m0 = g.getMerc(c)!.momentum;
+  run(g, 1);
+  const m1 = g.getMerc(c)!.momentum;
+  assert.ok(m1 > m0, "달리면 속도가 오른다");
+  assert.ok(m1 <= 1);
+  const wire = g.snapshotMercs().find((w) => w[0] === c)!;
+  assert.ok(wire[13] > 0, "속도가 클라이언트에 전달된다");
+  // 목표에 닿아 공격하면 속도가 크게 준다
+  let before = 0;
+  for (let i = 0; i < 200; i++) {
+    before = Math.max(before, g.getMerc(c)!.momentum);
+    g.step();
+    if (g.enemyCount === 0) break;
+  }
+  assert.ok(before > 0.5, "충분히 가속했다");
+  assert.equal(g.enemyCount, 0, "궁병이 처치되었다");
+  assert.ok(g.getMerc(c)!.momentum < before * 0.9, "공격하면 속도가 줄어든다");
+});
+
+test("기병 용병이 창병 적에게 돌격하면 돌격 피해가 자신에게 돌아온다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const c = g.addMerc(a, CAVALRY, p.x + 30, p.y + 150);
+  const mx = g.getMerc(c)!.x;
+  const my = g.getMerc(c)!.y;
+  const e = g.spawnEnemyAt(mx + 25, my, SPEAR); // 어쩔 수 없이 맞서야 하는 거리
+  (g.getMerc(c) as { momentum: number }).momentum = 1;
+  const full = g.getMerc(c)!.hp;
+  run(g, 0.4);
+  const bonus = chargeBonus(MERC_STATS[CAVALRY]!.speed, 1);
+  assert.ok(g.getMerc(c)!.hp <= full - bonus + 1e-6, "자신이 입힌 만큼의 돌격 피해를 되돌려받는다");
+  assert.ok(g.getEnemy(e)!.hp > ENEMY_STATS[SPEAR]!.hp - MERC_STATS[CAVALRY]!.damage - 1e-6, "창병은 돌격 피해를 받지 않는다");
+});
+
+test("방패는 깨져도 일정 시간 뒤 다시 생기고, 재생 중에는 정면에서도 막지 못한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const m = g.addMerc(a, SHIELD, p.x + 60, p.y);
+  const live = g.getMerc(m) as { shield: number; regenT: number };
+  const max = MERC_STATS[SHIELD]!.shield;
+  assert.equal(live.shield, max);
+  live.shield = 0;
+  live.regenT = SHIELD_REGEN_SEC;
+  const wire = g.snapshotMercs().find((w) => w[0] === m)!;
+  assert.equal(wire[10], 0);
+  assert.equal(wire[11], max);
+  assert.ok(wire[14] > 0, "재생 대기 시간이 전달된다");
+  run(g, SHIELD_REGEN_SEC - 1);
+  assert.equal(g.getMerc(m)!.shield, 0);
+  run(g, 1.2);
+  assert.equal(g.getMerc(m)!.shield, max);
+  assert.equal(g.getMerc(m)!.regenT, 0);
+});
+
+test("검방병 용병의 방패는 정면의 화살을 막는다(화살은 방패에 25%만 들어간다)", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const m = g.addMerc(a, SHIELD, p.x + 60, p.y);
+  const mm = g.getMerc(m)!;
+  g.spawnEnemyAt(mm.x + 140, mm.y, ARCHER); // 정면에서 쏜다
+  const hp0 = mm.hp;
+  run(g, 4);
+  const cur = g.getMerc(m)!;
+  assert.equal(cur.hp, hp0, "몸은 맞지 않는다");
+  assert.ok(cur.shield < MERC_STATS[SHIELD]!.shield, "방패가 조금 깎였다");
+  assert.ok(cur.shield > MERC_STATS[SHIELD]!.shield - ENEMY_STATS[ARCHER]!.damage * 4, "화살 피해의 일부만 들어갔다");
 });

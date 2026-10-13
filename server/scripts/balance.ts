@@ -2,12 +2,12 @@
 // 실행: npm run balance -w server [-- <초> <플레이어 수 목록 예: 1,3,6> <시드 수>]
 import {
   CARDS,
-  COUNTER_MATRIX,
+  CAVALRY,
+  SHIELD,
   MAX_PLAYERS,
   UNIT_COST,
   WEAPONS,
   mercPrice,
-  typeMultiplier,
   CAMP_USE_RADIUS,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
@@ -97,17 +97,11 @@ function simulate(players: number, seconds: number, seed: number): Result {
         }
       }
       const len = Math.hypot(dx, dy) || 1;
-      // 무기: 거리가 가까우면 가장 유리한 근접 무기, 아니면 활
+      // 무기: 가까우면 상대에 맞는 근접 무기(방패→철퇴, 기병→창, 그 밖→검), 멀면 활
       let weapon = 0;
       if (near && nearD < 90) {
-        let best = -1;
-        WEAPONS.forEach((w, i) => {
-          const score = typeMultiplier(w.type, near![4]) * w.damage / w.cooldown;
-          if (score > best) {
-            best = score;
-            weapon = i;
-          }
-        });
+        const t = near[4];
+        weapon = t === SHIELD ? 3 : t === CAVALRY ? 1 : 2;
       }
       g.setWeapon(id, weapon);
       g.setInput(id, {
@@ -192,4 +186,3 @@ if (process.env.DETAIL) {
   console.log("병종별 보유(마지막):", names.map((n, i) => `${n} ${(rs.reduce((a, r) => a + r.ownedByType[i]!, 0) / rs.length / counts[0]!).toFixed(1)}`).join(" · "));
 }
 void CARDS;
-void COUNTER_MATRIX;
