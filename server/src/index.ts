@@ -31,6 +31,11 @@ wss.on("connection", (ws) => {
     } else if (msg.t === "input") {
       const id = ids.get(ws);
       if (id !== undefined) game.setInput(id, msg);
+    } else if (msg.t === "buy") {
+      const id = ids.get(ws);
+      if (id === undefined) return;
+      const result = game.buy(id, Number(msg.camp), Number(msg.slot));
+      if (!result.ok) send(ws, { t: "notice", text: result.reason });
     }
   });
   ws.on("close", () => {
@@ -47,6 +52,8 @@ setInterval(() => {
     tick: game.tick,
     time: Math.round(game.time * 10) / 10,
     players: game.snapshotPlayers(),
+    mercs: game.snapshotMercs(),
+    camps: game.snapshotCamps(),
     enemies: game.snapshotEnemies(),
     bullets: game.snapshotBullets(),
   } satisfies ServerMsg);
