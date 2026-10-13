@@ -9,6 +9,12 @@ export const MAX_PLAYERS = 8;
 export const WORLD_SIZE = 4000;
 export const NAME_MAX_LENGTH = 12;
 
+// 방
+export const ROOM_CODE_LENGTH = 4;
+export const ROOM_NAME_MAX_LENGTH = 16;
+export const MAX_ROOMS = 30;
+export const RECONNECT_GRACE_SEC = 30; // 접속이 끊겨도 이 시간 안에 돌아오면 같은 캐릭터로 이어서 한다
+
 // 주인공
 export const PLAYER_SPEED = 220; // px/s
 export const PLAYER_RADIUS = 16;
@@ -103,8 +109,29 @@ export interface PlayerInput {
   fire: boolean;
 }
 
+export interface RoomInfo {
+  code: string;
+  name: string;
+  players: number;
+  max: number;
+}
+
+export interface RoomMember {
+  id: number;
+  name: string;
+  online: boolean;
+}
+
 export type ClientMsg =
-  | { t: "join"; name: string }
+  // 로비
+  | { t: "list" }
+  | { t: "create"; name: string; room?: string }
+  | { t: "join"; name: string; code: string }
+  | { t: "quick"; name: string }
+  | { t: "rejoin"; token: string }
+  | { t: "leave" }
+  | { t: "kick"; id: number } // 방장만
+  // 게임 중
   | { t: "input"; dx: number; dy: number; aim: number; fire: boolean }
   | { t: "buy"; camp: number; slot: number }
   | { t: "weapon"; index: number } // 무기 변경(WEAPONS 인덱스)
@@ -113,8 +140,11 @@ export type ClientMsg =
   | { t: "charge"; x: number; y: number }; // 기병 돌격 지시(월드 좌표)
 
 export type ServerMsg =
-  | { t: "welcome"; id: number; tick: number }
-  | { t: "full" }
+  | { t: "rooms"; rooms: RoomInfo[] } // 로비에 있는 동안 방 목록이 바뀔 때마다 온다
+  | { t: "welcome"; id: number; tick: number; code: string; token: string } // token은 재접속에 쓴다
+  | { t: "room"; code: string; name: string; hostId: number; players: RoomMember[] } // 방 구성이 바뀔 때마다
+  | { t: "left"; reason: string } // 방에서 나왔다(스스로, 내보내짐, 방 종료)
+  | { t: "error"; text: string }
   | { t: "notice"; text: string }
   | {
       t: "state";

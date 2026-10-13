@@ -112,6 +112,7 @@ const newMods = (): Mods => ({
 });
 
 interface Slot {
+  away: boolean; // 접속이 끊겨 돌아오기를 기다리는 중. 주인공은 제자리에 서고 적에게 노려지지 않는다.
   switchCd: number; // 무기를 바꾼 직후 공격할 수 없는 남은 시간
   mods: Mods;
   state: PlayerState;
@@ -230,6 +231,7 @@ export class Game {
         respawn: 0,
       },
       mods: newMods(),
+      away: false,
       switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false },
       fireCd: 0,
@@ -247,7 +249,19 @@ export class Game {
 
   setInput(id: number, raw: Parameters<typeof sanitizeInput>[0]): void {
     const slot = this.slots.get(id);
-    if (slot) slot.input = sanitizeInput(raw);
+    if (slot && !slot.away) slot.input = sanitizeInput(raw);
+  }
+
+  /** 접속이 끊긴 플레이어를 기다리는 동안: 입력을 멈추고, 주인공이 적의 목표가 되지 않게 한다(용병은 계속 싸운다) */
+  setAway(id: number, away: boolean): void {
+    const slot = this.slots.get(id);
+    if (!slot) return;
+    slot.away = away;
+    if (away) slot.input = { dx: 0, dy: 0, aim: slot.input.aim, fire: false };
+  }
+
+  get playerCount(): number {
+    return this.slots.size;
   }
 
   /** 캠프에서 용병을 고용한다. 거리·금화·보유 한도를 서버가 검증한다. */
@@ -613,7 +627,7 @@ export class Game {
   private collectFriendlies(): Friendly[] {
     const list: Friendly[] = [];
     for (const s of this.slots.values()) {
-      if (s.state.respawn > 0) continue;
+      if (s.state.respawn > 0 || s.away) continue;
       const p = s.state;
       list.push({
         x: p.x,

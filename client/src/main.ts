@@ -1,4 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
+import { createLobby } from "./lobby.js";
 import {
   BULLET_RADIUS,
   CARDS,
@@ -27,7 +28,6 @@ import {
 } from "@mercenary/shared";
 
 const params = new URLSearchParams(location.search);
-const name = params.get("name") ?? `용병단${Math.floor(Math.random() * 100)}`;
 const serverUrl = params.get("server") ?? `ws://${location.hostname}:8080`;
 const statusEl = document.getElementById("status")!;
 
@@ -389,22 +389,68 @@ async function main() {
   // 자동 화면 검증용: 최신 서버 상태를 읽을 수 있게 노출한다
   Object.defineProperty(window, "__game", { get: () => ({ latest, myId }) });
 
-  const ws = new WebSocket(serverUrl);
-  const send = (m: ClientMsg) => ws.readyState === ws.OPEN && ws.send(JSON.stringify(m));
-  ws.onopen = () => send({ t: "join", name });
-  ws.onclose = () => (statusEl.textContent = "서버와 연결이 끊겼습니다");
-  ws.onmessage = (ev) => {
-    const msg = JSON.parse(ev.data) as ServerMsg;
-    if (msg.t === "welcome") myId = msg.id;
-    else if (msg.t === "full") statusEl.textContent = "방이 가득 찼습니다";
-    else if (msg.t === "notice") {
-      toast.text = msg.text;
-      toastLeft = 2.5;
-    } else if (msg.t === "state") {
-      latest = msg;
-      statusEl.textContent = `${name} · 접속 ${msg.players.length}명`;
-    }
+  // --- 접속: 로비(방 목록·만들기·참가)를 거쳐 방에 들어가고, 끊기면 같은 캐릭터로 이어서 접속한다 ---
+  let ws!: WebSocket;
+  const send = (m: ClientMsg) => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m));
+  const lobby = createLobby({
+    send,
+    onEnter: (id) => {
+      myId = id;
+    },
+    onLeave: () => {
+      myId = -1;
+      latest = null;
+      levelOf.clear();
+      lastLevel = 0;
+      statusEl.textContent = "";
+    },
+  });
+  let retries = 0;
+  let autoStarted = false;
+  const connect = () => {
+    ws = new WebSocket(serverUrl);
+    ws.onopen = () => {
+      retries = 0;
+      const token = lobby.token();
+      if (token) {
+        statusEl.textContent = "이어서 접속하는 중...";
+        send({ t: "rejoin", token });
+        return;
+      }
+      statusEl.textContent = "";
+      // ?name=이름 으로 열면 로비를 건너뛰고 바로 시작한다(테스트·링크 공유용). ?room=코드 를 같이 주면 그 방에 참가한다.
+      const autoName = params.get("name");
+      if (!autoStarted && autoName) {
+        autoStarted = true;
+        const room = params.get("room");
+        send(room ? { t: "join", name: autoName, code: room } : { t: "quick", name: autoName });
+      }
+    };
+    ws.onclose = () => {
+      lobby.markDisconnected();
+      if (lobby.token() && retries < 15) {
+        retries++;
+        statusEl.textContent = `연결이 끊겼습니다. 다시 접속하는 중... (${retries}/15)`;
+        setTimeout(connect, 2000);
+        return;
+      }
+      lobby.clearToken();
+      statusEl.textContent = "";
+      lobby.showLobby("서버와 연결이 끊겼습니다. 서버가 켜져 있는지 확인하고 페이지를 새로 고쳐 주세요");
+    };
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data) as ServerMsg;
+      if (lobby.handle(msg)) return;
+      if (msg.t === "notice") {
+        toast.text = msg.text;
+        toastLeft = 2.5;
+      } else if (msg.t === "state") {
+        latest = msg;
+        statusEl.textContent = `방 ${lobby.roomCode()} · 접속 ${msg.players.length}명 · Esc: 방 메뉴`;
+      }
+    };
   };
+  connect();
 
   // 입력: WASD/방향키 이동, 마우스 조준, 마우스 버튼(또는 스페이스) 누르고 있으면 발사, 캠프 근처에서 1~3 키로 고용
   const cycleWeapon = (dir: number) => {
@@ -430,6 +476,11 @@ async function main() {
     }
   };
   window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      lobby.toggleRoomPanel();
+      return;
+    }
+    if (lobby.blocksGameInput()) return;
     const k = e.key.toLowerCase();
     if (!e.repeat && k === "q") cycleWeapon(1);
     if (!e.repeat && (k === "z" || k === "x" || k === "c")) send({ t: "pick", index: "zxc".indexOf(k) });

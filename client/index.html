@@ -5,13 +5,91 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mercenary</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #14161c; overflow: hidden; }
+      html, body { margin: 0; height: 100%; background: #14161c; overflow: hidden; font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
       canvas { display: block; }
-      #status { position: fixed; top: 8px; left: 8px; color: #cfd3dc; font: 13px sans-serif; }
+      #status { position: fixed; top: 8px; left: 8px; color: #cfd3dc; font-size: 13px; pointer-events: none; }
+
+      .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(10, 11, 15, 0.82); color: #e6e9f0; z-index: 10; }
+      .overlay.open { display: flex; }
+      .panel { box-sizing: border-box; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 20px; background: #1d2029; border: 1px solid #343949; border-radius: 12px; }
+      .panel h1 { margin: 0 0 4px; font-size: 24px; }
+      .panel h2 { margin: 18px 0 8px; font-size: 14px; color: #9aa1b0; font-weight: 600; }
+      .sub { margin: 0; color: #9aa1b0; font-size: 13px; }
+      #lobby { background: #0f1015; } /* 로비는 게임 화면이 비치지 않게 불투명하게 */
+      .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+      .row > input { flex: 1; min-width: 0; }
+      input { box-sizing: border-box; padding: 9px 10px; font-size: 15px; color: #e6e9f0; background: #12141a; border: 1px solid #3a4052; border-radius: 8px; outline: none; }
+      input:focus { border-color: #e0c05d; }
+      button { white-space: nowrap; padding: 9px 14px; font-size: 14px; color: #e6e9f0; background: #2c3140; border: 1px solid #3f4659; border-radius: 8px; cursor: pointer; }
+      button:hover:not(:disabled) { background: #384056; }
+      button:disabled { opacity: 0.45; cursor: default; }
+      button.primary { background: #b8863b; border-color: #d7a24d; color: #1a1306; font-weight: 700; }
+      button.primary:hover:not(:disabled) { background: #cb9644; }
+      button.danger { background: #5b2a2a; border-color: #8a3f3f; }
+      .error { min-height: 18px; margin-top: 10px; font-size: 13px; color: #ff9b8f; }
+      .list { margin-top: 4px; border: 1px solid #2c3140; border-radius: 8px; max-height: 220px; overflow: auto; }
+      .list .empty { padding: 14px; text-align: center; color: #7d8496; font-size: 13px; }
+      .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid #262a37; }
+      .item:last-child { border-bottom: none; }
+      .item .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .item .code { font-family: ui-monospace, monospace; color: #e0c05d; }
+      .item .meta { color: #9aa1b0; font-size: 12px; }
+      .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: #3a3320; color: #e0c05d; }
+      .tag.off { background: #3a2a2a; color: #ff9b8f; }
+      .bigcode { font-family: ui-monospace, monospace; font-size: 30px; letter-spacing: 6px; color: #e0c05d; }
+      .hint { color: #7d8496; font-size: 12px; margin-top: 10px; }
     </style>
   </head>
   <body>
     <div id="status">연결 중...</div>
+
+    <div id="lobby" class="overlay open">
+      <div class="panel">
+        <h1>머서너리</h1>
+        <p class="sub">용병을 고용해 몰려오는 적에 맞서는 협동 서바이벌 (최대 8명)</p>
+
+        <h2>이름</h2>
+        <div class="row"><input id="lobbyName" maxlength="12" placeholder="이름" autocomplete="off" /></div>
+
+        <h2>바로 시작</h2>
+        <div class="row">
+          <button id="lobbyQuick" class="primary">빠른 시작</button>
+          <span class="sub">자리가 있는 방에 들어가거나, 없으면 새로 만듭니다</span>
+        </div>
+
+        <h2>방 만들기</h2>
+        <div class="row">
+          <input id="lobbyRoomName" maxlength="16" placeholder="방 이름 (비우면 자동)" autocomplete="off" />
+          <button id="lobbyCreate">만들기</button>
+        </div>
+
+        <h2>코드로 참가</h2>
+        <div class="row">
+          <input id="lobbyCode" maxlength="4" placeholder="방 코드 4글자" autocomplete="off" style="text-transform: uppercase; letter-spacing: 3px" />
+          <button id="lobbyJoin">참가</button>
+        </div>
+
+        <h2>열려 있는 방</h2>
+        <div id="lobbyList" class="list"></div>
+        <div id="lobbyError" class="error"></div>
+      </div>
+    </div>
+
+    <div id="roomPanel" class="overlay">
+      <div class="panel">
+        <h1 id="roomTitle">방</h1>
+        <p class="sub">친구에게 이 코드를 알려 주세요</p>
+        <div class="row"><span id="roomCode" class="bigcode"></span><button id="roomCopy">복사</button></div>
+        <h2>참가자</h2>
+        <div id="roomMembers" class="list"></div>
+        <div class="row" style="justify-content: flex-end; margin-top: 16px">
+          <button id="roomLeave" class="danger">방 나가기</button>
+          <button id="roomClose">닫기 (Esc)</button>
+        </div>
+        <div class="hint">연결이 끊겨도 30초 안에 같은 브라우저 탭에서 다시 열면 이어서 할 수 있습니다.</div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
