@@ -1,15 +1,51 @@
+import { createServer } from "node:http";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import { TICK_RATE, type ClientMsg, type ServerMsg } from "@mercenary/shared";
 import { RoomManager, type Conn } from "./rooms.js";
+import { serveStatic } from "./static.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
-const MAX_CONNECTIONS = 300;
+const HOST = process.env.HOST ?? "0.0.0.0";
+/** 빌드된 클라이언트 위치. 기본은 저장소의 client/dist */
+const STATIC_DIR = process.env.STATIC_DIR ?? fileURLToPath(new URL("../../client/dist", import.meta.url));
+/** 쉼표로 구분한 허용 출처(예: https://game.example.com). 비우면 모두 허용한다. */
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const MAX_CONNECTIONS = Number(process.env.MAX_CONNECTIONS ?? 300);
 const MAX_MESSAGE_BYTES = 2048; // 정상적인 메시지는 훨씬 작다
 const MAX_MESSAGES_PER_SEC = 120; // 입력 20회/초 + 클릭 등을 넉넉히 허용
 const PING_INTERVAL_MS = 15000;
 
 const manager = new RoomManager();
-const wss = new WebSocketServer({ port: PORT, maxPayload: MAX_MESSAGE_BYTES });
+const hasClient = existsSync(STATIC_DIR);
+
+const http = createServer((req, res) => {
+  if (req.url === "/healthz") {
+    res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true, rooms: manager.roomCount(), connections: metas.size }));
+    return;
+  }
+  if (!hasClient) {
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("클라이언트가 빌드되지 않았습니다. `npm run build`를 먼저 실행하세요.");
+    return;
+  }
+  serveStatic(STATIC_DIR, req, res);
+});
+
+const wss = new WebSocketServer({
+  server: http,
+  path: "/ws",
+  maxPayload: MAX_MESSAGE_BYTES,
+  // 상태 메시지는 반복되는 구조라 압축이 잘 된다(약 1/3). 낮은 압축 단계로 CPU 부담을 줄인다.
+  perMessageDeflate: {
+    threshold: 512,
+    zlibDeflateOptions: { level: 1 },
+    serverNoContextTakeover: true,
+    clientNoContextTakeover: true,
+    concurrencyLimit: 10,
+  },
+  verifyClient: ({ origin }: { origin: string }) => ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin),
+});
 
 interface Meta {
   conn: Conn;
@@ -76,4 +112,8 @@ setInterval(() => {
 
 setInterval(() => manager.step(), 1000 / TICK_RATE);
 
-console.log(`[mercenary] server listening on ws://localhost:${PORT}`);
+http.listen(PORT, HOST, () => {
+  console.log(`[mercenary] http://${HOST}:${PORT}  (게임 접속: /ws, 상태 확인: /healthz)`);
+  if (!hasClient) console.log(`[mercenary] 경고: ${STATIC_DIR} 가 없습니다. 클라이언트를 서비스하려면 'npm run build'를 실행하세요.`);
+  if (ALLOWED_ORIGINS.length) console.log(`[mercenary] 허용 출처: ${ALLOWED_ORIGINS.join(", ")}`);
+});

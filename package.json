@@ -2,12 +2,18 @@
   "name": "mercenary",
   "private": true,
   "version": "0.0.1",
-  "workspaces": ["shared", "server", "client"],
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
   "scripts": {
     "dev:server": "npm run dev -w server",
     "dev:client": "npm run dev -w client",
     "typecheck": "tsc -p shared --noEmit && tsc -p server --noEmit && tsc -p client --noEmit",
-    "test": "npm run test -w server"
+    "test": "npm run test -w server",
+    "build": "npm run build -w client",
+    "start": "npm run start -w server"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

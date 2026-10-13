@@ -28,7 +28,8 @@ import {
 } from "@mercenary/shared";
 
 const params = new URLSearchParams(location.search);
-const serverUrl = params.get("server") ?? `ws://${location.hostname}:8080`;
+// 기본은 접속한 주소와 같은 곳의 /ws. HTTPS 페이지에서는 자동으로 wss가 된다. 개발 서버도 /ws를 게임 서버로 넘겨 준다.
+const serverUrl = params.get("server") ?? `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const statusEl = document.getElementById("status")!;
 
 const PLAYER_COLORS = [0xe05d5d, 0x5da6e0, 0x6fd16f, 0xe0c05d, 0xb07be0, 0x5de0d0, 0xe08f5d, 0xd96fb0];
