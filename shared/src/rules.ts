@@ -47,19 +47,19 @@ export interface UnitStats {
 const deg = (d: number) => (d * Math.PI) / 180;
 
 export const MERC_STATS: readonly UnitStats[] = [
-  { hp: 70, speed: 150, reach: 30, damage: 14, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 450 },
-  { hp: 60, speed: 95, reach: 58, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(25), ranged: false, radius: 13, leash: 150 },
-  { hp: 40, speed: 95, reach: 280, damage: 8, windup: 0.25, cooldown: 1.0, arc: 0, ranged: true, radius: 12, leash: 0 },
-  { hp: 120, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 120 },
-  { hp: 90, speed: 75, reach: 40, damage: 18, windup: 0.5, cooldown: 1.4, arc: deg(90), ranged: false, radius: 15, leash: 110 },
+  { hp: 110, speed: 150, reach: 30, damage: 14, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 450 },
+  { hp: 100, speed: 95, reach: 58, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(25), ranged: false, radius: 13, leash: 150 },
+  { hp: 65, speed: 95, reach: 280, damage: 8, windup: 0.25, cooldown: 1.0, arc: 0, ranged: true, radius: 12, leash: 0 },
+  { hp: 180, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 120 },
+  { hp: 140, speed: 75, reach: 40, damage: 18, windup: 0.5, cooldown: 1.4, arc: deg(90), ranged: false, radius: 15, leash: 110 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
-  { hp: 24, speed: 125, reach: 28, damage: 10, windup: 0.35, cooldown: 1.2, arc: deg(55), ranged: false, radius: 12, leash: 0 },
-  { hp: 28, speed: 85, reach: 52, damage: 9, windup: 0.45, cooldown: 1.3, arc: deg(22), ranged: false, radius: 12, leash: 0 },
-  { hp: 18, speed: 75, reach: 260, damage: 7, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0 },
-  { hp: 45, speed: 70, reach: 30, damage: 8, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0 },
-  { hp: 36, speed: 60, reach: 38, damage: 14, windup: 0.7, cooldown: 1.8, arc: deg(85), ranged: false, radius: 14, leash: 0 },
+  { hp: 24, speed: 125, reach: 28, damage: 6, windup: 0.35, cooldown: 1.2, arc: deg(55), ranged: false, radius: 12, leash: 0 },
+  { hp: 28, speed: 85, reach: 52, damage: 5, windup: 0.45, cooldown: 1.3, arc: deg(22), ranged: false, radius: 12, leash: 0 },
+  { hp: 18, speed: 75, reach: 260, damage: 4.5, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0 },
+  { hp: 45, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0 },
+  { hp: 36, speed: 60, reach: 38, damage: 7.5, windup: 0.7, cooldown: 1.8, arc: deg(85), ranged: false, radius: 14, leash: 0 },
 ];
 
 /** 적 생성 비율(기병, 창병, 궁병, 검방병, 둔기병) */
@@ -125,8 +125,13 @@ export function angleDiff(a: number, b: number): number {
 }
 
 // 경험치와 레벨: 처치 경험치의 일부는 처치한 사람에게, 나머지는 모든 플레이어에게 똑같이 나뉜다(뒤처져도 따라갈 수 있게).
-export const ENEMY_XP = [6, 5, 5, 6, 8] as const; // 병종별 처치 경험치
+export const ENEMY_XP = [3, 2.5, 2.5, 3, 4] as const; // 병종별 처치 경험치
 export const XP_TEAM_SHARE = 0.5; // 팀 공유 비율. 나머지(0.5)는 처치한 사람 몫
 export function xpNeeded(level: number): number {
-  return 20 + 15 * (level - 1);
+  return 20 + 22 * (level - 1);
 }
+
+// 레벨업 순간의 밀어내기: 주변 적을 밀쳐 내고 잠깐 공격하지 못하게 한다(카드를 고를 숨 돌릴 틈)
+export const LEVELUP_PUSH_RADIUS = 240;
+export const LEVELUP_PUSH_DISTANCE = 170;
+export const LEVELUP_STUN_SEC = 0.8;

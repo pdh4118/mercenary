@@ -5,6 +5,11 @@ import {
   BLUNT,
   CAMP_FIRST_SPAWN_SEC,
   CAMP_USE_RADIUS,
+  LEVELUP_PUSH_DISTANCE,
+  LEVELUP_PUSH_RADIUS,
+  LEVELUP_STUN_SEC,
+  WEAPONS,
+  WEAPON_SWITCH_DELAY_SEC,
   CARDS,
   ENEMY_XP,
   OFFER_SIZE,
@@ -224,8 +229,9 @@ test("적의 공격은 병종 상성에 따라 용병에게 들어가는 피해�
     return MERC_STATS[mercType]!.hp - g.getMerc(merc)!.hp;
   };
   // 기병은 창병에게 약하다(방어 쪽 창병이 기병의 공격을 덜 받는 게 아니라, 기병→창병 배율 0.6)
-  assert.equal(dmgTo(SPEAR), ENEMY_STATS[CAVALRY]!.damage * typeMultiplier(CAVALRY, SPEAR));
-  assert.equal(dmgTo(ARCHER), ENEMY_STATS[CAVALRY]!.damage * typeMultiplier(CAVALRY, ARCHER));
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+  assert.ok(near(dmgTo(SPEAR), ENEMY_STATS[CAVALRY]!.damage * typeMultiplier(CAVALRY, SPEAR)));
+  assert.ok(near(dmgTo(ARCHER), ENEMY_STATS[CAVALRY]!.damage * typeMultiplier(CAVALRY, ARCHER)));
   assert.ok(dmgTo(ARCHER) > dmgTo(SPEAR));
 });
 
@@ -747,4 +753,115 @@ test("카드 효과: 용병 부활 시간 단축", () => {
   }
   assert.ok(g.getMerc(m)!.respawn > 0);
   assert.ok(g.getMerc(m)!.respawn <= MERC_RESPAWN_SEC[SPEAR] * 0.8 + 1e-9);
+});
+
+// --- 주인공 무기 ------------------------------------------------------------
+
+/** 무기를 들고 정면(동쪽)으로 공격하며, 대상이 처음 피해를 입는 순간까지 진행한다 */
+const swingUntilHit = (g: Game, id: number, enemy: number) => {
+  const full = g.getEnemy(enemy)!.hp;
+  g.setInput(id, { ...idle, fire: true });
+  for (let i = 0; i < 40 && g.getEnemy(enemy) && g.getEnemy(enemy)!.hp === full; i++) g.step();
+  return g.getEnemy(enemy)?.hp;
+};
+
+test("무기 목록: 활·창·검·철퇴가 각각 궁병·창병·검방병·둔기병 속성이다", () => {
+  assert.deepEqual(WEAPONS.map((w) => w.name), ["활", "창", "검", "철퇴"]);
+  assert.deepEqual(WEAPONS.map((w) => w.type), [ARCHER, SPEAR, SHIELD, BLUNT]);
+  assert.equal(WEAPONS[0]!.ranged, true);
+});
+
+test("창: 정면 부채꼴의 적만 맞히고 병종 상성 배율이 적용된다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  g.setWeapon(a, 1);
+  const front = g.spawnEnemyAt(p.x + 60, p.y, SHIELD);
+  const behind = g.spawnEnemyAt(p.x - 40, p.y, SHIELD);
+  const after = swingUntilHit(g, a, front);
+  assert.equal(after, ENEMY_STATS[SHIELD]!.hp - WEAPONS[1]!.damage * typeMultiplier(SPEAR, SHIELD));
+  assert.equal(g.getEnemy(behind)!.hp, ENEMY_STATS[SHIELD]!.hp, "뒤에 있는 적은 맞지 않는다");
+  assert.ok(me(g, a).swing > 0, "휘두르는 이펙트 정보가 전달된다");
+});
+
+test("창은 사거리 밖의 적을 맞히지 못한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  g.setWeapon(a, 1);
+  const far = g.spawnEnemyAt(p.x + WEAPONS[1]!.reach + 80, p.y, SHIELD);
+  g.setInput(a, { ...idle, fire: true });
+  run(g, 0.3);
+  assert.equal(g.getEnemy(far)!.hp, ENEMY_STATS[SHIELD]!.hp);
+});
+
+test("검은 궁병에게 강하고, 철퇴는 검방병에게 강하다", () => {
+  const sword = quiet();
+  const a = sword.addPlayer("a")!;
+  const pa = me(sword, a);
+  sword.setWeapon(a, 2);
+  const archer = sword.spawnEnemyAt(pa.x + 40, pa.y, ARCHER);
+  assert.equal(swingUntilHit(sword, a, archer), ENEMY_STATS[ARCHER]!.hp - WEAPONS[2]!.damage * typeMultiplier(SHIELD, ARCHER));
+  assert.ok(typeMultiplier(SHIELD, ARCHER) > 1);
+
+  const mace = quiet();
+  const b = mace.addPlayer("b")!;
+  const pb = me(mace, b);
+  mace.setWeapon(b, 3);
+  const shield = mace.spawnEnemyAt(pb.x + 40, pb.y, SHIELD);
+  assert.equal(swingUntilHit(mace, b, shield), ENEMY_STATS[SHIELD]!.hp - WEAPONS[3]!.damage * typeMultiplier(BLUNT, SHIELD));
+  assert.ok(typeMultiplier(BLUNT, SHIELD) > 1);
+});
+
+test("활도 궁병 속성이라 창병 적에게 강하다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const spear = g.spawnEnemyAt(p.x + 200, p.y, SPEAR);
+  const after = swingUntilHit(g, a, spear);
+  assert.equal(after, ENEMY_STATS[SPEAR]!.hp - WEAPONS[0]!.damage * typeMultiplier(ARCHER, SPEAR));
+});
+
+test("무기를 바꾼 직후에는 잠깐 공격할 수 없다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const e = g.spawnEnemyAt(p.x + 40, p.y, SHIELD);
+  g.setWeapon(a, 3);
+  g.setInput(a, { ...idle, fire: true });
+  run(g, WEAPON_SWITCH_DELAY_SEC - 0.1);
+  assert.equal(g.getEnemy(e)!.hp, ENEMY_STATS[SHIELD]!.hp);
+  run(g, 0.3);
+  assert.ok(g.getEnemy(e)!.hp < ENEMY_STATS[SHIELD]!.hp);
+});
+
+test("무기 변경 검증: 범위 밖·소수·같은 무기는 무시된다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  for (const bad of [-1, WEAPONS.length, 1.5, Number.NaN, "2", null]) assert.equal(g.setWeapon(a, bad), false);
+  assert.equal(g.setWeapon(a, 0), false);
+  assert.equal(g.getPlayer(a)!.weapon, 0);
+  assert.equal(g.setWeapon(a, 2), true);
+  assert.equal(g.getPlayer(a)!.weapon, 2);
+});
+
+// --- 레벨업 밀어내기 -----------------------------------------------------------
+
+test("레벨업하면 주변 적이 밀려나고 하던 공격이 끊기며 잠깐 공격하지 못한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = { ...me(g, a) };
+  const near = g.spawnEnemyAt(p.x + 30, p.y, SPEAR);
+  const far = g.spawnEnemyAt(p.x + LEVELUP_PUSH_RADIUS + 120, p.y, SPEAR);
+  g.step();
+  assert.ok(g.getEnemy(near)!.atkT > 0, "공격 준비 중");
+  const farX = g.getEnemy(far)!.x;
+  g.giveXp(a, xpNeeded(1));
+  const e = g.getEnemy(near)!;
+  assert.ok(Math.hypot(e.x - p.x, e.y - p.y) > 30 + LEVELUP_PUSH_DISTANCE * 0.9, "멀리 밀려난다");
+  assert.equal(e.atkT, 0);
+  assert.ok(e.cd >= LEVELUP_STUN_SEC - 1e-9);
+  assert.equal(g.getEnemy(far)!.x, farX, "범위 밖의 적은 그대로");
+  run(g, 0.5);
+  assert.equal(me(g, a).hp, PLAYER_MAX_HP, "그 사이 피해를 입지 않는다");
 });

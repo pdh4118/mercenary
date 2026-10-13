@@ -2,6 +2,7 @@
 
 export * from "./rules.js";
 export * from "./cards.js";
+import { ARCHER, BLUNT, SHIELD, SPEAR } from "./rules.js";
 
 export const TICK_RATE = 20; // 서버가 초당 계산·전송하는 횟수
 export const MAX_PLAYERS = 8;
@@ -21,11 +22,34 @@ export const BULLET_RANGE = 520;
 export const BULLET_RADIUS = 5;
 export const BULLET_DAMAGE = 10;
 
+/**
+ * 주인공 무기. 무기마다 병종 속성이 있어 같은 상성표(COUNTER_MATRIX)가 적용된다.
+ * 활은 원거리 투사체, 나머지는 조준 방향으로 부채꼴을 휘두르는 근접 무기다.
+ */
+export interface WeaponDef {
+  name: string;
+  type: number; // 상성에 쓰는 병종
+  ranged: boolean;
+  reach: number; // 근접: 휘두르는 거리
+  arc: number; // 근접: 부채꼴 반각(라디안)
+  damage: number;
+  cooldown: number;
+}
+const rad = (d: number) => (d * Math.PI) / 180;
+export const WEAPONS: readonly WeaponDef[] = [
+  { name: "활", type: ARCHER, ranged: true, reach: BULLET_RANGE, arc: 0, damage: BULLET_DAMAGE, cooldown: FIRE_COOLDOWN_SEC },
+  { name: "창", type: SPEAR, ranged: false, reach: 74, arc: rad(20), damage: 17, cooldown: 0.5 },
+  { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 11, cooldown: 0.3 },
+  { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 26, cooldown: 0.85 },
+];
+export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
+export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간
+
 // 적 생성
 export const ENEMY_SPAWN_DISTANCE = 650; // 플레이어로부터 이 거리(화면 밖)에서 생성
 export const ENEMY_MAX = 400;
-export const ENEMY_SPAWN_BASE_PER_SEC = 1.5; // 플레이어 1명당
-export const ENEMY_SPAWN_GROWTH_PER_SEC = 0.03; // 시간이 지날수록 초당 늘어나는 양
+export const ENEMY_SPAWN_BASE_PER_SEC = 0.9; // 플레이어 1명당
+export const ENEMY_SPAWN_GROWTH_PER_SEC = 0.012; // 시간이 지날수록 초당 늘어나는 양
 
 export interface PlayerState {
   id: number;
@@ -37,6 +61,8 @@ export interface PlayerState {
   kills: number;
   gold: number;
   maxHp: number;
+  weapon: number; // WEAPONS 인덱스
+  swing: number; // 근접 공격 이펙트가 남은 시간(초), 0이면 없음
   level: number;
   xp: number; // 현재 레벨에서 모은 경험치
   xpNeed: number; // 다음 레벨까지 필요한 경험치
@@ -81,6 +107,7 @@ export type ClientMsg =
   | { t: "join"; name: string }
   | { t: "input"; dx: number; dy: number; aim: number; fire: boolean }
   | { t: "buy"; camp: number; slot: number }
+  | { t: "weapon"; index: number } // 무기 변경(WEAPONS 인덱스)
   | { t: "pick"; index: number } // 레벨업 카드 선택(0..2)
   | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number }; // 기병 돌격 지시(월드 좌표)

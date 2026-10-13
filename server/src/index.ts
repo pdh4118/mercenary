@@ -36,6 +36,9 @@ wss.on("connection", (ws) => {
       if (id === undefined) return;
       const result = game.buy(id, Number(msg.camp), Number(msg.slot));
       if (!result.ok) send(ws, { t: "notice", text: result.reason });
+    } else if (msg.t === "weapon") {
+      const id = ids.get(ws);
+      if (id !== undefined) game.setWeapon(id, msg.index);
     } else if (msg.t === "pick") {
       const id = ids.get(ws);
       if (id !== undefined) game.pick(id, Number(msg.index));

@@ -7,6 +7,12 @@ import {
   xpNeeded,
   type CardEffect,
   BULLET_DAMAGE,
+  LEVELUP_PUSH_DISTANCE,
+  LEVELUP_PUSH_RADIUS,
+  LEVELUP_STUN_SEC,
+  SWING_VISUAL_SEC,
+  WEAPONS,
+  WEAPON_SWITCH_DELAY_SEC,
   BULLET_RADIUS,
   BULLET_RANGE,
   BULLET_SPEED,
@@ -106,6 +112,7 @@ const newMods = (): Mods => ({
 });
 
 interface Slot {
+  switchCd: number; // 무기를 바꾼 직후 공격할 수 없는 남은 시간
   mods: Mods;
   state: PlayerState;
   input: PlayerInput;
@@ -205,6 +212,8 @@ export class Game {
         y: 0,
         hp: PLAYER_MAX_HP,
         maxHp: PLAYER_MAX_HP,
+        weapon: 0,
+        swing: 0,
         aim: 0,
         kills: 0,
         gold: START_GOLD,
@@ -221,6 +230,7 @@ export class Game {
         respawn: 0,
       },
       mods: newMods(),
+      switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false },
       fireCd: 0,
       facing: 0,
@@ -498,23 +508,50 @@ export class Game {
       p.aim = s.input.aim;
       const turn = FORMATION_TURN_RATE * dt;
       s.facing += Math.max(-turn, Math.min(turn, angleDiff(p.aim, s.facing)));
-      if (s.input.fire && s.fireCd <= 0) {
-        s.fireCd = FIRE_COOLDOWN_SEC / s.mods.heroFireRate;
-        this.bullets.push({
-          id: this.nextEntityId++,
-          x: p.x,
-          y: p.y,
-          vx: Math.cos(p.aim) * BULLET_SPEED,
-          vy: Math.sin(p.aim) * BULLET_SPEED,
-          left: BULLET_RANGE,
-          hostile: false,
-          damage: BULLET_DAMAGE * s.mods.heroDmg,
-          srcType: NO_TYPE,
-          owner: p.id,
-          radius: BULLET_RADIUS,
-        });
-      }
+      s.switchCd = Math.max(0, s.switchCd - dt);
+      p.swing = Math.max(0, p.swing - dt);
+      if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0) this.useWeapon(s);
     }
+  }
+
+  /** 주인공 공격. 활은 투사체를 쏘고, 나머지는 조준 방향 부채꼴을 즉시 휘두른다. 모두 무기의 병종 상성을 받는다. */
+  private useWeapon(s: Slot): void {
+    const p = s.state;
+    const w = WEAPONS[p.weapon]!;
+    const damage = w.damage * s.mods.heroDmg;
+    s.fireCd = w.cooldown / s.mods.heroFireRate;
+    if (w.ranged) {
+      this.bullets.push({
+        id: this.nextEntityId++,
+        x: p.x,
+        y: p.y,
+        vx: Math.cos(p.aim) * BULLET_SPEED,
+        vy: Math.sin(p.aim) * BULLET_SPEED,
+        left: w.reach,
+        hostile: false,
+        damage,
+        srcType: w.type,
+        owner: p.id,
+        radius: BULLET_RADIUS,
+      });
+      return;
+    }
+    p.swing = SWING_VISUAL_SEC;
+    for (const e of [...this.enemies.values()]) {
+      if (Math.hypot(e.x - p.x, e.y - p.y) > w.reach + ENEMY_STATS[e.type]!.radius) continue;
+      if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > w.arc) continue;
+      this.damageEnemy(e, damage * typeMultiplier(w.type, e.type), p.id);
+    }
+  }
+
+  /** 무기를 바꾼다. 바꾼 직후에는 잠깐 공격할 수 없다. */
+  setWeapon(playerId: number, index: unknown): boolean {
+    const s = this.slots.get(playerId);
+    if (!s || typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= WEAPONS.length) return false;
+    if (s.state.weapon === index) return false;
+    s.state.weapon = index;
+    s.switchCd = WEAPON_SWITCH_DELAY_SEC;
+    return true;
   }
 
   private stepCamps(dt: number): void {
@@ -554,7 +591,8 @@ export class Game {
     const alive = this.alivePlayers();
     if (alive.length === 0) return;
     const perPlayer = ENEMY_SPAWN_BASE_PER_SEC + ENEMY_SPAWN_GROWTH_PER_SEC * this.time;
-    this.spawnBudget += perPlayer * alive.length * dt;
+    // 인원이 늘수록 적도 늘지만, 아군 전력도 함께 늘어나므로 인원 수에 정비례시키지는 않는다
+    this.spawnBudget += perPlayer * Math.pow(alive.length, 0.75) * dt;
     const totalWeight = ENEMY_SPAWN_WEIGHTS.reduce((a, b) => a + b, 0);
     while (this.spawnBudget >= 1) {
       this.spawnBudget -= 1;
@@ -826,13 +864,32 @@ export class Game {
     if (!s || amount <= 0) return;
     const p = s.state;
     p.xp += amount;
+    let leveled = false;
     while (p.xp >= p.xpNeed) {
       p.xp -= p.xpNeed;
       p.level++;
       p.xpNeed = xpNeeded(p.level);
       p.pending++;
+      leveled = true;
     }
+    if (leveled && p.respawn <= 0) this.levelUpPush(p);
     if (p.pending > 0 && p.offer.length === 0) p.offer = this.rollOffer(s);
+  }
+
+  /** 레벨업 순간 주변 적을 밀어내고 잠깐 공격하지 못하게 한다(카드를 고를 숨 돌릴 틈) */
+  private levelUpPush(p: PlayerState): void {
+    for (const e of this.enemies.values()) {
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      const d = Math.hypot(dx, dy);
+      if (d > LEVELUP_PUSH_RADIUS) continue;
+      const nx = d > 0.001 ? dx / d : Math.cos(e.id);
+      const ny = d > 0.001 ? dy / d : Math.sin(e.id);
+      e.x = clampToWorld(e.x + nx * LEVELUP_PUSH_DISTANCE, 14);
+      e.y = clampToWorld(e.y + ny * LEVELUP_PUSH_DISTANCE, 14);
+      e.atkT = 0; // 하던 공격 동작을 끊는다
+      e.cd = Math.max(e.cd, LEVELUP_STUN_SEC);
+    }
   }
 
   /** 레벨업 카드를 고른다. 선택은 각자 하며 게임은 멈추지 않는다. */

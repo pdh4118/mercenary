@@ -4,6 +4,10 @@ import {
   CARDS,
   CARD_CATEGORY_NAMES,
   CAMP_USE_RADIUS,
+  COUNTER_MATRIX,
+  LEVELUP_PUSH_RADIUS,
+  SWING_VISUAL_SEC,
+  WEAPONS,
   ENEMY_STATS,
   MERC_STATS,
   PLAYER_RADIUS,
@@ -321,8 +325,49 @@ async function main() {
         .fill(CATEGORY_COLORS[card.category]!);
     });
   };
-  hud.addChild(hudText, xpBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
+  // 무기 바: 현재 무기와 상성(유리/불리)을 보여 준다
+  const SLOT_W = 76;
+  const weaponBar = new Container();
+  const weaponSlots = WEAPONS.map((w, i) => {
+    const node = new Container();
+    node.position.set(i * (SLOT_W + 4), 16);
+    const bg = new Graphics();
+    const label = new Text({ text: w.name, style: { fill: 0xffffff, fontSize: 15, fontWeight: "bold" } });
+    label.anchor.set(0.5, 0);
+    label.position.set(SLOT_W / 2, 8);
+    const sub = new Text({ text: `${UNIT_NAMES[w.type]}계`, style: { fill: 0xb8bdc9, fontSize: 11 } });
+    sub.anchor.set(0.5, 0);
+    sub.position.set(SLOT_W / 2, 30);
+    node.addChild(bg, label, sub);
+    weaponBar.addChild(node);
+    return { bg };
+  });
+  const weaponHint = new Text({ text: "", style: { fill: 0xcfd3dc, fontSize: 12 } });
+  weaponHint.position.set(0, 70);
+  const weaponTitle = new Text({ text: "무기 전환: Q / 마우스 휠", style: { fill: 0x9aa1b0, fontSize: 11 } });
+  weaponBar.addChild(weaponTitle, weaponHint);
+  let shownWeapon = -1;
+  const drawWeaponBar = (active: number) => {
+    if (active === shownWeapon) return;
+    shownWeapon = active;
+    weaponSlots.forEach((slot, i) => {
+      const color = TYPE_COLORS[WEAPONS[i]!.type]!;
+      slot.bg
+        .clear()
+        .roundRect(0, 0, SLOT_W, 50, 6)
+        .fill({ color: i === active ? darken(color, 0.55) : 0x000000, alpha: i === active ? 0.9 : 0.5 })
+        .stroke({ width: i === active ? 3 : 1, color });
+    });
+    const row = COUNTER_MATRIX[WEAPONS[active]!.type]!;
+    const names = (pred: (m: number) => boolean) => UNIT_TYPES.filter((t) => pred(row[t]!)).map((t) => UNIT_NAMES[t]).join("·") || "-";
+    weaponHint.text = `유리: ${names((m) => m > 1)}   불리: ${names((m) => m < 1)}`;
+  };
+  weaponBar.visible = false;
+  hud.addChild(hudText, xpBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
+  const levelOf = new Map<number, number>();
+  const rings: { x: number; y: number; age: number }[] = [];
+  const RING_SEC = 0.5;
   let latest: Extract<ServerMsg, { t: "state" }> | null = null;
   let myId = -1;
   let toastLeft = 0;
@@ -350,6 +395,11 @@ async function main() {
   };
 
   // 입력: WASD/방향키 이동, 마우스 조준, 마우스 버튼(또는 스페이스) 누르고 있으면 발사, 캠프 근처에서 1~3 키로 고용
+  const cycleWeapon = (dir: number) => {
+    const cur = latest?.players.find((p) => p.id === myId)?.weapon;
+    if (cur === undefined) return;
+    send({ t: "weapon", index: (cur + dir + WEAPONS.length) % WEAPONS.length });
+  };
   const keys = new Set<string>();
   let firing = false;
   let mouseX = app.screen.width / 2 + 1;
@@ -369,6 +419,7 @@ async function main() {
   };
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
+    if (!e.repeat && k === "q") cycleWeapon(1);
     if (!e.repeat && (k === "z" || k === "x" || k === "c")) send({ t: "pick", index: "zxc".indexOf(k) });
     if (!e.repeat && nearCampId >= 0) {
       if (!e.shiftKey && (k === "1" || k === "2" || k === "3")) send({ t: "buy", camp: nearCampId, slot: Number(k) - 1 });
@@ -395,6 +446,14 @@ async function main() {
   });
   window.addEventListener("pointerup", () => ((firing = false), pushInput()));
   app.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  app.canvas.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      if (e.deltaY !== 0) cycleWeapon(e.deltaY > 0 ? 1 : -1);
+    },
+    { passive: false },
+  );
   setInterval(() => pushInput(true), 1000 / TICK_RATE);
 
   /** 공격 예고(부채꼴 또는 직선). 진행될수록 진해지고, 끝나는 순간 판정이 일어난다. */
@@ -438,8 +497,12 @@ async function main() {
         v.aimLine
           .moveTo(Math.cos(p.aim) * PLAYER_RADIUS, Math.sin(p.aim) * PLAYER_RADIUS)
           .lineTo(Math.cos(p.aim) * (PLAYER_RADIUS + 14), Math.sin(p.aim) * (PLAYER_RADIUS + 14))
-          .stroke({ width: 4, color: 0xffffff });
+          .stroke({ width: 4, color: TYPE_COLORS[WEAPONS[p.weapon]!.type]! });
       }
+      // 레벨업을 감지해 밀어내기 고리를 띄운다(처음 접속 시에는 제외)
+      const seenLevel = levelOf.get(p.id);
+      if (seenLevel !== undefined && p.level > seenLevel) rings.push({ x: v.x, y: v.y, age: 0 });
+      levelOf.set(p.id, p.level);
     });
     camps.update(latest.camps, k, (v, w) => {
       v.label.text = `캠프 ${Math.ceil(w[3])}초`;
@@ -458,6 +521,28 @@ async function main() {
       const v = mercs.views.get(w[0]);
       const st = MERC_STATS[w[4]]!;
       if (v) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!);
+    }
+
+    // 근접 무기 휘두르기 이펙트와 레벨업 밀어내기 고리
+    for (const p of latest.players) {
+      const w = WEAPONS[p.weapon]!;
+      const v = players.views.get(p.id);
+      if (!v || p.swing <= 0 || w.ranged) continue;
+      fxLayer
+        .moveTo(v.x, v.y)
+        .arc(v.x, v.y, w.reach, p.aim - w.arc, p.aim + w.arc)
+        .closePath()
+        .fill({ color: TYPE_COLORS[w.type]!, alpha: 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC) });
+    }
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const r = rings[i]!;
+      r.age += ticker.deltaMS / 1000;
+      if (r.age >= RING_SEC) {
+        rings.splice(i, 1);
+        continue;
+      }
+      const k2 = r.age / RING_SEC;
+      fxLayer.circle(r.x, r.y, LEVELUP_PUSH_RADIUS * (0.25 + 0.75 * k2)).stroke({ width: 5 * (1 - k2) + 1, color: 0xffe08a, alpha: 0.8 * (1 - k2) });
     }
 
     // 카메라와 HUD
@@ -496,6 +581,8 @@ async function main() {
         .roundRect(52, 91, 160 * Math.min(1, meState.xp / meState.xpNeed), 7, 3)
         .fill(0xffe08a);
       showOffer(meState.offer, meState.pending);
+      weaponBar.visible = true;
+      drawWeaponBar(meState.weapon);
       if (lastLevel > 0 && meState.level > lastLevel) {
         levelToast.text = `레벨 ${meState.level}!`;
         levelToastLeft = 2;
@@ -540,6 +627,7 @@ async function main() {
     levelToastLeft = Math.max(0, levelToastLeft - ticker.deltaMS / 1000);
     levelToast.visible = levelToastLeft > 0;
     levelToast.position.set(app.screen.width / 2, 100);
+    weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 100);
     cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(110, app.screen.height / 2 - 130));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
