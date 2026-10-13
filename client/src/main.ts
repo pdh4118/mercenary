@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
+import { Application, Assets, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
 import {
   BULLET_RADIUS,
   CARDS,
@@ -34,6 +34,12 @@ const statusEl = document.getElementById("status")!;
 const PLAYER_COLORS = [0xe05d5d, 0x5da6e0, 0x6fd16f, 0xe0c05d, 0xb07be0, 0x5de0d0, 0xe08f5d, 0xd96fb0];
 /** 병종 색: 기병 주황, 창병 초록, 궁병 노랑, 검방병 파랑, 둔기병 보라 */
 const TYPE_COLORS = [0xe8883a, 0x6fc46f, 0xe6d45d, 0x5da6e0, 0xb07be0];
+/** 스프라이트 파일 이름(병종 번호 순서) */
+const UNIT_FILES = ["cavalry", "spear", "archer", "sword", "mace"] as const;
+/** 이미지는 화면 표시 크기의 약 2배로 만들어 두었다 */
+const SPRITE_SCALE = 0.5;
+/** 스프라이트 기준점: 가로 중앙, 세로는 몸통 쪽(발은 그 아래). 서버의 유닛 좌표가 몸통 중심이 된다. */
+const SPRITE_ANCHOR_Y = 0.65;
 const SMOOTH_MS = 60; // 서버 스냅샷(20Hz)을 따라가는 보간 시간 상수
 const SNAP_DISTANCE = 200; // 이보다 멀리 떨어지면(부활·순간이동) 미끄러지지 않고 바로 이동
 
@@ -83,22 +89,6 @@ class Pool<T extends Tracked, W> {
   }
 }
 
-/** 병종별 모양: 기병 마름모, 창병 삼각형, 궁병 원, 검방병 사각형, 둔기병 육각형 */
-function drawShape(g: Graphics, type: number, r: number): Graphics {
-  switch (type) {
-    case 0:
-      return g.poly([0, -r * 1.2, r * 0.95, 0, 0, r * 1.2, -r * 0.95, 0]);
-    case 1:
-      return g.poly([0, -r * 1.15, r * 1.05, r * 0.85, -r * 1.05, r * 0.85]);
-    case 2:
-      return g.circle(0, 0, r);
-    case 3:
-      return g.roundRect(-r, -r, r * 2, r * 2, r * 0.25);
-    default:
-      return g.poly(Array.from({ length: 6 }, (_, i) => [Math.cos((i * Math.PI) / 3) * r * 1.1, Math.sin((i * Math.PI) / 3) * r * 1.1]).flat());
-  }
-}
-
 function darken(color: number, f: number): number {
   const r = Math.round(((color >> 16) & 255) * f);
   const g = Math.round(((color >> 8) & 255) * f);
@@ -124,11 +114,10 @@ async function main() {
   grid.rect(-half, -half, WORLD_SIZE, WORLD_SIZE).stroke({ width: 4, color: 0x5a3b3b });
   world.addChild(grid);
 
-  // 적은 수백 마리가 되므로 병종별 텍스처를 한 번 만들어 스프라이트로 재사용한다
+  // 병종 스프라이트(기병, 창병, 궁병, 검방병, 둔기병 순). 적은 수백 마리가 되므로 텍스처 하나를 모두가 공유한다.
+  const loadUnits = (side: "ally" | "enemy") => Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/units/${side}_${f}.png`)));
+  const [allyTex, enemyTex] = await Promise.all([loadUnits("ally"), loadUnits("enemy")]);
   const tex = (g: Graphics): Texture => app.renderer.generateTexture(g);
-  const enemyTex = UNIT_TYPES.map((t) =>
-    tex(drawShape(new Graphics(), t, ENEMY_STATS[t]!.radius).fill(darken(TYPE_COLORS[t]!, 0.4)).stroke({ width: 2, color: 0x4a1212 })),
-  );
   const friendlyBullet = tex(new Graphics().circle(0, 0, BULLET_RADIUS).fill(0xfff1a8));
   const hostileBullet = tex(new Graphics().circle(0, 0, BULLET_RADIUS).fill(0xff6a5a));
 
@@ -138,18 +127,31 @@ async function main() {
   const bulletLayer = new Container();
   const mercLayer = new Container();
   const playerLayer = new Container();
+  enemyLayer.sortableChildren = true; // 아래쪽에 있는 유닛이 위에 그려지게(깊이 정렬)
+  mercLayer.sortableChildren = true;
   const chargeMark = new Graphics();
   const chargeLabel = new Text({ text: "돌격", style: { fill: 0xffc27a, fontSize: 13 } });
   chargeLabel.anchor.set(0.5, 1);
   chargeMark.visible = chargeLabel.visible = false;
   world.addChild(campLayer, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, chargeMark, chargeLabel);
 
-  const enemies = new Pool<Tracked & { sprite: Sprite }, EnemyWire>(
+  /** 스프라이트는 오른쪽을 보고 그려져 있어, 왼쪽으로 움직이거나 공격할 때는 좌우 반전한다 */
+  interface Facing {
+    lastX: number;
+    face: 1 | -1;
+  }
+  const faceFrom = (v: Facing, x: number, attackAng: number | null) => {
+    if (attackAng !== null) v.face = Math.cos(attackAng) >= 0 ? 1 : -1;
+    else if (Math.abs(x - v.lastX) > 0.15) v.face = x > v.lastX ? 1 : -1;
+    v.lastX = x;
+  };
+
+  const enemies = new Pool<Tracked & Facing & { sprite: Sprite }, EnemyWire>(
     (w) => {
       const sprite = new Sprite(enemyTex[w[4]]!);
-      sprite.anchor.set(0.5);
+      sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       enemyLayer.addChild(sprite);
-      return { node: sprite, sprite, x: 0, y: 0 };
+      return { node: sprite, sprite, x: 0, y: 0, lastX: w[1], face: 1 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -173,21 +175,29 @@ async function main() {
       .fill(hp / max > 0.3 ? 0x6fd16f : 0xe05d5d);
   };
 
-  interface MercView extends Tracked {
+  interface MercView extends Tracked, Facing {
     bar: Graphics;
+    sprite: Sprite;
     lastKey: string;
   }
   const mercs = new Pool<MercView, MercWire>(
     (w) => {
       const node = new Container();
       const st = MERC_STATS[w[4]]!;
-      const body = drawShape(new Graphics(), w[4], st.radius)
-        .fill(TYPE_COLORS[w[4]]!)
-        .stroke({ width: 3, color: PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]! });
+      const t = allyTex[w[4]]!;
+      const color = PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!;
+      // 어느 플레이어의 용병인지 발밑 고리 색으로 구분한다
+      const footY = t.height * SPRITE_SCALE * (1 - SPRITE_ANCHOR_Y) * 0.85;
+      const ring = new Graphics()
+        .ellipse(0, footY, st.radius * 1.25, st.radius * 0.6)
+        .fill({ color, alpha: 0.28 })
+        .stroke({ width: 3, color });
+      const sprite = new Sprite(t);
+      sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       const bar = new Graphics();
-      node.addChild(body, bar);
+      node.addChild(ring, sprite, bar);
       mercLayer.addChild(node);
-      return { node, bar, x: 0, y: 0, lastKey: "" };
+      return { node, bar, sprite, x: 0, y: 0, lastKey: "", lastX: w[1], face: 1 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -255,12 +265,14 @@ async function main() {
   legend.addChild(legendBg);
   let lx = 12;
   for (const t of UNIT_TYPES) {
-    const icon = drawShape(new Graphics(), t, 8).fill(TYPE_COLORS[t]!);
-    icon.position.set(lx + 9, 14);
+    const icon = new Sprite(allyTex[t]!);
+    icon.anchor.set(0.5);
+    icon.scale.set(22 / icon.texture.height);
+    icon.position.set(lx + 14, 14);
     const label = new Text({ text: UNIT_NAMES[t], style: { fill: 0xcfd3dc, fontSize: 12 } });
-    label.position.set(lx + 22, 6);
+    label.position.set(lx + 32, 6);
     legend.addChild(icon, label);
-    lx += 22 + label.width + 12;
+    lx += 32 + label.width + 12;
   }
   const legendText = new Text({
     text: "상성: 창병>기병 · 궁병>창병 · 검방병>궁병 · 둔기병>검방병 · 기병>창병 제외 전부",
@@ -477,15 +489,21 @@ async function main() {
     const k = 1 - Math.exp(-ticker.deltaMS / SMOOTH_MS);
 
     enemies.update(latest.enemies, k, (v, w) => {
-      v.sprite.alpha = 0.6 + 0.4 * Math.min(1, w[3] / ENEMY_STATS[w[4]]!.hp);
+      faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
+      v.sprite.scale.set(SPRITE_SCALE * v.face, SPRITE_SCALE);
+      v.sprite.zIndex = v.y;
+      v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / ENEMY_STATS[w[4]]!.hp);
     });
     bullets.update(latest.bullets, k);
     mercs.update(latest.mercs, k, (v, w) => {
       v.node.visible = w[8] <= 0; // 쓰러진 용병은 부활할 때까지 숨긴다
+      faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
+      v.sprite.scale.set(SPRITE_SCALE * v.face, SPRITE_SCALE);
+      v.node.zIndex = v.y;
       const key = `${w[3]}/${w[9]}`;
       if (v.lastKey !== key) {
         v.lastKey = key;
-        drawBar(v.bar, w[3], w[9], 26, -MERC_STATS[w[4]]!.radius - 9);
+        drawBar(v.bar, w[3], w[9], 26, -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 6);
       }
     });
     players.update(latest.players, k, (v, p) => {
@@ -632,7 +650,7 @@ async function main() {
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 80);
-    campPanel.position.set(app.screen.width / 2 - campPanel.width / 2, app.screen.height - campPanel.height - 84);
+    campPanel.position.set(app.screen.width / 2 - campPanel.width / 2, app.screen.height - campPanel.height - 112);
     toast.position.set(app.screen.width / 2, 74);
     legend.position.set(0, app.screen.height - LEGEND_H);
   });
