@@ -1,0 +1,17 @@
+{
+  "name": "@mercenary/client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@mercenary/shared": "*",
+    "pixi.js": "^8.5.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
