@@ -30,7 +30,7 @@ wss.on("connection", (ws) => {
       send(ws, { t: "welcome", id, tick: game.tick });
     } else if (msg.t === "input") {
       const id = ids.get(ws);
-      if (id !== undefined) game.setInput(id, msg.dx, msg.dy);
+      if (id !== undefined) game.setInput(id, msg);
     }
   });
   ws.on("close", () => {
@@ -42,7 +42,14 @@ wss.on("connection", (ws) => {
 
 setInterval(() => {
   game.step();
-  const payload = JSON.stringify({ t: "state", tick: game.tick, players: game.snapshot() } satisfies ServerMsg);
+  const payload = JSON.stringify({
+    t: "state",
+    tick: game.tick,
+    time: Math.round(game.time * 10) / 10,
+    players: game.snapshotPlayers(),
+    enemies: game.snapshotEnemies(),
+    bullets: game.snapshotBullets(),
+  } satisfies ServerMsg);
   for (const ws of ids.keys()) if (ws.readyState === ws.OPEN) ws.send(payload);
 }, 1000 / TICK_RATE);
 
