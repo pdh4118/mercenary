@@ -581,3 +581,33 @@ test("코드를 가끔 틀리는 것은 괜찮고, 맞게 입력하면 실패 �
     m.handle(c, { t: "leave" });
   }
 });
+
+test("모두 쓰러지면 결과가 전달되고 방은 끝난 상태가 되며, 방장이 다시 하기를 누르면 대기실로 돌아간다", () => {
+  const { m, conn } = setup();
+  const host = conn();
+  m.handle(host, { t: "quick", name: "A" });
+  const guest = conn();
+  m.handle(guest, { t: "join", name: "B", code: host.last("welcome")!.code });
+  const game = m.roomOf(host)!.game;
+  game.autoSpawn = false;
+  const hp = game.getPlayer(host.last("welcome")!.id) as { down: boolean };
+  hp.down = true;
+  (game.getPlayer(guest.last("welcome")!.id) as { down: boolean }).down = true;
+  seconds(m, 0.2);
+  const result = host.last("result")!;
+  assert.equal(result.status, "defeat");
+  assert.equal(result.players.length, 2);
+  assert.ok(guest.last("result"));
+  assert.equal(host.last("room")!.phase, "ended");
+  // 끝난 방에는 새로 들어올 수 없다
+  const late = conn();
+  m.handle(late, { t: "join", name: "C", code: host.last("welcome")!.code });
+  assert.ok(late.last("error"));
+  // 방장이 아니면 다시 하기를 할 수 없다
+  m.handle(guest, { t: "rematch" });
+  assert.equal(host.last("room")!.phase, "ended");
+  m.handle(host, { t: "rematch" });
+  assert.equal(host.last("room")!.phase, "waiting");
+  assert.equal(game.status, "playing");
+  assert.equal(game.getPlayer(host.last("welcome")!.id)!.down, false);
+});

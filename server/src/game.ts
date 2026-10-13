@@ -3,6 +3,33 @@ import {
   BLUNT,
   CARDS,
   ENEMY_XP,
+  ARMY_AGGRO,
+  ARMY_ENGAGE_DISTANCE,
+  ARMY_LEASH,
+  ARMY_MARCH_SPEED,
+  ARMY_SPAWN_DISTANCE,
+  BOSS_DMG_MULT,
+  BOSS_HP_BASE,
+  BOSS_HP_PER_STAGE,
+  BOSS_SIZE,
+  BOSS_SPEED_MULT,
+  EVT_ARROW_HIT,
+  EVT_ENEMY_ARROW_HIT,
+  EVT_REVIVE,
+  EVT_SHIELD_BLOCK,
+  EVT_SHIELD_BREAK,
+  REVIVE_HP_FRAC,
+  REVIVE_INVULN_SEC,
+  REVIVE_RADIUS,
+  REVIVE_SEC,
+  STAGE_BREAK_SEC,
+  STAGE_CLEAR_GOLD,
+  STAGE_CLEAR_XP,
+  STAGE_COUNT,
+  STAGE_ENEMY_DMG_GROWTH,
+  STAGE_ENEMY_HP_GROWTH,
+  STAGE_GROW_SEC,
+  STAGE_SPAWN_GROWTH,
   OFFER_SIZE,
   XP_TEAM_SHARE,
   xpNeeded,
@@ -67,7 +94,6 @@ import {
   NO_TYPE,
   PLAYER_MAX_HP,
   PLAYER_RADIUS,
-  PLAYER_RESPAWN_SEC,
   PLAYER_SPEED,
   SPEAR,
   SPEAR_AVOID_RADIUS,
@@ -84,12 +110,18 @@ import {
   type BulletWire,
   type CampWire,
   type EnemyWire,
+  type EventWire,
+  type GameInfo,
+  type GameStatus,
+  type ResultPlayer,
+  type StagePhase,
   type MercWire,
   type PlayerInput,
   type PlayerState,
   type UnitStats,
 } from "@mercenary/shared";
 import { resolveHit, type Hit } from "./combat.js";
+import { armyLayout, armySize, bossTypeOf } from "./stage.js";
 
 /** 레벨업 카드로 쌓이는 강화 수치(배율은 1이 기본) */
 interface Mods {
@@ -129,6 +161,7 @@ interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
+  revives: number; // 동료를 일으켜 세운 횟수
   facing: number; // 진형이 바라보는 방향. 조준 방향을 천천히 따라간다
 }
 
@@ -148,7 +181,15 @@ interface Fighter {
   chargeSnap: number; // 공격 예비 동작을 시작할 때 정해진 돌격 추가 피해
 }
 
-type Enemy = Fighter;
+interface Enemy extends Fighter {
+  maxHp: number;
+  shieldMax: number;
+  dmgMult: number;
+  boss: boolean; // 보스군의 장군
+  army: boolean; // 보스군 소속(진형 자리를 지킨다)
+  slotF: number; // 진형 자리(행군 방향 기준)
+  slotL: number;
+}
 interface Merc extends Fighter {
   owner: number;
   respawn: number;
@@ -189,7 +230,16 @@ interface Friendly {
   hit: (h: Hit) => number;
 }
 
+/** 시험 플레이용: MERC_STAGE_GROW_SEC=20 처럼 지정하면 성장 시간이 짧아진다 */
+const GROW_SEC = Number(process.env.MERC_STAGE_GROW_SEC) > 0 ? Number(process.env.MERC_STAGE_GROW_SEC) : STAGE_GROW_SEC;
 const SEPARATION_CELL = 32;
+const EVENT_CAP = 80;
+
+interface Army {
+  x: number; // 진형 기준점(장군 뒤 중앙이 아니라 진형 맨 앞 중앙)
+  y: number;
+  heading: number;
+}
 const ENEMY_ARROW_RANGE_FACTOR = 1.2;
 const MERC_ARROW_RANGE_FACTOR = 1.1;
 
@@ -210,6 +260,14 @@ export class Game {
   private nextEntityId = 1;
   private spawnBudget = 0;
   private campTimer = CAMP_FIRST_SPAWN_SEC;
+  private events: EventWire[] = [];
+  private army: Army | null = null;
+  stage = 1;
+  phase: StagePhase = "grow";
+  private phaseT = GROW_SEC; // grow: 보스군 도착까지, break: 다음 스테이지까지
+  private stageTime = 0; // 이번 스테이지에서 흐른 성장 시간(적 생성량 계산용)
+  status: GameStatus = "playing";
+  private armyTotal = 0;
 
   constructor(private rng: () => number = Math.random) {}
 
@@ -221,10 +279,44 @@ export class Game {
     if (this.isFull) return null;
     const id = this.nextId++;
     const clean = name.trim().slice(0, NAME_MAX_LENGTH) || `용병단${id}`;
-    const slot: Slot = {
+    const slot = this.newSlot(id, clean);
+    this.placeAtSpawn(slot.state, id);
+    this.slots.set(id, slot);
+    return id;
+  }
+
+  /** 같은 참가자들로 판을 처음부터 다시 시작한다(다시 하기) */
+  reset(): void {
+    const old = [...this.slots.values()];
+    this.slots.clear();
+    this.enemies.clear();
+    this.mercs.clear();
+    this.camps.clear();
+    this.bullets = [];
+    this.events = [];
+    this.army = null;
+    this.armyTotal = 0;
+    this.time = 0;
+    this.stage = 1;
+    this.phase = "grow";
+    this.phaseT = GROW_SEC;
+    this.stageTime = 0;
+    this.status = "playing";
+    this.spawnBudget = 0;
+    this.campTimer = CAMP_FIRST_SPAWN_SEC;
+    for (const o of old) {
+      const slot = this.newSlot(o.state.id, o.state.name);
+      slot.away = o.away;
+      this.placeAtSpawn(slot.state, o.state.id);
+      this.slots.set(o.state.id, slot);
+    }
+  }
+
+  private newSlot(id: number, name: string): Slot {
+    return {
       state: {
         id,
-        name: clean,
+        name,
         x: 0,
         y: 0,
         hp: PLAYER_MAX_HP,
@@ -244,18 +336,18 @@ export class Game {
         chargeLeft: 0,
         chargeX: 0,
         chargeY: 0,
-        respawn: 0,
+        down: false,
+        revive: 0,
+        invuln: 0,
       },
       mods: newMods(),
       away: false,
       switchCd: 0,
-      input: { dx: 0, dy: 0, aim: 0, fire: false },
+      input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
+      revives: 0,
       facing: 0,
     };
-    this.placeAtSpawn(slot.state, id);
-    this.slots.set(id, slot);
-    return id;
   }
 
   removePlayer(id: number): void {
@@ -273,7 +365,7 @@ export class Game {
     const slot = this.slots.get(id);
     if (!slot) return;
     slot.away = away;
-    if (away) slot.input = { dx: 0, dy: 0, aim: slot.input.aim, fire: false };
+    if (away) slot.input = { dx: 0, dy: 0, aim: slot.input.aim, fire: false, revive: false };
   }
 
   get playerCount(): number {
@@ -284,7 +376,7 @@ export class Game {
   buy(playerId: number, campId: number, offerIndex: number): BuyResult {
     const s = this.slots.get(playerId);
     const camp = this.camps.get(campId);
-    if (!s || s.state.respawn > 0) return { ok: false, reason: "지금은 고용할 수 없습니다" };
+    if (!s || s.state.down) return { ok: false, reason: "지금은 고용할 수 없습니다" };
     if (!camp) return { ok: false, reason: "캠프가 사라졌습니다" };
     if (Math.hypot(camp.x - s.state.x, camp.y - s.state.y) > CAMP_USE_RADIUS) {
       return { ok: false, reason: "캠프가 너무 멉니다" };
@@ -306,7 +398,7 @@ export class Game {
   /** 캠프 근처에서 용병 1명을 해고하고 지불한 금화의 일부를 돌려받는다. 쓰러진 용병, 체력이 낮은 용병 순으로 내보낸다. */
   dismiss(playerId: number, type: number): BuyResult {
     const s = this.slots.get(playerId);
-    if (!s || s.state.respawn > 0) return { ok: false, reason: "지금은 해고할 수 없습니다" };
+    if (!s || s.state.down) return { ok: false, reason: "지금은 해고할 수 없습니다" };
     const nearCamp = [...this.camps.values()].some((c) => Math.hypot(c.x - s.state.x, c.y - s.state.y) <= CAMP_USE_RADIUS);
     if (!nearCamp) return { ok: false, reason: "캠프 근처에서만 해고할 수 있습니다" };
     let pick: Merc | null = null;
@@ -324,7 +416,7 @@ export class Game {
   /** 기병에게 돌격 지점을 지시한다. 주인공 가까운 곳으로 제한하고, 일정 시간 뒤 자동으로 해제된다. */
   charge(playerId: number, x: unknown, y: unknown): void {
     const s = this.slots.get(playerId);
-    if (!s || s.state.respawn > 0 || typeof x !== "number" || typeof y !== "number") return;
+    if (!s || s.state.down || typeof x !== "number" || typeof y !== "number") return;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     const dx = x - s.state.x;
     const dy = y - s.state.y;
@@ -351,6 +443,14 @@ export class Game {
     if (this.slots.size === 0) {
       // 아무도 없으면 판을 초기화해, 다음에 들어온 사람이 난이도가 올라간 판을 받지 않게 한다
       this.time = 0;
+      this.stage = 1;
+      this.phase = "grow";
+      this.phaseT = GROW_SEC;
+      this.stageTime = 0;
+      this.status = "playing";
+      this.army = null;
+      this.armyTotal = 0;
+      this.events = [];
       this.spawnBudget = 0;
       this.campTimer = CAMP_FIRST_SPAWN_SEC;
       this.enemies.clear();
@@ -360,9 +460,14 @@ export class Game {
       this.tick++;
       return;
     }
+    if (this.status !== "playing") {
+      this.tick++;
+      return;
+    }
     const dt = 1 / TICK_RATE;
     this.time += dt;
     this.stepPlayers(dt);
+    this.stepStage(dt);
     this.stepCamps(dt);
     this.spawnEnemies(dt);
     const friendlies = this.collectFriendlies();
@@ -370,6 +475,8 @@ export class Game {
     this.stepEnemies(dt, friendlies);
     this.separateEnemies();
     this.stepBullets(dt, friendlies);
+    // 모든 주인공이 쓰러져 있으면 게임오버(동료가 일으켜 세울 사람이 없다)
+    if ([...this.slots.values()].every((s) => s.state.down)) this.status = "defeat";
     this.tick++;
   }
 
@@ -384,14 +491,15 @@ export class Game {
       e.id,
       round(e.x),
       round(e.y),
-      Math.ceil(e.hp),
+      Math.max(1, Math.ceil((100 * e.hp) / e.maxHp)),
       e.type,
       progress(e, ENEMY_STATS),
       round(e.atkAng, 100),
-      Math.ceil(e.shield),
+      e.shieldMax > 0 ? Math.ceil((100 * e.shield) / e.shieldMax) : 0,
       round(e.face, 100),
       round(e.momentum, 100),
       round(e.regenT, 10),
+      e.boss ? 1 : 0,
     ]);
   }
 
@@ -444,9 +552,201 @@ export class Game {
   }
 
   spawnEnemyAt(x: number, y: number, type = 1): number {
+    return this.makeEnemy(x, y, type).id;
+  }
+
+  /** 지금 스테이지의 강화가 반영된 적을 만든다 */
+  private makeEnemy(x: number, y: number, type: number, extra: Partial<Enemy> = {}): Enemy {
     const id = this.nextEntityId++;
-    this.enemies.set(id, { id, type, x, y, hp: ENEMY_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, shield: ENEMY_STATS[type]!.shield, regenT: 0, momentum: 0, chargeSnap: 0 });
-    return id;
+    const st = ENEMY_STATS[type]!;
+    const hpMult = (1 + STAGE_ENEMY_HP_GROWTH * (this.stage - 1)) * (extra.boss ? BOSS_HP_BASE + BOSS_HP_PER_STAGE * (this.stage - 1) : 1);
+    const e: Enemy = {
+      id, type, x, y,
+      hp: st.hp * hpMult,
+      maxHp: st.hp * hpMult,
+      shield: st.shield * hpMult,
+      shieldMax: st.shield * hpMult,
+      dmgMult: (1 + STAGE_ENEMY_DMG_GROWTH * (this.stage - 1)) * (extra.boss ? BOSS_DMG_MULT : 1),
+      atkT: 0, atkAng: 0, face: 0, cd: 0, regenT: 0, momentum: 0, chargeSnap: 0,
+      boss: false, army: false, slotF: 0, slotL: 0,
+      ...extra,
+    };
+    this.enemies.set(id, e);
+    return e;
+  }
+
+  // --- 스테이지 ------------------------------------------------------------
+
+  info(): GameInfo {
+    let bossHp = 0;
+    let armyLeft = 0;
+    for (const e of this.enemies.values()) {
+      if (e.army) armyLeft++;
+      if (e.boss) bossHp = Math.max(1, Math.ceil((100 * e.hp) / e.maxHp));
+    }
+    return {
+      stage: this.stage,
+      phase: this.phase,
+      timer: this.phase === "boss" ? 0 : Math.ceil(Math.max(0, this.phaseT)),
+      status: this.status,
+      bossType: bossTypeOf(this.stage),
+      bossHp,
+      armyLeft,
+      armyTotal: this.armyTotal,
+    };
+  }
+
+  result(): { status: GameStatus; stage: number; time: number; players: ResultPlayer[] } {
+    return {
+      status: this.status,
+      stage: this.stage,
+      time: Math.round(this.time),
+      players: [...this.slots.values()].map((s) => ({ name: s.state.name, level: s.state.level, kills: s.state.kills, revives: s.revives })),
+    };
+  }
+
+  /** 순간 효과를 가져가고 비운다 */
+  takeEvents(): EventWire[] {
+    const out = this.events;
+    this.events = [];
+    return out;
+  }
+
+  private pushEvent(kind: number, x: number, y: number, ang: number): void {
+    if (this.events.length < EVENT_CAP) this.events.push([kind, Math.round(x), Math.round(y), Math.round(ang * 100) / 100]);
+  }
+
+  /** 테스트용: 성장 시간을 건너뛰고 곧바로 보스군을 부른다 */
+  forceBoss(): void {
+    if (this.phase === "grow") this.startArmy();
+  }
+
+  /** 테스트용: 해당 스테이지의 성장 단계 처음으로 이동한다 */
+  jumpToStage(stage: number): void {
+    this.stage = Math.max(1, Math.min(STAGE_COUNT, Math.floor(stage)));
+    this.phase = "grow";
+    this.phaseT = GROW_SEC;
+    this.stageTime = 0;
+    this.army = null;
+    this.armyTotal = 0;
+  }
+
+  private stepStage(dt: number): void {
+    if (this.phase === "grow") {
+      if (!this.autoSpawn) return;
+      this.phaseT -= dt;
+      this.stageTime += dt;
+      if (this.phaseT <= 0) this.startArmy();
+    } else if (this.phase === "boss") {
+      this.stepArmy(dt);
+    } else {
+      this.phaseT -= dt;
+      if (this.phaseT <= 0) {
+        this.stage++;
+        this.phase = "grow";
+        this.phaseT = GROW_SEC;
+        this.stageTime = 0;
+      }
+    }
+  }
+
+  /** 보스군 등장: 먼 곳에서 진형을 갖춘 채 병종별로 줄지어 행군해 온다 */
+  private startArmy(): void {
+    const alive = this.alivePlayers();
+    if (alive.length === 0) return;
+    this.phase = "boss";
+    this.phaseT = 0;
+    const cx = alive.reduce((a, s) => a + s.state.x, 0) / alive.length;
+    const cy = alive.reduce((a, s) => a + s.state.y, 0) / alive.length;
+    const layout = armyLayout(this.stage, armySize(this.stage, this.slots.size));
+    const depth = Math.max(...layout.map((l) => -l.forward)) + 60;
+    const reach = Math.max(...layout.map((l) => Math.abs(l.lateral))) + 60;
+    const base = this.rng() * Math.PI * 2;
+    // 진형 전체가 월드 안에 들어오는 방향을 고른다
+    const half = WORLD_SIZE / 2 - 20;
+    let chosen = { x: 0, y: 0, heading: 0 };
+    let bestFit = -Infinity;
+    for (let k = 0; k < 8; k++) {
+      const ang = base + (k * Math.PI) / 4;
+      const x = cx + Math.cos(ang) * ARMY_SPAWN_DISTANCE;
+      const y = cy + Math.sin(ang) * ARMY_SPAWN_DISTANCE;
+      const heading = ang + Math.PI;
+      const hx = Math.cos(heading);
+      const hy = Math.sin(heading);
+      const corners = [
+        [x - hx * depth + -hy * reach, y - hy * depth + hx * reach],
+        [x - hx * depth - -hy * reach, y - hy * depth - hx * reach],
+        [x + -hy * reach, y + hx * reach],
+        [x - -hy * reach, y - hx * reach],
+      ];
+      const fit = -Math.max(...corners.map(([px, py]) => Math.max(Math.abs(px!) - half, Math.abs(py!) - half, 0)));
+      if (fit > bestFit) {
+        bestFit = fit;
+        chosen = { x, y, heading };
+      }
+      if (fit === 0) break;
+    }
+    this.army = chosen;
+    for (const slot of layout) {
+      const [px, py] = this.armySlotPos(slot.forward, slot.lateral);
+      this.makeEnemy(clampToWorld(px, 14), clampToWorld(py, 14), slot.type, {
+        army: true,
+        boss: slot.general,
+        slotF: slot.forward,
+        slotL: slot.lateral,
+        face: chosen.heading,
+      });
+    }
+    this.armyTotal = layout.length;
+  }
+
+  private armySlotPos(f: number, l: number): [number, number] {
+    const a = this.army!;
+    const c = Math.cos(a.heading);
+    const sn = Math.sin(a.heading);
+    return [a.x + c * f - sn * l, a.y + sn * f + c * l];
+  }
+
+  /** 진형 기준점이 가장 가까운 살아 있는 주인공을 향해 천천히 행군한다 */
+  private stepArmy(dt: number): void {
+    const a = this.army;
+    if (!a) return;
+    let near: PlayerState | null = null;
+    let best = Infinity;
+    for (const s of this.alivePlayers()) {
+      const d = Math.hypot(s.state.x - a.x, s.state.y - a.y);
+      if (d < best) {
+        best = d;
+        near = s.state;
+      }
+    }
+    if (!near) return;
+    const want = Math.atan2(near.y - a.y, near.x - a.x);
+    const turn = 0.6 * dt;
+    a.heading += Math.max(-turn, Math.min(turn, angleDiff(want, a.heading)));
+    if (best > 60) {
+      const speed = best > ARMY_ENGAGE_DISTANCE ? ARMY_MARCH_SPEED : ARMY_MARCH_SPEED * 0.35;
+      const step = Math.min(speed * dt, best - 60);
+      a.x += Math.cos(a.heading) * step;
+      a.y += Math.sin(a.heading) * step;
+    }
+  }
+
+  /** 장군이 쓰러지면 스테이지 클리어: 남은 병사는 흩어져 일반 적이 되고, 보상과 쓰러진 동료의 부활이 주어진다 */
+  private onBossDown(): void {
+    for (const e of this.enemies.values()) {
+      e.army = false;
+      e.boss = false;
+    }
+    this.army = null;
+    for (const s of this.slots.values()) {
+      s.state.gold += STAGE_CLEAR_GOLD * this.stage;
+      this.giveXp(s.state.id, STAGE_CLEAR_XP + 15 * this.stage);
+      if (s.state.down) this.standUp(s);
+    }
+    this.phase = "break";
+    this.phaseT = STAGE_BREAK_SEC;
+    if (this.stage >= STAGE_COUNT) this.status = "victory";
   }
 
   addMerc(owner: number, type: number, x: number, y: number, paid = 0): number {
@@ -524,21 +824,17 @@ export class Game {
   }
 
   private alivePlayers(): Slot[] {
-    return [...this.slots.values()].filter((s) => s.state.respawn <= 0);
+    return [...this.slots.values()].filter((s) => !s.state.down);
   }
 
   private stepPlayers(dt: number): void {
     for (const s of this.slots.values()) {
       const p = s.state;
-      if (p.respawn > 0) {
+      if (p.down) {
         p.chargeLeft = 0;
-        p.respawn = Math.max(0, p.respawn - dt);
-        if (p.respawn === 0) {
-          p.hp = p.maxHp;
-          this.placeAtSpawn(p, p.id);
-        }
         continue;
       }
+      p.invuln = Math.max(0, p.invuln - dt);
       s.fireCd = Math.max(0, s.fireCd - dt);
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const speed = PLAYER_SPEED * s.mods.heroSpeed;
@@ -552,6 +848,36 @@ export class Game {
       p.swing = Math.max(0, p.swing - dt);
       if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0) this.useWeapon(s);
     }
+    this.stepRevive(dt);
+  }
+
+  /** 쓰러진 동료 곁에서 부활 키를 누르고 있으면 진행도가 차오르고, 떼면 서서히 줄어든다 */
+  private stepRevive(dt: number): void {
+    for (const d of this.slots.values()) {
+      const dp = d.state;
+      if (!dp.down) continue;
+      const helper = [...this.slots.values()].find(
+        (r) => !r.state.down && !r.away && r.input.revive && Math.hypot(r.state.x - dp.x, r.state.y - dp.y) <= REVIVE_RADIUS,
+      );
+      if (!helper) {
+        dp.revive = Math.max(0, dp.revive - dt / REVIVE_SEC);
+        continue;
+      }
+      dp.revive = Math.min(1, dp.revive + dt / REVIVE_SEC);
+      if (dp.revive >= 1) {
+        this.standUp(d);
+        helper.revives++;
+      }
+    }
+  }
+
+  private standUp(s: Slot): void {
+    const p = s.state;
+    p.down = false;
+    p.revive = 0;
+    p.hp = Math.max(1, Math.round(p.maxHp * REVIVE_HP_FRAC));
+    p.invuln = REVIVE_INVULN_SEC;
+    this.pushEvent(EVT_REVIVE, p.x, p.y, 0);
   }
 
   /** 주인공 공격. 활은 투사체를 쏘고, 나머지는 조준 방향 부채꼴을 즉시 휘두른다. 무기마다 방패·범위 규칙이 다르다. */
@@ -579,7 +905,7 @@ export class Game {
     p.swing = SWING_VISUAL_SEC;
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
-      if (Math.hypot(e.x - p.x, e.y - p.y) > w.reach + ENEMY_STATS[e.type]!.radius) continue;
+      if (Math.hypot(e.x - p.x, e.y - p.y) > w.reach + radiusOf(e)) continue;
       if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > w.arc) continue;
       struck.push(e);
     }
@@ -633,7 +959,9 @@ export class Game {
     if (!this.autoSpawn) return;
     const alive = this.alivePlayers();
     if (alive.length === 0) return;
-    const perPlayer = ENEMY_SPAWN_BASE_PER_SEC + ENEMY_SPAWN_GROWTH_PER_SEC * this.time;
+    if (this.phase === "break") return;
+    const stageMult = (1 + STAGE_SPAWN_GROWTH * (this.stage - 1)) * (this.phase === "boss" ? 0.25 : 1);
+    const perPlayer = (ENEMY_SPAWN_BASE_PER_SEC + ENEMY_SPAWN_GROWTH_PER_SEC * this.stageTime) * stageMult;
     // 인원이 늘수록 적도 늘지만, 아군 전력도 함께 늘어나므로 인원 수에 정비례시키지는 않는다
     this.spawnBudget += perPlayer * Math.pow(alive.length, 0.75) * dt;
     const totalWeight = ENEMY_SPAWN_WEIGHTS.reduce((a, b) => a + b, 0);
@@ -656,7 +984,7 @@ export class Game {
   private collectFriendlies(): Friendly[] {
     const list: Friendly[] = [];
     for (const s of this.slots.values()) {
-      if (s.state.respawn > 0 || s.away) continue;
+      if (s.state.down || s.away) continue;
       const p = s.state;
       list.push({
         x: p.x,
@@ -664,6 +992,7 @@ export class Game {
         radius: PLAYER_RADIUS,
         ownerId: p.id,
         hit: (h) => {
+          if (p.invuln > 0) return 0; // 부활 직후 잠깐 무적
           // 창을 들면 창병처럼 돌격을 반사하고, 검을 들면 정면 피해를 절반으로 막는다
           const w = WEAPONS[p.weapon]!;
           const r = resolveHit(
@@ -673,7 +1002,9 @@ export class Game {
           p.hp -= r.body;
           if (p.hp <= 0) {
             p.hp = 0;
-            p.respawn = PLAYER_RESPAWN_SEC;
+            p.down = true;
+            p.revive = 0;
+            p.chargeLeft = 0;
           }
           return r.reflected;
         },
@@ -704,6 +1035,9 @@ export class Game {
     if (broke || f.shield <= 0) {
       f.shield = 0;
       f.regenT = SHIELD_REGEN_SEC;
+      this.pushEvent(EVT_SHIELD_BREAK, f.x, f.y, f.face);
+    } else {
+      this.pushEvent(EVT_SHIELD_BLOCK, f.x, f.y, f.face);
     }
   }
 
@@ -786,7 +1120,7 @@ export class Game {
 
       if (target) {
         m.face = Math.atan2(target.y - m.y, target.x - m.x); // 방패는 상대를 향한다
-        const reachNow = st.ranged ? st.reach : st.reach + ENEMY_STATS[target.type]!.radius;
+        const reachNow = st.ranged ? st.reach : st.reach + radiusOf(target);
         if (targetDist <= reachNow) {
           if (m.cd <= 0) {
             m.atkT = st.windup;
@@ -849,7 +1183,7 @@ export class Game {
 
     const speed = cavSpeed(st.speed, m.momentum);
     if (target) {
-      const reachNow = st.reach + ENEMY_STATS[target.type]!.radius;
+      const reachNow = st.reach + radiusOf(target);
       const d = Math.hypot(target.x - m.x, target.y - m.y);
       if (d <= reachNow) {
         if (m.cd <= 0) {
@@ -944,7 +1278,7 @@ export class Game {
     m.chargeSnap = 0;
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
-      if (Math.hypot(e.x - m.x, e.y - m.y) > st.reach + ENEMY_STATS[e.type]!.radius) continue;
+      if (Math.hypot(e.x - m.x, e.y - m.y) > st.reach + radiusOf(e)) continue;
       if (Math.abs(angleDiff(Math.atan2(e.y - m.y, e.x - m.x), m.atkAng)) > st.arc) continue;
       struck.push(e);
     }
@@ -986,13 +1320,14 @@ export class Game {
     const owner = this.slots.get(ownerId);
     if (owner) {
       owner.state.kills++;
-      owner.state.gold += Math.round((ENEMY_GOLD[e.type] ?? 0) * owner.mods.goldMult);
+      owner.state.gold += Math.round((ENEMY_GOLD[e.type] ?? 0) * owner.mods.goldMult * (e.boss ? 5 : 1));
     }
     // 경험치: 일부는 처치한 사람에게, 나머지는 모든 플레이어에게 똑같이 나눈다
-    const xp = ENEMY_XP[e.type] ?? 0;
+    const xp = (ENEMY_XP[e.type] ?? 0) * (e.boss ? 5 : 1);
     const shared = (xp * XP_TEAM_SHARE) / this.slots.size;
     for (const s of this.slots.values()) this.giveXp(s.state.id, shared);
     if (owner) this.giveXp(owner.state.id, xp * (1 - XP_TEAM_SHARE));
+    if (e.boss) this.onBossDown();
   }
 
   /** 경험치를 주고, 레벨업하면 선택 횟수를 쌓는다. 선택지는 한 번에 하나씩 뜬다. */
@@ -1009,7 +1344,7 @@ export class Game {
       p.pending++;
       leveled = true;
     }
-    if (leveled && p.respawn <= 0) this.levelUpPush(p);
+    if (leveled && !p.down) this.levelUpPush(p);
     if (p.pending > 0 && p.offer.length === 0) p.offer = this.rollOffer(s);
   }
 
@@ -1117,7 +1452,7 @@ export class Game {
   private stepEnemies(dt: number, friendlies: Friendly[]): void {
     for (const e of this.enemies.values()) {
       const st = ENEMY_STATS[e.type]!;
-      this.regenShield(e, st.shield, dt);
+      this.regenShield(e, e.shieldMax, dt);
       e.cd = Math.max(0, e.cd - dt);
 
       if (e.atkT > 0) {
@@ -1130,16 +1465,29 @@ export class Game {
         continue; // 예비 동작 중에는 멈춰 선다
       }
 
+      const home = e.army && this.army ? this.armySlotPos(e.slotF, e.slotL) : null;
+      const leashed = home !== null && Math.hypot(home[0] - e.x, home[1] - e.y) > ARMY_LEASH;
+      const aggro = Math.max(ARMY_AGGRO, st.reach + 20);
       let target: Friendly | null = null;
       let targetDist = Infinity;
-      for (const f of friendlies) {
-        const d = Math.hypot(f.x - e.x, f.y - e.y);
-        if (d < targetDist) {
-          targetDist = d;
-          target = f;
+      if (!leashed) {
+        for (const f of friendlies) {
+          const d = Math.hypot(f.x - e.x, f.y - e.y);
+          if (d < targetDist && (home === null || d <= aggro)) {
+            targetDist = d;
+            target = f;
+          }
         }
       }
-      if (!target) continue;
+      if (!target) {
+        // 진형 소속은 자리를 지키며 대열과 함께 움직인다
+        if (home) {
+          this.moveToward(e, home[0], home[1], st.speed * 1.2, dt, 4);
+          e.face = this.army!.heading;
+        }
+        continue;
+      }
+      const speed = st.speed * (e.boss ? BOSS_SPEED_MULT : 1);
 
       const attackRange = st.ranged ? st.reach : st.reach + target.radius * 0.5;
       if (targetDist <= attackRange) {
@@ -1147,7 +1495,7 @@ export class Game {
           e.atkT = st.windup;
           e.atkAng = Math.atan2(target.y - e.y, target.x - e.x);
           e.face = e.atkAng;
-          e.chargeSnap = e.type === CAVALRY ? chargeBonus(st.speed, e.momentum) : 0;
+          e.chargeSnap = e.type === CAVALRY ? chargeBonus(speed, e.momentum) : 0;
           continue;
         }
         // 근접은 쿨다운 중에도 붙어서 압박하고, 원거리는 거리를 유지한다
@@ -1156,9 +1504,9 @@ export class Game {
       const stop = st.ranged ? st.reach * 0.8 : st.reach * 0.5 + target.radius;
       e.face = Math.atan2(target.y - e.y, target.x - e.x);
       if (e.type === CAVALRY) {
-        this.updateMomentum(e, this.moveToward(e, target.x, target.y, cavSpeed(st.speed, e.momentum), dt, stop), dt);
+        this.updateMomentum(e, this.moveToward(e, target.x, target.y, cavSpeed(speed, e.momentum), dt, stop), dt);
       } else {
-        this.moveToward(e, target.x, target.y, st.speed, dt, stop);
+        this.moveToward(e, target.x, target.y, speed, dt, stop);
       }
     }
   }
@@ -1173,7 +1521,7 @@ export class Game {
         vy: Math.sin(e.atkAng) * ENEMY_ARROW_SPEED,
         left: st.reach * ENEMY_ARROW_RANGE_FACTOR,
         hostile: true,
-        damage: st.damage,
+        damage: st.damage * e.dmgMult,
         srcType: e.type,
         owner: 0,
         radius: 4,
@@ -1191,14 +1539,14 @@ export class Game {
       struck.push(f);
     }
     for (const f of struck) {
-      const back = f.hit({ damage: st.damage, charge, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x) });
+      const back = f.hit({ damage: st.damage * e.dmgMult, charge: charge * e.dmgMult, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x) });
       if (back > 0) this.reflectToEnemy(e, back, f.ownerId); // 창병이 돌격을 되돌려준다
     }
     if (st.splash > 0) {
       for (const f of friendlies) {
         if (struck.includes(f)) continue;
         if (!struck.some((s) => Math.hypot(s.x - f.x, s.y - f.y) <= st.splash)) continue;
-        f.hit({ damage: st.damage * SPLASH_FACTOR, charge: 0, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x) });
+        f.hit({ damage: st.damage * e.dmgMult * SPLASH_FACTOR, charge: 0, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x) });
       }
     }
   }
@@ -1216,12 +1564,12 @@ export class Game {
     for (const e of this.enemies.values()) {
       const cx = Math.floor(e.x / SEPARATION_CELL);
       const cy = Math.floor(e.y / SEPARATION_CELL);
-      const er = ENEMY_STATS[e.type]!.radius;
+      const er = radiusOf(e);
       for (let ox = -1; ox <= 1; ox++) {
         for (let oy = -1; oy <= 1; oy++) {
           for (const o of grid.get(key(cx + ox, cy + oy)) ?? []) {
             if (o.id <= e.id) continue; // 쌍마다 한 번만
-            const min = er + ENEMY_STATS[o.type]!.radius;
+            const min = er + radiusOf(o);
             const dx = o.x - e.x;
             const dy = o.y - e.y;
             const d = Math.hypot(dx, dy);
@@ -1256,13 +1604,15 @@ export class Game {
           for (const f of friendlies) {
             if (Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
             f.hit({ damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }); // 날아온 쪽이 정면인지 본다
+            this.pushEvent(EVT_ENEMY_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             hit = true;
             break;
           }
         } else {
           for (const e of this.enemies.values()) {
-            if (Math.hypot(e.x - px, e.y - py) > b.radius + ENEMY_STATS[e.type]!.radius) continue;
+            if (Math.hypot(e.x - px, e.y - py) > b.radius + radiusOf(e)) continue;
             this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }, b.owner);
+            this.pushEvent(EVT_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             hit = true;
             break;
           }
@@ -1275,6 +1625,10 @@ export class Game {
     }
     this.bullets = remaining;
   }
+}
+
+function radiusOf(e: Enemy): number {
+  return ENEMY_STATS[e.type]!.radius * (e.boss ? BOSS_SIZE : 1);
 }
 
 function round(v: number, scale = 10): number {

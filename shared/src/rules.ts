@@ -164,3 +164,43 @@ export function xpNeeded(level: number): number {
 export const LEVELUP_PUSH_RADIUS = 240;
 export const LEVELUP_PUSH_DISTANCE = 170;
 export const LEVELUP_STUN_SEC = 0.8;
+
+// --- 스테이지와 보스군 -----------------------------------------------------------
+// 스테이지마다 자유 성장 시간(적이 계속 몰려옴) → 보스군 진격 → 보스(장군)를 쓰러뜨리면 클리어. 10스테이지를 모두 깨면 승리.
+export const STAGE_COUNT = 10;
+export const STAGE_GROW_SEC = 180; // 스테이지당 자유 성장 시간
+export const STAGE_BREAK_SEC = 10; // 클리어 뒤 쉬는 시간(회복·부활·보상)
+export const STAGE_ENEMY_HP_GROWTH = 0.18; // 스테이지가 오를 때마다 적 체력 +18%
+export const STAGE_ENEMY_DMG_GROWTH = 0.1; // 적 피해 +10%
+export const STAGE_SPAWN_GROWTH = 0.12; // 일반 적 생성량 +12%
+export const STAGE_CLEAR_GOLD = 40; // 클리어 보상 금화 = 이 값 x 스테이지 (모든 플레이어에게)
+export const STAGE_CLEAR_XP = 30; // 클리어 보상 경험치 = 이 값 + 15 x 스테이지
+
+// 보스군: 진형과 병종 조합을 갖춰 천천히 행군해 온다. 인원 수에 비례해 커진다.
+export const ARMY_BASE_UNITS = 10;
+export const ARMY_UNITS_PER_STAGE = 6;
+export const ARMY_PLAYER_EXPONENT = 0.8; // 병력 = (기본 + 스테이지 x 증가) x 인원^0.8
+export const ARMY_MAX_UNITS = 260;
+export const ARMY_SPAWN_DISTANCE = 900;
+export const ARMY_MARCH_SPEED = 55; // 진형이 전진하는 속도(px/s)
+export const ARMY_ENGAGE_DISTANCE = 220; // 아군과 이 거리 안이면 진형이 멈추고 싸운다
+export const ARMY_AGGRO = 240; // 병사가 진형을 벗어나 아군을 쫓기 시작하는 거리
+export const ARMY_LEASH = 380; // 진형 자리에서 이만큼 벗어나면 되돌아간다
+export const ARMY_RANK_SPACING = 38;
+export const ARMY_LATERAL_SPACING = 34;
+export const ARMY_RANK_WIDTH = 10; // 한 줄 최대 인원
+/** 스테이지별 보스(장군) 병종: 방패, 창, 기병, 둔기, 궁, 방패, 둔기, 기병, 창, 둔기 */
+export const BOSS_TYPES = [SHIELD, SPEAR, CAVALRY, BLUNT, ARCHER, SHIELD, BLUNT, CAVALRY, SPEAR, BLUNT] as const;
+export const BOSS_HP_BASE = 7; // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
+export const BOSS_HP_PER_STAGE = 2.5;
+export const BOSS_DMG_MULT = 1.6;
+export const BOSS_SIZE = 1.7; // 반경·그림 크기 배율
+export const BOSS_SPEED_MULT = 0.9;
+
+// --- 쓰러짐과 부활 ---------------------------------------------------------------
+// 주인공은 체력이 0이 되면 쓰러지고 저절로 일어나지 않는다. 다른 주인공이 곁에서 부활 키를 누르고 있으면 일으켜 세울 수 있다.
+// 모든 주인공이 동시에 쓰러져 있으면 게임 오버. 스테이지를 클리어하면 모두 회복·부활한다.
+export const REVIVE_RADIUS = 70;
+export const REVIVE_SEC = 3; // 한 명이 눌렀을 때 걸리는 시간. 둘 이상이면 더 빠르다
+export const REVIVE_HP_FRAC = 0.5;
+export const REVIVE_INVULN_SEC = 2;

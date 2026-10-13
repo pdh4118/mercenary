@@ -29,7 +29,6 @@ import {
   MERC_RESPAWN_SEC,
   MERC_STATS,
   PLAYER_MAX_HP,
-  PLAYER_RESPAWN_SEC,
   PLAYER_SPEED,
   SHIELD,
   SPEAR,
@@ -251,21 +250,19 @@ test("적 궁병의 화살은 날아가서 맞는다", () => {
   assert.ok(me(g, a).hp < PLAYER_MAX_HP);
 });
 
-test("체력이 0이 되면 사망하고 일정 시간 뒤 전체 체력으로 부활한다", () => {
+test("체력이 0이 되면 쓰러지고, 혼자뿐이면 게임오버가 된다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
-  for (let i = 0; i < 400 && me(g, a).respawn === 0; i++) {
+  for (let i = 0; i < 400 && !me(g, a).down; i++) {
     if (i % 5 === 0) {
       const p = me(g, a);
       g.spawnEnemyAt(p.x, p.y, BLUNT);
     }
     g.step();
   }
-  assert.ok(me(g, a).respawn > 0);
+  assert.ok(me(g, a).down);
   assert.equal(me(g, a).hp, 0);
-  run(g, PLAYER_RESPAWN_SEC + 0.2);
-  assert.equal(me(g, a).respawn, 0);
-  assert.equal(me(g, a).hp, PLAYER_MAX_HP);
+  assert.equal(g.status, "defeat");
 });
 
 test("겹친 적들은 서로 밀려나 한 점에 뭉치지 않는다", () => {
@@ -491,6 +488,7 @@ test("기병은 오래 걸리는 부활 시간을 가진다", () => {
   const c = g.addMerc(a, CAVALRY, p.x + 300, p.y);
   const spear = g.addMerc(a, SPEAR, p.x - 300, p.y);
   for (let i = 0; i < 400 && (g.getMerc(c)!.respawn === 0 || g.getMerc(spear)!.respawn === 0); i++) {
+    g.getPlayer(a)!.hp = PLAYER_MAX_HP; // 주인공이 먼저 쓰러져 게임이 끝나지 않게
     if (i % 4 === 0) {
       g.spawnEnemyAt(g.getMerc(c)!.x, g.getMerc(c)!.y, BLUNT);
       g.spawnEnemyAt(g.getMerc(spear)!.x, g.getMerc(spear)!.y, BLUNT);

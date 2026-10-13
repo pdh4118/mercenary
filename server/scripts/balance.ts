@@ -34,6 +34,10 @@ interface Result {
   aliveHeroPct: number;
   deathsByType: number[];
   ownedByType: number[];
+  stage: number;
+  status: string;
+  endSec: number;
+  revives: number;
 }
 
 function simulate(players: number, seconds: number, seed: number): Result {
@@ -53,13 +57,14 @@ function simulate(players: number, seconds: number, seed: number): Result {
   let aliveTicks = 0;
   let totalTicks = 0;
   const ticks = seconds * 20;
+  let endSec = seconds;
 
   for (let t = 0; t < ticks; t++) {
     const enemies = g.snapshotEnemies();
     const camps = g.snapshotCamps();
     for (const id of ids) {
       const p = g.getPlayer(id)!;
-      if (p.respawn > 0) continue;
+      if (p.down) continue;
       // 가장 가까운 적과 주변 위험도
       let near: (typeof enemies)[number] | null = null;
       let nearD = Infinity;
@@ -80,8 +85,23 @@ function simulate(players: number, seconds: number, seed: number): Result {
       }
       let dx = 0;
       let dy = 0;
+      // 쓰러진 동료가 가까이 있으면 달려가 일으켜 세운다
+      let rescue: { x: number; y: number } | null = null;
+      let rescueD = 700;
+      for (const other of ids) {
+        const o = g.getPlayer(other)!;
+        const d = Math.hypot(o.x - p.x, o.y - p.y);
+        if (other !== id && o.down && d < rescueD) {
+          rescue = o;
+          rescueD = d;
+        }
+      }
+      const reviving = rescue !== null && rescueD < 60;
       // 이동: 위협이 가까우면 반대쪽으로 물러나고, 아니면 캠프로 가거나 중앙 쪽에 머문다
-      if (cn > 0 && nearD < 150) {
+      if (rescue) {
+        dx = rescue.x - p.x;
+        dy = rescue.y - p.y;
+      } else if (cn > 0 && nearD < 150) {
         dx = p.x - cx / cn;
         dy = p.y - cy / cn;
       } else {
@@ -109,6 +129,7 @@ function simulate(players: number, seconds: number, seed: number): Result {
         dy: dy / len,
         aim: near ? Math.atan2(near[2] - p.y, near[1] - p.x) : 0,
         fire: !!near && nearD < 420,
+        revive: reviving,
       });
       // 고용
       const camp = camps.find((c) => Math.hypot(c[1] - p.x, c[2] - p.y) < CAMP_USE_RADIUS - 10);
@@ -130,7 +151,7 @@ function simulate(players: number, seconds: number, seed: number): Result {
 
     // 지표
     for (const id of ids) {
-      const dead = g.getPlayer(id)!.respawn > 0;
+      const dead = g.getPlayer(id)!.down;
       if (dead && !wasDead.get(id)) {
         heroDeaths++;
         if (firstDeathSec === null) firstDeathSec = t / 20;
@@ -147,6 +168,10 @@ function simulate(players: number, seconds: number, seed: number): Result {
       } else if (m[8] === 0) mercDown.delete(m[0]);
     }
     if (t > 0 && t % (60 * 20) === 0) enemiesAt.push(g.enemyCount);
+    if (g.status !== "playing") {
+      endSec = t / 20;
+      break;
+    }
   }
   const ps = ids.map((id) => g.getPlayer(id)!);
   return {
@@ -160,23 +185,27 @@ function simulate(players: number, seconds: number, seed: number): Result {
     aliveHeroPct: (100 * aliveTicks) / totalTicks,
     deathsByType,
     ownedByType: [0, 1, 2, 3, 4].map((t) => g.snapshotMercs().filter((m) => m[4] === t).length),
+    stage: g.info().stage,
+    status: g.status,
+    endSec,
+    revives: g.result().players.reduce((n, q) => n + q.revives, 0),
   };
 }
 
-const seconds = Number(process.argv[2] ?? 300);
+const seconds = Number(process.argv[2] ?? 2100);
 const counts = (process.argv[3] ?? "1,3,6").split(",").map(Number).filter((n) => n >= 1 && n <= MAX_PLAYERS);
 const seeds = Number(process.argv[4] ?? 3);
 
-console.log(`시뮬레이션 ${seconds}초, 시드 ${seeds}개 평균 (봇: 물러서며 사격, 캠프에서 고용, 카드 무작위)`);
-console.log("인원 | 주인공 사망(1인당) | 첫 사망(초) | 용병 쓰러짐(1인당) | 평균 레벨 | 처치(1인당) | 용병 수 | 적 수 @1/2/3/4분 | 생존율");
+console.log(`시뮬레이션 최대 ${seconds}초, 시드 ${seeds}개 (봇: 물러서며 사격, 캠프에서 고용, 카드 무작위, 쓰러진 동료 부활)`);
+console.log("인원 | 결과(승/패) | 도달 스테이지(평균) | 종료(초) | 주인공 쓰러짐(1인당) | 부활 | 용병 쓰러짐(1인당) | 평균 레벨 | 용병 수");
 for (const n of counts) {
   const rs = Array.from({ length: seeds }, (_, i) => simulate(n, seconds, 7 + i * 101));
   const avg = (f: (r: Result) => number) => rs.reduce((s, r) => s + f(r), 0) / rs.length;
-  const firsts = rs.map((r) => r.firstDeathSec).filter((v): v is number => v !== null);
-  const enemies = [0, 1, 2, 3].map((k) => Math.round(avg((r) => r.enemiesAt[k] ?? 0)));
+  const wins = rs.filter((r) => r.status === "victory").length;
+  const losses = rs.filter((r) => r.status === "defeat").length;
   console.log(
-    `${String(n).padStart(2)}명 | ${(avg((r) => r.heroDeaths) / n).toFixed(1).padStart(6)} | ${firsts.length ? (firsts.reduce((a, b) => a + b, 0) / firsts.length).toFixed(0).padStart(5) : "  없음"}` +
-      ` | ${(avg((r) => r.mercDeaths) / n).toFixed(1).padStart(6)} | ${avg((r) => r.level).toFixed(1).padStart(5)} | ${(avg((r) => r.kills) / n).toFixed(0).padStart(6)} | ${avg((r) => r.mercs).toFixed(1).padStart(4)} | ${enemies.join("/").padEnd(14)} | ${avg((r) => r.aliveHeroPct).toFixed(0)}%`,
+    `${String(n).padStart(2)}명 | ${wins}/${losses} | ${avg((r) => r.stage).toFixed(1).padStart(5)} | ${avg((r) => r.endSec).toFixed(0).padStart(5)}` +
+      ` | ${(avg((r) => r.heroDeaths) / n).toFixed(1).padStart(5)} | ${avg((r) => r.revives).toFixed(1).padStart(4)} | ${(avg((r) => r.mercDeaths) / n).toFixed(1).padStart(6)} | ${avg((r) => r.level).toFixed(1).padStart(5)} | ${avg((r) => r.mercs).toFixed(1).padStart(4)}`,
   );
 }
 if (process.env.DETAIL) {

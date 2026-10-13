@@ -21,7 +21,6 @@ export const RECONNECT_GRACE_SEC = 30; // 접속이 끊겨도 이 시간 안에 
 export const PLAYER_SPEED = 220; // px/s
 export const PLAYER_RADIUS = 16;
 export const PLAYER_MAX_HP = 100;
-export const PLAYER_RESPAWN_SEC = 5;
 
 // 주인공 기본 공격(투사체). 병종이 없으므로 상성 배율은 적용되지 않는다.
 export const FIRE_COOLDOWN_SEC = 0.25;
@@ -83,7 +82,9 @@ export interface PlayerState {
   chargeLeft: number; // 기병 돌격 지시가 남은 시간(초), 지시 중이 아니면 0
   chargeX: number;
   chargeY: number;
-  respawn: number; // 사망 시 부활까지 남은 초, 생존 중이면 0
+  down: boolean; // 쓰러짐(스스로 일어나지 못하고, 동료가 부활시켜야 한다)
+  revive: number; // 부활 진행도 0..1
+  invuln: number; // 부활 직후 무적 남은 시간(초)
 }
 
 /**
@@ -94,7 +95,7 @@ export type EnemyWire = [
   id: number,
   x: number,
   y: number,
-  hp: number,
+  hp: number, // 체력 비율 0..100(스테이지 강화·보스 배율과 무관하게 표시하기 위해)
   type: number,
   atk: number,
   ang: number,
@@ -102,6 +103,7 @@ export type EnemyWire = [
   face: number, // 바라보는 방향(방패가 막는 방향)
   mom: number, // 기병의 속도 0..1
   regen: number, // 깨진 방패가 재생될 때까지 남은 초(0이면 해당 없음)
+  boss: number, // 1이면 보스(장군)
 ];
 export type MercWire = [
   id: number,
@@ -120,6 +122,35 @@ export type MercWire = [
   mom: number,
   regen: number,
 ];
+/** 서버가 알려 주는 순간 효과(그 틱에 일어난 일): [종류, x, y, 방향] */
+export const EVT_ARROW_HIT = 0; // 아군 화살 명중
+export const EVT_ENEMY_ARROW_HIT = 1; // 적 화살 명중
+export const EVT_SHIELD_BLOCK = 2; // 방패가 막음
+export const EVT_SHIELD_BREAK = 3; // 방패가 깨짐
+export const EVT_REVIVE = 4; // 부활
+export type EventWire = [kind: number, x: number, y: number, ang: number];
+
+export type StagePhase = "grow" | "boss" | "break";
+export type GameStatus = "playing" | "victory" | "defeat";
+/** 진행 상황: 스테이지, 단계(성장/보스/휴식), 남은 시간, 보스군 상태 */
+export interface GameInfo {
+  stage: number;
+  phase: StagePhase;
+  timer: number; // grow: 보스군 도착까지, break: 다음 스테이지까지 남은 초. boss: 0
+  status: GameStatus;
+  bossType: number; // 이번 스테이지 보스 병종
+  bossHp: number; // 보스 체력 비율 0..100(보스 단계가 아니면 0)
+  armyLeft: number; // 남은 보스군 병력(장군 포함)
+  armyTotal: number;
+}
+
+export interface ResultPlayer {
+  name: string;
+  level: number;
+  kills: number;
+  revives: number; // 동료를 일으켜 세운 횟수
+}
+
 export type BulletWire = [id: number, x: number, y: number, team: 0 | 1]; // team 1 = 적 투사체
 export type CampWire = [id: number, x: number, y: number, left: number, offer0: number, offer1: number, offer2: number];
 
@@ -128,9 +159,10 @@ export interface PlayerInput {
   dy: number; // -1..1
   aim: number; // 라디안
   fire: boolean;
+  revive: boolean; // 곁에 쓰러진 동료가 있을 때 누르고 있으면 일으켜 세운다
 }
 
-export type RoomPhase = "waiting" | "playing";
+export type RoomPhase = "waiting" | "playing" | "ended";
 
 export interface RoomInfo {
   code: string;
@@ -158,8 +190,9 @@ export type ClientMsg =
   | { t: "kick"; id: number } // 방장만
   | { t: "ready"; ready: boolean } // 대기실에서 준비/준비 취소
   | { t: "start" } // 방장만. 모두 준비되면 게임 시작
+  | { t: "rematch" } // 방장만. 게임이 끝난 뒤 대기실로 돌아가 다시 시작
   // 게임 중
-  | { t: "input"; dx: number; dy: number; aim: number; fire: boolean }
+  | { t: "input"; dx: number; dy: number; aim: number; fire: boolean; revive?: boolean }
   | { t: "buy"; camp: number; slot: number }
   | { t: "weapon"; index: number } // 무기 변경(WEAPONS 인덱스)
   | { t: "pick"; index: number } // 레벨업 카드 선택(0..2)
@@ -173,6 +206,7 @@ export type ServerMsg =
   | { t: "left"; reason: string } // 방에서 나왔다(스스로, 내보내짐, 방 종료)
   | { t: "error"; text: string }
   | { t: "notice"; text: string }
+  | { t: "result"; status: GameStatus; stage: number; time: number; players: ResultPlayer[] } // 게임이 끝났다
   | {
       t: "state";
       tick: number;
@@ -181,6 +215,8 @@ export type ServerMsg =
       mercs: MercWire[];
       enemies: EnemyWire[];
       bullets: BulletWire[];
+      g: GameInfo;
+      ev: EventWire[];
       camps: CampWire[];
     };
 
@@ -195,7 +231,7 @@ export function sanitizeInput(raw: Partial<Record<keyof PlayerInput, unknown>>):
     dx /= len;
     dy /= len;
   }
-  return { dx, dy, aim: num(raw.aim, -Math.PI * 2, Math.PI * 2), fire: raw.fire === true };
+  return { dx, dy, aim: num(raw.aim, -Math.PI * 2, Math.PI * 2), fire: raw.fire === true, revive: raw.revive === true };
 }
 
 export function clampToWorld(v: number, radius: number): number {

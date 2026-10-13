@@ -121,6 +121,9 @@ export class RoomManager {
       case "start":
         this.start(conn);
         return;
+      case "rematch":
+        this.rematch(conn);
+        return;
       default:
         this.gameMessage(conn, msg);
     }
@@ -179,6 +182,7 @@ export class RoomManager {
       this.failures.set(key, { count, blockedUntil: count >= JOIN_FAIL_LIMIT ? this.clock + JOIN_FAIL_BLOCK_SEC : 0 });
       return this.fail(conn, "방을 찾을 수 없습니다. 코드를 확인해 주세요");
     }
+    if (room.phase === "ended") return this.fail(conn, "이미 끝난 게임입니다");
     if (room.game.isFull) return this.fail(conn, "방이 가득 찼습니다");
     this.failures.delete(key);
     this.enter(conn, room, clean(playerName, NAME_MAX_LENGTH));
@@ -189,7 +193,7 @@ export class RoomManager {
     if (this.where.has(conn)) return this.fail(conn, "이미 방에 들어가 있습니다");
     let best: Room | null = null;
     for (const r of this.rooms.values()) {
-      if (r.isPrivate || r.game.isFull) continue; // 비공개 방은 빠른 시작에 끼지 않는다
+      if (r.isPrivate || r.game.isFull || r.phase === "ended") continue; // 비공개 방은 빠른 시작에 끼지 않는다
       if (!best || r.game.playerCount > best.game.playerCount) best = r;
     }
     if (!best) {
@@ -220,6 +224,7 @@ export class RoomManager {
     this.where.set(conn, { room: at.room, id: m.id });
     at.room.game.setAway(m.id, false);
     conn.send({ t: "welcome", id: m.id, tick: at.room.game.tick, code: at.room.code, token: m.token });
+    if (at.room.phase === "ended") conn.send({ t: "result", ...at.room.game.result() });
     this.broadcastRoom(at.room);
   }
 
@@ -260,12 +265,26 @@ export class RoomManager {
     this.broadcastLobby();
   }
 
+  /** 방장이 끝난 게임을 대기실로 되돌린다. 같은 참가자들로 처음부터 다시 시작할 수 있다. */
+  private rematch(conn: Conn): void {
+    const at = this.where.get(conn);
+    if (!at) return;
+    const { room } = at;
+    if (room.hostId !== at.id) return this.fail(conn, "방장만 다시 시작할 수 있습니다");
+    if (room.phase !== "ended") return;
+    room.game.reset();
+    for (const m of room.members.values()) m.ready = false;
+    room.phase = "waiting";
+    this.broadcastRoom(room);
+    this.broadcastLobby();
+  }
+
   // --- 방 -------------------------------------------------------------------
 
   list(): RoomInfo[] {
     return [...this.rooms.values()]
       .filter((r) => !r.isPrivate)
-      .map((r) => ({ code: r.code, name: r.name, players: r.game.playerCount, max: MAX_PLAYERS, playing: r.phase === "playing" }))
+      .map((r) => ({ code: r.code, name: r.name, players: r.game.playerCount, max: MAX_PLAYERS, playing: r.phase !== "waiting" }))
       .sort((a, b) => b.players - a.players || a.code.localeCompare(b.code));
   }
 
@@ -377,12 +396,22 @@ export class RoomManager {
         camps: room.game.snapshotCamps(),
         enemies: room.game.snapshotEnemies(),
         bullets: room.game.snapshotBullets(),
+        g: room.game.info(),
+        ev: room.game.takeEvents(),
       };
       let json: string | null = null;
       for (const m of room.members.values()) {
         if (!m.conn) continue;
         if (m.conn.sendRaw) m.conn.sendRaw((json ??= JSON.stringify(state)));
         else m.conn.send(state);
+      }
+      if (room.game.status !== "playing") {
+        // 마지막 상태를 보낸 뒤 결과를 알리고, 방은 끝난 상태로 둔다
+        room.phase = "ended";
+        const result: ServerMsg = { t: "result", ...room.game.result() };
+        for (const m of room.members.values()) m.conn?.send(result);
+        this.broadcastRoom(room);
+        this.broadcastLobby();
       }
     }
   }

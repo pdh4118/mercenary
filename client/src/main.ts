@@ -10,6 +10,14 @@ import {
   SWING_VISUAL_SEC,
   WEAPONS,
   ENEMY_STATS,
+  BOSS_SIZE,
+  EVT_ARROW_HIT,
+  EVT_ENEMY_ARROW_HIT,
+  EVT_REVIVE,
+  EVT_SHIELD_BREAK,
+  EVT_SHIELD_BLOCK,
+  REVIVE_RADIUS,
+  STAGE_COUNT,
   MERC_STATS,
   PLAYER_RADIUS,
   TICK_RATE,
@@ -189,21 +197,6 @@ async function main() {
     },
     (w) => [w[0], w[1], w[2]],
     false, // 빠르게 움직이는 투사체는 서버 위치를 그대로 그린다
-    (v) => {
-      // 사라진 자리 가까이에 맞을 대상이 있었다면 명중 이펙트를 보여 준다(사거리 끝에서 사라진 것은 제외)
-      if (!latest || !v.ready) return;
-      const targets: [number, number][] = v.hostile
-        ? [...latest.players.map((p): [number, number] => [p.x, p.y]), ...latest.mercs.filter((m) => m[8] <= 0).map((m): [number, number] => [m[1], m[2]])]
-        : latest.enemies.map((e): [number, number] => [e[1], e[2]]);
-      if (!targets.some(([x, y]) => Math.hypot(x - v.x, y - v.y) < 34)) return;
-      const fx = new Sprite((v.hostile ? enemyArrow : allyArrow)[4]!);
-      fx.anchor.set(0.85, 0.5);
-      fx.scale.set(ARROW_SCALE);
-      fx.position.set(v.x, v.y);
-      fx.rotation = v.angle;
-      bulletLayer.addChild(fx);
-      hitFx.push({ node: fx, age: 0 });
-    },
   );
 
   const drawBar = (g: Graphics, hp: number, max: number, width: number, y: number) => {
@@ -340,6 +333,9 @@ async function main() {
   const LEGEND_H = 64;
   legendBg.rect(0, 0, Math.max(lx, legendText.width + 24, helpText.width + 24), LEGEND_H).fill({ color: 0x000000, alpha: 0.35 });
   const xpBar = new Graphics();
+  const stageText = new Text({ text: "", style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
+  stageText.anchor.set(0.5, 0);
+  const bossBar = new Graphics();
   const levelToast = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 20, stroke: { color: 0x000000, width: 3 } } });
   levelToast.anchor.set(0.5, 0);
 
@@ -424,10 +420,12 @@ async function main() {
     weaponHint.text = WEAPONS[active]!.note;
   };
   weaponBar.visible = false;
-  hud.addChild(hudText, xpBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
+  hud.addChild(hudText, xpBar, stageText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
+  const bursts: { kind: number; x: number; y: number; ang: number; age: number }[] = [];
+  const BURST_SEC = 0.35;
   const RING_SEC = 0.5;
   let latest: Extract<ServerMsg, { t: "state" }> | null = null;
   let myId = -1;
@@ -495,6 +493,19 @@ async function main() {
         toastLeft = 2.5;
       } else if (msg.t === "state") {
         latest = msg;
+        for (const [kind, x, y, ang] of msg.ev ?? []) {
+          if (kind === EVT_ARROW_HIT || kind === EVT_ENEMY_ARROW_HIT) {
+            const fx = new Sprite((kind === EVT_ENEMY_ARROW_HIT ? enemyArrow : allyArrow)[4]!);
+            fx.anchor.set(0.85, 0.5);
+            fx.scale.set(ARROW_SCALE);
+            fx.position.set(x, y);
+            fx.rotation = ang;
+            bulletLayer.addChild(fx);
+            hitFx.push({ node: fx, age: 0 });
+          } else if (bursts.length < 60) {
+            bursts.push({ kind, x, y, ang, age: 0 });
+          }
+        }
         statusEl.textContent = `방 ${lobby.roomCode()} · 접속 ${msg.players.length}명 · Esc: 방 메뉴`;
       }
     };
@@ -518,10 +529,11 @@ async function main() {
     const dy = (keys.has("s") || keys.has("arrowdown") ? 1 : 0) - (keys.has("w") || keys.has("arrowup") ? 1 : 0);
     const fire = firing || keys.has(" ");
     const aim = Math.round(readAim() * 100) / 100;
-    const key = `${dx},${dy},${aim},${fire}`;
+    const revive = keys.has("e");
+    const key = `${dx},${dy},${aim},${fire},${revive}`;
     if (force || key !== last) {
       last = key;
-      send({ t: "input", dx, dy, aim, fire });
+      send({ t: "input", dx, dy, aim, fire, revive });
     }
   };
   window.addEventListener("keydown", (e) => {
@@ -590,9 +602,10 @@ async function main() {
 
     enemies.update(latest.enemies, k, (v, w) => {
       faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
-      v.sprite.scale.set(SPRITE_SCALE * v.face, SPRITE_SCALE);
+      const size = w[11] === 1 ? BOSS_SIZE : 1;
+      v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
       v.sprite.zIndex = v.y;
-      v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / ENEMY_STATS[w[4]]!.hp);
+      v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
     });
     bullets.update(latest.bullets, k, (v, w) => {
       // 이동한 방향으로 화살을 돌린다
@@ -638,13 +651,22 @@ async function main() {
       }
     });
     players.update(latest.players, k, (v, p) => {
-      const dead = p.respawn > 0;
-      v.node.alpha = dead ? 0.25 : 1;
+      const dead = p.down;
+      // 쓰러지면 흐리게, 부활 직후 무적일 때는 깜빡인다
+      v.node.alpha = dead ? 0.4 : p.invuln > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 90)) : 1;
       // 들고 있는 무기에 맞는 모습으로 바꾸고, 조준한 쪽을 바라보게 좌우 반전한다
       const tex = heroTex[p.weapon] ?? heroTex[0]!;
       if (v.sprite.texture !== tex) v.sprite.texture = tex;
       v.sprite.scale.set(HERO_SCALE * (Math.cos(p.aim) >= 0 ? 1 : -1), HERO_SCALE);
       drawBar(v.bar, p.hp, p.maxHp, 36, HERO_TOP - 6);
+      if (dead) {
+        // 부활 진행도
+        v.bar
+          .rect(-22, HERO_TOP - 14, 44, 6)
+          .fill(0x2a2d36)
+          .rect(-22, HERO_TOP - 14, 44 * p.revive, 6)
+          .fill(0x7be08f);
+      }
       v.aimMark.clear();
       if (!dead) {
         // 조준 방향 표시: 몸 바깥의 작은 화살촉(무기 색)
@@ -693,13 +715,41 @@ async function main() {
     for (const w of latest.enemies) {
       if (w[4] !== SHIELD) continue;
       const v = enemies.views.get(w[0]);
-      if (v) shieldArc(v.x, v.y, w[8], w[7] / ENEMY_STATS[SHIELD]!.shield, w[10], ENEMY_STATS[SHIELD]!.radius + 12, 0xffa89a);
+      if (v) shieldArc(v.x, v.y, w[8], w[7] / 100, w[10], (ENEMY_STATS[SHIELD]!.radius + 12) * (w[11] === 1 ? BOSS_SIZE : 1), 0xffa89a);
     }
     for (const w of latest.mercs) {
       if (w[4] !== SHIELD || w[8] > 0) continue;
       const v = mercs.views.get(w[0]);
       if (v) shieldArc(v.x, v.y, w[12], w[11] > 0 ? w[10] / w[11] : 0, w[14], MERC_STATS[SHIELD]!.radius + 12, 0x8fd0ff);
     }
+    // 장군: 발밑에 금빛 고리
+    for (const w of latest.enemies) {
+      if (w[11] !== 1) continue;
+      const v = enemies.views.get(w[0]);
+      if (v) fxLayer.ellipse(v.x, v.y + 22, 34, 15).stroke({ width: 3, color: 0xffd45d, alpha: 0.85 });
+    }
+    // 서버가 알려 준 순간 효과(명중·방패·부활)
+    for (let i = bursts.length - 1; i >= 0; i--) {
+      const b = bursts[i]!;
+      b.age += ticker.deltaMS / 1000;
+      const t = b.age / BURST_SEC;
+      if (t >= 1) {
+        bursts.splice(i, 1);
+        continue;
+      }
+      if (b.kind === EVT_SHIELD_BLOCK) {
+        const r = 22 + 8 * t;
+        fxLayer
+          .moveTo(b.x + Math.cos(b.ang - 0.7) * r, b.y + Math.sin(b.ang - 0.7) * r)
+          .arc(b.x, b.y, r, b.ang - 0.7, b.ang + 0.7)
+          .stroke({ width: 4 * (1 - t) + 1, color: 0xbfe6ff, alpha: 0.9 * (1 - t) });
+      } else if (b.kind === EVT_SHIELD_BREAK) {
+        fxLayer.circle(b.x, b.y, 14 + 34 * t).stroke({ width: 5 * (1 - t) + 1, color: 0x8fd0ff, alpha: 0.9 * (1 - t) });
+      } else if (b.kind === EVT_REVIVE) {
+        fxLayer.circle(b.x, b.y, 10 + 60 * t).stroke({ width: 6 * (1 - t) + 1, color: 0x7be08f, alpha: 0.9 * (1 - t) });
+      }
+    }
+
     // 기병이 속도를 낼수록 뒤에 속도선이 길어진다
     const streak = (x: number, y: number, face: number, mom: number) => {
       if (mom < 0.4) return;
@@ -786,7 +836,14 @@ async function main() {
         levelToastLeft = 2;
       }
       lastLevel = meState.level;
-      deadText.text = meState.respawn > 0 ? `쓰러졌습니다 - ${Math.ceil(meState.respawn)}초 뒤 부활` : "";
+      const fallen = latest.players.find((q) => q.id !== myId && q.down && Math.hypot(q.x - meState.x, q.y - meState.y) <= REVIVE_RADIUS * 1.5);
+      deadText.text = meState.down
+        ? meState.revive > 0
+          ? `동료가 일으켜 세우는 중... ${Math.round(meState.revive * 100)}%`
+          : "쓰러졌습니다 - 동료가 일으켜 주기를 기다리는 중"
+        : fallen
+          ? `${fallen.name} 부활: E 누르고 있기${fallen.revive > 0 ? ` (${Math.round(fallen.revive * 100)}%)` : ""}`
+          : "";
 
       // 가까운 캠프의 고용 목록
       let best: CampWire | null = null;
@@ -798,7 +855,7 @@ async function main() {
           best = c;
         }
       }
-      if (best && meState.respawn <= 0) {
+      if (best && !meState.down) {
         nearCampId = best[0];
         const owned = mine.length;
         const lines = ["캠프 - 고용 (숫자 키)"];
@@ -822,6 +879,21 @@ async function main() {
         campPanel.visible = false;
       }
     }
+    const gi = latest.g;
+    if (gi && gi.status !== "playing") deadText.text = ""; // 결과 화면이 뜨면 안내 문구는 숨긴다
+    if (gi) {
+      const mmss = (t: number) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+      if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · 보스군 도착까지 ${mmss(gi.timer)}`;
+      else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${UNIT_NAMES[gi.bossType]} 장군의 군대 ${gi.armyLeft}/${gi.armyTotal}`;
+      else stageText.text = `스테이지 ${gi.stage} 클리어! 다음 스테이지까지 ${gi.timer}초`;
+      stageText.position.set(app.screen.width / 2, 8);
+      bossBar.clear();
+      if (gi.phase === "boss" && gi.bossHp > 0) {
+        const bw = 320;
+        const bx = app.screen.width / 2 - bw / 2;
+        bossBar.roundRect(bx, 36, bw, 10, 4).fill({ color: 0x000000, alpha: 0.6 }).roundRect(bx, 36, (bw * gi.bossHp) / 100, 10, 4).fill(0xe8883a);
+      }
+    }
     levelToastLeft = Math.max(0, levelToastLeft - ticker.deltaMS / 1000);
     levelToast.visible = levelToastLeft > 0;
     levelToast.position.set(app.screen.width / 2, 100);
@@ -829,7 +901,7 @@ async function main() {
     cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(110, app.screen.height / 2 - 130));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
-    deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 80);
+    deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 120);
     campPanel.position.set(app.screen.width / 2 - campPanel.width / 2, app.screen.height - campPanel.height - 112);
     toast.position.set(app.screen.width / 2, 74);
     legend.position.set(0, app.screen.height - LEGEND_H);

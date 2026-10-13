@@ -1,4 +1,6 @@
-import type { ClientMsg, RoomInfo, RoomMember, RoomPhase, ServerMsg } from "@mercenary/shared";
+import { STAGE_COUNT, type ClientMsg, type RoomInfo, type RoomMember, type RoomPhase, type ServerMsg } from "@mercenary/shared";
+
+type ResultMsg = Extract<ServerMsg, { t: "result" }>;
 
 const NAME_KEY = "mercenary.name";
 export const TOKEN_KEY = "mercenary.token";
@@ -63,6 +65,8 @@ export function createLobby(opts: Options): Lobby {
   const errorEl = $("lobbyError");
   const waitEl = $("waitRoom");
   const waitErrorEl = $("waitError");
+  const resultEl = $("resultPanel");
+  let lastResult: ResultMsg | null = null;
 
   let code = "";
   let myId = -1;
@@ -182,7 +186,40 @@ export function createLobby(opts: Options): Lobby {
       : "방장이 시작하면 게임이 열립니다. 준비를 눌러 주세요.";
   }
 
+  /** 게임이 끝났을 때의 결과 화면. 방장만 다시 시작할 수 있다. */
+  function renderResult(): void {
+    const r = lastResult;
+    if (!r) return;
+    const win = r.status === "victory";
+    const title = $("resultTitle");
+    title.textContent = win ? "승리!" : "전멸...";
+    title.className = win ? "victory" : "defeat";
+    const mm = Math.floor(r.time / 60);
+    const ss = String(r.time % 60).padStart(2, "0");
+    $("resultSub").textContent = win
+      ? `스테이지 ${STAGE_COUNT}개를 모두 돌파했습니다 · ${mm}:${ss}`
+      : `스테이지 ${r.stage}/${STAGE_COUNT}에서 모든 주인공이 쓰러졌습니다 · ${mm}:${ss}`;
+    const list = $("resultList");
+    list.replaceChildren();
+    for (const p of r.players) {
+      const item = document.createElement("div");
+      item.className = "item";
+      const nm = document.createElement("div");
+      nm.className = "grow";
+      nm.textContent = p.name;
+      const st = document.createElement("div");
+      st.className = "stat";
+      st.textContent = `Lv ${p.level} · 처치 ${p.kills} · 부활시킴 ${p.revives}`;
+      item.append(nm, st);
+      list.append(item);
+    }
+    const iAmHost = hostId === myId;
+    $("resultRematch").style.display = iAmHost ? "" : "none";
+    $("resultHint").textContent = iAmHost ? "다시 하기를 누르면 대기실로 돌아갑니다." : "방장이 다시 시작하기를 기다리는 중입니다.";
+  }
+
   const showLobby = (error = "") => {
+    resultEl.classList.remove("open");
     roomEl.classList.remove("open");
     waitEl.classList.remove("open");
     lobbyEl.classList.add("open");
@@ -201,6 +238,8 @@ export function createLobby(opts: Options): Lobby {
   codeInput.onkeydown = (e) => e.key === "Enter" && joinByCode();
   $("roomLeave").onclick = () => opts.send({ t: "leave" });
   $("waitLeave").onclick = () => opts.send({ t: "leave" });
+  $("resultLeave").onclick = () => opts.send({ t: "leave" });
+  $("resultRematch").onclick = () => opts.send({ t: "rematch" });
   $("waitReady").onclick = () => opts.send({ t: "ready", ready: !members.find((m) => m.id === myId)?.ready });
   $("waitStart").onclick = () => {
     waitErrorEl.textContent = "";
@@ -243,7 +282,10 @@ export function createLobby(opts: Options): Lobby {
           $("roomTitle").textContent = msg.name;
           $("roomCode").textContent = msg.code;
           renderMembers($("roomMembers"), members, false);
+          if (phase === "ended") renderResult();
+          else resultEl.classList.remove("open");
           if (phase === "waiting") {
+            lastResult = null;
             // 대기실: 게임 화면 대신 대기실을 보여 준다
             roomEl.classList.remove("open");
             renderWaitRoom(msg.name, msg.private);
@@ -253,8 +295,14 @@ export function createLobby(opts: Options): Lobby {
             waitErrorEl.textContent = "";
           }
           return true;
+        case "result":
+          lastResult = msg;
+          renderResult();
+          resultEl.classList.add("open");
+          return true;
         case "left":
           inRoom = false;
+          lastResult = null;
           members = [];
           waitEl.classList.remove("open");
           safe.del(TOKEN_KEY, sessionStorage);
@@ -279,9 +327,9 @@ export function createLobby(opts: Options): Lobby {
     playerName: () => nameInput.value.trim(),
     roomCode: () => code,
     inRoom: () => inRoom,
-    blocksGameInput: () => lobbyEl.classList.contains("open") || roomEl.classList.contains("open") || waitEl.classList.contains("open"),
+    blocksGameInput: () => lobbyEl.classList.contains("open") || roomEl.classList.contains("open") || waitEl.classList.contains("open") || resultEl.classList.contains("open"),
     toggleRoomPanel() {
-      if (!inRoom || phase !== "playing" || lobbyEl.classList.contains("open") || waitEl.classList.contains("open")) return;
+      if (!inRoom || phase !== "playing" || resultEl.classList.contains("open") || lobbyEl.classList.contains("open") || waitEl.classList.contains("open")) return;
       roomEl.classList.toggle("open");
     },
     markDisconnected: () => {
