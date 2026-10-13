@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  JOIN_FAIL_BLOCK_SEC,
+  JOIN_FAIL_LIMIT,
   MAX_PLAYERS,
   MAX_ROOMS,
   NAME_MAX_LENGTH,
@@ -15,6 +17,7 @@ import {
 import { RoomManager, type Conn } from "../src/rooms.js";
 
 class FakeConn implements Conn {
+  ip?: string;
   msgs: ServerMsg[] = [];
   closed = false;
   send(msg: ServerMsg) {
@@ -59,9 +62,9 @@ test("방 만들기: 4글자 코드를 받고 방장이 되며 방 목록에 나
   const room = a.last("room")!;
   assert.equal(room.hostId, w.id);
   assert.equal(room.name, "우리 방");
-  assert.deepEqual(room.players, [{ id: w.id, name: "철수", online: true }]);
+  assert.deepEqual(room.players, [{ id: w.id, name: "철수", online: true, ready: false }]);
   const b = conn();
-  assert.deepEqual(b.last("rooms")!.rooms, [{ code: w.code, name: "우리 방", players: 1, max: MAX_PLAYERS }]);
+  assert.deepEqual(b.last("rooms")!.rooms, [{ code: w.code, name: "우리 방", players: 1, max: MAX_PLAYERS, playing: false }]);
 });
 
 test("코드로 참가: 대소문자·공백을 가리지 않고, 기존 인원에게도 알려진다", () => {
@@ -116,6 +119,8 @@ test("방마다 독립된 판이다: 한 방의 입력·적이 다른 방에 영
   const b = conn();
   m.handle(a, { t: "create", name: "A" });
   m.handle(b, { t: "create", name: "B" });
+  m.handle(a, { t: "start" });
+  m.handle(b, { t: "start" });
   const ra = m.roomOf(a)!;
   const rb = m.roomOf(b)!;
   assert.notEqual(ra.code, rb.code);
@@ -139,6 +144,9 @@ test("상태는 같은 방 사람에게만, 매 틱 전달된다", () => {
   m.handle(a, { t: "create", name: "A" });
   m.handle(b, { t: "join", name: "B", code: a.last("welcome")!.code });
   m.handle(c, { t: "create", name: "C" });
+  m.handle(b, { t: "ready", ready: true });
+  m.handle(a, { t: "start" });
+  m.handle(c, { t: "start" });
   m.step();
   const sa = a.last("state")!;
   assert.equal(sa.players.length, 2);
@@ -197,12 +205,14 @@ test("접속이 끊겨도 제한 시간 안에는 자리를 지키고, 같은 �
   m.handle(a, { t: "create", name: "A" });
   const b = conn();
   m.handle(b, { t: "join", name: "B", code: a.last("welcome")!.code });
+  m.handle(b, { t: "ready", ready: true });
+  m.handle(a, { t: "start" });
   const { id, token } = b.last("welcome")!;
   const game = m.roomOf(b)!.game;
   game.getPlayer(id)!.gold = 777;
 
   m.disconnect(b);
-  assert.deepEqual(a.last("room")!.players.find((p) => p.id === id), { id, name: "B", online: false });
+  assert.deepEqual(a.last("room")!.players.find((p) => p.id === id), { id, name: "B", online: false, ready: true });
   seconds(m, RECONNECT_GRACE_SEC - 5);
   assert.equal(game.playerCount, 2, "아직 자리가 남아 있다");
 
@@ -345,4 +355,229 @@ test("로비에 있는 사람에게 방 목록 변화가 실시간으로 전해�
   assert.equal(lobbyer.last("rooms")!.rooms.length, 1);
   m.handle(a, { t: "leave" });
   assert.equal(lobbyer.last("rooms")!.rooms.length, 0);
+});
+
+// --- 비공개 방과 대기실 ----------------------------------------------------------
+
+
+
+test("비공개 방: 목록과 빠른 시작에서 제외되고, 코드로만 들어올 수 있다", () => {
+  const { m, conn } = setup();
+  const host = conn();
+  m.handle(host, { t: "create", name: "H", room: "비밀방", private: true });
+  const code = host.last("welcome")!.code;
+  assert.equal(host.last("room")!.private, true);
+  assert.deepEqual(m.list(), []);
+  // 로비 사람에게 방 목록 갱신으로도 새어 나가지 않는다
+  const watcher = conn();
+  assert.deepEqual(watcher.last("rooms")!.rooms, []);
+  // 빠른 시작은 비공개 방에 들어가지 않고 새 공개 방을 만든다
+  const q = conn();
+  m.handle(q, { t: "quick", name: "Q" });
+  assert.notEqual(q.last("welcome")!.code, code);
+  assert.equal(m.roomOf(host)!.game.playerCount, 1);
+  // 코드로는 들어올 수 있다
+  const friend = conn();
+  m.handle(friend, { t: "join", name: "F", code });
+  assert.equal(friend.last("welcome")!.code, code);
+  assert.equal(m.roomOf(host)!.game.playerCount, 2);
+});
+
+test("공개 방은 기본값이고 목록에 대기 중/진행 중이 표시된다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  m.handle(a, { t: "create", name: "A" });
+  assert.equal(a.last("room")!.private, false);
+  assert.equal(m.list()[0]!.playing, false);
+  m.handle(a, { t: "start" });
+  assert.equal(m.list()[0]!.playing, true);
+});
+
+test("대기실: 방을 만들면 대기 상태이고, 시작 전에는 게임이 진행되지 않는다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  m.handle(a, { t: "create", name: "A" });
+  assert.equal(a.last("room")!.phase, "waiting");
+  const room = m.roomOf(a)!;
+  const id = a.last("welcome")!.id;
+  const p0 = { ...room.game.getPlayer(id)! };
+  m.handle(a, { t: "input", dx: 1, dy: 0, aim: 0, fire: false }); // 대기실에서는 조작 무시
+  seconds(m, 30);
+  assert.equal(room.game.time, 0, "시간이 흐르지 않는다");
+  assert.equal(room.game.enemyCount, 0, "적이 나오지 않는다");
+  assert.equal(room.game.getPlayer(id)!.x, p0.x);
+  assert.equal(a.last("state"), undefined, "상태 메시지를 보내지 않는다");
+});
+
+test("준비와 시작: 방장만 시작하고, 접속 중인 다른 참가자가 모두 준비해야 한다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  const b = conn();
+  const c = conn();
+  m.handle(a, { t: "create", name: "A" });
+  const code = a.last("welcome")!.code;
+  m.handle(b, { t: "join", name: "B", code });
+  m.handle(c, { t: "join", name: "C", code });
+  assert.equal(a.last("room")!.players.every((p) => !p.ready), true);
+
+  m.handle(b, { t: "start" });
+  assert.ok(b.last("error")!.text.includes("방장"));
+  m.handle(a, { t: "start" });
+  assert.ok(a.last("error")!.text.includes("준비"), "아무도 준비하지 않았다");
+  assert.ok(a.last("error")!.text.includes("B") && a.last("error")!.text.includes("C"));
+
+  m.handle(b, { t: "ready", ready: true });
+  assert.equal(a.last("room")!.players.find((p) => p.name === "B")!.ready, true);
+  m.handle(a, { t: "start" });
+  assert.ok(a.last("error")!.text.includes("C"), "C가 아직");
+  assert.equal(a.last("room")!.phase, "waiting");
+
+  m.handle(b, { t: "ready", ready: false }); // 준비 취소
+  m.handle(b, { t: "ready", ready: true });
+  m.handle(c, { t: "ready", ready: true });
+  m.handle(a, { t: "start" });
+  assert.equal(a.last("room")!.phase, "playing");
+  assert.equal(c.last("room")!.phase, "playing");
+  seconds(m, 1);
+  assert.ok(b.last("state"), "시작하면 상태가 전달된다");
+  assert.ok(m.roomOf(a)!.game.time > 0);
+});
+
+test("방장 혼자면 바로 시작할 수 있다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  m.handle(a, { t: "create", name: "A" });
+  m.handle(a, { t: "start" });
+  assert.equal(a.last("room")!.phase, "playing");
+});
+
+test("연결이 끊긴 참가자는 시작을 막지 않는다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  const b = conn();
+  m.handle(a, { t: "create", name: "A" });
+  m.handle(b, { t: "join", name: "B", code: a.last("welcome")!.code });
+  m.disconnect(b);
+  m.handle(a, { t: "start" });
+  assert.equal(a.last("room")!.phase, "playing");
+});
+
+test("시작한 뒤에는 준비 없이 바로 합류하고, 그 사람의 게임 조작이 먹는다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  m.handle(a, { t: "create", name: "A" });
+  m.handle(a, { t: "start" });
+  const late = conn();
+  m.handle(late, { t: "join", name: "L", code: a.last("welcome")!.code });
+  assert.equal(late.last("room")!.phase, "playing");
+  const game = m.roomOf(late)!.game;
+  const id = late.last("welcome")!.id;
+  const x0 = game.getPlayer(id)!.x;
+  m.handle(late, { t: "input", dx: 1, dy: 0, aim: 0, fire: false });
+  seconds(m, 1);
+  assert.ok(game.getPlayer(id)!.x > x0 + 100);
+});
+
+test("빠른 시작으로 새로 만들어진 방은 기다리지 않고 바로 진행된다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  m.handle(a, { t: "quick", name: "A" });
+  assert.equal(a.last("room")!.phase, "playing");
+  seconds(m, 1);
+  assert.ok(a.last("state"));
+});
+
+test("대기실 상태에서도 나가기·내보내기·방장 넘김이 동작한다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  const b = conn();
+  const c = conn();
+  m.handle(a, { t: "create", name: "A", private: true });
+  const code = a.last("welcome")!.code;
+  m.handle(b, { t: "join", name: "B", code });
+  m.handle(c, { t: "join", name: "C", code });
+  m.handle(a, { t: "kick", id: c.last("welcome")!.id });
+  assert.ok(c.last("left"));
+  m.handle(a, { t: "leave" });
+  assert.equal(b.last("room")!.hostId, b.last("welcome")!.id);
+  assert.equal(b.last("room")!.phase, "waiting");
+  assert.equal(b.last("room")!.private, true);
+  // 새 방장이 시작할 수 있다
+  m.handle(b, { t: "start" });
+  assert.equal(b.last("room")!.phase, "playing");
+});
+
+test("대기실에서 끊겼다가 재접속하면 대기실로 돌아오고 준비 상태가 유지된다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  const b = conn();
+  m.handle(a, { t: "create", name: "A" });
+  m.handle(b, { t: "join", name: "B", code: a.last("welcome")!.code });
+  m.handle(b, { t: "ready", ready: true });
+  const { token, id } = b.last("welcome")!;
+  m.disconnect(b);
+  seconds(m, 5);
+  const b2 = conn();
+  m.handle(b2, { t: "rejoin", token });
+  assert.equal(b2.last("room")!.phase, "waiting");
+  assert.equal(b2.last("room")!.players.find((p) => p.id === id)!.ready, true);
+});
+
+test("준비·시작 요청은 방 밖이나 진행 중에는 무시된다", () => {
+  const { m, conn } = setup();
+  const x = conn();
+  assert.doesNotThrow(() => {
+    m.handle(x, { t: "ready", ready: true });
+    m.handle(x, { t: "start" });
+  });
+  const a = conn();
+  m.handle(a, { t: "quick", name: "A" });
+  m.handle(a, { t: "ready", ready: true }); // 진행 중에는 의미 없다
+  m.handle(a, { t: "start" });
+  assert.equal(a.last("room")!.phase, "playing");
+});
+
+test("코드 무작위 대입 방지: 같은 주소에서 연속으로 틀리면 잠시 차단된다", () => {
+  const { m } = setup();
+  const make = (ip: string) => {
+    const c = new FakeConn();
+    c.ip = ip;
+    m.connect(c);
+    return c;
+  };
+  const host = make("1.1.1.1");
+  m.handle(host, { t: "create", name: "H", private: true });
+  const code = host.last("welcome")!.code;
+  const attacker = make("6.6.6.6");
+  for (let i = 0; i < JOIN_FAIL_LIMIT; i++) m.handle(attacker, { t: "join", name: "X", code: "QQQQ" });
+  // 이제는 맞는 코드를 넣어도 막힌다
+  m.handle(attacker, { t: "join", name: "X", code });
+  assert.ok(attacker.last("error")!.text.includes("너무 많이"));
+  assert.equal(attacker.last("welcome"), undefined);
+  // 다른 주소는 영향이 없다
+  const other = make("2.2.2.2");
+  m.handle(other, { t: "join", name: "O", code });
+  assert.ok(other.last("welcome"));
+  // 시간이 지나면 풀린다
+  seconds(m, JOIN_FAIL_BLOCK_SEC + 1);
+  m.handle(attacker, { t: "join", name: "X", code });
+  assert.ok(attacker.last("welcome"));
+});
+
+test("코드를 가끔 틀리는 것은 괜찮고, 맞게 입력하면 실패 횟수가 초기화된다", () => {
+  const { m } = setup();
+  const host = new FakeConn();
+  host.ip = "1.1.1.1";
+  m.connect(host);
+  m.handle(host, { t: "create", name: "H" });
+  const code = host.last("welcome")!.code;
+  for (let round = 0; round < 3; round++) {
+    const c = new FakeConn();
+    c.ip = "3.3.3.3";
+    m.connect(c);
+    for (let i = 0; i < JOIN_FAIL_LIMIT - 1; i++) m.handle(c, { t: "join", name: "X", code: "ZZZZ" });
+    m.handle(c, { t: "join", name: "X", code });
+    assert.ok(c.last("welcome"), `${round}번째 시도`);
+    m.handle(c, { t: "leave" });
+  }
 });

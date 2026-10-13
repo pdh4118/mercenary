@@ -16,6 +16,7 @@ npm start       # http://0.0.0.0:8080
 | `HOST` | 0.0.0.0 | 바인딩 주소. 리버스 프록시 뒤에 둘 때는 `127.0.0.1`을 권장 |
 | `ALLOWED_ORIGINS` | (모두 허용) | 허용할 접속 출처. 예: `https://game.example.com`. 쉼표로 여러 개 |
 | `MAX_CONNECTIONS` | 300 | 동시 접속 상한 |
+| `TRUST_PROXY` | (꺼짐) | `1`이면 `cf-connecting-ip`/`x-forwarded-for` 헤더를 접속자 주소로 쓴다. **Cloudflare Tunnel이나 리버스 프록시 뒤에서는 켜야** 비공개 방 코드 무작위 대입 차단이 접속자별로 동작한다(안 켜면 모두가 프록시 주소 하나로 보인다). 서버를 인터넷에 직접 열었다면 켜지 말 것 |
 | `STATIC_DIR` | `client/dist` | 빌드된 클라이언트 위치 |
 
 상태 확인: `GET /healthz` → `{"ok":true,"rooms":N,"connections":N}`
@@ -103,5 +104,5 @@ WantedBy=multi-user.target
 ## 아직 없는 것
 
 - 서버 재시작 시 방 복구, 계정/로그인, 접속 기록 저장
-- 비공개 방(코드를 아는 사람만) — 지금 방 목록에는 모든 방이 보인다
+- 방 비밀번호(비공개 방은 4글자 코드만으로 입장한다. 같은 주소에서 8번 연속 틀리면 60초 차단)
 - 같은 IP 접속 수 제한, 신고·차단 같은 운영 도구

@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
@@ -13,6 +13,8 @@ const STATIC_DIR = process.env.STATIC_DIR ?? fileURLToPath(new URL("../../client
 /** 쉼표로 구분한 허용 출처(예: https://game.example.com). 비우면 모두 허용한다. */
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const MAX_CONNECTIONS = Number(process.env.MAX_CONNECTIONS ?? 300);
+/** 프록시/터널 뒤에서 실제 접속자 주소를 헤더에서 읽는다. 직접 인터넷에 열어 둘 때는 켜지 말 것(헤더를 속일 수 있다). */
+const TRUST_PROXY = process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true";
 const MAX_MESSAGE_BYTES = 2048; // 정상적인 메시지는 훨씬 작다
 const MAX_MESSAGES_PER_SEC = 120; // 입력 20회/초 + 클릭 등을 넉넉히 허용
 const PING_INTERVAL_MS = 15000;
@@ -55,12 +57,25 @@ interface Meta {
 }
 const metas = new Map<WebSocket, Meta>();
 
-wss.on("connection", (ws) => {
+/** 코드 무작위 대입 차단에 쓸 접속 주소 */
+function clientIp(req: IncomingMessage): string | undefined {
+  if (TRUST_PROXY) {
+    const cf = req.headers["cf-connecting-ip"];
+    if (typeof cf === "string" && cf) return cf.trim();
+    const xff = req.headers["x-forwarded-for"];
+    const first = (Array.isArray(xff) ? xff[0] : xff)?.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return req.socket.remoteAddress ?? undefined;
+}
+
+wss.on("connection", (ws, req) => {
   if (metas.size >= MAX_CONNECTIONS) {
     ws.close(1013, "서버가 가득 찼습니다");
     return;
   }
   const conn: Conn = {
+    ip: clientIp(req),
     send: (msg: ServerMsg) => ws.readyState === ws.OPEN && ws.send(JSON.stringify(msg)),
     sendRaw: (json: string) => ws.readyState === ws.OPEN && ws.send(json),
     close: () => ws.close(),

@@ -1,4 +1,4 @@
-import type { ClientMsg, RoomInfo, RoomMember, ServerMsg } from "@mercenary/shared";
+import type { ClientMsg, RoomInfo, RoomMember, RoomPhase, ServerMsg } from "@mercenary/shared";
 
 const NAME_KEY = "mercenary.name";
 export const TOKEN_KEY = "mercenary.token";
@@ -58,14 +58,19 @@ export function createLobby(opts: Options): Lobby {
   const nameInput = $<HTMLInputElement>("lobbyName");
   const roomNameInput = $<HTMLInputElement>("lobbyRoomName");
   const codeInput = $<HTMLInputElement>("lobbyCode");
+  const privateInput = $<HTMLInputElement>("lobbyPrivate");
   const listEl = $("lobbyList");
   const errorEl = $("lobbyError");
+  const waitEl = $("waitRoom");
+  const waitErrorEl = $("waitError");
 
   let code = "";
   let myId = -1;
   let inRoom = false;
   let hostId = -1;
+  let phase: RoomPhase = "playing";
   let rooms: RoomInfo[] = [];
+  let members: RoomMember[] = [];
 
   const params = new URLSearchParams(location.search);
   nameInput.value = (params.get("name") ?? safe.get(NAME_KEY) ?? "").slice(0, 12);
@@ -98,7 +103,10 @@ export function createLobby(opts: Options): Lobby {
       const c = document.createElement("span");
       c.className = "code";
       c.textContent = r.code;
-      meta.append(c, ` · ${r.players}/${r.max}명`);
+      const state = document.createElement("span");
+      state.className = r.playing ? "tag live" : "tag";
+      state.textContent = r.playing ? "진행 중" : "대기 중";
+      meta.append(c, ` · ${r.players}/${r.max}명 `, state);
       info.append(nm, meta);
       const join = document.createElement("button");
       join.textContent = r.players >= r.max ? "가득 참" : "참가";
@@ -109,8 +117,8 @@ export function createLobby(opts: Options): Lobby {
     }
   }
 
-  function renderMembers(players: RoomMember[]): void {
-    const box = $("roomMembers");
+  /** 참가자 목록을 그린다. 대기실에서는 준비 표시를, 방 메뉴에서는 생략한다. */
+  function renderMembers(box: HTMLElement, players: RoomMember[], showReady: boolean): void {
     box.replaceChildren();
     const iAmHost = hostId === myId;
     for (const p of players) {
@@ -124,6 +132,11 @@ export function createLobby(opts: Options): Lobby {
         const t = document.createElement("span");
         t.className = "tag";
         t.textContent = "방장";
+        item.append(t);
+      } else if (showReady && p.online) {
+        const t = document.createElement("span");
+        t.className = p.ready ? "tag ready" : "tag off";
+        t.textContent = p.ready ? "준비 완료" : "준비 안 함";
         item.append(t);
       }
       if (!p.online) {
@@ -143,15 +156,42 @@ export function createLobby(opts: Options): Lobby {
     }
   }
 
+  /** 대기실 화면(참가자·준비·시작 버튼)을 현재 상태로 갱신한다 */
+  function renderWaitRoom(roomName: string, isPrivate: boolean): void {
+    $("waitTitle").textContent = roomName;
+    $("waitPrivate").style.display = isPrivate ? "inline-block" : "none";
+    $("waitCode").textContent = code;
+    $("waitCount").textContent = `(${members.length}명)`;
+    renderMembers($("waitMembers"), members, true);
+    const iAmHost = hostId === myId;
+    const me = members.find((m) => m.id === myId);
+    const waiting = members.filter((m) => m.id !== hostId && m.online && !m.ready);
+    const readyBtn = $<HTMLButtonElement>("waitReady");
+    const startBtn = $<HTMLButtonElement>("waitStart");
+    readyBtn.style.display = iAmHost ? "none" : "";
+    readyBtn.textContent = me?.ready ? "준비 취소" : "준비";
+    readyBtn.className = me?.ready ? "" : "primary";
+    startBtn.style.display = iAmHost ? "" : "none";
+    startBtn.disabled = waiting.length > 0;
+    $("waitHint").textContent = iAmHost
+      ? waiting.length > 0
+        ? `준비하지 않은 사람: ${waiting.map((m) => m.name).join(", ")}`
+        : members.length > 1
+          ? "모두 준비했습니다. 시작할 수 있습니다."
+          : "혼자서도 시작할 수 있습니다. 친구가 오면 기다려 보세요."
+      : "방장이 시작하면 게임이 열립니다. 준비를 눌러 주세요.";
+  }
+
   const showLobby = (error = "") => {
     roomEl.classList.remove("open");
+    waitEl.classList.remove("open");
     lobbyEl.classList.add("open");
     setError(error);
   };
   const hideLobby = () => lobbyEl.classList.remove("open");
 
   $("lobbyQuick").onclick = () => opts.send({ t: "quick", name: name() });
-  $("lobbyCreate").onclick = () => opts.send({ t: "create", name: name(), room: roomNameInput.value });
+  $("lobbyCreate").onclick = () => opts.send({ t: "create", name: name(), room: roomNameInput.value, private: privateInput.checked });
   const joinByCode = () => {
     const c = codeInput.value.trim();
     if (c.length < 4) return setError("방 코드 4글자를 입력해 주세요");
@@ -160,6 +200,17 @@ export function createLobby(opts: Options): Lobby {
   $("lobbyJoin").onclick = joinByCode;
   codeInput.onkeydown = (e) => e.key === "Enter" && joinByCode();
   $("roomLeave").onclick = () => opts.send({ t: "leave" });
+  $("waitLeave").onclick = () => opts.send({ t: "leave" });
+  $("waitReady").onclick = () => opts.send({ t: "ready", ready: !members.find((m) => m.id === myId)?.ready });
+  $("waitStart").onclick = () => {
+    waitErrorEl.textContent = "";
+    opts.send({ t: "start" });
+  };
+  $("waitCopy").onclick = () => {
+    void navigator.clipboard?.writeText(code).catch(() => undefined);
+    $("waitCopy").textContent = "복사됨";
+    setTimeout(() => ($("waitCopy").textContent = "복사"), 1200);
+  };
   $("roomClose").onclick = () => roomEl.classList.remove("open");
   $("roomCopy").onclick = () => {
     void navigator.clipboard?.writeText(code).catch(() => undefined);
@@ -187,12 +238,25 @@ export function createLobby(opts: Options): Lobby {
         case "room":
           code = msg.code;
           hostId = msg.hostId;
+          phase = msg.phase;
+          members = msg.players;
           $("roomTitle").textContent = msg.name;
           $("roomCode").textContent = msg.code;
-          renderMembers(msg.players);
+          renderMembers($("roomMembers"), members, false);
+          if (phase === "waiting") {
+            // 대기실: 게임 화면 대신 대기실을 보여 준다
+            roomEl.classList.remove("open");
+            renderWaitRoom(msg.name, msg.private);
+            if (inRoom) waitEl.classList.add("open");
+          } else {
+            waitEl.classList.remove("open"); // 시작되었다
+            waitErrorEl.textContent = "";
+          }
           return true;
         case "left":
           inRoom = false;
+          members = [];
+          waitEl.classList.remove("open");
           safe.del(TOKEN_KEY, sessionStorage);
           opts.onLeave();
           showLobby(msg.reason);
@@ -202,6 +266,8 @@ export function createLobby(opts: Options): Lobby {
           if (!inRoom) {
             safe.del(TOKEN_KEY, sessionStorage);
             showLobby(msg.text);
+          } else if (waitEl.classList.contains("open")) {
+            waitErrorEl.textContent = msg.text; // 시작 실패 등
           } else {
             setError(msg.text);
           }
@@ -213,9 +279,9 @@ export function createLobby(opts: Options): Lobby {
     playerName: () => nameInput.value.trim(),
     roomCode: () => code,
     inRoom: () => inRoom,
-    blocksGameInput: () => lobbyEl.classList.contains("open") || roomEl.classList.contains("open"),
+    blocksGameInput: () => lobbyEl.classList.contains("open") || roomEl.classList.contains("open") || waitEl.classList.contains("open"),
     toggleRoomPanel() {
-      if (!inRoom || lobbyEl.classList.contains("open")) return;
+      if (!inRoom || phase !== "playing" || lobbyEl.classList.contains("open") || waitEl.classList.contains("open")) return;
       roomEl.classList.toggle("open");
     },
     markDisconnected: () => {

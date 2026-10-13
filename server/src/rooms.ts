@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 import {
+  JOIN_FAIL_BLOCK_SEC,
+  JOIN_FAIL_LIMIT,
   MAX_PLAYERS,
   MAX_ROOMS,
   NAME_MAX_LENGTH,
@@ -9,12 +11,15 @@ import {
   TICK_RATE,
   type ClientMsg,
   type RoomInfo,
+  type RoomPhase,
   type ServerMsg,
 } from "@mercenary/shared";
 import { Game } from "./game.js";
 
 /** 네트워크 연결을 추상화한 것. 실제로는 WebSocket을 감싸고, 테스트에서는 가짜를 쓴다. */
 export interface Conn {
+  /** 접속한 주소(코드 무작위 대입 차단에 쓴다). 알 수 없으면 비운다. */
+  ip?: string;
   send(msg: ServerMsg): void;
   /** 같은 내용을 여러 명에게 보낼 때 직렬화를 한 번만 하려고 쓴다(없으면 send로 대신한다) */
   sendRaw?(json: string): void;
@@ -29,6 +34,7 @@ interface Member {
   conn: Conn | null; // null이면 접속이 끊겨 돌아오기를 기다리는 중
   token: string;
   offlineLeft: number;
+  ready: boolean; // 대기실에서 준비 여부
 }
 
 interface Room {
@@ -37,6 +43,8 @@ interface Room {
   game: Game;
   hostId: number;
   members: Map<number, Member>;
+  phase: RoomPhase; // waiting: 대기실(게임 정지), playing: 진행 중
+  isPrivate: boolean; // 비공개: 목록·빠른 시작에서 제외, 코드로만 입장
 }
 
 /** 이름·방 이름에서 제어 문자를 지우고 길이를 자른다 */
@@ -55,6 +63,9 @@ export class RoomManager {
   private where = new Map<Conn, { room: Room; id: number }>();
   private tokens = new Map<string, { room: Room; id: number }>();
   private lobby = new Set<Conn>();
+  /** 코드 무작위 대입을 막기 위한 주소별 참가 실패 기록. 시각은 서버가 진행한 시간(초) 기준. */
+  private failures = new Map<string, { count: number; blockedUntil: number }>();
+  private clock = 0;
 
   constructor(private rng: () => number = Math.random) {}
 
@@ -87,7 +98,7 @@ export class RoomManager {
         conn.send({ t: "rooms", rooms: this.list() });
         return;
       case "create":
-        this.create(conn, msg.name, msg.room);
+        this.create(conn, msg.name, msg.room, msg.private === true);
         return;
       case "join":
         this.join(conn, msg.name, msg.code);
@@ -104,6 +115,12 @@ export class RoomManager {
       case "kick":
         this.kick(conn, msg.id);
         return;
+      case "ready":
+        this.setReady(conn, msg.ready === true);
+        return;
+      case "start":
+        this.start(conn);
+        return;
       default:
         this.gameMessage(conn, msg);
     }
@@ -113,6 +130,7 @@ export class RoomManager {
     const at = this.where.get(conn);
     if (!at) return;
     const { room, id } = at;
+    if (room.phase !== "playing") return; // 대기실에서는 게임 조작을 받지 않는다
     switch (msg.t) {
       case "input":
         room.game.setInput(id, msg);
@@ -139,19 +157,30 @@ export class RoomManager {
     }
   }
 
-  private create(conn: Conn, playerName: unknown, roomName: unknown): void {
+  private create(conn: Conn, playerName: unknown, roomName: unknown, isPrivate: boolean): void {
     if (this.where.has(conn)) return this.fail(conn, "이미 방에 들어가 있습니다");
     if (this.rooms.size >= MAX_ROOMS) return this.fail(conn, "지금은 방을 더 만들 수 없습니다");
     const name = clean(playerName, NAME_MAX_LENGTH);
-    const room = this.makeRoom(clean(roomName, ROOM_NAME_MAX_LENGTH) || `${name || "용병단"}의 방`);
+    const room = this.makeRoom(clean(roomName, ROOM_NAME_MAX_LENGTH) || `${name || "용병단"}의 방`, isPrivate);
     this.enter(conn, room, name);
   }
 
   private join(conn: Conn, playerName: unknown, code: unknown): void {
     if (this.where.has(conn)) return this.fail(conn, "이미 방에 들어가 있습니다");
+    const key = conn.ip ?? "unknown";
+    const fail = this.failures.get(key);
+    if (fail && fail.blockedUntil > this.clock) {
+      return this.fail(conn, `코드를 너무 많이 틀렸습니다. ${Math.ceil(fail.blockedUntil - this.clock)}초 뒤에 다시 시도해 주세요`);
+    }
     const room = this.rooms.get(clean(code, ROOM_CODE_LENGTH).toUpperCase());
-    if (!room) return this.fail(conn, "방을 찾을 수 없습니다. 코드를 확인해 주세요");
+    if (!room) {
+      // 비공개 방 코드를 무작위로 대입하는 것을 막기 위해, 같은 주소에서 연속으로 틀리면 잠시 막는다
+      const count = (fail && fail.blockedUntil <= this.clock ? fail.count : 0) + 1;
+      this.failures.set(key, { count, blockedUntil: count >= JOIN_FAIL_LIMIT ? this.clock + JOIN_FAIL_BLOCK_SEC : 0 });
+      return this.fail(conn, "방을 찾을 수 없습니다. 코드를 확인해 주세요");
+    }
     if (room.game.isFull) return this.fail(conn, "방이 가득 찼습니다");
+    this.failures.delete(key);
     this.enter(conn, room, clean(playerName, NAME_MAX_LENGTH));
   }
 
@@ -160,12 +189,14 @@ export class RoomManager {
     if (this.where.has(conn)) return this.fail(conn, "이미 방에 들어가 있습니다");
     let best: Room | null = null;
     for (const r of this.rooms.values()) {
-      if (!r.game.isFull && (!best || r.game.playerCount > best.game.playerCount)) best = r;
+      if (r.isPrivate || r.game.isFull) continue; // 비공개 방은 빠른 시작에 끼지 않는다
+      if (!best || r.game.playerCount > best.game.playerCount) best = r;
     }
     if (!best) {
       if (this.rooms.size >= MAX_ROOMS) return this.fail(conn, "지금은 방을 더 만들 수 없습니다");
       const name = clean(playerName, NAME_MAX_LENGTH);
-      best = this.makeRoom(`${name || "용병단"}의 방`);
+      best = this.makeRoom(`${name || "용병단"}의 방`, false);
+      best.phase = "playing"; // 빠른 시작은 기다리지 않고 바로 시작한다
     }
     this.enter(conn, best, clean(playerName, NAME_MAX_LENGTH));
   }
@@ -206,11 +237,35 @@ export class RoomManager {
     this.removeMember(at.room, targetId, "방장에게 내보내졌습니다");
   }
 
+  private setReady(conn: Conn, ready: boolean): void {
+    const at = this.where.get(conn);
+    if (!at || at.room.phase !== "waiting") return;
+    const m = at.room.members.get(at.id);
+    if (!m) return;
+    m.ready = ready;
+    this.broadcastRoom(at.room);
+  }
+
+  /** 방장이 게임을 시작한다. 접속 중인 다른 참가자가 모두 준비해야 한다. */
+  private start(conn: Conn): void {
+    const at = this.where.get(conn);
+    if (!at) return;
+    const { room } = at;
+    if (room.hostId !== at.id) return this.fail(conn, "방장만 시작할 수 있습니다");
+    if (room.phase !== "waiting") return;
+    const notReady = [...room.members.values()].filter((m) => m.id !== room.hostId && m.conn && !m.ready);
+    if (notReady.length > 0) return this.fail(conn, `아직 준비하지 않은 사람이 있습니다 (${notReady.map((m) => m.name).join(", ")})`);
+    room.phase = "playing";
+    this.broadcastRoom(room);
+    this.broadcastLobby();
+  }
+
   // --- 방 -------------------------------------------------------------------
 
   list(): RoomInfo[] {
     return [...this.rooms.values()]
-      .map((r) => ({ code: r.code, name: r.name, players: r.game.playerCount, max: MAX_PLAYERS }))
+      .filter((r) => !r.isPrivate)
+      .map((r) => ({ code: r.code, name: r.name, players: r.game.playerCount, max: MAX_PLAYERS, playing: r.phase === "playing" }))
       .sort((a, b) => b.players - a.players || a.code.localeCompare(b.code));
   }
 
@@ -224,12 +279,12 @@ export class RoomManager {
     return at && { code: at.room.code, game: at.room.game, hostId: at.room.hostId };
   }
 
-  private makeRoom(name: string): Room {
+  private makeRoom(name: string, isPrivate: boolean): Room {
     let code = "";
     do {
       code = Array.from({ length: ROOM_CODE_LENGTH }, () => CODE_CHARS[Math.floor(this.rng() * CODE_CHARS.length)]).join("");
     } while (this.rooms.has(code));
-    const room: Room = { code, name, game: new Game(this.rng), hostId: -1, members: new Map() };
+    const room: Room = { code, name, game: new Game(this.rng), hostId: -1, members: new Map(), phase: "waiting", isPrivate };
     this.rooms.set(code, room);
     return room;
   }
@@ -241,7 +296,7 @@ export class RoomManager {
       return this.fail(conn, "방이 가득 찼습니다");
     }
     const token = randomBytes(12).toString("hex");
-    room.members.set(id, { id, name: room.game.getPlayer(id)!.name, conn, token, offlineLeft: 0 });
+    room.members.set(id, { id, name: room.game.getPlayer(id)!.name, conn, token, offlineLeft: 0, ready: false });
     if (room.hostId < 0) room.hostId = id; // 처음 들어온 사람이 방장
     this.lobby.delete(conn);
     this.where.set(conn, { room, id });
@@ -280,7 +335,9 @@ export class RoomManager {
       code: room.code,
       name: room.name,
       hostId: room.hostId,
-      players: [...room.members.values()].map((m) => ({ id: m.id, name: m.name, online: !!m.conn })),
+      phase: room.phase,
+      private: room.isPrivate,
+      players: [...room.members.values()].map((m) => ({ id: m.id, name: m.name, online: !!m.conn, ready: m.ready })),
     };
     for (const m of room.members.values()) m.conn?.send(msg);
   }
@@ -299,14 +356,18 @@ export class RoomManager {
 
   /** 한 틱: 모든 방의 판을 진행하고, 끊긴 사람의 대기 시간을 줄이고, 상태를 보낸다 */
   step(): void {
+    this.clock += 1 / TICK_RATE;
+    if (this.failures.size > 0 && Math.round(this.clock * TICK_RATE) % (60 * TICK_RATE) === 0) {
+      for (const [k, f] of this.failures) if (f.blockedUntil <= this.clock) this.failures.delete(k); // 차단이 풀렸거나 오래된 기록
+    }
     for (const room of [...this.rooms.values()]) {
-      room.game.step();
+      if (room.phase === "playing") room.game.step();
       for (const m of [...room.members.values()]) {
         if (m.conn) continue;
         m.offlineLeft -= 1 / TICK_RATE;
         if (m.offlineLeft <= 0) this.removeMember(room, m.id, "접속이 끊겨 방에서 제외되었습니다");
       }
-      if (!this.rooms.has(room.code)) continue;
+      if (!this.rooms.has(room.code) || room.phase !== "playing") continue;
       const state: ServerMsg = {
         t: "state",
         tick: room.game.tick,
