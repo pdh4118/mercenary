@@ -58,6 +58,7 @@ def main() -> int:
     ap.add_argument("--scale", type=float, default=0.38, help="시트 대비 출력 배율. 모든 스프라이트에 같은 값을 써서 상대 크기를 유지한다")
     ap.add_argument("--min-height", type=int, default=100, help="이보다 낮은 덩어리(글자 라벨 등)는 무시")
     ap.add_argument("--alpha", type=int, default=40)
+    ap.add_argument("--attach", type=int, default=10, help="떨어진 작은 조각을 가장 가까운 스프라이트에 붙이는 최대 간격(px). 속도선 같은 이펙트는 크게")
     args = ap.parse_args()
 
     names = args.names.split(",")
@@ -80,17 +81,20 @@ def main() -> int:
         if len(ys):
             boxes[i] = (xs.min(), ys.min(), xs.max(), ys.max())
     big = {i: b for i, b in boxes.items() if b[3] - b[1] + 1 >= args.min_height}
-    # 떨어져 있는 작은 조각(창끝 등)은 근처의 큰 스프라이트에 붙이고, 멀리 있는 것(글자 라벨)은 버린다
-    margin = 10
+    # 떨어져 있는 작은 조각(창끝, 속도선 등)은 가장 가까운 큰 스프라이트에 붙이고(상자 간격 attach px 이내),
+    # 멀리 있는 것(글자 라벨)은 버린다
+    def gap(a: tuple, b: tuple) -> float:
+        dx = max(0, a[0] - b[2], b[0] - a[2])
+        dy = max(0, a[1] - b[3], b[1] - a[3])
+        return float(np.hypot(dx, dy))
+
     merged = {i: [i] for i in big}
     for i, b in boxes.items():
         if i in big:
             continue
-        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
-        for j, bb in big.items():
-            if bb[0] - margin <= cx <= bb[2] + margin and bb[1] - margin <= cy <= bb[3] + margin:
-                merged[j].append(i)
-                break
+        near = min(big.items(), key=lambda kv: gap(b, kv[1]), default=None)
+        if near is not None and gap(b, near[1]) <= args.attach:
+            merged[near[0]].append(i)
     comps = []
     for j, members in merged.items():
         own = mask & np.isin(full_labels, members)

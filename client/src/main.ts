@@ -1,7 +1,6 @@
-import { Application, Assets, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
+import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture } from "pixi.js";
 import { createLobby } from "./lobby.js";
 import {
-  BULLET_RADIUS,
   CARDS,
   CARD_CATEGORY_NAMES,
   CAMP_USE_RADIUS,
@@ -42,6 +41,10 @@ const UNIT_FILES = ["cavalry", "spear", "archer", "sword", "mace"] as const;
 const SPRITE_SCALE = 0.5;
 /** 스프라이트 기준점: 가로 중앙, 세로는 몸통 쪽(발은 그 아래). 서버의 유닛 좌표가 몸통 중심이 된다. */
 const SPRITE_ANCHOR_Y = 0.65;
+/** 주인공 스프라이트 파일 이름(무기 순서: 활, 창, 검, 철퇴) */
+const HERO_FILES = ["archer", "spear", "sword", "mace"] as const;
+/** 주인공은 일반 병사보다 한눈에 띄게 조금 크게 그린다 */
+const HERO_SCALE = 0.62;
 const SMOOTH_MS = 60; // 서버 스냅샷(20Hz)을 따라가는 보간 시간 상수
 const SNAP_DISTANCE = 200; // 이보다 멀리 떨어지면(부활·순간이동) 미끄러지지 않고 바로 이동
 
@@ -58,6 +61,7 @@ class Pool<T extends Tracked, W> {
     private make: (w: W) => T,
     private pos: (w: W) => [id: number, x: number, y: number],
     private smooth: boolean,
+    private onRemove?: (v: T) => void,
   ) {}
 
   update(items: W[], k: number, onEach?: (v: T, w: W) => void): void {
@@ -84,6 +88,7 @@ class Pool<T extends Tracked, W> {
     }
     for (const [id, v] of this.views) {
       if (!seen.has(id)) {
+        this.onRemove?.(v);
         v.node.destroy({ children: true });
         this.views.delete(id);
       }
@@ -106,22 +111,25 @@ async function main() {
   const world = new Container();
   app.stage.addChild(world);
 
-  // 이동이 눈에 보이도록 바닥 격자와 월드 경계를 그린다
-  const grid = new Graphics();
   const half = WORLD_SIZE / 2;
-  for (let v = -half; v <= half; v += 200) {
-    grid.moveTo(v, -half).lineTo(v, half).moveTo(-half, v).lineTo(half, v);
-  }
-  grid.stroke({ width: 1, color: 0x262a35 });
-  grid.rect(-half, -half, WORLD_SIZE, WORLD_SIZE).stroke({ width: 4, color: 0x5a3b3b });
-  world.addChild(grid);
-
   // 병종 스프라이트(기병, 창병, 궁병, 검방병, 둔기병 순). 적은 수백 마리가 되므로 텍스처 하나를 모두가 공유한다.
   const loadUnits = (side: "ally" | "enemy") => Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/units/${side}_${f}.png`)));
   const [allyTex, enemyTex] = await Promise.all([loadUnits("ally"), loadUnits("enemy")]);
-  const tex = (g: Graphics): Texture => app.renderer.generateTexture(g);
-  const friendlyBullet = tex(new Graphics().circle(0, 0, BULLET_RADIUS).fill(0xfff1a8));
-  const hostileBullet = tex(new Graphics().circle(0, 0, BULLET_RADIUS).fill(0xff6a5a));
+  // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
+  const [heroTex, campTex, groundTex, allyArrow, enemyArrow] = await Promise.all([
+    Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_${f}.png`))),
+    Assets.load<Texture>("assets/camp/camp.png"),
+    Assets.load<Texture>("assets/tiles/ground_a.png"),
+    Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/arrow_ally_${i}.png`))),
+    Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/arrow_enemy_${i}.png`))),
+  ]);
+
+  // 바닥은 타일을 반복해서 깔고, 월드 경계를 선으로 표시한다
+  const ground = new TilingSprite({ texture: groundTex, width: WORLD_SIZE, height: WORLD_SIZE });
+  ground.position.set(-half, -half);
+  ground.tint = 0xa6a6a6; // 전투가 잘 보이도록 바닥을 한 단계 어둡게 눌러 둔다
+  const border = new Graphics().rect(-half, -half, WORLD_SIZE, WORLD_SIZE).stroke({ width: 4, color: 0x5a3b3b });
+  world.addChild(ground, border);
 
   const campLayer = new Container();
   const enemyLayer = new Container();
@@ -158,15 +166,44 @@ async function main() {
     (w) => [w[0], w[1], w[2]],
     true,
   );
-  const bullets = new Pool<Tracked, BulletWire>(
+  /** 화살은 날아가는 방향으로 돌려 그린다. 서버가 방향을 보내지 않으므로 이전 위치와의 차이로 구한다. */
+  interface BulletView extends Tracked {
+    hostile: boolean;
+    angle: number;
+    ready: boolean;
+    x0: number; // 이전 프레임 위치(방향 계산용)
+    y0: number;
+  }
+  const hitFx: { node: Sprite; age: number }[] = [];
+  const HIT_FX_SEC = 0.22;
+  const ARROW_SCALE = 0.5;
+  const bullets = new Pool<BulletView, BulletWire>(
     (w) => {
-      const sprite = new Sprite(w[3] === 1 ? hostileBullet : friendlyBullet);
-      sprite.anchor.set(0.5);
+      const hostile = w[3] === 1;
+      const sprite = new Sprite((hostile ? enemyArrow : allyArrow)[2]!); // 속도선이 중간 정도인 컷
+      sprite.anchor.set(0.82, 0.5); // 화살촉이 위치에 오도록
+      sprite.scale.set(ARROW_SCALE);
+      sprite.visible = false; // 첫 프레임에는 방향을 모른다
       bulletLayer.addChild(sprite);
-      return { node: sprite, x: 0, y: 0 };
+      return { node: sprite, x: 0, y: 0, hostile, angle: 0, ready: false, x0: w[1], y0: w[2] };
     },
     (w) => [w[0], w[1], w[2]],
     false, // 빠르게 움직이는 투사체는 서버 위치를 그대로 그린다
+    (v) => {
+      // 사라진 자리 가까이에 맞을 대상이 있었다면 명중 이펙트를 보여 준다(사거리 끝에서 사라진 것은 제외)
+      if (!latest || !v.ready) return;
+      const targets: [number, number][] = v.hostile
+        ? [...latest.players.map((p): [number, number] => [p.x, p.y]), ...latest.mercs.filter((m) => m[8] <= 0).map((m): [number, number] => [m[1], m[2]])]
+        : latest.enemies.map((e): [number, number] => [e[1], e[2]]);
+      if (!targets.some(([x, y]) => Math.hypot(x - v.x, y - v.y) < 34)) return;
+      const fx = new Sprite((v.hostile ? enemyArrow : allyArrow)[4]!);
+      fx.anchor.set(0.85, 0.5);
+      fx.scale.set(ARROW_SCALE);
+      fx.position.set(v.x, v.y);
+      fx.rotation = v.angle;
+      bulletLayer.addChild(fx);
+      hitFx.push({ node: fx, age: 0 });
+    },
   );
 
   const drawBar = (g: Graphics, hp: number, max: number, width: number, y: number) => {
@@ -207,20 +244,30 @@ async function main() {
 
   interface PlayerView extends Tracked {
     bar: Graphics;
-    aimLine: Graphics;
+    aimMark: Graphics;
+    sprite: Sprite;
   }
+  const HERO_TOP = -Math.max(...heroTex.map((t) => t.height)) * HERO_SCALE * SPRITE_ANCHOR_Y; // 가장 큰 포즈의 머리 위쪽
   const players = new Pool<PlayerView, PlayerState>(
     (p) => {
       const node = new Container();
-      const aimLine = new Graphics();
-      const body = new Graphics().circle(0, 0, PLAYER_RADIUS).fill(PLAYER_COLORS[(p.id - 1) % PLAYER_COLORS.length]!);
+      const color = PLAYER_COLORS[(p.id - 1) % PLAYER_COLORS.length]!;
+      // 어느 플레이어인지 발밑 고리 색으로 구분한다(용병과 같은 방식)
+      const footY = Math.max(...heroTex.map((t) => t.height)) * HERO_SCALE * (1 - SPRITE_ANCHOR_Y) * 0.85;
+      const ring = new Graphics()
+        .ellipse(0, footY, PLAYER_RADIUS * 1.5, PLAYER_RADIUS * 0.7)
+        .fill({ color, alpha: 0.3 })
+        .stroke({ width: 3, color });
+      const sprite = new Sprite(heroTex[0]!);
+      sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
+      const aimMark = new Graphics(); // 조준 방향 표시(몸 바깥에)
       const bar = new Graphics();
-      const label = new Text({ text: p.name, style: { fill: 0xffffff, fontSize: 13 } });
+      const label = new Text({ text: p.name, style: { fill: 0xffffff, fontSize: 13, stroke: { color: 0x000000, width: 3 } } });
       label.anchor.set(0.5, 1);
-      label.y = -PLAYER_RADIUS - 10;
-      node.addChild(aimLine, body, bar, label);
+      label.y = HERO_TOP - 12;
+      node.addChild(ring, sprite, aimMark, bar, label);
       playerLayer.addChild(node);
-      return { node, aimLine, bar, x: 0, y: 0 };
+      return { node, aimMark, bar, sprite, x: 0, y: 0 };
     },
     (p) => [p.id, p.x, p.y],
     true,
@@ -233,10 +280,12 @@ async function main() {
     () => {
       const node = new Container();
       const ring = new Graphics().circle(0, 0, CAMP_USE_RADIUS).fill({ color: 0xe0c05d, alpha: 0.06 }).stroke({ width: 2, color: 0xe0c05d, alpha: 0.5 });
-      const tent = new Graphics().poly([0, -26, 26, 20, -26, 20]).fill(0xb8863b).stroke({ width: 3, color: 0x6e4d1e });
-      const label = new Text({ text: "", style: { fill: 0xf2dfa0, fontSize: 13 } });
+      const tent = new Sprite(campTex);
+      tent.anchor.set(0.5, 0.6); // 모닥불 쪽이 원 가운데에 오도록
+      tent.scale.set(0.5);
+      const label = new Text({ text: "", style: { fill: 0xf2dfa0, fontSize: 13, stroke: { color: 0x000000, width: 3 } } });
       label.anchor.set(0.5, 0);
-      label.y = 26;
+      label.y = campTex.height * 0.5 * 0.4 + 4;
       node.addChild(ring, tent, label);
       campLayer.addChild(node);
       return { node, label, x: 0, y: 0 };
@@ -545,7 +594,29 @@ async function main() {
       v.sprite.zIndex = v.y;
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / ENEMY_STATS[w[4]]!.hp);
     });
-    bullets.update(latest.bullets, k);
+    bullets.update(latest.bullets, k, (v, w) => {
+      // 이동한 방향으로 화살을 돌린다
+      const dx = w[1] - v.x0;
+      const dy = w[2] - v.y0;
+      if (Math.abs(dx) + Math.abs(dy) > 0.5) {
+        v.angle = Math.atan2(dy, dx);
+        v.node.rotation = v.angle;
+        v.node.visible = true;
+        v.ready = true;
+      }
+      v.x0 = w[1];
+      v.y0 = w[2];
+    });
+    // 명중 이펙트: 잠깐 보였다가 사라진다
+    for (let i = hitFx.length - 1; i >= 0; i--) {
+      const fx = hitFx[i]!;
+      fx.age += ticker.deltaMS / 1000;
+      fx.node.alpha = Math.max(0, 1 - fx.age / HIT_FX_SEC);
+      if (fx.age >= HIT_FX_SEC) {
+        fx.node.destroy();
+        hitFx.splice(i, 1);
+      }
+    }
     mercs.update(latest.mercs, k, (v, w) => {
       v.node.visible = w[8] <= 0; // 쓰러진 용병은 부활할 때까지 숨긴다
       faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
@@ -569,13 +640,22 @@ async function main() {
     players.update(latest.players, k, (v, p) => {
       const dead = p.respawn > 0;
       v.node.alpha = dead ? 0.25 : 1;
-      drawBar(v.bar, p.hp, p.maxHp, 36, -PLAYER_RADIUS - 6);
-      v.aimLine.clear();
+      // 들고 있는 무기에 맞는 모습으로 바꾸고, 조준한 쪽을 바라보게 좌우 반전한다
+      const tex = heroTex[p.weapon] ?? heroTex[0]!;
+      if (v.sprite.texture !== tex) v.sprite.texture = tex;
+      v.sprite.scale.set(HERO_SCALE * (Math.cos(p.aim) >= 0 ? 1 : -1), HERO_SCALE);
+      drawBar(v.bar, p.hp, p.maxHp, 36, HERO_TOP - 6);
+      v.aimMark.clear();
       if (!dead) {
-        v.aimLine
-          .moveTo(Math.cos(p.aim) * PLAYER_RADIUS, Math.sin(p.aim) * PLAYER_RADIUS)
-          .lineTo(Math.cos(p.aim) * (PLAYER_RADIUS + 14), Math.sin(p.aim) * (PLAYER_RADIUS + 14))
-          .stroke({ width: 4, color: TYPE_COLORS[WEAPONS[p.weapon]!.type]! });
+        // 조준 방향 표시: 몸 바깥의 작은 화살촉(무기 색)
+        const ca = Math.cos(p.aim);
+        const sa = Math.sin(p.aim);
+        const tip = 50;
+        const base = 40;
+        v.aimMark
+          .poly([ca * tip, sa * tip, ca * base - sa * 6, sa * base + ca * 6, ca * base + sa * 6, sa * base - ca * 6])
+          .fill({ color: TYPE_COLORS[WEAPONS[p.weapon]!.type]!, alpha: 0.95 })
+          .stroke({ width: 1.5, color: 0x000000, alpha: 0.7 });
       }
       // 레벨업을 감지해 밀어내기 고리를 띄운다(처음 접속 시에는 제외)
       const seenLevel = levelOf.get(p.id);

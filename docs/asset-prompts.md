@@ -7,13 +7,39 @@
 | 에셋 | 상태 |
 |---|---|
 | 병종 유닛 10종 (아군·적 각 5) | 완료, 게임에 적용됨 (`client/public/assets/units/`) |
-| 주인공 (무기 4종) | 이 문서 3번 |
-| 캠프 | 이 문서 4번 |
-| 바닥 타일 | 이 문서 5번 |
-| 투사체 (화살) | 이 문서 6번 |
+| 주인공 (무기별 포즈) | 완료, 적용됨 (`assets/hero/`). 기병 포즈는 아직 쓸 곳이 없어 보관 |
+| 캠프 | 완료, 적용됨 (`assets/camp/camp.png`) |
+| 바닥 타일 | 완료, 적용됨 (`assets/tiles/ground_a.png`) |
+| 투사체 (화살, 아군·적 각 5컷) | 완료, 적용됨 (`assets/fx/`). 속도선 컷으로 날아가고 명중 컷을 잠깐 보여 줌 |
 | 레벨업 카드 아이콘 19종 | 이 문서 7번 |
 | 무기·HUD 아이콘 | 이 문서 8번 |
 | 효과음·음악 | 이 문서 10번 |
+
+### 이미지 생성 도구가 투명 배경을 주지 않을 때
+
+생성 도구가 투명 PNG 대신 **흰 배경(체크무늬 잡음이 구워진 가짜 투명)** 이미지를 주는 경우가 많습니다. 처음 유닛 시트는 진짜 투명이었지만 주인공·캠프·화살은 흰 배경이었습니다. 그래도 문제없이 처리할 수 있습니다.
+
+```sh
+# 1) 흰 배경을 투명으로 (가장자리에서 이어진 흰색만 지우므로 그림 속 흰 하이라이트는 남는다)
+python3 tools/remove_bg.py 원본.webp 투명.png
+#   - 속도선·폭발 같은 반투명 이펙트가 있으면:  --effects --threshold 215
+#   - 활과 시위 사이처럼 '닫힌 구멍 속 배경'이 남으면 그 위치를 지정:  --pocket-box x0,y0,x1,y1
+# 2) 시트를 한 장씩 자르기
+python3 tools/slice_sheet.py 투명.png client/public/assets/<폴더> --names a,b,c --rows 1 --scale 0.4
+#   - 속도선처럼 본체와 떨어진 조각이 있으면:  --attach 120 --min-height 40
+```
+
+이번에 쓴 명령(다시 만들 때 그대로 쓸 수 있음):
+
+```sh
+python3 tools/remove_bg.py 주인공.webp /tmp/hero.png --pocket-box 790,390,880,550
+python3 tools/slice_sheet.py /tmp/hero.png client/public/assets/hero --names hero_cavalry,hero_spear,hero_archer,hero_sword,hero_mace --rows 1 --scale 0.4
+python3 tools/remove_bg.py 캠프.webp /tmp/camp.png
+python3 tools/slice_sheet.py /tmp/camp.png client/public/assets/camp --names camp --rows 1 --scale 0.4 --min-height 300
+python3 tools/remove_bg.py 화살.webp /tmp/arrows.png --effects --threshold 215
+python3 tools/slice_sheet.py /tmp/arrows.png client/public/assets/fx --names arrow_ally_0,arrow_ally_1,arrow_ally_2,arrow_ally_3,arrow_ally_4,arrow_enemy_0,arrow_enemy_1,arrow_enemy_2,arrow_enemy_3,arrow_enemy_4 --rows 2 --scale 0.3 --min-height 40 --attach 120
+# 바닥은 512x512로 줄여 tools/tile_preview.py 로 이음새 점수를 확인
+```
 
 ## 0. 먼저 읽어 주세요 (그림체와 시트 형식)
 
