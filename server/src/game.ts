@@ -10,6 +10,9 @@ import {
   ARMY_SPAWN_DISTANCE,
   BOSS_DMG_MULT,
   CRIT_BASE_MULT,
+  KNOCK_BOSS_FACTOR,
+  KNOCK_MAX,
+  KNOCK_STUN_SEC,
   DEFENSE_MAX,
   DODGE_MAX,
   EVT_DODGE,
@@ -123,6 +126,13 @@ import {
   type MercStat,
   CAMP_TIER_SEC,
   SHAKEN_DEATHS,
+  SQUAD_CLEAR_GOLD,
+  SQUAD_FIRST_SEC,
+  SQUAD_INTERVAL_BASE,
+  SQUAD_INTERVAL_MIN,
+  SQUAD_INTERVAL_STAGE,
+  SQUAD_MARCH_MULT,
+  SQUAD_SPAWN_DISTANCE,
   SHAKEN_FRAC,
   SHAKEN_GRACE_SEC,
   SHAKEN_MIN_ARMY,
@@ -163,7 +173,7 @@ import {
   type UnitStats,
 } from "@mercenary/shared";
 import { resolveHit, type Hit } from "./combat.js";
-import { armyLayout, armySize, bossTypeOf } from "./stage.js";
+import { SQUAD_KINDS, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
 const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mods.legends.has(legendKey(id, scope));
@@ -173,7 +183,7 @@ type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn"];
 const newMercMods = (): MercMods => ({
   hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1,
-  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0,
+  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0, knock: 0,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
 const mstat = (mods: Mods, type: number, stat: MercStat): number =>
@@ -194,6 +204,7 @@ interface Mods {
   heroCrit: number;
   heroCritMult: number;
   heroArea: number;
+  heroKnock: number;
   heroFireRate: number;
   heroRegen: number;
 }
@@ -212,6 +223,7 @@ const newMods = (): Mods => ({
   heroCrit: 0,
   heroCritMult: CRIT_BASE_MULT,
   heroArea: 1,
+  heroKnock: 0,
   heroFireRate: 1,
   heroRegen: 0,
 });
@@ -255,6 +267,7 @@ interface Enemy extends Fighter {
   dmgMult: number;
   boss: boolean; // 보스군의 장군
   army: boolean; // 보스군 소속(진형 자리를 지킨다)
+  squad: number; // 소대 번호(0이면 소속 없음). 소대도 진형 자리를 지킨다
   slotF: number; // 진형 자리(행군 방향 기준)
   slotL: number;
 }
@@ -308,6 +321,8 @@ interface Friendly {
 
 /** 시험 플레이용: MERC_STAGE_GROW_SEC=20 처럼 지정하면 성장 시간이 짧아진다 */
 const GROW_SEC = Number(process.env.MERC_STAGE_GROW_SEC) > 0 ? Number(process.env.MERC_STAGE_GROW_SEC) : STAGE_GROW_SEC;
+/** 시험 플레이용: MERC_SQUAD_FIRST_SEC=3 처럼 지정하면 첫 소대가 빨리 온다 */
+const SQUAD_FIRST = Number(process.env.MERC_SQUAD_FIRST_SEC) > 0 ? Number(process.env.MERC_SQUAD_FIRST_SEC) : SQUAD_FIRST_SEC;
 const SEPARATION_CELL = 32;
 const EVENT_CAP = 80;
 
@@ -344,6 +359,9 @@ export class Game {
   private stageTime = 0; // 이번 스테이지에서 흐른 성장 시간(적 생성량 계산용)
   status: GameStatus = "playing";
   private armyTotal = 0;
+  private squads = new Map<number, { a: Army; left: number; size: number }>();
+  private nextSquadId = 1;
+  private squadTimer = SQUAD_FIRST;
 
   constructor(private rng: () => number = Math.random) {}
 
@@ -389,6 +407,8 @@ export class Game {
     this.events = [];
     this.army = null;
     this.armyTotal = 0;
+    this.squads.clear();
+    this.squadTimer = SQUAD_FIRST;
     this.time = 0;
     this.stage = 1;
     this.phase = "grow";
@@ -557,6 +577,8 @@ export class Game {
       this.status = "playing";
       this.army = null;
       this.armyTotal = 0;
+      this.squads.clear();
+      this.squadTimer = SQUAD_FIRST;
       this.events = [];
       this.spawnBudget = 0;
       this.campTimer = CAMP_FIRST_SPAWN_SEC;
@@ -577,6 +599,7 @@ export class Game {
     this.stepStage(dt);
     this.stepCamps(dt);
     this.spawnEnemies(dt);
+    this.stepSquads(dt);
     const friendlies = this.collectFriendlies();
     this.stepMercs(dt);
     this.stepEnemies(dt, friendlies);
@@ -678,7 +701,7 @@ export class Game {
       shieldMax: st.shield * hpMult,
       dmgMult: (1 + STAGE_ENEMY_DMG_GROWTH * (this.stage - 1)) * (extra.boss ? BOSS_DMG_MULT : 1),
       atkT: 0, atkAng: 0, face: 0, cd: 0, regenT: 0, momentum: 0, chargeSnap: 0,
-      boss: false, army: false, slotF: 0, slotL: 0,
+      boss: false, army: false, squad: 0, slotF: 0, slotL: 0,
       ...extra,
     };
     this.enemies.set(id, e);
@@ -703,6 +726,7 @@ export class Game {
       bossHp,
       armyLeft,
       armyTotal: this.armyTotal,
+      squads: this.squads.size,
     };
   }
 
@@ -739,6 +763,8 @@ export class Game {
     this.stageTime = 0;
     this.army = null;
     this.armyTotal = 0;
+    this.squads.clear();
+    this.squadTimer = SQUAD_FIRST;
   }
 
   private stepStage(dt: number): void {
@@ -753,6 +779,7 @@ export class Game {
       this.phaseT -= dt;
       if (this.phaseT <= 0) {
         this.stage++;
+        this.squadTimer = SQUAD_FIRST;
         this.phase = "grow";
         this.phaseT = GROW_SEC;
         this.stageTime = 0;
@@ -810,8 +837,8 @@ export class Game {
     this.armyTotal = layout.length;
   }
 
-  private armySlotPos(f: number, l: number): [number, number] {
-    const a = this.army!;
+  private armySlotPos(f: number, l: number, army: Army | null = this.army): [number, number] {
+    const a = army!;
     const c = Math.cos(a.heading);
     const sn = Math.sin(a.heading);
     return [a.x + c * f - sn * l, a.y + sn * f + c * l];
@@ -819,8 +846,10 @@ export class Game {
 
   /** 진형 기준점이 가장 가까운 살아 있는 주인공을 향해 천천히 행군한다 */
   private stepArmy(dt: number): void {
-    const a = this.army;
-    if (!a) return;
+    if (this.army) this.marchArmy(this.army, dt, 1);
+  }
+
+  private marchArmy(a: Army, dt: number, speedMult: number): void {
     let near: PlayerState | null = null;
     let best = Infinity;
     for (const s of this.alivePlayers()) {
@@ -835,11 +864,60 @@ export class Game {
     const turn = 0.6 * dt;
     a.heading += Math.max(-turn, Math.min(turn, angleDiff(want, a.heading)));
     if (best > 60) {
-      const speed = best > ARMY_ENGAGE_DISTANCE ? ARMY_MARCH_SPEED : ARMY_MARCH_SPEED * 0.35;
+      const speed = (best > ARMY_ENGAGE_DISTANCE ? ARMY_MARCH_SPEED : ARMY_MARCH_SPEED * 0.35) * speedMult;
       const step = Math.min(speed * dt, best - 60);
       a.x += Math.cos(a.heading) * step;
       a.y += Math.sin(a.heading) * step;
     }
+  }
+
+  /** 소대: 보스가 아닐 때도 가끔 진형을 갖춘 소규모 혼성 부대가 다가온다(성장 단계에서만) */
+  private stepSquads(dt: number): void {
+    for (const sq of this.squads.values()) this.marchArmy(sq.a, dt, SQUAD_MARCH_MULT);
+    if (!this.autoSpawn || this.phase !== "grow") return;
+    this.squadTimer -= dt;
+    if (this.squadTimer > 0) return;
+    this.squadTimer = Math.max(SQUAD_INTERVAL_MIN, SQUAD_INTERVAL_BASE - SQUAD_INTERVAL_STAGE * this.stage);
+    if (this.squads.size >= 2 + Math.floor(this.slots.size / 3)) return; // 한꺼번에 너무 많이 오지 않게
+    this.spawnSquad();
+  }
+
+  /** 소대 한 개를 먼 곳에서 진형을 갖춘 채 등장시킨다. kind를 주면 그 구성(테스트용), 없으면 무작위. */
+  spawnSquad(kindIndex?: number): number {
+    const alive = this.alivePlayers();
+    if (alive.length === 0) return 0;
+    const kind = SQUAD_KINDS[kindIndex ?? Math.floor(this.rng() * SQUAD_KINDS.length)]!;
+    const layout = squadLayout(squadComposition(kind, squadSize(this.stage, this.slots.size)));
+    const target = alive[Math.floor(this.rng() * alive.length)]!.state;
+    const half = WORLD_SIZE / 2 - 120;
+    let ang = this.rng() * Math.PI * 2;
+    let ax = 0;
+    let ay = 0;
+    for (let k = 0; k < 8; k++, ang += Math.PI / 4) {
+      ax = target.x + Math.cos(ang) * SQUAD_SPAWN_DISTANCE;
+      ay = target.y + Math.sin(ang) * SQUAD_SPAWN_DISTANCE;
+      if (Math.abs(ax) < half && Math.abs(ay) < half) break;
+    }
+    ax = Math.max(-half, Math.min(half, ax));
+    ay = Math.max(-half, Math.min(half, ay));
+    const id = this.nextSquadId++;
+    const a: Army = { x: ax, y: ay, heading: Math.atan2(target.y - ay, target.x - ax) };
+    this.squads.set(id, { a, left: layout.length, size: layout.length });
+    for (const slot of layout) {
+      const [px, py] = this.armySlotPos(slot.forward, slot.lateral, a);
+      this.makeEnemy(clampToWorld(px, 14), clampToWorld(py, 14), slot.type, { squad: id, slotF: slot.forward, slotL: slot.lateral, face: a.heading });
+    }
+    return id;
+  }
+
+  private onSquadMemberDown(id: number): void {
+    const sq = this.squads.get(id);
+    if (!sq) return;
+    sq.left--;
+    if (sq.left > 0) return;
+    this.squads.delete(id);
+    // 소대를 전멸시키면 모두에게 보상
+    for (const sl of this.slots.values()) sl.state.gold += SQUAD_CLEAR_GOLD * sq.size;
   }
 
   /** 장군이 쓰러지면 스테이지 클리어: 남은 병사는 흩어져 일반 적이 되고, 보상과 쓰러진 동료의 부활이 주어진다 */
@@ -1510,7 +1588,18 @@ export class Game {
     if (has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
+    else if (owner && r.body + r.shield > 0) this.knockBack(e, hit.fromAngle, src ? mstat(owner.mods, src.type, "knock") : owner.mods.heroKnock);
     return r.reflected;
+  }
+
+  /** 넉백: 맞은 적이 공격해 온 쪽 반대로 밀려나고, 하던 공격 동작이 끊기며 잠깐 공격하지 못한다. 보스는 덜 밀린다. */
+  private knockBack(e: Enemy, fromAngle: number, amount: number): void {
+    if (amount <= 0) return;
+    const dist = Math.min(KNOCK_MAX, amount * (e.boss ? KNOCK_BOSS_FACTOR : 1));
+    e.x = clampToWorld(e.x - Math.cos(fromAngle) * dist, 14);
+    e.y = clampToWorld(e.y - Math.sin(fromAngle) * dist, 14);
+    e.atkT = 0;
+    e.cd = Math.max(e.cd, KNOCK_STUN_SEC);
   }
 
   /** 피의 갈증: 때린 쪽(용병 또는 주인공)이 체력을 회복한다 */
@@ -1554,6 +1643,7 @@ export class Game {
     const shared = (xp * XP_TEAM_SHARE) / this.slots.size;
     for (const s of this.slots.values()) this.giveXp(s.state.id, shared);
     if (owner) this.giveXp(owner.state.id, xp * (1 - XP_TEAM_SHARE));
+    if (e.squad) this.onSquadMemberDown(e.squad);
     if (e.boss) this.onBossDown();
   }
 
@@ -1673,6 +1763,7 @@ export class Game {
         break;
       case "heroSpeed": m.heroSpeed += e.v; break;
       case "heroDmg": m.heroDmg += e.v; break;
+      case "heroKnock": m.heroKnock += e.v; break;
       case "heroDefense": m.heroDefense += e.v; break;
       case "heroDodge": m.heroDodge += e.v; break;
       case "heroRange": m.heroRange += e.v; break;
@@ -1754,7 +1845,8 @@ export class Game {
         continue; // 예비 동작 중에는 멈춰 선다
       }
 
-      const home = e.army && this.army ? this.armySlotPos(e.slotF, e.slotL) : null;
+      const group = e.army ? this.army : e.squad ? (this.squads.get(e.squad)?.a ?? null) : null;
+      const home = group ? this.armySlotPos(e.slotF, e.slotL, group) : null;
       const leashed = home !== null && Math.hypot(home[0] - e.x, home[1] - e.y) > ARMY_LEASH;
       const aggro = Math.max(ARMY_AGGRO, st.reach + 20);
       let target: Friendly | null = null;
@@ -1772,7 +1864,7 @@ export class Game {
         // 진형 소속은 자리를 지키며 대열과 함께 움직인다
         if (home) {
           this.moveToward(e, home[0], home[1], st.speed * 1.2, dt, 4);
-          e.face = this.army!.heading;
+          e.face = group!.heading;
         }
         continue;
       }

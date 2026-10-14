@@ -154,6 +154,7 @@ export interface GameInfo {
   bossHp: number; // 보스 체력 비율 0..100(보스 단계가 아니면 0)
   armyLeft: number; // 남은 보스군 병력(장군 포함)
   armyTotal: number;
+  squads: number; // 지금 다가오는 소대 수
 }
 
 export interface ResultPlayer {

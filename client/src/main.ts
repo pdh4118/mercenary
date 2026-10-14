@@ -373,7 +373,8 @@ async function main() {
         case "hp":
         case "defense": return SHIELD;
         case "dmg":
-        case "area": return BLUNT_TYPE;
+        case "area":
+        case "knock": return BLUNT_TYPE;
         case "atkSpeed":
         case "range": return SPEAR_TYPE;
         case "speed":
@@ -385,7 +386,8 @@ async function main() {
     switch (e.k) {
       case "heroDefense": return SHIELD;
       case "heroDodge": return 0;
-      case "heroArea": return BLUNT_TYPE;
+      case "heroArea":
+      case "heroKnock": return BLUNT_TYPE;
       case "heroDmg":
       case "heroFireRate":
       case "heroRange":
@@ -533,6 +535,7 @@ async function main() {
   let latest: Extract<ServerMsg, { t: "state" }> | null = null;
   let myId = -1;
   let toastLeft = 0;
+  let lastSquads = 0;
   let levelToastLeft = 0;
   let lastLevel = 0;
   let nearCampId = -1;
@@ -1048,7 +1051,13 @@ async function main() {
     if (gi && gi.status !== "playing") deadText.text = ""; // 결과 화면이 뜨면 안내 문구는 숨긴다
     if (gi) {
       const mmss = (t: number) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
-      if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · 보스군 도착까지 ${mmss(gi.timer)}`;
+      const squadText = gi.squads > 0 ? ` · 적 소대 ${gi.squads}` : "";
+      if (gi.squads > lastSquads) {
+        toast.text = "적 소대가 진형을 갖추고 다가옵니다!";
+        toastLeft = 2.5;
+      }
+      lastSquads = gi.squads;
+      if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · 보스군 도착까지 ${mmss(gi.timer)}${squadText}`;
       else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${UNIT_NAMES[gi.bossType]} 장군의 군대 ${gi.armyLeft}/${gi.armyTotal}`;
       else stageText.text = `스테이지 ${gi.stage} 클리어! 다음 스테이지까지 ${gi.timer}초`;
       stageText.position.set(app.screen.width / 2, 8);

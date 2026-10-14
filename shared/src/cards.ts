@@ -45,7 +45,7 @@ export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: rea
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
 /** 용병 능력치 종류. 배율 계열(hp~area, respawn)은 곱해지고, 나머지는 더해진다. */
-export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "pierce" | "respawn";
+export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "pierce" | "respawn" | "knock";
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
@@ -58,6 +58,7 @@ export type CardEffect =
   | { k: "heroCrit"; v: number }
   | { k: "heroCritMult"; v: number }
   | { k: "heroArea"; v: number }
+  | { k: "heroKnock"; v: number }
   | { k: "heroDefense"; v: number }
   | { k: "heroDodge"; v: number }
   | { k: "heroMaxHp"; v: number }
@@ -93,19 +94,20 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
   regen: "체력 재생",
   pierce: "관통",
   respawn: "부활 시간",
+  knock: "넉백",
 };
 /** 병종 전용 일반 카드 한 장의 효과량. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.02, pierce: 1, respawn: -0.25,
+  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.02, pierce: 1, respawn: -0.25, knock: 30,
 };
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
-  ["hp", "dmg", "speed", "crit", "dodge", "atkSpeed", "area"], // 기병
-  ["hp", "dmg", "range", "defense", "atkSpeed", "area"], // 창병
+  ["hp", "dmg", "speed", "crit", "dodge", "atkSpeed", "area", "knock"], // 기병
+  ["hp", "dmg", "range", "defense", "atkSpeed", "area", "knock"], // 창병
   ["dmg", "range", "atkSpeed", "crit", "pierce"], // 궁병(화살이라 범위는 없다)
-  ["hp", "defense", "regen", "dmg", "respawn", "atkSpeed", "area"], // 검방병
-  ["dmg", "area", "hp", "critMult", "atkSpeed"], // 둔기병
+  ["hp", "defense", "regen", "dmg", "respawn", "atkSpeed", "area", "knock"], // 검방병
+  ["dmg", "area", "hp", "critMult", "atkSpeed", "knock"], // 둔기병
 ];
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -116,6 +118,7 @@ export const scaledValue = (stat: MercStat | "heroPierce", base: number, rarity:
 /** 능력치 변화량을 사람이 읽는 문구로 */
 export function describeStat(stat: MercStat, v: number): string {
   if (stat === "pierce") return `+${v}`;
+  if (stat === "knock") return `+${Math.round(v)}`;
   const pct = Math.abs(v) * 100;
   const text = pct >= 10 ? String(Math.round(pct)) : String(Math.round(pct * 10) / 10);
   if (stat === "regen") return `초당 최대 체력 +${text}%`;
@@ -173,6 +176,7 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroCrit", label: "치명타 확률", base: 0.08, weight: 6, fmt: "pct" },
   { k: "heroCritMult", label: "치명타 피해", base: 0.3, weight: 4, minLevel: 3, fmt: "pct" },
   { k: "heroArea", label: "범위", base: 0.15, weight: 4, fmt: "pct" },
+  { k: "heroKnock", label: "넉백", base: 30, weight: 5, fmt: "flat" },
   { k: "heroDefense", label: "방어력", base: 0.08, weight: 7, fmt: "pct" },
   { k: "heroDodge", label: "회피율", base: 0.06, weight: 5, fmt: "pct" },
   { k: "heroRegen", label: "체력 재생", base: 0.8, weight: 5, fmt: "regen" },

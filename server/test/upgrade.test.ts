@@ -170,6 +170,7 @@ import {
   ENEMY_STATS,
   LEGENDS,
   LEGEND_CONST,
+  KNOCK_BOSS_FACTOR,
   MERC_NAME_COUNT,
   MERC_XP_KILL,
   MERC_XP_NEED,
@@ -443,4 +444,54 @@ test("레벨이 낮으면 희귀·영웅 카드는 나오지 않는다", () => {
     for (const i of p.offer) assert.equal(CARDS[i]!.rarity, 0, `${p.level}레벨에서 ${CARDS[i]!.name}`);
     g.pick(a, 0);
   }
+});
+
+test("넉백: 맞은 적이 공격해 온 반대쪽으로 밀려나고 공격 동작이 끊긴다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.applyCardForTest(a, { k: "heroKnock", v: 60 });
+  const p = g.getPlayer(a)!;
+  g.jumpToStage(10); // 한 방에 죽지 않게
+  const e = g.spawnEnemyAt(p.x + 40, p.y, 4);
+  g.setWeapon(a, 3);
+  run(g, 0.3);
+  const x0 = g.getEnemy(e)!.x;
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  g.step();
+  const en = g.getEnemy(e)!;
+  assert.ok(en.x - x0 > 50 && en.x - x0 <= 60, `${en.x - x0}`); // 같은 틱에 조금 되돌아온 몫을 뺀다
+  assert.equal(en.atkT, 0);
+  assert.ok(en.cd >= 0.3, "잠깐 공격하지 못한다");
+});
+
+test("넉백: 보스는 덜 밀리고, 용병 병종 카드는 그 병종에만 적용된다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.applyCardForTest(a, { k: "mercStat", stat: "knock", v: 40, type: SPEAR });
+  g.jumpToStage(10);
+  const sp = g.addMerc(a, SPEAR, 0, 0);
+  const sh = g.addMerc(a, SHIELD, 0, 0);
+  const dmg = g as unknown as { damageEnemy(e: unknown, h: unknown, o: number, src?: unknown): number };
+  const hit = { damage: 1, charge: 0, srcType: SPEAR, fromAngle: Math.PI }; // 서쪽에서 맞음 → 동쪽으로 밀린다
+  const strike = (type: number, src: number, boss = false) => {
+    const e = g.spawnEnemyAt(1000, 1000, type);
+    const en = g.getEnemy(e) as { hp: number; maxHp: number; shield: number; boss: boolean };
+    en.hp = en.maxHp = 1e6;
+    en.shield = 0;
+    en.boss = boss;
+    dmg.damageEnemy(en, hit, a, g.getMerc(src));
+    return g.getEnemy(e)!.x - 1000;
+  };
+  assert.ok(Math.abs(strike(0, sp) - 40) < 1e-6, "창병 카드는 창병의 공격에 적용");
+  assert.equal(strike(0, sh), 0, "검방병의 공격에는 적용되지 않는다");
+  assert.ok(Math.abs(strike(0, sp, true) - 40 * KNOCK_BOSS_FACTOR) < 1e-6, "보스는 덜 밀린다");
+});
+
+test("넉백 카드: 주인공과 병종 전용이 있고 등급이 오를수록 많이 밀어낸다", () => {
+  const hero = [0, 1, 2].map((r) => CARDS.find((c) => c.effect.k === "heroKnock" && c.rarity === r)!);
+  const v = (c: (typeof CARDS)[number]) => (c.effect.k === "heroKnock" ? c.effect.v : 0);
+  assert.ok(v(hero[0]!) < v(hero[1]!) && v(hero[1]!) < v(hero[2]!));
+  for (const t of [0, 1, 3, 4]) assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === t), `${t}`);
+  assert.ok(!CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === ARCHER_T), "궁병은 넉백 카드 없음");
+  assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === undefined), "전체 용병용도 있다");
 });

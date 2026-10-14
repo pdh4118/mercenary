@@ -190,6 +190,16 @@ export const ARMY_RANK_SPACING = 38;
 export const ARMY_LATERAL_SPACING = 34;
 export const ARMY_RANK_WIDTH = 10; // 한 줄 최대 인원
 /** 스테이지별 보스(장군) 병종: 방패, 창, 기병, 둔기, 궁, 방패, 둔기, 기병, 창, 둔기 */
+// 소대: 보스가 아닐 때도 가끔 소규모 혼성 부대가 진형을 갖추고 다가온다
+export const SQUAD_FIRST_SEC = 30; // 스테이지 시작 뒤 첫 소대까지
+export const SQUAD_INTERVAL_BASE = 42; // 소대 간격(초). 스테이지가 오를수록 짧아진다
+export const SQUAD_INTERVAL_STAGE = 3;
+export const SQUAD_INTERVAL_MIN = 20;
+export const SQUAD_BASE_SIZE = 4;
+export const SQUAD_MAX_SIZE = 14;
+export const SQUAD_SPAWN_DISTANCE = 700;
+export const SQUAD_MARCH_MULT = 1.3; // 보스군보다 빠르게 행군한다
+export const SQUAD_CLEAR_GOLD = 4; // 소대를 전멸시키면 병사 1명당 모든 플레이어가 받는 금화
 export const BOSS_TYPES = [SHIELD, SPEAR, CAVALRY, BLUNT, ARCHER, SHIELD, BLUNT, CAVALRY, SPEAR, BLUNT] as const;
 export const BOSS_HP_BASE = 7; // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
 export const BOSS_HP_PER_STAGE = 2.5;
@@ -211,4 +221,7 @@ export const CRIT_BASE_MULT = 1.5; // 치명타 기본 피해 배율
 export const CRIT_MAX_CHANCE = 0.75; // 치명타 확률 상한
 export const DEFENSE_MAX = 0.6; // 방어력(피해 감소) 상한
 export const DODGE_MAX = 0.5; // 회피율 상한
+export const KNOCK_BOSS_FACTOR = 0.25; // 보스는 넉백이 이만큼만 먹힌다
+export const KNOCK_MAX = 160; // 한 번에 밀려나는 최대 거리
+export const KNOCK_STUN_SEC = 0.4; // 밀려난 적이 공격하지 못하는 시간
 export const AREA_ARC_MAX = 2.4; // 범위 증가로 넓어지는 근접 부채꼴 반각 상한(라디안)
