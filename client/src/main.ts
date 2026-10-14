@@ -411,10 +411,10 @@ async function main() {
     sub.position.set(68, 38);
     const price = new Text({ text: "", style: { fill: 0xffd45d, fontSize: 24, fontWeight: "bold" } });
     price.anchor.set(1, 0);
-    price.position.set(CAMP_W - 28 - 0, 6);
+    price.position.set(CAMP_W - 28 - 20, 6);
     const lead = new Text({ text: "", style: { fill: 0x9fd0ff, fontSize: 16 } });
     lead.anchor.set(1, 0);
-    lead.position.set(CAMP_W - 28, 38);
+    lead.position.set(CAMP_W - 28 - 20, 38);
     node.addChild(bg, icon, key, name, sub, price, lead);
     campPanel.addChild(node);
     return { bg, icon, name, sub, price, lead };
@@ -462,7 +462,7 @@ async function main() {
 
   // 레벨업 카드: 게임을 멈추지 않는 작은 카드. Z/X/C 한 번으로 고른다. 시안(강철 테두리·일러스트 창·별)을 따라 그린다.
   const CARD_W = 350;
-  const CARD_H = 134;
+  const CARD_H = 142;
   const CARD_GAP = 10;
   const ART = 94;
   const CATEGORY_COLORS = [0xe0c05d, 0x6fd16f, 0x5da6e0, 0xff7a2e];
@@ -526,7 +526,7 @@ async function main() {
     tag.position.set(ART + 26, 8);
     const rar = new Text({ text: "", style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" } });
     rar.position.set(ART + 26, 8);
-    const title = new Text({ text: "", style: { fill: 0xffffff, fontSize: 20, fontWeight: "bold" } });
+    const title = new Text({ text: "", style: { fill: 0xffffff, fontSize: 20, fontWeight: "bold", lineHeight: 22, wordWrap: true, wordWrapWidth: CARD_W - ART - 38 } });
     title.position.set(ART + 26, 28);
     const desc = new Text({ text: "", style: { fill: 0xd2d6e0, fontSize: 14, lineHeight: 18, wordWrap: true, wordWrapWidth: CARD_W - ART - 38 } });
     desc.position.set(ART + 26, 58);
@@ -570,9 +570,12 @@ async function main() {
       v.rar.x = ART + 26 + v.tag.width + 6;
       v.starOn.style.fill = RARITY_COLORS[card.rarity]!;
       v.title.text = card.name;
-      v.title.style.fontSize = 20; // 이름이 길면 칸에 맞게 줄인다
-      while (v.title.width > CARD_W - ART - 38 && v.title.style.fontSize > 13) v.title.style.fontSize--;
+      v.title.style.fontSize = 20;
+      v.title.style.wordWrapWidth = CARD_W - ART - 38;
       v.desc.text = card.desc;
+      // 이름이 두 줄이 되면 설명을 그만큼 아래로 민다(긴 이름은 글자를 한 단계 줄여 두 줄 안에 넣는다)
+      while (v.title.height > 46 && (v.title.style.fontSize as number) > 15) v.title.style.fontSize = (v.title.style.fontSize as number) - 1;
+      v.desc.y = 30 + v.title.height + 4;
       const n = card.stars ?? starsOf(card.weight);
       v.starOn.text = "★".repeat(n);
       v.starOff.text = "★".repeat(3);

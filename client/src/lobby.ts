@@ -427,6 +427,7 @@ export function createLobby(opts: Options): Lobby {
           lastResult = msg;
           if (msg.partial) {
             // 진행 중 요청한 중간 기록: 나가려던 중이면 확인 화면, 아니면 기록만 보여 준다
+            roomEl.classList.remove("open"); // 방 메뉴가 기록 화면을 가리지 않게
             renderResult(msg, "partial", true);
             $("resultTitle").textContent = "진행 기록";
             $("resultLeave").style.display = leaveAfterRecord ? "" : "none";

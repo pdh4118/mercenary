@@ -73,7 +73,7 @@ const deg = rad;
 
 export const MERC_STATS: readonly UnitStats[] = [
   // 기병: speed는 최대 속도. 평소엔 느리게 출발해 점점 빨라진다. 피해는 기본 + 속도에 비례한 돌격 피해.
-  { hp: 160, speed: 230, reach: 30, damage: 12, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
+  { hp: 160, speed: 300, reach: 30, damage: 12, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
   // 창병: 사거리가 가장 길고 폭이 좁다(찌르기)
   { hp: 145, speed: 95, reach: 100, damage: 15, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
   { hp: 95, speed: 95, reach: 280, damage: 12, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
@@ -84,7 +84,7 @@ export const MERC_STATS: readonly UnitStats[] = [
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
-  { hp: 24, speed: 190, reach: 28, damage: 4, windup: 0.35, cooldown: 1.2, arc: deg(55), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
+  { hp: 24, speed: 230, reach: 28, damage: 4, windup: 0.35, cooldown: 1.2, arc: deg(55), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
   { hp: 28, speed: 85, reach: 58, damage: 5, windup: 0.45, cooldown: 1.3, arc: deg(22), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
   { hp: 18, speed: 75, reach: 260, damage: 4.5, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 0 },
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },
