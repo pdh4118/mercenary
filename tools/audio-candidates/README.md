@@ -35,7 +35,8 @@
 | `boss_warning_1` | poligonstudio (#392618) | 미확인 | 미정 |
 | `bgm_boss` | harrisonlace (#871671) | 미확인 | 미정(임시 음악) |
 | `bgm_grow` | code_box (#559485) | 미확인 | 미정(임시 음악) |
-| `enemy_die_1` | starkvind (#559975) | 미확인 | 미정(1종뿐이라 변형 추가 권장) |
+| `enemy_die_1` | starkvind (#559975) | 미확인 | 미정 |
+| `enemy_die_2` | artmasterrich (#345456) | 미확인 | 미정 |
 
 Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~2`와 직접 받은 `impact`, 활·방패 소리 파일(`bow_shot_1`, `arrow_volley_1`, `shield_block_*`, `crit_hit_*`)도 생성·출처 약관을 확인해야 합니다(Suno는 요금제에 따라 상업 이용 조건이 다릅니다).
 
@@ -51,3 +52,4 @@ Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~
 | `bgm_boss` | `871671__harrisonlace__cinematic_drum_loop_shellshock_143.wav` | 60.4초 드럼만 있는 루프(143 BPM, 36마디). 임시 보스전 음악. 제작자 harrisonlace, **라이선스 확인 필요** |
 | `bgm_grow` | `559485__code_box__battle-tactics.wav` | 원본 74초 중 앞 69초(끝의 소리가 줄어드는 부분 제외), 처음부터 끝까지 꽉 찬 전투 분위기 음악. 임시 성장 시간 음악. 제작자 code_box, **라이선스 확인 필요** |
 | `enemy_die_1` | `559975__starkvind__man-dies.wav` | 0.7초, 남자가 쓰러지며 내는 비명(중심 약 1.2kHz). 한 종류뿐이라 높낮이를 매번 ±15% 바꿔 재생하고 간격을 150ms로 늘렸다. 제작자 starkvind, **라이선스 확인 필요** |
+| `enemy_die_2` | `345456__artmasterrich__male_death_04.wav` | 0.85초(원본 1.03초), 남자 죽는 비명. 원본이 0dB를 넘어 5dB 낮춤(중심 약 1.8kHz). 제작자 artmasterrich, **라이선스 확인 필요** |
