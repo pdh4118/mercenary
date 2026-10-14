@@ -9,6 +9,10 @@ import {
   ARMY_MARCH_SPEED,
   ARMY_SPAWN_DISTANCE,
   BOSS_DMG_MULT,
+  CRIT_BASE_MULT,
+  CRIT_MAX_CHANCE,
+  AREA_ARC_MAX,
+  EVT_CRIT,
   BOSS_HP_BASE,
   BOSS_HP_PER_STAGE,
   BOSS_SIZE,
@@ -132,6 +136,16 @@ interface Mods {
   typeDmg: number[];
   heroSpeed: number;
   heroDmg: number;
+  mercRange: number;
+  mercPierce: number;
+  mercCrit: number; // 치명타 확률(0..1)
+  mercCritMult: number; // 치명타 피해 배율
+  mercArea: number;
+  heroRange: number;
+  heroPierce: number;
+  heroCrit: number;
+  heroCritMult: number;
+  heroArea: number;
   heroFireRate: number;
   heroRegen: number;
 }
@@ -147,6 +161,16 @@ const newMods = (): Mods => ({
   typeDmg: UNIT_TYPES.map(() => 1),
   heroSpeed: 1,
   heroDmg: 1,
+  mercRange: 1,
+  mercPierce: 0,
+  mercCrit: 0,
+  mercCritMult: CRIT_BASE_MULT,
+  mercArea: 1,
+  heroRange: 1,
+  heroPierce: 0,
+  heroCrit: 0,
+  heroCritMult: CRIT_BASE_MULT,
+  heroArea: 1,
   heroFireRate: 1,
   heroRegen: 0,
 });
@@ -209,6 +233,9 @@ interface Bullet {
   srcType: number;
   owner: number; // 처치 보상을 받을 플레이어(적 투사체는 0)
   radius: number;
+  pierce: number; // 더 뚫고 지나갈 수 있는 적 수
+  crit: boolean;
+  hitIds: Set<number>; // 이미 맞힌 적(관통 중 중복 피해 방지)
 }
 
 interface Camp {
@@ -282,6 +309,17 @@ export class Game {
     this.placeAtSpawn(slot.state, id);
     this.slots.set(id, slot);
     return id;
+  }
+
+  /** 테스트용: 카드 효과를 바로 적용한다 */
+  applyCardForTest(playerId: number, effect: CardEffect): void {
+    const s = this.slots.get(playerId);
+    if (s) this.applyCard(s, effect);
+  }
+
+  /** 테스트용: 카드가 반영된 용병 능력치 */
+  mercStatsForTest(mercId: number): UnitStats {
+    return this.mercStats(this.mercs.get(mercId)!);
   }
 
   /** 같은 참가자들로 판을 처음부터 다시 시작한다(다시 하기) */
@@ -872,7 +910,9 @@ export class Game {
   private useWeapon(s: Slot): void {
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
-    const damage = w.damage * s.mods.heroDmg;
+    const crit = this.rollCrit(s.mods.heroCrit);
+    const damage = w.damage * s.mods.heroDmg * (crit ? s.mods.heroCritMult : 1);
+    const reach = w.reach * s.mods.heroRange;
     s.fireCd = w.cooldown / s.mods.heroFireRate;
     if (w.ranged) {
       this.bullets.push({
@@ -881,24 +921,33 @@ export class Game {
         y: p.y,
         vx: Math.cos(p.aim) * BULLET_SPEED,
         vy: Math.sin(p.aim) * BULLET_SPEED,
-        left: w.reach,
+        left: reach,
         hostile: false,
         damage,
         srcType: w.type,
         owner: p.id,
         radius: BULLET_RADIUS,
+        pierce: s.mods.heroPierce,
+        crit,
+        hitIds: new Set(),
       });
       return;
     }
     p.swing = SWING_VISUAL_SEC;
+    const arc = Math.min(AREA_ARC_MAX, w.arc * s.mods.heroArea);
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
-      if (Math.hypot(e.x - p.x, e.y - p.y) > w.reach + radiusOf(e)) continue;
-      if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > w.arc) continue;
+      if (Math.hypot(e.x - p.x, e.y - p.y) > reach + radiusOf(e)) continue;
+      if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > arc) continue;
       struck.push(e);
     }
-    for (const e of struck) this.damageEnemy(e, { damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x) }, p.id);
-    if (w.splash > 0) this.splashEnemies(struck, w.splash, damage * SPLASH_FACTOR, w.type, p.x, p.y, p.id);
+    for (const e of struck) this.damageEnemy(e, { damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x), crit }, p.id);
+    if (w.splash > 0) this.splashEnemies(struck, w.splash * s.mods.heroArea, damage * SPLASH_FACTOR, w.type, p.x, p.y, p.id);
+  }
+
+  /** 치명타 판정(공격 한 번에 한 번) */
+  private rollCrit(chance: number): boolean {
+    return chance > 0 && this.rng() < Math.min(CRIT_MAX_CHANCE, chance);
   }
 
   /** 무기를 바꾼다. 바꾼 직후에는 잠깐 공격할 수 없다. */
@@ -1242,6 +1291,9 @@ export class Game {
   }
 
   private resolveMercAttack(m: Merc, st: UnitStats): void {
+    const mods = this.slots.get(m.owner)?.mods ?? newMods();
+    const crit = this.rollCrit(mods.mercCrit);
+    const dmg = st.damage * (crit ? mods.mercCritMult : 1);
     if (st.ranged) {
       this.bullets.push({
         id: this.nextEntityId++,
@@ -1251,10 +1303,13 @@ export class Game {
         vy: Math.sin(m.atkAng) * MERC_ARROW_SPEED,
         left: st.reach * MERC_ARROW_RANGE_FACTOR,
         hostile: false,
-        damage: st.damage,
+        damage: st.damage * (crit ? mods.mercCritMult : 1),
         srcType: m.type,
         owner: m.owner,
         radius: 4,
+        pierce: mods.mercPierce,
+        crit,
+        hitIds: new Set(),
       });
       return;
     }
@@ -1272,9 +1327,9 @@ export class Game {
     }
     let reflected = 0;
     for (const e of struck) {
-      reflected += this.damageEnemy(e, { damage: st.damage, charge, srcType: m.type, fromAngle: Math.atan2(m.y - e.y, m.x - e.x) }, m.owner);
+      reflected += this.damageEnemy(e, { damage: dmg, charge, srcType: m.type, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit }, m.owner);
     }
-    if (st.splash > 0) this.splashEnemies(struck, st.splash, st.damage * SPLASH_FACTOR, m.type, m.x, m.y, m.owner);
+    if (st.splash > 0) this.splashEnemies(struck, st.splash, dmg * SPLASH_FACTOR, m.type, m.x, m.y, m.owner);
     if (reflected > 0) this.hurtMerc(m, reflected); // 창병에게 돌격하면 그 피해가 자신에게 돌아온다
   }
 
@@ -1293,6 +1348,7 @@ export class Game {
     const r = resolveHit({ type: e.type, shield: e.shield, face: e.face }, hit);
     this.applyShield(e, r.shield, r.shieldBroke);
     e.hp -= r.body;
+    if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
     if (e.hp <= 0) this.killEnemy(e, ownerId);
     return r.reflected;
   }
@@ -1412,6 +1468,16 @@ export class Game {
         break;
       case "heroSpeed": m.heroSpeed += e.v; break;
       case "heroDmg": m.heroDmg += e.v; break;
+      case "mercRange": m.mercRange += e.v; break;
+      case "mercPierce": m.mercPierce += e.v; break;
+      case "mercCrit": m.mercCrit += e.v; break;
+      case "mercCritMult": m.mercCritMult += e.v; break;
+      case "mercArea": m.mercArea += e.v; break;
+      case "heroRange": m.heroRange += e.v; break;
+      case "heroPierce": m.heroPierce += e.v; break;
+      case "heroCrit": m.heroCrit += e.v; break;
+      case "heroCritMult": m.heroCritMult += e.v; break;
+      case "heroArea": m.heroArea += e.v; break;
       case "heroFireRate": m.heroFireRate += e.v; break;
       case "heroRegen": m.heroRegen += e.v; break;
     }
@@ -1434,6 +1500,9 @@ export class Game {
       damage: base.damage * mods.mercDmg * mods.typeDmg[m.type]!,
       cooldown: base.cooldown / mods.mercAtkSpeed,
       speed: base.speed * mods.mercSpeed,
+      reach: base.reach * mods.mercRange,
+      splash: base.splash * mods.mercArea,
+      arc: Math.min(AREA_ARC_MAX, base.arc * mods.mercArea),
     };
   }
 
@@ -1513,6 +1582,9 @@ export class Game {
         srcType: e.type,
         owner: 0,
         radius: 4,
+        pierce: 0,
+        crit: false,
+        hitIds: new Set(),
       });
       return;
     }
@@ -1597,10 +1669,15 @@ export class Game {
             break;
           }
         } else {
-          for (const e of this.enemies.values()) {
-            if (Math.hypot(e.x - px, e.y - py) > b.radius + radiusOf(e)) continue;
-            this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }, b.owner);
+          for (const e of [...this.enemies.values()]) {
+            if (b.hitIds.has(e.id) || Math.hypot(e.x - px, e.y - py) > b.radius + radiusOf(e)) continue;
+            b.hitIds.add(e.id);
+            this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit }, b.owner);
             this.pushEvent(EVT_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
+            if (b.pierce > 0) {
+              b.pierce--; // 뚫고 지나가 다음 적을 노린다
+              continue;
+            }
             hit = true;
             break;
           }

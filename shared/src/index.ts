@@ -129,6 +129,7 @@ export const EVT_ENEMY_ARROW_HIT = 1; // 적 화살 명중
 export const EVT_SHIELD_BLOCK = 2; // 방패가 막음
 export const EVT_SHIELD_BREAK = 3; // 방패가 깨짐
 export const EVT_REVIVE = 4; // 부활
+export const EVT_CRIT = 5; // 치명타
 export type EventWire = [kind: number, x: number, y: number, ang: number];
 
 export type StagePhase = "grow" | "boss" | "break";

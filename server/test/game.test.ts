@@ -1006,3 +1006,63 @@ test("검방병 용병의 방패는 정면의 화살을 막는다(화살은 방�
   assert.ok(cur.shield < MERC_STATS[SHIELD]!.shield, "방패가 조금 깎였다");
   assert.ok(cur.shield > MERC_STATS[SHIELD]!.shield - ENEMY_STATS[ARCHER]!.damage * 4, "화살 피해의 일부만 들어갔다");
 });
+
+test("치명타: 확률이 100%면 기본 피해의 1.5배가 들어가고 이벤트가 나온다", () => {
+  const g = new Game(() => 0); // rng가 항상 0이면 치명타가 반드시 난다
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.jumpToStage(10); // 체력이 높은 적(한 방에 죽지 않게)
+  g.applyCardForTest(a, { k: "heroCrit", v: 1 });
+  g.setWeapon(a, 3); // 철퇴
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  const id = g.spawnEnemyAt(p.x + 40, p.y, 4);
+  const base = g.getEnemy(id)!.hp;
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  g.step();
+  const dealt = base - g.getEnemy(id)!.hp;
+  assert.ok(Math.abs(dealt - WEAPONS[3]!.damage * 1.5) < 1e-6, `${dealt}`);
+  assert.ok(g.takeEvents().some((e) => e[0] === 5));
+});
+
+test("관통: 화살이 지정한 수만큼 더 많은 적을 맞힌다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  g.applyCardForTest(a, { k: "heroPierce", v: 1 });
+  const ids = [100, 160, 220].map((d) => g.spawnEnemyAt(p.x + d, p.y, 4));
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  g.step();
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+  run(g, 1);
+  const hurt = ids.filter((id) => g.getEnemy(id)!.hp < ENEMY_STATS[4]!.hp).length;
+  assert.equal(hurt, 2, "관통 1이면 2명");
+});
+
+test("사거리·범위 카드: 주인공 창의 사거리가 늘고 철퇴 범위 공격 반경이 커진다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  g.setWeapon(a, 1); // 창
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  const far = g.spawnEnemyAt(p.x + WEAPONS[1]!.reach + 22, p.y, 4); // 기본 사거리 밖
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  g.step();
+  assert.equal(g.getEnemy(far)!.hp, ENEMY_STATS[4]!.hp);
+  g.applyCardForTest(a, { k: "heroRange", v: 0.5 });
+  run(g, 1);
+  assert.ok(g.getEnemy(far)!.hp < ENEMY_STATS[4]!.hp);
+});
+
+test("용병 능력치 카드: 사거리·범위가 용병 능력치에 반영된다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const sp = g.addMerc(a, SPEAR, 0, 0);
+  const before = g.mercStatsForTest(sp).reach;
+  g.applyCardForTest(a, { k: "mercRange", v: 0.5 });
+  assert.ok(Math.abs(g.mercStatsForTest(sp).reach - before * 1.5) < 1e-9);
+  const mace = g.addMerc(a, BLUNT, 0, 0);
+  const sp0 = g.mercStatsForTest(mace).splash;
+  g.applyCardForTest(a, { k: "mercArea", v: 0.5 });
+  assert.ok(Math.abs(g.mercStatsForTest(mace).splash - sp0 * 1.5) < 1e-9);
+});

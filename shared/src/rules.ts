@@ -204,3 +204,8 @@ export const REVIVE_RADIUS = 70;
 export const REVIVE_SEC = 3; // 한 명이 눌렀을 때 걸리는 시간. 둘 이상이면 더 빠르다
 export const REVIVE_HP_FRAC = 0.5;
 export const REVIVE_INVULN_SEC = 2;
+
+// 공격 능력치(레벨업 카드)
+export const CRIT_BASE_MULT = 1.5; // 치명타 기본 피해 배율
+export const CRIT_MAX_CHANCE = 0.75; // 치명타 확률 상한
+export const AREA_ARC_MAX = 2.4; // 범위 증가로 넓어지는 근접 부채꼴 반각 상한(라디안)

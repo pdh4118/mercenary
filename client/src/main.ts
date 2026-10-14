@@ -18,6 +18,7 @@ import {
   EVT_ARROW_HIT,
   EVT_ENEMY_ARROW_HIT,
   EVT_REVIVE,
+  EVT_CRIT,
   EVT_SHIELD_BREAK,
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
@@ -356,15 +357,21 @@ async function main() {
     switch (e.k) {
       case "typeBoost": return e.type;
       case "mercHp": return SHIELD;
-      case "mercDmg": return BLUNT_TYPE;
-      case "mercAtkSpeed": return SPEAR_TYPE;
+      case "mercDmg":
+      case "mercArea":
+      case "heroArea": return BLUNT_TYPE;
+      case "mercAtkSpeed":
+      case "mercRange": return SPEAR_TYPE;
       case "mercSpeed": return 0;
       case "heroDmg":
-      case "heroFireRate": return ARCHER_TYPE;
+      case "heroFireRate":
+      case "heroRange":
+      case "heroPierce":
+      case "mercPierce": return ARCHER_TYPE;
       default: return -1;
     }
   };
-  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", mercRespawn: "↺", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥" };
+  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", mercRespawn: "↺", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", mercCrit: "CRIT", heroCrit: "CRIT", mercCritMult: "x1.5+", heroCritMult: "x1.5+" };
   /** 뽑힐 확률이 낮을수록 별이 많다 */
   const starsOf = (weight: number) => (weight >= 8 ? 1 : weight >= 5 ? 2 : 3);
   const cardPanel = new Container();
@@ -422,6 +429,7 @@ async function main() {
         v.artSprite.scale.set(ART / tex.width, ART / tex.height);
       }
       v.glyph.visible = art < 0;
+      v.glyph.style.fontSize = 20;
       v.glyph.text = card.effect.k === "leadership" ? `+${card.effect.v}` : (GLYPHS[card.effect.k] ?? "★");
       v.tag.text = CARD_CATEGORY_NAMES[card.category];
       v.tag.style.fill = color;
@@ -835,6 +843,8 @@ async function main() {
           .stroke({ width: 4 * (1 - t) + 1, color: 0xbfe6ff, alpha: 0.9 * (1 - t) });
       } else if (b.kind === EVT_SHIELD_BREAK) {
         fxLayer.circle(b.x, b.y, 14 + 34 * t).stroke({ width: 5 * (1 - t) + 1, color: 0x8fd0ff, alpha: 0.9 * (1 - t) });
+      } else if (b.kind === EVT_CRIT) {
+        fxLayer.star(b.x, b.y - 10 * t, 5, 12 + 10 * t, 5).fill({ color: 0xffd45d, alpha: 0.95 * (1 - t) }).stroke({ width: 1.5, color: 0xff8a3b, alpha: 1 - t });
       } else if (b.kind === EVT_REVIVE) {
         fxLayer.circle(b.x, b.y, 10 + 60 * t).stroke({ width: 6 * (1 - t) + 1, color: 0x7be08f, alpha: 0.9 * (1 - t) });
       }
