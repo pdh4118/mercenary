@@ -69,6 +69,24 @@ export interface UnitStats {
 }
 export const SPLASH_FACTOR = 0.5;
 
+// 창 찌르기 범위: 부채꼴이 아니라 앞으로 뻗은 직사각형(사다리꼴). 가까운 쪽은 넓고 끝으로 갈수록 좁아진다.
+export const SPEAR_HALF_WIDTH_NEAR = 28; // 몸 바로 앞의 반폭(px)
+export const SPEAR_HALF_WIDTH_FAR = 10; // 사거리 끝의 반폭(px)
+/** 사거리 reach인 창의 찌르기 범위가 앞에서 f만큼 떨어진 곳에서 갖는 반폭. widthMult는 범위 증가 능력 배율 */
+export function spearHalfWidth(f: number, reach: number, widthMult = 1): number {
+  const t = Math.max(0, Math.min(1, f / reach));
+  return (SPEAR_HALF_WIDTH_NEAR + (SPEAR_HALF_WIDTH_FAR - SPEAR_HALF_WIDTH_NEAR) * t) * widthMult;
+}
+/** 대상(tx,ty, 반경 r)이 (ox,oy)에서 aim 방향으로 찌르는 창 범위 안에 있는가 */
+export function inSpearBox(ox: number, oy: number, aim: number, tx: number, ty: number, r: number, reach: number, widthMult = 1): boolean {
+  const dx = tx - ox;
+  const dy = ty - oy;
+  const f = dx * Math.cos(aim) + dy * Math.sin(aim); // 앞쪽으로 얼마나 떨어졌나
+  const l = Math.abs(-dx * Math.sin(aim) + dy * Math.cos(aim)); // 옆으로 얼마나 비켜났나
+  if (f < -r * 0.5 || f > reach + r) return false;
+  return l <= spearHalfWidth(f, reach, widthMult) + r;
+}
+
 const deg = rad;
 
 export const MERC_STATS: readonly UnitStats[] = [

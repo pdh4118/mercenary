@@ -37,6 +37,7 @@ import {
   mercName,
   PLAYER_RADIUS,
   TICK_RATE,
+  spearHalfWidth,
   unitCost,
   decodeOffer,
   TIER_BUY_MULT,
@@ -895,7 +896,21 @@ async function main() {
   setInterval(() => pushInput(true), 1000 / TICK_RATE);
 
   /** 공격 예고(부채꼴 또는 직선). 진행될수록 진해지고, 끝나는 순간 판정이 일어난다. */
-  const drawTelegraph = (x: number, y: number, ang: number, reach: number, arc: number, ranged: boolean, prog: number, color: number) => {
+  /** 창 찌르기 범위(앞으로 뻗은 사다리꼴: 가까운 쪽이 넓고 끝이 좁다) */
+  const drawSpearBox = (x: number, y: number, ang: number, reach: number, widthMult: number, color: number, alpha: number) => {
+    const c = Math.cos(ang);
+    const s = Math.sin(ang);
+    const nearW = spearHalfWidth(0, reach, widthMult);
+    const farW = spearHalfWidth(reach, reach, widthMult);
+    fxLayer
+      .poly([x - s * nearW, y + c * nearW, x + c * reach - s * farW, y + s * reach + c * farW, x + c * reach + s * farW, y + s * reach - c * farW, x + s * nearW, y - c * nearW])
+      .fill({ color, alpha });
+  };
+  const drawTelegraph = (x: number, y: number, ang: number, reach: number, arc: number, ranged: boolean, prog: number, color: number, spear = false) => {
+    if (spear) {
+      drawSpearBox(x, y, ang, reach, arc / MERC_STATS[SPEAR_TYPE]!.arc, color, 0.1 + 0.35 * prog);
+      return;
+    }
     if (ranged) {
       fxLayer
         .moveTo(x, y)
@@ -1055,7 +1070,7 @@ async function main() {
       if (w[5] === undefined || w[6] <= 0) continue;
       const v = mercs.views.get(w[0]);
       const st = MERC_STATS[w[4]]!;
-      if (v) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!);
+      if (v) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!, w[4] === SPEAR_TYPE);
     }
 
     // 방패(검방병): 정면을 막는 호. 깨지면 회색으로 비고, 재생되면 다시 파랗게 돌아온다.
@@ -1152,6 +1167,10 @@ async function main() {
           .fill({ color: 0xffc27a, alpha: 0.12 + 0.3 * prog });
       }
       if (!v || p.swing <= 0 || w.ranged) continue;
+      if (w.type === SPEAR_TYPE) {
+        drawSpearBox(v.x, v.y, p.aim, w.reach, 1, TYPE_COLORS[w.type]!, 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC));
+        continue;
+      }
       fxLayer
         .moveTo(v.x, v.y)
         .arc(v.x, v.y, w.reach, p.aim - w.arc, p.aim + w.arc)

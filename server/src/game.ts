@@ -44,6 +44,7 @@ import {
   STAGE_CLEAR_XP,
   STAGE_COUNT,
   ARCHER_KITE_HOME_PULL,
+  inSpearBox,
   ARCHER_KITE_MARGIN,
   ARCHER_KITE_SPEED_MULT,
   ENEMY_LEVEL_DMG_GROWTH,
@@ -1207,8 +1208,13 @@ export class Game {
     const arc = Math.min(AREA_ARC_MAX, w.arc * s.mods.heroArea);
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
-      if (Math.hypot(e.x - p.x, e.y - p.y) > reach + radiusOf(e)) continue;
-      if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > arc) continue;
+      if (w.type === SPEAR) {
+        // 창: 앞으로 뻗은 직사각형(가까운 쪽이 넓고 끝이 좁다)
+        if (!inSpearBox(p.x, p.y, p.aim, e.x, e.y, radiusOf(e), reach, s.mods.heroArea)) continue;
+      } else {
+        if (Math.hypot(e.x - p.x, e.y - p.y) > reach + radiusOf(e)) continue;
+        if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > arc) continue;
+      }
       struck.push(e);
     }
     for (const e of struck) this.damageEnemy(e, { damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x), crit }, p.id);
@@ -1696,8 +1702,13 @@ export class Game {
     m.chargeSnap = 0;
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
-      if (Math.hypot(e.x - m.x, e.y - m.y) > st.reach + radiusOf(e)) continue;
-      if (Math.abs(angleDiff(Math.atan2(e.y - m.y, e.x - m.x), m.atkAng)) > st.arc) continue;
+      if (m.type === SPEAR) {
+        // 창병도 직사각형 찌르기. 범위 증가 능력은 폭에 적용된다.
+        if (!inSpearBox(m.x, m.y, m.atkAng, e.x, e.y, radiusOf(e), st.reach, st.arc / MERC_STATS[SPEAR]!.arc)) continue;
+      } else {
+        if (Math.hypot(e.x - m.x, e.y - m.y) > st.reach + radiusOf(e)) continue;
+        if (Math.abs(angleDiff(Math.atan2(e.y - m.y, e.x - m.x), m.atkAng)) > st.arc) continue;
+      }
       struck.push(e);
     }
     let reflected = 0;

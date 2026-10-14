@@ -136,3 +136,41 @@ test("결과 기록에 준 피해·받은 피해·쓰러짐·금화·용병 수�
   assert.equal(r.downs, 0);
   void e;
 });
+
+test("창 찌르기 범위는 직사각형(사다리꼴): 가까운 곳은 넓고 끝은 좁다", async () => {
+  const { inSpearBox, spearHalfWidth, SPEAR_HALF_WIDTH_NEAR, SPEAR_HALF_WIDTH_FAR } = await import("@mercenary/shared");
+  const reach = 112;
+  assert.ok(spearHalfWidth(0, reach) === SPEAR_HALF_WIDTH_NEAR && spearHalfWidth(reach, reach) === SPEAR_HALF_WIDTH_FAR);
+  assert.ok(SPEAR_HALF_WIDTH_NEAR > SPEAR_HALF_WIDTH_FAR * 2);
+  // 가까운 곳에서는 옆으로 25px 비껴도 맞고, 끝에서는 같은 25px이면 빗나간다(반경 0인 대상)
+  assert.ok(inSpearBox(0, 0, 0, 10, 25, 0, reach));
+  assert.ok(!inSpearBox(0, 0, 0, reach - 2, 25, 0, reach));
+  assert.ok(inSpearBox(0, 0, 0, reach - 2, 8, 0, reach));
+  // 부채꼴과 달리 사거리 안에서도 옆으로 많이 벗어나면 안 맞고, 뒤쪽·사거리 밖도 안 맞는다
+  assert.ok(!inSpearBox(0, 0, 0, 50, 40, 0, reach));
+  assert.ok(!inSpearBox(0, 0, 0, -40, 0, 0, reach));
+  assert.ok(!inSpearBox(0, 0, 0, reach + 20, 0, 0, reach));
+  // 조준 방향을 돌리면 같이 돈다
+  assert.ok(inSpearBox(0, 0, Math.PI / 2, 0, 80, 0, reach));
+  assert.ok(!inSpearBox(0, 0, Math.PI / 2, 80, 0, 0, reach));
+  // 범위 증가는 폭을 넓힌다
+  assert.ok(!inSpearBox(0, 0, 0, 60, 28, 0, reach, 1) && inSpearBox(0, 0, 0, 60, 28, 0, reach, 1.6));
+});
+
+test("주인공 창은 정면 직사각형 안의 적만 맞히고, 근접 옆의 적은 맞힌다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.setWeapon(a, 1);
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  const hp = (id: number) => g.getEnemy(id)!.hp;
+  const nearSide = g.spawnEnemyAt(p.x + 24, p.y + 24, SPEAR); // 가까운 옆: 직사각형의 넓은 쪽 안
+  const farSide = g.spawnEnemyAt(p.x + 100, p.y + 34, SPEAR); // 먼 곳 옆: 좁아진 곳 밖
+  const tip = g.spawnEnemyAt(p.x + 100, p.y - 2, SPEAR); // 끝 중앙: 안
+  for (const id of [nearSide, farSide, tip]) (g.getEnemy(id) as { hp: number }).hp = 900;
+  g.setInput(a, { ...idle, aim: 0, fire: true });
+  g.step();
+  assert.ok(hp(nearSide) < 900, "가까운 옆은 맞는다");
+  assert.equal(hp(farSide), 900, "먼 곳 옆은 빗나간다");
+  assert.ok(hp(tip) < 900, "끝 중앙은 맞는다");
+});
