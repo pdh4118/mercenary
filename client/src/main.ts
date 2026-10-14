@@ -1,6 +1,7 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
+import { bindAudioUi, createAudio } from "./audio.js";
 import { createMercPanel, isReady } from "./mercpanel.js";
 import {
   CARDS,
@@ -27,6 +28,7 @@ import {
   EVT_DMG_ENEMY,
   EVT_DMG_ENEMY_CRIT,
   EVT_DMG_SHIELD,
+  EVT_KNOCK,
   EVT_SHIELD_BREAK,
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
@@ -136,6 +138,14 @@ async function main() {
   const world = new Container();
   app.stage.addChild(world);
 
+  // 소리: 파일이 없으면 조용히 건너뛴다. 브라우저 정책상 첫 클릭·키 입력 뒤부터 난다.
+  const audio = createAudio();
+  bindAudioUi(audio);
+  Object.defineProperty(window, "__audio", { get: () => audio.stats() });
+  document.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement | null)?.closest("button")) audio.play("ui_click");
+  });
+
   const half = WORLD_SIZE / 2;
   // 병종 스프라이트(기병, 창병, 궁병, 검방병, 둔기병 순). 적은 수백 마리가 되므로 텍스처 하나를 모두가 공유한다.
   const loadUnits = (side: "ally" | "enemy") => Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/units/${side}_${f}.png`)));
@@ -191,6 +201,7 @@ async function main() {
     },
     (w) => [w[0], w[1], w[2]],
     true,
+    (v) => audio.play("enemy_die", { x: v.x, y: v.y }), // 사라졌다 = 쓰러졌다
   );
   /** 화살은 날아가는 방향으로 돌려 그린다. 서버가 방향을 보내지 않으므로 이전 위치와의 차이로 구한다. */
   interface BulletView extends Tracked {
@@ -211,6 +222,7 @@ async function main() {
       sprite.scale.set(ARROW_SCALE);
       sprite.visible = false; // 첫 프레임에는 방향을 모른다
       bulletLayer.addChild(sprite);
+      audio.play("bow_shot", { x: w[1], y: w[2], vol: hostile ? 0.6 : 1 });
       return { node: sprite, x: 0, y: 0, hostile, angle: 0, ready: false, x0: w[1], y0: w[2] };
     },
     (w) => [w[0], w[1], w[2]],
@@ -230,6 +242,7 @@ async function main() {
     sprite: Sprite;
     lastKey: string;
     label: Text;
+    wasDown: boolean;
   }
   const mercs = new Pool<MercView, MercWire>(
     (w) => {
@@ -252,7 +265,7 @@ async function main() {
       label.visible = false;
       node.addChild(ring, sprite, bar, label);
       mercLayer.addChild(node);
-      return { node, bar, sprite, label, x: 0, y: 0, lastKey: "", lastX: w[1], face: 1 };
+      return { node, bar, sprite, label, x: 0, y: 0, lastKey: "", lastX: w[1], face: 1, wasDown: w[8] > 0 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -262,6 +275,8 @@ async function main() {
     bar: Graphics;
     aimMark: Graphics;
     sprite: Sprite;
+    lastSwing: number;
+    wasDown: boolean;
   }
   const HERO_TOP = -Math.max(...heroTex.map((t) => t.height)) * HERO_SCALE * SPRITE_ANCHOR_Y; // 가장 큰 포즈의 머리 위쪽
   const players = new Pool<PlayerView, PlayerState>(
@@ -283,7 +298,7 @@ async function main() {
       label.y = HERO_TOP - 12;
       node.addChild(ring, sprite, aimMark, bar, label);
       playerLayer.addChild(node);
-      return { node, aimMark, bar, sprite, x: 0, y: 0 };
+      return { node, aimMark, bar, sprite, x: 0, y: 0, lastSwing: 0, wasDown: false };
     },
     (p) => [p.id, p.x, p.y],
     true,
@@ -562,6 +577,8 @@ async function main() {
   let myId = -1;
   let toastLeft = 0;
   let lastSquads = 0;
+  // 소리용: 이전 프레임 값을 기억해 변화 순간에 소리를 낸다
+  const snd = { gold: -1, down: false, shaken: 0, near: -1, phase: "", status: "playing", mercTier: new Map<number, number>(), mercSeen: false, downPlayers: new Set<number>() };
   let levelToastLeft = 0;
   let lastLevel = 0;
   let nearCampId = -1;
@@ -586,6 +603,7 @@ async function main() {
     notify: (text) => {
       toast.text = text;
       toastLeft = 2.5;
+      audio.play("upgrade_ready");
     },
   });
   const lobby = createLobby({
@@ -648,7 +666,20 @@ async function main() {
         toastLeft = 2.5;
       } else if (msg.t === "state") {
         latest = msg;
+        const arrowSpots = (msg.ev ?? []).filter((q) => q[0] === EVT_ARROW_HIT || q[0] === EVT_ENEMY_ARROW_HIT);
         for (const [kind, x, y, ang, val, owner] of msg.ev ?? []) {
+          // 서버가 알려 준 순간에 맞춰 소리를 낸다
+          if (kind === EVT_ARROW_HIT) audio.play("arrow_hit", { x, y });
+          else if (kind === EVT_ENEMY_ARROW_HIT) audio.play("arrow_hit", { x, y, vol: 0.7 });
+          else if (kind === EVT_SHIELD_BLOCK) audio.play("shield_block", { x, y });
+          else if (kind === EVT_SHIELD_BREAK) audio.play("shield_break", { x, y });
+          else if (kind === EVT_CRIT) audio.play("crit_hit", { x, y });
+          else if (kind === EVT_BACKSTAB) audio.play("backstab", { x, y });
+          else if (kind === EVT_KNOCK) audio.play("knockback", { x, y });
+          else if (kind === EVT_DODGE) audio.play("dodge", { x, y });
+          else if (kind === EVT_REVIVE) audio.play("revive_done", { x, y });
+          else if ((kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) && !arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14)) audio.play("melee_hit", { x, y }); // 화살이 아닌 근접 타격
+          else if (kind === EVT_DMG_ALLY && owner === myId) audio.play("ally_hurt", { x, y });
           // 피해 숫자는 내 유닛(주인공·용병)이 관련된 것만 띄운다
           if (owner === myId && kind === EVT_DMG_ENEMY) spawnFloat(numFmt(val), x, y, { fill: 0xffffff, fontSize: 15, fontWeight: "600", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_ENEMY_CRIT) spawnFloat(`${numFmt(val)}!`, x, y, { fill: 0xffd45d, fontSize: 25, fontWeight: "900", stroke: { color: 0x7a2e00, width: 5 } }, 1.1, 0.5);
@@ -721,6 +752,8 @@ async function main() {
       return;
     }
     if (k === "r" && !e.repeat) {
+      const mine = latest?.players.find((p) => p.id === myId);
+      if (mine && mine.offer.length > 0 && mine.rerolls > 0) audio.play("card_reroll");
       send({ t: "reroll" });
       return;
     }
@@ -730,7 +763,13 @@ async function main() {
     }
     if (formations.isOpen()) return; // 편성 화면에서는 게임 조작을 받지 않는다
     if (!e.repeat && k === "q") cycleWeapon(1);
-    if (!e.repeat && (k === "z" || k === "x" || k === "c")) send({ t: "pick", index: "zxc".indexOf(k) });
+    if (!e.repeat && (k === "z" || k === "x" || k === "c")) {
+      const idx = "zxc".indexOf(k);
+      const offered = latest?.players.find((p) => p.id === myId)?.offer[idx];
+      if (offered !== undefined) audio.play(CARDS[offered]?.category === 3 ? "legend_card" : "card_pick");
+      send({ t: "pick", index: idx });
+    }
+    if (k === "m" && !e.repeat) audio.toggleMute();
     if (!e.repeat && nearCampId >= 0) {
       if (!e.shiftKey && (k === "1" || k === "2" || k === "3")) send({ t: "buy", camp: nearCampId, slot: Number(k) - 1 });
       const digit = /^Digit([1-5])$/.exec(e.code);
@@ -748,6 +787,7 @@ async function main() {
     if (e.button === 2) {
       // 우클릭: 커서가 가리키는 월드 위치로 기병 돌격 지시
       const me = latest?.players.find((p) => p.id === myId);
+      if (me) audio.play("cavalry_charge");
       if (me) send({ t: "charge", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2 });
       return;
     }
@@ -783,6 +823,8 @@ async function main() {
   };
 
   app.ticker.add((ticker) => {
+    // 배경 음악: 로비/대기실, 성장 단계, 보스 단계(끝난 뒤에는 멈춘다)
+    audio.music(!latest ? "bgm_lobby" : latest.g && latest.g.status !== "playing" ? null : latest.g?.phase === "boss" ? "bgm_boss" : "bgm_grow");
     if (!latest) return;
     const k = 1 - Math.exp(-ticker.deltaMS / SMOOTH_MS);
 
@@ -833,6 +875,8 @@ async function main() {
     }
     mercs.update(latest.mercs, k, (v, w) => {
       v.node.visible = w[8] <= 0; // 쓰러진 용병은 부활할 때까지 숨긴다
+      if (v.wasDown && w[8] <= 0 && w[5] === myId) audio.play("merc_respawn", { x: v.x, y: v.y });
+      v.wasDown = w[8] > 0;
       faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
       const grow = 1 + 0.05 * w[15]; // 강화할수록 조금 커진다
       v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
@@ -857,6 +901,11 @@ async function main() {
     });
     players.update(latest.players, k, (v, p) => {
       const dead = p.down;
+      // 근접 무기를 휘두르는 순간과 쓰러지는 순간의 소리(위치는 그 주인공 자리)
+      if (p.swing > 0 && v.lastSwing <= 0 && !WEAPONS[p.weapon]!.ranged) audio.play((["", "spear_thrust", "sword_swing", "mace_smash"] as const)[p.weapon] || "sword_swing", { x: v.x, y: v.y });
+      v.lastSwing = p.swing;
+      if (dead && !v.wasDown && p.id !== myId) audio.play("hero_down", { x: v.x, y: v.y });
+      v.wasDown = dead;
       // 쓰러지면 흐리게, 부활 직후 무적일 때는 깜빡인다
       v.node.alpha = dead ? 0.4 : p.invuln > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 90)) : 1;
       // 들고 있는 무기에 맞는 모습으로 바꾸고, 조준한 쪽을 바라보게 좌우 반전한다
@@ -1013,6 +1062,7 @@ async function main() {
     // 카메라와 HUD
     const me = players.views.get(myId);
     const meState = latest.players.find((p) => p.id === myId);
+    if (meState) audio.setListener(meState.x, meState.y);
     const charging = !!meState && meState.chargeLeft > 0;
     chargeMark.visible = chargeLabel.visible = charging;
     if (charging && meState) {
@@ -1056,7 +1106,29 @@ async function main() {
       if (lastLevel > 0 && meState.level > lastLevel) {
         levelToast.text = `레벨 ${meState.level}!`;
         levelToastLeft = 2;
+        audio.play("level_up");
       }
+      // 소리: 값이 바뀐 순간(금화 획득, 쓰러짐, 사기 저하, 용병 고용·강화)
+      if (snd.gold >= 0 && meState.gold > snd.gold) audio.play("coin_gain");
+      snd.gold = meState.gold;
+      if (meState.down && !snd.down) audio.play("hero_down");
+      snd.down = meState.down;
+      if (meState.shaken > 0 && snd.shaken <= 0) audio.play("morale_break");
+      snd.shaken = meState.shaken;
+      const nowTiers = new Map(mine.map((w) => [w[0], w[15]] as const));
+      if (snd.mercSeen) {
+        for (const [id, tier] of nowTiers) {
+          const before = snd.mercTier.get(id);
+          if (before === undefined) audio.play("hire");
+          else if (tier > before) audio.play("upgrade_done");
+        }
+      }
+      snd.mercTier = nowTiers;
+      snd.mercSeen = true;
+      // 다른 플레이어가 쓰러지면 멀리서도 알린다(가까우면 위의 위치 소리가 난다)
+      // 동료를 일으키는 동안 이어지는 소리와 기병이 달릴 때의 말발굽 소리
+      audio.loop("revive_loop", keys.has("e") && latest.players.some((q) => q.id !== myId && q.down && Math.hypot(q.x - meState.x, q.y - meState.y) <= REVIVE_RADIUS * 1.5));
+      audio.loop("hoof_gallop", mine.some((w) => w[4] === 0 && w[13] > 0.6 && w[8] <= 0));
       lastLevel = meState.level;
       const fallen = latest.players.find((q) => q.id !== myId && q.down && Math.hypot(q.x - meState.x, q.y - meState.y) <= REVIVE_RADIUS * 1.5);
       deadText.text = meState.down
@@ -1078,6 +1150,7 @@ async function main() {
         }
       }
       if (best && !meState.down) {
+        if (snd.near < 0) audio.play("camp_open"); // 방금 범위에 들어왔다
         nearCampId = best[0];
         const owned = mine.length;
         const lines = ["캠프 - 고용 (숫자 키)"];
@@ -1107,6 +1180,14 @@ async function main() {
     if (gi && gi.status !== "playing") deadText.text = ""; // 결과 화면이 뜨면 안내 문구는 숨긴다
     if (gi) {
       const mmss = (t: number) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+      if (snd.phase) {
+        if (gi.phase === "boss" && snd.phase !== "boss") audio.play("boss_warning");
+        if (gi.phase === "break" && snd.phase === "boss") audio.play(gi.status === "victory" ? "victory" : "stage_clear");
+        if (gi.status === "defeat" && snd.status !== "defeat") audio.play("defeat");
+      }
+      snd.phase = gi.phase;
+      snd.status = gi.status;
+      if (gi.squads > lastSquads) audio.play("squad_warning");
       const squadText = gi.squads > 0 ? ` · 적 소대 ${gi.squads}` : "";
       if (gi.squads > lastSquads) {
         toast.text = "적 소대가 진형을 갖추고 다가옵니다!";
@@ -1124,6 +1205,7 @@ async function main() {
         bossBar.roundRect(bx, 36, bw, 10, 4).fill({ color: 0x000000, alpha: 0.6 }).roundRect(bx, 36, (bw * gi.bossHp) / 100, 10, 4).fill(0xe8883a);
       }
     }
+    snd.near = nearCampId;
     levelToastLeft = Math.max(0, levelToastLeft - ticker.deltaMS / 1000);
     levelToast.visible = levelToastLeft > 0;
     levelToast.position.set(app.screen.width / 2, 100);

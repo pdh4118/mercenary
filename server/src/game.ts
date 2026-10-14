@@ -20,6 +20,7 @@ import {
   AREA_ARC_MAX,
   EVT_CRIT,
   EVT_BACKSTAB,
+  EVT_KNOCK,
   EVT_DMG_ALLY,
   EVT_DMG_ENEMY,
   EVT_DMG_ENEMY_CRIT,
@@ -1634,6 +1635,7 @@ export class Game {
     e.y = clampToWorld(e.y - Math.sin(fromAngle) * dist, 14);
     e.atkT = 0;
     e.cd = Math.max(e.cd, KNOCK_STUN_SEC);
+    this.pushEvent(EVT_KNOCK, e.x, e.y, fromAngle + Math.PI);
   }
 
   /** 피의 갈증: 때린 쪽(용병 또는 주인공)이 체력을 회복한다 */

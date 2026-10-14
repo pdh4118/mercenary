@@ -7,6 +7,7 @@
     <style>
       html, body { margin: 0; height: 100%; background: #14161c; overflow: hidden; font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
       canvas { display: block; }
+      #soundBtn { position: fixed; top: 6px; right: 8px; z-index: 11; width: 34px; padding: 4px 0; font-size: 16px; background: rgba(0,0,0,.45); border-color: #3f4659; }
       #status { position: fixed; top: 8px; left: 8px; color: #cfd3dc; font-size: 13px; pointer-events: none; }
 
       .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(10, 11, 15, 0.82); color: #e6e9f0; z-index: 10; }
@@ -77,6 +78,7 @@
   </head>
   <body>
     <div id="status">연결 중...</div>
+    <button id="soundBtn" title="소리 켜기/끄기 (M)">🔊</button>
 
     <div id="lobby" class="overlay open">
       <div class="panel">
@@ -177,6 +179,10 @@
           <button id="roomLeave" class="danger">방 나가기</button>
           <button id="roomClose">닫기 (Esc)</button>
         </div>
+        <h2>소리</h2>
+        <div class="row"><span class="sub" style="width: 56px">효과음</span><input id="sfxVol" type="range" min="0" max="100" style="padding: 0" /></div>
+        <div class="row"><span class="sub" style="width: 56px">음악</span><input id="musicVol" type="range" min="0" max="100" style="padding: 0" /></div>
+        <label class="check"><input id="soundMute" type="checkbox" /> <span>음소거 (M)</span></label>
         <div class="hint">연결이 끊겨도 30초 안에 같은 브라우저 탭에서 다시 열면 이어서 할 수 있습니다.</div>
       </div>
     </div>
