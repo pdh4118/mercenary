@@ -270,7 +270,7 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 | --- | --- | --- | --- |
 | `bow_shot` | 활을 쏠 때(주인공·궁병) | `short wooden bow release, dry string twang, no echo` | 0.2초, 3종 |
 | `arrow_volley` | 궁병 여럿이 동시에 쏠 때(화살 연사) | `volley of many arrows released at once, bowstrings snapping together then a rush of arrows through the air` | 0.8초, 1종 |
-| `arrow_hit` | 화살이 적에게 맞을 때 | `soft arrow thud into leather and flesh, short, low volume` | 0.15초, 2종 |
+| `arrow_hit` | 화살이 적에게 맞을 때 | `soft arrow thud into leather and flesh, short, low volume` | 0.15~0.27초, 3종 |
 | `melee_hit` | 근접 타격(검·창·철퇴로 몸을 때림) | `quick melee weapon hit, dull cloth and metal impact, medium thud` | 0.2~0.4초, 6종 |
 | `shield_block` | 방패가 공격을 막을 때 | `wooden shield block, solid knock with a faint metal ring` | 0.2~0.45초, 4종 |
 | `shield_break` | 방패가 깨질 때 | `shield shattering, splintering wood and a metal snap, short` | 1.2초, 1종 |
