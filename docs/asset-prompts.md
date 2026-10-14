@@ -275,7 +275,7 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 | `shield_block` | 방패가 공격을 막을 때 | `wooden shield block, solid knock with a faint metal ring` | 0.2초, 3종 |
 | `shield_break` | 방패가 깨질 때 | `shield shattering, splintering wood and a metal snap, short` | 0.5초(3번째는 1.2초), 3종 |
 | `crit_hit` | 치명타 | `sharp critical strike, bright metallic slash with a heavy thump` | 0.3초, 8종 (충격음 8개 적용됨) |
-| `enemy_die` | 적이 쓰러질 때 | `small fantasy soldier falls, short grunt-less thud and armor clatter, low volume` | 0.25초, 4종 |
+| `enemy_die` | 적이 쓰러질 때 | `small fantasy soldier falls, short grunt-less thud and armor clatter, low volume` | 0.7초, 1종 |
 | `ally_hurt` | 내 유닛(주인공)이 맞을 때 | `player takes damage, dull body hit with short breathy grunt, not shrill` | 0.25초, 3종 |
 | `level_up` | 레벨업 | `short uplifting level-up chime, warm bells, about one second` | 0.9초, 1종 |
 | `boss_warning` | 보스군이 나타날 때 | `distant war horn blast, deep and ominous, two long notes, with faint marching drums` | 3초, 1종 |

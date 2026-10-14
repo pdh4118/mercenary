@@ -31,7 +31,7 @@ export const SOUNDS = {
   shield_block: d(3, 0.55, 70, 4),
   shield_break: d(3, 0.7, 150, 2),
   crit_hit: d(8, 0.7, 90, 3, 0.05), // 충격음 8종을 번갈아
-  enemy_die: d(4, 0.4, 80, 4),
+  enemy_die: d(1, 0.35, 150, 3, 0.15),
   ally_hurt: d(3, 0.6, 120, 3, 0.05, false),
   level_up: d(1, 0.8, 0, 1, 0, false, { important: true }),
   boss_warning: d(1, 0.9, 0, 1, 0, false, { important: true }),
