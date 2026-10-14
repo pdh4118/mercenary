@@ -33,7 +33,7 @@ export const SOUNDS = {
   crit_hit: d(8, 0.7, 90, 3, 0.05), // 충격음 8종을 번갈아
   enemy_die: d(2, 0.35, 150, 3, 0.15),
   armor_fall: d(5, 0.4, 120, 3, 0.1), // 쓰러질 때 비명과 함께 깔리는 갑옷 소리
-  ally_hurt: d(3, 0.6, 120, 3, 0.05, false),
+  ally_hurt: d(1, 0.6, 120, 3, 0.08, false),
   level_up: d(1, 0.8, 0, 1, 0, false, { important: true }),
   boss_warning: d(1, 0.9, 0, 1, 0, false, { important: true }),
   // 2순위
