@@ -80,3 +80,5 @@ Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~
 | `melee_hit_3, 4` (Suno) | 낮은 음이 또렷하게 남음(86~108Hz) | 뺌. 남은 소리는 번호를 앞당겨 `melee_hit_1 ~ 6`이 됨 |
 
 뺀 파일은 `removed/` 폴더에 보관했습니다. (위의 출처 표에 적힌 `melee_hit_5~8`, `shield_break_3`은 각각 `melee_hit_3~6`, `shield_break_1`로 번호가 바뀌었습니다.)
+
+추가: 화살 맞는 소리 `arrow_hit_1`에서 기타 튕기는 소리가 난다는 확인이 있어, 이 번호의 파일을 완전히 비웠습니다(옛 Suno 조각은 `removed/`에 있음). 지금 `arrow_hit`은 2종(`arrow_hit_1` = `melee_hit_4`를 높인 소리, `arrow_hit_2` = Suno 조각)입니다.
