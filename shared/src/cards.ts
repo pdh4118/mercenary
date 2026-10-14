@@ -2,14 +2,42 @@
 
 import { UNIT_NAMES, UNIT_TYPES } from "./rules.js";
 
-/** 0=규모(수 늘리기), 1=용병 강화, 2=주인공 강화 */
-export const CARD_CATEGORY_NAMES = ["규모", "용병 강화", "주인공 강화"] as const;
+/** 0=규모(수 늘리기), 1=용병 강화, 2=주인공 강화, 3=전설(드물고 강력한 시너지) */
+export const CARD_CATEGORY_NAMES = ["규모", "용병 강화", "주인공 강화", "전설"] as const;
+
+/** 전설 능력: 드물게 나오고 한 번만 고를 수 있으며, 다른 능력치와 겹칠수록 급격히 강해진다. */
+export type LegendId = "stormfire" | "bloodthirst" | "pierceRamp" | "execute" | "thorns" | "chargeBoost" | "undying" | "splashBoost" | "warcry";
+export const LEGEND_CONST = {
+  bloodthirstFrac: 0.15, // 준 피해의 이만큼 회복(치명타는 2배)
+  pierceRamp: 1.35, // 관통할 때마다 피해 배율
+  executeBelow: 0.3, // 이 체력 비율 아래의 적에게
+  executeMult: 2, // 피해 배율
+  thornsFrac: 0.5, // 받은 피해의 이만큼을 공격자에게
+  chargeMult: 2, // 기병 돌격 피해 배율
+  undyingChance: 0.35, // 쓰러질 때 되살아날 확률
+  splashMult: 2, // 범위 피해 배율
+  warcryStep: 0.08, // 처치 한 번당 용병 공격 속도
+  warcryMax: 5, // 최대 중첩
+  warcrySec: 6, // 중첩 유지 시간
+} as const;
+export const LEGENDS: Record<LegendId, { name: string; desc: string }> = {
+  stormfire: { name: "폭풍 연사", desc: "치명타가 터지면 다음 공격 대기시간이 사라진다 (치명타·공격 속도와 시너지)" },
+  bloodthirst: { name: "피의 갈증", desc: "준 피해의 15%를 회복, 치명타는 2배 (치명타 피해와 시너지)" },
+  pierceRamp: { name: "관통 증폭", desc: "화살이 적을 뚫을 때마다 피해 +35% (관통 수와 시너지)" },
+  execute: { name: "처형", desc: "체력 30% 이하 적에게 피해 x2 (공격력·치명타와 시너지)" },
+  thorns: { name: "가시 갑옷", desc: "받은 피해의 50%를 공격자에게 되돌린다 (체력·방어력과 시너지)" },
+  chargeBoost: { name: "돌격 가속", desc: "기병 돌격 피해 x2 (기병 이동 속도와 시너지)" },
+  undying: { name: "불사의 군단", desc: "용병이 쓰러질 때 35% 확률로 체력 절반으로 즉시 되살아난다" },
+  splashBoost: { name: "광역 증폭", desc: "범위 공격 피해 x2 (범위·공격력과 시너지)" },
+  warcry: { name: "전장의 함성", desc: "적을 처치할 때마다 6초간 용병 공격 속도 +8% (최대 5중첩)" },
+};
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
   | { k: "priceMult"; v: number } // 고용 가격에 v를 곱한다
   | { k: "goldMult"; v: number } // 금화 획득 +v(비율)
   | { k: "mercStat"; stat: MercStat; v: number; type?: number } // 용병 능력치. type을 생략하면 모든 용병(효과는 작다)
+  | { k: "legend"; id: LegendId }
   | { k: "heroRange"; v: number }
   | { k: "heroPierce"; v: number }
   | { k: "heroCrit"; v: number }
@@ -26,7 +54,8 @@ export type CardEffect =
 export interface CardDef {
   name: string;
   desc: string;
-  category: 0 | 1 | 2;
+  category: 0 | 1 | 2 | 3;
+  unique?: boolean; // 한 번 고르면 다시 나오지 않는다
   weight: number; // 뽑힐 확률 가중치
   stars?: number; // 표시용 등급(1~3). 없으면 가중치로 정한다
   minLevel?: number; // 이 레벨부터 등장
@@ -115,6 +144,10 @@ export const CARDS: readonly CardDef[] = [
   { name: "전리품 +25%", desc: "적을 잡아 얻는 금화가 25% 늘어난다", category: 0, weight: 5, effect: { k: "goldMult", v: 0.25 } },
   // 용병 강화: 병종 전용(주력)과 전체(약함)
   ...statCards(),
+  // 전설: 드물게 나오는 시너지 능력(한 번만)
+  ...(Object.keys(LEGENDS) as LegendId[]).map(
+    (id): CardDef => ({ name: `[전설] ${LEGENDS[id].name}`, desc: LEGENDS[id].desc, category: 3, weight: 1.5, stars: 3, minLevel: 6, unique: true, effect: { k: "legend", id } }),
+  ),
   // 주인공 강화
   { name: "최대 체력 +25", desc: "주인공의 최대 체력 +25", category: 2, weight: 8, effect: { k: "heroMaxHp", v: 25 } },
   { name: "이동 속도 +8%", desc: "주인공이 더 빨리 움직인다", category: 2, weight: 6, effect: { k: "heroSpeed", v: 0.08 } },

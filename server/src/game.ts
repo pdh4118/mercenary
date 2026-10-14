@@ -121,6 +121,14 @@ import {
   type StagePhase,
   type MercWire,
   type MercStat,
+  type LegendId,
+  LEGEND_CONST,
+  MERC_NAME_COUNT,
+  MERC_XP_KILL,
+  MERC_XP_OVERFLOW,
+  MERC_XP_PER_DAMAGE,
+  MERC_XP_PER_HURT,
+  mercXpNeed,
   MAX_TIER,
   REROLL_MAX,
   REROLL_PER_PICK,
@@ -152,6 +160,7 @@ const mstat = (mods: Mods, type: number, stat: MercStat): number =>
 
 /** 레벨업 카드로 쌓이는 강화 수치(배율은 1이 기본) */
 interface Mods {
+  legends: Set<LegendId>; // 고른 전설 능력
   goldMult: number;
   all: MercMods;
   type: MercMods[];
@@ -169,6 +178,7 @@ interface Mods {
 }
 
 const newMods = (): Mods => ({
+  legends: new Set(),
   goldMult: 1,
   all: newMercMods(),
   type: UNIT_TYPES.map(() => newMercMods()),
@@ -192,6 +202,8 @@ interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
+  haste: number; // 전장의 함성 중첩
+  hasteT: number;
   zones: number[]; // 진형: 병종별 구역
   spacing: number; // 진형 간격 배율
   revives: number; // 동료를 일으켜 세운 횟수
@@ -230,6 +242,8 @@ interface Merc extends Fighter {
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   flankT: number; // 기병이 우회 접근에 쓴 시간
   tier: number; // 강화 단계 0~4
+  nameId: number;
+  xp: number; // 강화에 쓰는 경험치
 }
 
 interface Bullet {
@@ -247,6 +261,7 @@ interface Bullet {
   pierce: number; // 더 뚫고 지나갈 수 있는 적 수
   crit: boolean;
   hitIds: Set<number>; // 이미 맞힌 적(관통 중 중복 피해 방지)
+  merc?: Merc; // 쏜 용병(경험치를 받는다)
 }
 
 interface Camp {
@@ -263,6 +278,7 @@ interface Friendly {
   y: number;
   radius: number;
   ownerId: number; // 반사 피해로 적을 처치했을 때 보상을 받을 플레이어
+  merc?: Merc; // 용병이면 그 용병(경험치)
   /** 공격을 받는다. 되돌려줄 피해(창병의 돌격 반사)를 돌려준다. */
   hit: (h: Hit) => number;
 }
@@ -328,6 +344,12 @@ export class Game {
     if (s) this.applyCard(s, effect);
   }
 
+  /** 테스트용: 용병에게 경험치를 바로 준다 */
+  grantMercXpForTest(mercId: number, amount: number): void {
+    const m = this.mercs.get(mercId);
+    if (m) this.gainMercXp(m, amount);
+  }
+
   /** 테스트용: 카드가 반영된 용병 능력치 */
   mercStatsForTest(mercId: number): UnitStats {
     return this.mercStats(this.mercs.get(mercId)!);
@@ -381,6 +403,7 @@ export class Game {
         xpNeed: xpNeeded(1),
         pending: 0,
         rerolls: REROLL_START,
+        legends: [],
         offer: [],
         priceMult: 1,
         leadership: START_LEADERSHIP,
@@ -396,6 +419,8 @@ export class Game {
       switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
+      haste: 0,
+      hasteT: 0,
       zones: [...DEFAULT_PRESETS[0]!.zones],
       spacing: DEFAULT_PRESETS[0]!.spacing,
       revives: 0,
@@ -574,6 +599,8 @@ export class Game {
       round(m.momentum, 100),
       round(m.regenT, 10),
       m.tier,
+      m.nameId,
+      Math.floor(m.xp),
     ]);
   }
 
@@ -805,7 +832,7 @@ export class Game {
 
   addMerc(owner: number, type: number, x: number, y: number, paid = 0): number {
     const id = this.nextEntityId++;
-    const merc: Merc = { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
+    const merc: Merc = { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier: 0, nameId: this.pickName(owner), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
     this.mercs.set(id, merc);
     merc.hp = this.mercStats(merc).hp; // 이미 받은 강화가 반영된 체력으로 시작한다
     merc.shield = this.mercStats(merc).shield;
@@ -816,6 +843,23 @@ export class Game {
     const id = this.nextEntityId++;
     this.camps.set(id, { id, x, y, left: CAMP_LIFETIME_SEC, offers });
     return id;
+  }
+
+  /** 같은 주인의 용병끼리 이름이 겹치지 않게 무작위로 짓는다 */
+  private pickName(owner: number): number {
+    const used = new Set<number>();
+    for (const m of this.mercs.values()) if (m.owner === owner) used.add(m.nameId);
+    let id = 0;
+    for (let i = 0; i < 20; i++) {
+      id = Math.floor(this.rng() * MERC_NAME_COUNT);
+      if (!used.has(id)) break;
+    }
+    return id;
+  }
+
+  private gainMercXp(m: Merc, amount: number): void {
+    if (amount <= 0 || m.tier >= MAX_TIER) return;
+    m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + amount);
   }
 
   getMerc(id: number): Readonly<Merc> | undefined {
@@ -869,6 +913,8 @@ export class Game {
   private stepPlayers(dt: number): void {
     for (const s of this.slots.values()) {
       const p = s.state;
+      s.hasteT = Math.max(0, s.hasteT - dt);
+      if (s.hasteT === 0) s.haste = 0;
       if (p.down) {
         p.chargeLeft = 0;
         continue;
@@ -927,6 +973,7 @@ export class Game {
     const damage = w.damage * s.mods.heroDmg * (crit ? s.mods.heroCritMult : 1);
     const reach = w.reach * s.mods.heroRange;
     s.fireCd = w.cooldown / s.mods.heroFireRate;
+    if (crit && s.mods.legends.has("stormfire")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
     if (w.ranged) {
       this.bullets.push({
         id: this.nextEntityId++,
@@ -955,7 +1002,7 @@ export class Game {
       struck.push(e);
     }
     for (const e of struck) this.damageEnemy(e, { damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x), crit }, p.id);
-    if (w.splash > 0) this.splashEnemies(struck, w.splash * s.mods.heroArea, damage * SPLASH_FACTOR, w.type, p.x, p.y, p.id);
+    if (w.splash > 0) this.splashEnemies(struck, w.splash * s.mods.heroArea, damage * this.splashFactor(s.mods), w.type, p.x, p.y, p.id);
   }
 
   /** 회피 판정: 피했으면 true(효과 표시를 띄운다) */
@@ -963,6 +1010,10 @@ export class Game {
     if (chance <= 0 || this.rng() >= Math.min(DODGE_MAX, chance)) return false;
     this.pushEvent(EVT_DODGE, x, y, 0);
     return true;
+  }
+
+  private splashFactor(mods: Mods): number {
+    return SPLASH_FACTOR * (mods.legends.has("splashBoost") ? LEGEND_CONST.splashMult : 1);
   }
 
   /** 치명타 판정(공격 한 번에 한 번) */
@@ -1057,7 +1108,9 @@ export class Game {
             { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
             h,
           );
-          p.hp -= r.body * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense));
+          const taken = r.body * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense));
+          p.hp -= taken;
+          this.thorns(s, h, taken);
           if (p.hp <= 0) {
             p.hp = 0;
             p.down = true;
@@ -1075,12 +1128,15 @@ export class Game {
         y: m.y,
         radius: MERC_STATS[m.type]!.radius,
         ownerId: m.owner,
+        merc: m,
         hit: (h) => {
           const mods = this.slots.get(m.owner)?.mods;
           if (this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y)) return 0;
           const r = resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
-          this.hurtMerc(m, r.body * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)));
+          const taken = r.body * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
+          this.hurtMerc(m, taken);
+          this.thorns(this.slots.get(m.owner), h, taken, m);
           return r.reflected;
         },
       });
@@ -1111,12 +1167,20 @@ export class Game {
   }
 
   private hurtMerc(m: Merc, amount: number): void {
+    if (amount <= 0) return;
+    this.gainMercXp(m, amount * MERC_XP_PER_HURT); // 맞을 때도 조금씩
     m.hp -= amount;
-    if (m.hp <= 0) {
-      m.hp = 0;
-      m.respawn = MERC_RESPAWN_SEC[m.type]! * (this.slots.get(m.owner) ? mstat(this.slots.get(m.owner)!.mods, m.type, "respawn") : 1);
-      m.atkT = 0;
+    if (m.hp > 0) return;
+    const owner = this.slots.get(m.owner);
+    // 불사의 군단: 쓰러지는 순간 확률로 체력 절반으로 되살아난다
+    if (owner?.mods.legends.has("undying") && this.rng() < LEGEND_CONST.undyingChance) {
+      m.hp = Math.max(1, this.mercStats(m).hp * 0.5);
+      this.pushEvent(EVT_REVIVE, m.x, m.y, 0);
+      return;
     }
+    m.hp = 0;
+    m.respawn = MERC_RESPAWN_SEC[m.type]! * (owner ? mstat(owner.mods, m.type, "respawn") : 1);
+    m.atkT = 0;
   }
 
   /** 기병의 속도: 움직이면 최대 속도를 향해 점점 오르고, 멈추면 줄어든다 */
@@ -1320,6 +1384,7 @@ export class Game {
     const crit = this.rollCrit(mstat(mods, m.type, "crit"));
     const critMult = CRIT_BASE_MULT + mstat(mods, m.type, "critMult");
     const dmg = st.damage * (crit ? critMult : 1);
+    if (crit && mods.legends.has("stormfire")) m.cd = 0;
     if (st.ranged) {
       this.bullets.push({
         id: this.nextEntityId++,
@@ -1336,10 +1401,11 @@ export class Game {
         pierce: Math.round(mstat(mods, m.type, "pierce")),
         crit,
         hitIds: new Set(),
+        merc: m,
       });
       return;
     }
-    const charge = m.type === CAVALRY ? m.chargeSnap : 0;
+    const charge = m.type === CAVALRY ? m.chargeSnap * (mods.legends.has("chargeBoost") ? LEGEND_CONST.chargeMult : 1) : 0;
     if (m.type === CAVALRY) {
       m.evadeT = CAV_EVADE_SEC; // 치고 빠지기
       m.momentum *= CAV_MOMENTUM_AFTER_HIT; // 부딪히면 속도를 잃는다
@@ -1353,41 +1419,70 @@ export class Game {
     }
     let reflected = 0;
     for (const e of struck) {
-      reflected += this.damageEnemy(e, { damage: dmg, charge, srcType: m.type, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit }, m.owner);
+      reflected += this.damageEnemy(e, { damage: dmg, charge, srcType: m.type, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit }, m.owner, m);
     }
-    if (st.splash > 0) this.splashEnemies(struck, st.splash, dmg * SPLASH_FACTOR, m.type, m.x, m.y, m.owner);
+    if (st.splash > 0) this.splashEnemies(struck, st.splash, dmg * this.splashFactor(mods), m.type, m.x, m.y, m.owner, m);
     if (reflected > 0) this.hurtMerc(m, reflected); // 창병에게 돌격하면 그 피해가 자신에게 돌아온다
   }
 
   /** 범위 공격: 맞힌 대상들 주변의 다른 적에게 일부 피해를 준다 */
-  private splashEnemies(struck: Enemy[], radius: number, damage: number, srcType: number, fromX: number, fromY: number, ownerId: number): void {
+  private splashEnemies(struck: Enemy[], radius: number, damage: number, srcType: number, fromX: number, fromY: number, ownerId: number, src?: Merc): void {
     const hit = new Set(struck.map((e) => e.id));
     for (const e of [...this.enemies.values()]) {
       if (hit.has(e.id)) continue;
       if (!struck.some((s) => Math.hypot(s.x - e.x, s.y - e.y) <= radius)) continue;
-      this.damageEnemy(e, { damage, charge: 0, srcType, fromAngle: Math.atan2(fromY - e.y, fromX - e.x) }, ownerId);
+      this.damageEnemy(e, { damage, charge: 0, srcType, fromAngle: Math.atan2(fromY - e.y, fromX - e.x) }, ownerId, src);
     }
   }
 
-  /** 적이 공격을 받는다. 방패·창병 반사 규칙을 적용하고, 되돌려줄 피해를 돌려준다. */
-  private damageEnemy(e: Enemy, hit: Hit, ownerId: number): number {
+  /** 적이 공격을 받는다. 방패·창병 반사 규칙을 적용하고, 되돌려줄 피해를 돌려준다. src는 때린 용병(없으면 주인공). */
+  private damageEnemy(e: Enemy, hit: Hit, ownerId: number, src?: Merc): number {
+    const owner = this.slots.get(ownerId);
+    const legends = owner?.mods.legends;
+    // 처형: 체력이 얼마 안 남은 적에게는 피해가 몇 배로 들어간다
+    if (legends?.has("execute") && e.hp < e.maxHp * LEGEND_CONST.executeBelow) hit = { ...hit, damage: hit.damage * LEGEND_CONST.executeMult };
     const r = resolveHit({ type: e.type, shield: e.shield, face: e.face }, hit);
     this.applyShield(e, r.shield, r.shieldBroke);
+    const dealt = Math.min(r.body, Math.max(0, e.hp));
     e.hp -= r.body;
+    if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
+    if (legends?.has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
-    if (e.hp <= 0) this.killEnemy(e, ownerId);
+    if (e.hp <= 0) this.killEnemy(e, ownerId, src);
     return r.reflected;
   }
 
-  /** 되돌려받은 피해(방패·방어와 무관하게 몸에 직접 들어간다) */
-  private reflectToEnemy(e: Enemy, amount: number, ownerId: number): void {
-    e.hp -= amount;
-    if (e.hp <= 0) this.killEnemy(e, ownerId);
+  /** 피의 갈증: 때린 쪽(용병 또는 주인공)이 체력을 회복한다 */
+  private lifesteal(owner: Slot, src: Merc | undefined, amount: number): void {
+    if (src) {
+      if (src.respawn <= 0) src.hp = Math.min(this.mercStats(src).hp, src.hp + amount);
+    } else if (!owner.state.down) {
+      owner.state.hp = Math.min(owner.state.maxHp, owner.state.hp + amount);
+    }
   }
 
-  private killEnemy(e: Enemy, ownerId: number): void {
+  /** 되돌려받은 피해(방패·방어와 무관하게 몸에 직접 들어간다) */
+  private reflectToEnemy(e: Enemy, amount: number, ownerId: number, src?: Merc): void {
+    if (src) this.gainMercXp(src, amount * MERC_XP_PER_DAMAGE);
+    e.hp -= amount;
+    if (e.hp <= 0) this.killEnemy(e, ownerId, src);
+  }
+
+  /** 가시 갑옷: 받은 피해의 일부를 공격자에게 돌려준다 */
+  private thorns(owner: Slot | undefined, h: Hit, taken: number, src?: Merc): void {
+    if (!owner?.mods.legends.has("thorns") || taken <= 0 || !h.src) return;
+    const attacker = h.src as Enemy;
+    if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, taken * LEGEND_CONST.thornsFrac, owner.state.id, src);
+  }
+
+  private killEnemy(e: Enemy, ownerId: number, src?: Merc): void {
     if (!this.enemies.delete(e.id)) return; // 이미 쓰러짐
     const owner = this.slots.get(ownerId);
+    if (src) this.gainMercXp(src, MERC_XP_KILL * (e.boss ? 4 : 1)); // 막타는 경험치를 크게 준다
+    if (owner?.mods.legends.has("warcry")) {
+      owner.haste = Math.min(LEGEND_CONST.warcryMax, owner.haste + 1);
+      owner.hasteT = LEGEND_CONST.warcrySec;
+    }
     if (owner) {
       owner.state.kills++;
       owner.state.gold += Math.round((ENEMY_GOLD[e.type] ?? 0) * owner.mods.goldMult * (e.boss ? 5 : 1));
@@ -1462,7 +1557,10 @@ export class Game {
     for (const m of this.mercs.values()) if (m.owner === s.state.id) owned.add(m.type);
     const count = (t: number) => [...this.mercs.values()].filter((m) => m.owner === s.state.id && m.type === t).length;
     let eligible = CARDS.map((c, i) => ({ c, i })).filter(
-      ({ c }) => (c.minLevel ?? 1) <= s.state.level && (c.unitType === undefined || owned.has(c.unitType)),
+      ({ c }) =>
+        (c.minLevel ?? 1) <= s.state.level &&
+        (c.unitType === undefined || owned.has(c.unitType)) &&
+        !(c.unique && c.effect.k === "legend" && s.state.legends.includes(c.effect.id)),
     );
     // 새로고침은 방금 본 카드를 빼고 뽑는다(남는 카드가 모자라면 그대로 둔다)
     const fresh = eligible.filter(({ i }) => !exclude.includes(i));
@@ -1501,6 +1599,12 @@ export class Game {
         else target[e.stat] += e.v;
         break;
       }
+      case "legend":
+        if (!m.legends.has(e.id)) {
+          m.legends.add(e.id);
+          p.legends.push(e.id);
+        }
+        break;
       case "heroMaxHp":
         p.maxHp += e.v;
         p.hp += e.v;
@@ -1538,7 +1642,7 @@ export class Game {
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
       damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]!,
-      cooldown: base.cooldown / mstat(mods, t, "atkSpeed"),
+      cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste ?? 0))),
       speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
       reach: base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier),
       splash: base.splash * area * (1 + TIER_AREA[t]! * tier),
@@ -1553,11 +1657,14 @@ export class Game {
     if (!s || s.state.down) return { ok: false, reason: "지금은 강화할 수 없습니다" };
     if (!m || m.owner !== playerId) return { ok: false, reason: "그 용병을 찾을 수 없습니다" };
     if (m.tier >= MAX_TIER) return { ok: false, reason: "이미 최고 단계입니다" };
+    const need = mercXpNeed(m.tier);
+    if (m.xp < need) return { ok: false, reason: `경험치가 부족합니다 (${Math.floor(m.xp)}/${need})` };
     const cost = upgradeCost(m.type, m.tier)!;
     if (s.state.gold < cost) return { ok: false, reason: `금화가 부족합니다 (${cost}G 필요)` };
     const before = this.mercStats(m);
     s.state.gold -= cost;
     m.paid += cost;
+    m.xp = Math.max(0, m.xp - need);
     m.tier++;
     const after = this.mercStats(m);
     if (m.respawn <= 0) {
@@ -1660,14 +1767,14 @@ export class Game {
       struck.push(f);
     }
     for (const f of struck) {
-      const back = f.hit({ damage: st.damage * e.dmgMult, charge: charge * e.dmgMult, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x) });
-      if (back > 0) this.reflectToEnemy(e, back, f.ownerId); // 창병이 돌격을 되돌려준다
+      const back = f.hit({ damage: st.damage * e.dmgMult, charge: charge * e.dmgMult, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x), src: e });
+      if (back > 0) this.reflectToEnemy(e, back, f.ownerId, f.merc); // 창병이 돌격을 되돌려준다
     }
     if (st.splash > 0) {
       for (const f of friendlies) {
         if (struck.includes(f)) continue;
         if (!struck.some((s) => Math.hypot(s.x - f.x, s.y - f.y) <= st.splash)) continue;
-        f.hit({ damage: st.damage * e.dmgMult * SPLASH_FACTOR, charge: 0, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x) });
+        f.hit({ damage: st.damage * e.dmgMult * SPLASH_FACTOR, charge: 0, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x), src: e });
       }
     }
   }
@@ -1733,10 +1840,11 @@ export class Game {
           for (const e of [...this.enemies.values()]) {
             if (b.hitIds.has(e.id) || Math.hypot(e.x - px, e.y - py) > b.radius + radiusOf(e)) continue;
             b.hitIds.add(e.id);
-            this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit }, b.owner);
+            this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit }, b.owner, b.merc);
             this.pushEvent(EVT_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             if (b.pierce > 0) {
               b.pierce--; // 뚫고 지나가 다음 적을 노린다
+              if (this.slots.get(b.owner)?.mods.legends.has("pierceRamp")) b.damage *= LEGEND_CONST.pierceRamp;
               continue;
             }
             hit = true;

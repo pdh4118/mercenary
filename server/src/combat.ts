@@ -21,6 +21,7 @@ export interface Hit {
   srcType: number; // 공격자 병종(방패 피해 배율에 쓴다). 병종 없음은 -1
   fromAngle: number; // 방어자 위치에서 공격자(또는 날아온 쪽)를 바라본 방향
   crit?: boolean; // 치명타(이미 피해에 반영됨. 표시용)
+  src?: unknown; // 공격자(가시 갑옷이 되돌릴 대상)
 }
 
 export interface HitResult {

@@ -1,7 +1,7 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture } from "pixi.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
-import { createMercPanel } from "./mercpanel.js";
+import { createMercPanel, isReady } from "./mercpanel.js";
 import {
   CARDS,
   CARD_CATEGORY_NAMES,
@@ -26,6 +26,7 @@ import {
   REVIVE_RADIUS,
   STAGE_COUNT,
   MERC_STATS,
+  mercName,
   PLAYER_RADIUS,
   TICK_RATE,
   UNIT_COST,
@@ -218,6 +219,7 @@ async function main() {
     bar: Graphics;
     sprite: Sprite;
     lastKey: string;
+    label: Text;
   }
   const mercs = new Pool<MercView, MercWire>(
     (w) => {
@@ -234,9 +236,13 @@ async function main() {
       const sprite = new Sprite(t);
       sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       const bar = new Graphics();
-      node.addChild(ring, sprite, bar);
+      const label = new Text({ text: mercName(w[16]), style: { fill: 0xffffff, fontSize: 11, stroke: { color: 0x000000, width: 3 } } });
+      label.anchor.set(0.5, 1);
+      label.y = -t.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 18;
+      label.visible = false;
+      node.addChild(ring, sprite, bar, label);
       mercLayer.addChild(node);
-      return { node, bar, sprite, x: 0, y: 0, lastKey: "", lastX: w[1], face: 1 };
+      return { node, bar, sprite, label, x: 0, y: 0, lastKey: "", lastX: w[1], face: 1 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -332,7 +338,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -351,7 +357,7 @@ async function main() {
   const CARD_H = 96;
   const CARD_GAP = 8;
   const ART = 72;
-  const CATEGORY_COLORS = [0xe0c05d, 0x6fd16f, 0x5da6e0];
+  const CATEGORY_COLORS = [0xe0c05d, 0x6fd16f, 0x5da6e0, 0xff7a2e];
   const cardArt = await Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/cards/art_${f}.png`)));
   /** 카드 일러스트: 병종 단련은 그 병종, 그 밖은 비슷한 성격의 그림을 빌려 쓴다. 없으면 글자 아이콘(-1). */
   const artOf = (c: (typeof CARDS)[number]): number => {
@@ -412,8 +418,8 @@ async function main() {
     desc.position.set(ART + 26, 46);
     const starOn = new Text({ text: "", style: { fill: 0xffd45d, fontSize: 13 } });
     const starOff = new Text({ text: "", style: { fill: 0x3b4152, fontSize: 13 } });
-    starOn.position.set(CARD_W - 62, CARD_H - 22);
-    starOff.position.set(CARD_W - 62, CARD_H - 22);
+    starOn.position.set(CARD_W - 70, 7);
+    starOff.position.set(CARD_W - 70, 7);
     node.addChild(bg, artSprite, artMask, artFrame, glyph, keyBg, key, tag, title, desc, starOff, starOn);
     cardPanel.addChild(node);
     return { node, bg, artSprite, artFrame, glyph, tag, title, desc, starOn, starOff };
@@ -532,7 +538,15 @@ async function main() {
       toastLeft = 2;
     },
   });
-  const mercPanel = createMercPanel({ send, colors: TYPE_COLORS });
+  let showNames = false;
+  const mercPanel = createMercPanel({
+    send,
+    colors: TYPE_COLORS,
+    notify: (text) => {
+      toast.text = text;
+      toastLeft = 2.5;
+    },
+  });
   const lobby = createLobby({
     send,
     onEnter: (id) => {
@@ -651,6 +665,10 @@ async function main() {
       formations.apply(Number(e.key[1]) - 1);
       return;
     }
+    if (k === "n" && !e.repeat) {
+      showNames = !showNames;
+      return;
+    }
     if (k === "u" && !e.repeat) {
       mercPanel.toggle();
       return;
@@ -757,11 +775,13 @@ async function main() {
       const grow = 1 + 0.05 * w[15]; // 강화할수록 조금 커진다
       v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
       v.node.zIndex = v.y;
-      const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}/${w[15]}`;
+      v.label.visible = showNames || mercPanel.hovered() === w[0];
+      const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}/${w[15]}/${isReady(w) ? 1 : 0}`;
       if (v.lastKey !== key) {
         v.lastKey = key;
         const top = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 6;
         drawBar(v.bar, w[3], w[9], 26, top);
+        if (isReady(w)) v.bar.poly([0, top - 20, -5, top - 13, 5, top - 13]).fill(0xffd45d).stroke({ width: 1, color: 0x000000 }); // 강화 가능 표시
         for (let i = 0; i < w[15]; i++) v.bar.circle(-10 + i * 6, top - (w[11] > 0 ? 12 : 7), 2.2).fill(0xffd45d); // 강화 단계 점
         if (w[11] > 0) {
           // 방패 체력: 몸 체력 막대 위에 파란색으로. 깨졌으면 비어 보인다.

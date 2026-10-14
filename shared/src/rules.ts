@@ -157,7 +157,7 @@ export function angleDiff(a: number, b: number): number {
 export const ENEMY_XP = [3, 2.5, 2.5, 3, 4] as const; // 병종별 처치 경험치
 export const XP_TEAM_SHARE = 0.5; // 팀 공유 비율. 나머지(0.5)는 처치한 사람 몫
 export function xpNeeded(level: number): number {
-  return 20 + 22 * (level - 1);
+  return 12 + 9 * (level - 1); // 레벨업이 잦도록 낮게 잡았다
 }
 
 // 레벨업 순간의 밀어내기: 주변 적을 밀쳐 내고 잠깐 공격하지 못하게 한다(카드를 고를 숨 돌릴 틈)
@@ -170,7 +170,7 @@ export const LEVELUP_STUN_SEC = 0.8;
 export const STAGE_COUNT = 10;
 export const STAGE_GROW_SEC = 180; // 스테이지당 자유 성장 시간
 export const STAGE_BREAK_SEC = 10; // 클리어 뒤 쉬는 시간(회복·부활·보상)
-export const STAGE_ENEMY_HP_GROWTH = 0.18; // 스테이지가 오를 때마다 적 체력 +18%
+export const STAGE_ENEMY_HP_GROWTH = 0.22; // 스테이지가 오를 때마다 적 체력 +22%
 export const STAGE_ENEMY_DMG_GROWTH = 0.1; // 적 피해 +10%
 export const STAGE_SPAWN_GROWTH = 0.12; // 일반 적 생성량 +12%
 export const STAGE_CLEAR_GOLD = 40; // 클리어 보상 금화 = 이 값 x 스테이지 (모든 플레이어에게)

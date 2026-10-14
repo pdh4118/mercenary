@@ -1,4 +1,4 @@
-import { UNIT_COST, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
+import { UNIT_COST, mercName, mercXpNeed, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -12,14 +12,19 @@ export interface MercPanel {
   hovered(): number;
 }
 
-/** 내 용병 목록과 한 명씩 강화하는 패널(U). 게임은 멈추지 않는다. */
-export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readonly number[] }): MercPanel {
+/** 강화할 수 있는 상태인가: 경험치를 다 채웠고 최고 단계가 아니다 */
+export const isReady = (w: MercWire): boolean => w[8] <= 0 && w[15] < 4 && w[17] >= mercXpNeed(w[15]);
+
+/** 내 용병 목록과 한 명씩 강화하는 패널(U). 경험치를 채운 용병만 강화 버튼이 뜬다. 게임은 멈추지 않는다. */
+export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readonly number[]; notify(text: string): void }): MercPanel {
   const panel = $("mercPanel");
   const list = $("mercList");
   const title = $("mercTitle");
   let sig = "";
   let hover = -1;
   let visible = false;
+  let ready = new Set<number>();
+  let first = true;
   const hex = (c: number) => "#" + c.toString(16).padStart(6, "0");
 
   return {
@@ -27,20 +32,31 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
     isOpen: () => panel.classList.contains("open"),
     show(v) {
       visible = v;
-      if (!v) panel.classList.remove("open");
+      if (!v) {
+        panel.classList.remove("open");
+        first = true;
+        ready = new Set();
+      }
     },
     hovered: () => hover,
     update(mercs, myId, gold) {
-      if (!visible || !panel.classList.contains("open")) return;
-      const mine = mercs.filter((w) => w[5] === myId).sort((a, b) => a[4] - b[4] || b[15] - a[15] || a[0] - b[0]);
-      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${w[8] > 0 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}`).join("|");
+      if (!visible) return;
+      const mine = mercs.filter((w) => w[5] === myId);
+      // 경험치를 다 채운 용병이 새로 생기면 알려 준다
+      const nowReady = new Set(mine.filter(isReady).map((w) => w[0]));
+      if (!first) for (const w of mine) if (nowReady.has(w[0]) && !ready.has(w[0])) opts.notify(`${mercName(w[16])} 강화 가능! (U)`);
+      ready = nowReady;
+      first = false;
+      if (!panel.classList.contains("open")) return;
+      mine.sort((a, b) => Number(isReady(b)) - Number(isReady(a)) || a[4] - b[4] || b[15] - a[15] || a[0] - b[0]);
+      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${w[8] > 0 ? 1 : 0}:${w[17]}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}`).join("|");
       if (next === sig) return;
       sig = next;
-      title.textContent = `내 용병 ${mine.length}명 · 금화 ${gold}G`;
+      title.textContent = `내 용병 ${mine.length}명 · 금화 ${gold}G · 강화 가능 ${nowReady.size}`;
       list.replaceChildren();
       hover = -1;
       for (const w of mine) {
-        const [id, , , hp, type, , , , respawn, maxHp, , , , , , tier] = w;
+        const [id, , , hp, type, , , , respawn, maxHp, , , , , , tier, nameId, xp] = w;
         const row = document.createElement("div");
         row.className = "mrow";
         row.onmouseenter = () => (hover = id);
@@ -51,22 +67,41 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
         const name = document.createElement("div");
         name.className = "grow";
         const nm = document.createElement("div");
-        nm.textContent = `${tierName(type, tier)} ${"★".repeat(tier)}`;
+        nm.textContent = `${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}`;
         const sub = document.createElement("div");
         sub.className = "stat";
         sub.textContent = respawn > 0 ? `쓰러짐 (${Math.ceil(respawn)}초)` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${UNIT_COST[type]}`;
         name.append(nm, sub);
-        const btn = document.createElement("button");
+        const need = mercXpNeed(tier);
+        if (Number.isFinite(need)) {
+          const bar = document.createElement("div");
+          bar.className = "xpbar";
+          const fill = document.createElement("div");
+          fill.style.width = `${Math.min(100, (100 * xp) / need)}%`;
+          if (xp >= need) fill.className = "full";
+          bar.append(fill);
+          name.append(bar);
+        }
+        row.append(dot, name);
         const cost = upgradeCost(type, tier);
         if (cost === null) {
-          btn.textContent = "최고 단계";
-          btn.disabled = true;
-        } else {
+          const t = document.createElement("span");
+          t.className = "stat";
+          t.textContent = "최고 단계";
+          row.append(t);
+        } else if (xp >= need) {
+          const btn = document.createElement("button");
           btn.textContent = `${tierName(type, tier + 1)} ${cost}G`;
-          btn.disabled = gold < cost;
+          btn.className = "primary";
+          btn.disabled = gold < cost || respawn > 0;
           btn.onclick = () => opts.send({ t: "upgrade", merc: id });
+          row.append(btn);
+        } else {
+          const t = document.createElement("span");
+          t.className = "stat";
+          t.textContent = `경험치 ${xp}/${need}`;
+          row.append(t);
         }
-        row.append(dot, name, btn);
         list.append(row);
       }
       if (mine.length === 0) {

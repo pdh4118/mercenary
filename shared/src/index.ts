@@ -4,6 +4,7 @@ export * from "./rules.js";
 export * from "./cards.js";
 export * from "./formation.js";
 export * from "./tiers.js";
+export * from "./names.js";
 import { ARCHER, BLUNT, SHIELD, SPEAR } from "./rules.js";
 
 export const TICK_RATE = 20; // 서버가 초당 계산·전송하는 횟수
@@ -59,7 +60,7 @@ export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 �
 // 적 생성
 export const ENEMY_SPAWN_DISTANCE = 650; // 플레이어로부터 이 거리(화면 밖)에서 생성
 export const ENEMY_MAX = 400;
-export const ENEMY_SPAWN_BASE_PER_SEC = 0.9; // 플레이어 1명당
+export const ENEMY_SPAWN_BASE_PER_SEC = 1.1; // 플레이어 1명당
 export const ENEMY_SPAWN_GROWTH_PER_SEC = 0.012; // 시간이 지날수록 초당 늘어나는 양
 
 export interface PlayerState {
@@ -79,6 +80,7 @@ export interface PlayerState {
   xpNeed: number; // 다음 레벨까지 필요한 경험치
   pending: number; // 아직 고르지 않은 레벨업 선택 횟수
   rerolls: number; // 남은 카드 새로고침 횟수
+  legends: string[]; // 고른 전설 능력(LegendId)
   offer: number[]; // 지금 고를 수 있는 카드(CARDS 인덱스). 없으면 빈 배열
   priceMult: number; // 고용 가격 배율(할인 카드)
   leadership: number; // 통솔력(보유할 수 있는 용병 비용 합의 최대치)
@@ -125,6 +127,8 @@ export type MercWire = [
   mom: number,
   regen: number,
   tier: number, // 강화 단계 0~4
+  nameId: number, // mercName()으로 이름을 얻는다
+  xp: number, // 용병 경험치(다음 단계 필요량은 mercXpNeed)
 ];
 /** 서버가 알려 주는 순간 효과(그 틱에 일어난 일): [종류, x, y, 방향] */
 export const EVT_ARROW_HIT = 0; // 아군 화살 명중
