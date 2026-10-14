@@ -108,7 +108,7 @@ export const START_LEADERSHIP = 5;
 /** 통솔력과 별개로 개체 수를 묶어 두는 안전 한도 */
 export const MAX_MERCS_PER_PLAYER = 16;
 /** 쓰러진 뒤 부활까지(초). 기병은 유지 부담으로 더 오래 걸린다. */
-export const MERC_RESPAWN_SEC = [60, 45, 45, 45, 45] as const;
+export const MERC_RESPAWN_SEC = [40, 30, 30, 30, 30] as const;
 export const DISMISS_REFUND = 0.5; // 해고하면 지불한 금화의 이 비율을 돌려받는다
 export const START_GOLD = 100;
 
