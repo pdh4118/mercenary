@@ -408,6 +408,7 @@ export class RoomManager {
         players: room.game.snapshotPlayers(),
         mercs: room.game.snapshotMercs(),
         camps: room.game.snapshotCamps(),
+        chests: room.game.snapshotChests(),
         enemies: room.game.snapshotEnemies(),
         bullets: room.game.snapshotBullets(),
         g: room.game.info(),

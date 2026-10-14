@@ -81,7 +81,8 @@ export interface PlayerState {
   level: number;
   xp: number; // 현재 레벨에서 모은 경험치
   xpNeed: number; // 다음 레벨까지 필요한 경험치
-  pending: number; // 아직 고르지 않은 레벨업 선택 횟수
+  pending: number; // 아직 고르지 않은 카드 선택 횟수(레벨업 + 보상 상자)
+  box: number; // 그중 보상 상자에서 나온 선택 횟수(상자가 먼저 나온다)
   rerolls: number; // 남은 카드 새로고침 횟수
   legends: string[]; // 고른 전설 능력(LegendId)
   luck: number; // 행운(높은 등급 카드 확률)
@@ -153,7 +154,7 @@ export const EVT_DMG_SHIELD = 10; // 적의 방패가 흡수한 피해
 export const EVT_DMG_ALLY = 11; // 아군(주인공·용병)이 입은 피해
 export type EventWire = [kind: number, x: number, y: number, ang: number, val: number, owner: number];
 
-export type StagePhase = "grow" | "boss" | "break";
+export type StagePhase = "grow" | "boss" | "break" | "tournament";
 export type GameStatus = "playing" | "victory" | "defeat";
 /** 진행 상황: 스테이지, 단계(성장/보스/휴식), 남은 시간, 보스군 상태 */
 export interface GameInfo {
@@ -166,6 +167,29 @@ export interface GameInfo {
   armyLeft: number; // 남은 보스군 병력(장군 포함)
   armyTotal: number;
   squads: number; // 지금 다가오는 소대 수
+  tour?: TourInfo | null; // 토너먼트 단계에서만
+}
+
+/** 토너먼트 진행 상황(토너먼트 단계일 때만 있다) */
+export interface TourMatchInfo {
+  a: string; // 선수 이름(자리가 비면 "")
+  b: string;
+  w: 0 | 1 | 2; // 0=아직, 1=a 승, 2=b 승(부전승 포함)
+}
+export interface TourInfo {
+  title: string; // 라운드 이름(결승, 준결승, 8강...)
+  step: "intro" | "fight" | "outro" | "end";
+  t: number; // 이 단계가 끝나기까지 남은 초
+  a: number; // 지금 경기 선수 번호(없으면 0)
+  b: number;
+  an: string;
+  bn: string;
+  ha: number; // 선수의 남은 전력 비율 0..100(주인공+용병 체력 합)
+  hb: number;
+  winner: string; // 방금 끝난 경기의 승자 이름(결과 표시 단계)
+  champion: string; // 우승자(end 단계)
+  rounds: { title: string; matches: TourMatchInfo[] }[];
+  now: [round: number, match: number]; // 지금 진행 중인 경기 위치
 }
 
 export interface ResultPlayer {
@@ -179,9 +203,13 @@ export interface ResultPlayer {
   mercDeaths: number; // 용병이 쓰러진 횟수
   mercs: number; // 끝났을 때 거느린 용병 수
   gold: number; // 번 금화 합(보상 포함)
+  wins: number; // 토너먼트 경기 승리 수
+  champion: number; // 토너먼트 우승 횟수
 }
 
 export type BulletWire = [id: number, x: number, y: number, team: 0 | 1]; // team 1 = 적 투사체
+/** 보스 보상 상자: id, x, y, 주인 번호, 남은 초 */
+export type ChestWire = [id: number, x: number, y: number, owner: number, left: number];
 export type CampWire = [id: number, x: number, y: number, left: number, offer0: number, offer1: number, offer2: number];
 
 export interface PlayerInput {
@@ -252,6 +280,7 @@ export type ServerMsg =
       g: GameInfo;
       ev: EventWire[];
       camps: CampWire[];
+      chests: ChestWire[];
     };
 
 /** 클라이언트 입력은 신뢰하지 않는다: 범위를 자르고, 대각선 속도가 빨라지지 않게 정규화한다. */

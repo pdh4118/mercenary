@@ -191,7 +191,7 @@ export const LEVELUP_STUN_SEC = 0.8;
 // --- 스테이지와 보스군 -----------------------------------------------------------
 // 스테이지마다 자유 성장 시간(적이 계속 몰려옴) → 보스군 진격 → 보스(장군)를 쓰러뜨리면 클리어. 10스테이지를 모두 깨면 승리.
 export const STAGE_COUNT = 10;
-export const STAGE_GROW_SEC = 180; // 스테이지당 자유 성장 시간
+export const STAGE_GROW_SEC = 150; // 스테이지당 자유 성장 시간(2분 30초)
 export const STAGE_BREAK_SEC = 10; // 클리어 뒤 쉬는 시간(회복·부활·보상)
 export const STAGE_ENEMY_HP_GROWTH = 0.3; // 스테이지가 오를 때마다 적 체력 +30%
 export const STAGE_ENEMY_DMG_GROWTH = 0.14; // 적 피해 +14%
@@ -234,6 +234,31 @@ export const BOSS_HP_PER_STAGE = 2.5;
 export const BOSS_DMG_MULT = 1.6;
 export const BOSS_SIZE = 1.7; // 반경·그림 크기 배율
 export const BOSS_SPEED_MULT = 0.9;
+
+// 보스를 못 잡아도 보스군이 나타난 지 이만큼 지나면 다음 스테이지로 넘어간다(보스군은 사라지고 보상은 없다). 마지막 스테이지는 예외.
+export const BOSS_TIMEOUT_SEC = 60;
+// 보스를 쓰러뜨리면 접속한 인원 수만큼 상자가 떨어진다. 상자마다 주인이 있고, 주인이 다가가면 열려 카드 한 장을 고른다(레벨업과 별개).
+export const CHEST_OPEN_RADIUS = 60;
+export const CHEST_LIFETIME_SEC = 300;
+export const CHEST_LUCK_BONUS = 1.5; // 상자 카드는 행운이 이만큼 더해진 것처럼 높은 등급이 잘 나온다
+
+// --- 토너먼트 ----------------------------------------------------------------------
+// 이 스테이지의 보스를 쓰러뜨리면 남은 적을 모두 없애고, 접속한 플레이어끼리 1대1 토너먼트를 연다(2명 이상일 때).
+// 각자 자기 용병을 데리고 싸우고, 주인공이 쓰러지면 진다. 시간이 다 되면 남은 체력 비율이 높은 쪽이 이긴다.
+export const TOURNAMENT_STAGES = [3, 6, 9, 10] as const;
+export const TOURNAMENT_INTRO_SEC = 5; // 대진 소개(움직일 수 없다)
+export const TOURNAMENT_MATCH_SEC = 60; // 한 경기 제한 시간
+export const TOURNAMENT_OUTRO_SEC = 4; // 경기 뒤 결과 표시
+export const TOURNAMENT_END_SEC = 7; // 우승자 발표
+export const TOURNAMENT_ARENA_RADIUS = 450; // 경기장 반지름(px). 월드 중앙
+export const TOURNAMENT_START_DIST = 300; // 두 선수가 중앙에서 떨어져 서는 거리
+export const TOURNAMENT_WIN_GOLD = 30; // 경기 승리 보상 금화 = 이 값 x 스테이지
+export const TOURNAMENT_CHAMPION_GOLD = 100; // 우승 보상 금화 = 이 값 x 스테이지
+export const TOURNAMENT_CHAMPION_XP = 60; // 우승 보상 경험치 = 이 값 x 스테이지
+export const TOURNAMENT_RUNNERUP_GOLD = 50; // 준우승 보상 금화 = 이 값 x 스테이지
+export const isTournamentStage = (stage: number): boolean => (TOURNAMENT_STAGES as readonly number[]).includes(stage);
+/** n명이 겨루는 토너먼트의 라운드 이름: 결승, 준결승, 8강... (roundsLeft는 이 라운드를 포함해 남은 라운드 수) */
+export const tournamentRoundName = (roundsLeft: number): string => (roundsLeft <= 1 ? "결승" : roundsLeft === 2 ? "준결승" : `${2 ** roundsLeft}강`);
 
 // --- 쓰러짐과 부활 ---------------------------------------------------------------
 // 주인공은 체력이 0이 되면 쓰러지고 저절로 일어나지 않는다. 다른 주인공이 곁에서 부활 키를 누르고 있으면 일으켜 세울 수 있다.

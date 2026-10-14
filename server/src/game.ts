@@ -130,6 +130,9 @@ import {
   sanitizeFormation,
   type BulletWire,
   type CampWire,
+  type ChestWire,
+  type TourInfo,
+  type TourMatchInfo,
   type EnemyWire,
   type EventWire,
   type GameInfo,
@@ -138,6 +141,22 @@ import {
   type StagePhase,
   type MercWire,
   type MercStat,
+  BOSS_TIMEOUT_SEC,
+  CHEST_LIFETIME_SEC,
+  CHEST_LUCK_BONUS,
+  CHEST_OPEN_RADIUS,
+  TOURNAMENT_ARENA_RADIUS,
+  TOURNAMENT_CHAMPION_GOLD,
+  TOURNAMENT_CHAMPION_XP,
+  TOURNAMENT_END_SEC,
+  TOURNAMENT_INTRO_SEC,
+  TOURNAMENT_MATCH_SEC,
+  TOURNAMENT_OUTRO_SEC,
+  TOURNAMENT_RUNNERUP_GOLD,
+  TOURNAMENT_START_DIST,
+  TOURNAMENT_WIN_GOLD,
+  isTournamentStage,
+  tournamentRoundName,
   CAMP_TIER_SEC,
   SHAKEN_DEATHS,
   SQUAD_CLEAR_GOLD,
@@ -262,7 +281,7 @@ interface Slot {
   zones: number[]; // 진형: 병종별 구역
   spacing: number; // 진형 간격 배율
   revives: number; // 동료를 일으켜 세운 횟수
-  stats: { dealt: number; taken: number; downs: number; mercDeaths: number; gold: number }; // 기록용 누적
+  stats: { dealt: number; taken: number; downs: number; mercDeaths: number; gold: number; wins: number; champion: number }; // 기록용 누적
   facing: number; // 진형이 바라보는 방향. 조준 방향을 천천히 따라간다
 }
 
@@ -340,6 +359,31 @@ interface Friendly {
   hit: (h: Hit) => number;
 }
 
+interface Chest {
+  id: number;
+  x: number;
+  y: number;
+  owner: number;
+  left: number;
+}
+
+interface TourMatch {
+  a: number; // 선수 번호(0이면 빈자리: 부전승)
+  b: number;
+  an: string;
+  bn: string;
+  w: 0 | 1 | 2;
+}
+interface Tournament {
+  rounds: { title: string; matches: TourMatch[] }[];
+  r: number; // 지금 라운드
+  m: number; // 지금 경기
+  step: "intro" | "fight" | "outro" | "end";
+  t: number; // 이 단계에서 남은 초
+  winner: string;
+  champion: string;
+}
+
 /** 시험 플레이용: MERC_STAGE_GROW_SEC=20 처럼 지정하면 성장 시간이 짧아진다 */
 const GROW_SEC = Number(process.env.MERC_STAGE_GROW_SEC) > 0 ? Number(process.env.MERC_STAGE_GROW_SEC) : STAGE_GROW_SEC;
 /** 시험 플레이용: MERC_SQUAD_FIRST_SEC=3 처럼 지정하면 첫 소대가 빨리 온다 */
@@ -367,6 +411,10 @@ export class Game {
   private enemies = new Map<number, Enemy>();
   private mercs = new Map<number, Merc>();
   private camps = new Map<number, Camp>();
+  private chests = new Map<number, Chest>();
+  private tour: Tournament | null = null;
+  private tourPending = false; // 보스를 잡은 직후, 다음 틱에 토너먼트를 연다
+  private bossT = 0; // 보스 단계가 시작된 뒤 흐른 시간
   private bullets: Bullet[] = [];
   private nextId = 1;
   private nextEntityId = 1;
@@ -468,6 +516,7 @@ export class Game {
         xp: 0,
         xpNeed: xpNeeded(1),
         pending: 0,
+        box: 0,
         rerolls: REROLL_START,
         legends: [],
         luck: 0,
@@ -496,7 +545,7 @@ export class Game {
       zones: [...DEFAULT_PRESETS[0]!.zones],
       spacing: DEFAULT_PRESETS[0]!.spacing,
       revives: 0,
-      stats: { dealt: 0, taken: 0, downs: 0, mercDeaths: 0, gold: 0 },
+      stats: { dealt: 0, taken: 0, downs: 0, mercDeaths: 0, gold: 0, wins: 0, champion: 0 },
       facing: 0,
     };
   }
@@ -611,6 +660,10 @@ export class Game {
       this.enemies.clear();
       this.mercs.clear();
       this.camps.clear();
+      this.chests.clear();
+      this.tour = null;
+      this.tourPending = false;
+      this.bossT = 0;
       this.bullets = [];
       this.tick++;
       return;
@@ -621,18 +674,29 @@ export class Game {
     }
     const dt = 1 / TICK_RATE;
     this.time += dt;
+    if (this.tourPending) {
+      this.tourPending = false;
+      this.beginTournament();
+    }
+    const duel = this.phase === "tournament";
     this.stepPlayers(dt);
     this.stepStage(dt);
-    this.stepCamps(dt);
-    this.spawnEnemies(dt);
-    this.stepSquads(dt);
+    this.stepChests(dt);
+    if (!duel) {
+      this.stepCamps(dt);
+      this.spawnEnemies(dt);
+      this.stepSquads(dt);
+    }
     const friendlies = this.collectFriendlies();
-    this.stepMercs(dt);
-    this.stepEnemies(dt, friendlies);
-    this.separateEnemies();
+    if (duel) this.stepDuelMercs(dt);
+    else {
+      this.stepMercs(dt);
+      this.stepEnemies(dt, friendlies);
+      this.separateEnemies();
+    }
     this.stepBullets(dt, friendlies);
-    // 모든 주인공이 쓰러져 있으면 게임오버(동료가 일으켜 세울 사람이 없다)
-    if ([...this.slots.values()].every((s) => s.state.down)) this.status = "defeat";
+    // 모든 주인공이 쓰러져 있으면 게임오버(동료가 일으켜 세울 사람이 없다). 토너먼트 중에는 지는 것이 정상이라 제외한다.
+    if (!duel && [...this.slots.values()].every((s) => s.state.down)) this.status = "defeat";
     this.tick++;
   }
 
@@ -760,13 +824,14 @@ export class Game {
     return {
       stage: this.stage,
       phase: this.phase,
-      timer: this.phase === "boss" ? 0 : Math.ceil(Math.max(0, this.phaseT)),
+      timer: this.phase === "boss" ? (this.stage < STAGE_COUNT ? Math.max(0, Math.ceil(BOSS_TIMEOUT_SEC - this.bossT)) : 0) : this.phase === "tournament" ? 0 : Math.ceil(Math.max(0, this.phaseT)),
       status: this.status,
       bossType: bossTypeOf(this.stage),
       bossHp,
       armyLeft,
       armyTotal: this.armyTotal,
       squads: this.squads.size,
+      tour: this.phase === "tournament" ? this.tourInfo() : null,
     };
   }
 
@@ -786,6 +851,8 @@ export class Game {
         mercDeaths: s.stats.mercDeaths,
         mercs: this.countMercs(s.state.id),
         gold: Math.round(s.stats.gold),
+        wins: s.stats.wins,
+        champion: s.stats.champion,
       })),
     };
   }
@@ -841,6 +908,11 @@ export class Game {
       if (this.phaseT <= 0) this.startArmy();
     } else if (this.phase === "boss") {
       this.stepArmy(dt);
+      this.bossT += dt;
+      // 보스를 못 잡아도 제한 시간이 지나면 보스군은 물러나고 다음 스테이지로 넘어간다(마지막 스테이지는 끝까지 잡아야 한다)
+      if (this.autoSpawn && this.bossT >= BOSS_TIMEOUT_SEC && this.stage < STAGE_COUNT) this.skipBoss();
+    } else if (this.phase === "tournament") {
+      this.stepTournament(dt);
     } else {
       this.phaseT -= dt;
       if (this.phaseT <= 0) {
@@ -859,6 +931,7 @@ export class Game {
     if (alive.length === 0) return;
     this.phase = "boss";
     this.phaseT = 0;
+    this.bossT = 0;
     const cx = alive.reduce((a, s) => a + s.state.x, 0) / alive.length;
     const cy = alive.reduce((a, s) => a + s.state.y, 0) / alive.length;
     const layout = armyLayout(this.stage, armySize(this.stage, this.slots.size));
@@ -990,13 +1063,385 @@ export class Game {
     }
   }
 
+
+  // --- 토너먼트 --------------------------------------------------------------------
+  /** 지금 경기의 두 선수 번호(경기 중이 아니면 [0, 0]) */
+  private tourPair(): [number, number] {
+    const t = this.tour;
+    const mt = t?.rounds[t.r]?.matches[t.m];
+    return t && mt && t.step !== "end" ? [mt.a, mt.b] : [0, 0];
+  }
+
+  private opponentOf(owner: number): number {
+    const [a, b] = this.tourPair();
+    return owner === a ? b : owner === b ? a : 0;
+  }
+
+  /** 토너먼트 중 이 플레이어가 지금 경기의 선수인가 */
+  private isFighter(id: number): boolean {
+    const [a, b] = this.tourPair();
+    return id !== 0 && (id === a || id === b);
+  }
+
+  /** 상대 선수의 주인공과 용병들(공격 대상) */
+  private duelFoes(owner: number, all: Friendly[] = this.collectFriendlies()): Friendly[] {
+    const opp = this.opponentOf(owner);
+    return opp === 0 ? [] : all.filter((f) => f.ownerId === opp);
+  }
+
+  private tourName(id: number): string {
+    return this.slots.get(id)?.state.name ?? "";
+  }
+
+  /** 보스를 잡은 직후: 남은 적과 상자를 뺀 모든 것을 정리하고 대진표를 짠 뒤 첫 경기를 연다 */
+  private beginTournament(): void {
+    const ids = [...this.slots.values()].filter((s) => !s.away).map((s) => s.state.id);
+    if (ids.length < 2) {
+      if (this.stage >= STAGE_COUNT) this.status = "victory";
+      return;
+    }
+    this.enemies.clear();
+    this.bullets = [];
+    this.camps.clear();
+    this.squads.clear();
+    this.army = null;
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    }
+    let size = 2;
+    while (size < ids.length) size *= 2;
+    const list = [...ids, ...new Array<number>(size - ids.length).fill(0)];
+    const rounds: Tournament["rounds"] = [];
+    const count = Math.log2(size);
+    for (let r = 0; r < count; r++) {
+      const matches: TourMatch[] = [];
+      for (let k = 0; k < size / 2 ** (r + 1); k++) matches.push({ a: 0, b: 0, an: "", bn: "", w: 0 });
+      rounds.push({ title: tournamentRoundName(count - r), matches });
+    }
+    rounds[0]!.matches.forEach((mt, k) => {
+      mt.a = list[k]!;
+      mt.b = list[size - 1 - k]!;
+      mt.an = this.tourName(mt.a);
+      mt.bn = this.tourName(mt.b);
+    });
+    this.phase = "tournament";
+    this.tour = { rounds, r: 0, m: 0, step: "intro", t: TOURNAMENT_INTRO_SEC, winner: "", champion: "" };
+    this.tourAdvance();
+  }
+
+  /** 다음 경기를 찾는다: 이미 끝났거나 부전승인 경기는 넘기고, 라운드가 끝나면 승자들로 다음 라운드를 채운다 */
+  private tourAdvance(): void {
+    const t = this.tour!;
+    for (;;) {
+      const round = t.rounds[t.r]!;
+      if (t.m >= round.matches.length) {
+        if (t.r >= t.rounds.length - 1) return this.tourFinalDone();
+        const winners = round.matches.map((mt) => (mt.w === 1 ? mt.a : mt.w === 2 ? mt.b : 0));
+        t.rounds[t.r + 1]!.matches.forEach((mt, i) => {
+          mt.a = winners[2 * i]!;
+          mt.b = winners[2 * i + 1]!;
+          mt.an = this.tourName(mt.a);
+          mt.bn = this.tourName(mt.b);
+        });
+        t.r++;
+        t.m = 0;
+        continue;
+      }
+      const mt = round.matches[t.m]!;
+      const aHere = mt.a !== 0 && this.slots.has(mt.a);
+      const bHere = mt.b !== 0 && this.slots.has(mt.b);
+      if (mt.w !== 0 || !aHere || !bHere) {
+        if (mt.w === 0) mt.w = bHere && !aHere ? 2 : 1; // 부전승(또는 나가 버린 쪽의 기권패)
+        t.m++;
+        continue;
+      }
+      this.tourSetup(mt);
+      return;
+    }
+  }
+
+  /** 경기 준비: 두 선수는 경기장 양끝에 서고 체력이 가득 찬다. 나머지는 경기장 가장자리에서 관전한다. */
+  private tourSetup(mt: TourMatch): void {
+    const t = this.tour!;
+    t.step = "intro";
+    t.t = TOURNAMENT_INTRO_SEC;
+    t.winner = "";
+    let spectator = 0;
+    const spectators = [...this.slots.values()].filter((s) => s.state.id !== mt.a && s.state.id !== mt.b);
+    for (const s of this.slots.values()) {
+      const p = s.state;
+      let x: number;
+      let y: number;
+      if (p.id === mt.a || p.id === mt.b) {
+        const west = p.id === mt.a;
+        x = west ? -TOURNAMENT_START_DIST : TOURNAMENT_START_DIST;
+        y = 0;
+        s.facing = west ? 0 : Math.PI;
+        p.aim = s.facing;
+      } else {
+        const ang = (spectator++ / Math.max(1, spectators.length)) * Math.PI + Math.PI * 1.1; // 경기장 아래쪽 가장자리를 따라
+        x = Math.cos(ang) * (TOURNAMENT_ARENA_RADIUS + 90);
+        y = Math.sin(ang) * (TOURNAMENT_ARENA_RADIUS + 90) * -1;
+      }
+      p.x = x;
+      p.y = y;
+      this.tourRestore(s);
+    }
+  }
+
+  /** 주인공과 용병을 온전한 상태로 되돌리고 주인공 곁(진형 자리)에 세운다 */
+  private tourRestore(s: Slot): void {
+    const p = s.state;
+    p.down = false;
+    p.hp = p.maxHp;
+    p.revive = 0;
+    p.invuln = 0;
+    p.swing = 0;
+    p.wind = 0;
+    p.chargeLeft = 0;
+    p.shaken = 0;
+    s.windT = 0;
+    s.fireCd = 0;
+    const slotsOf = this.formationSlots(p.id);
+    for (const m of this.mercs.values()) {
+      if (m.owner !== p.id) continue;
+      const st = this.mercStats(m);
+      m.hp = st.hp;
+      m.shield = st.shield;
+      m.regenT = 0;
+      m.respawn = 0;
+      m.atkT = 0;
+      m.cd = 0;
+      m.momentum = 0;
+      m.evadeT = 0;
+      m.chargeSnap = 0;
+      const home = slotsOf.get(m.id);
+      m.x = home?.[0] ?? p.x;
+      m.y = home?.[1] ?? p.y;
+      m.face = s.facing;
+    }
+  }
+
+  /** 선수의 남은 전력(주인공 + 용병 체력 합 / 최대치 합) 0..1 */
+  private tourPower(id: number): number {
+    const s = this.slots.get(id);
+    if (!s) return 0;
+    let hp = s.state.down ? 0 : s.state.hp;
+    let max = s.state.maxHp;
+    for (const m of this.mercs.values()) {
+      if (m.owner !== id) continue;
+      hp += m.respawn > 0 ? 0 : Math.max(0, m.hp);
+      max += this.mercStats(m).hp;
+    }
+    return max > 0 ? hp / max : 0;
+  }
+
+  private stepTournament(dt: number): void {
+    const t = this.tour;
+    if (!t) {
+      this.phase = "break";
+      this.phaseT = STAGE_BREAK_SEC;
+      return;
+    }
+    t.t -= dt;
+    if (t.step === "intro") {
+      if (t.t <= 0) {
+        t.step = "fight";
+        t.t = TOURNAMENT_MATCH_SEC;
+      }
+      return;
+    }
+    if (t.step === "fight") {
+      const mt = t.rounds[t.r]!.matches[t.m]!;
+      const aOut = !this.slots.get(mt.a) || this.slots.get(mt.a)!.away || this.slots.get(mt.a)!.state.down;
+      const bOut = !this.slots.get(mt.b) || this.slots.get(mt.b)!.away || this.slots.get(mt.b)!.state.down;
+      if (aOut || bOut) {
+        // 주인공이 쓰러진 쪽이 진다(동시에 쓰러지면 남은 용병이 많은 쪽)
+        const aw = aOut && bOut ? this.tourPower(mt.a) >= this.tourPower(mt.b) : !aOut;
+        return this.tourMatchDone(aw ? 1 : 2);
+      }
+      if (t.t <= 0) {
+        const pa = this.tourPower(mt.a);
+        const pb = this.tourPower(mt.b);
+        this.tourMatchDone(pa === pb ? (this.rng() < 0.5 ? 1 : 2) : pa > pb ? 1 : 2); // 시간 초과: 남은 전력이 높은 쪽
+      }
+      return;
+    }
+    if (t.step === "outro") {
+      if (t.t <= 0) {
+        t.m++;
+        this.tourAdvance();
+      }
+      return;
+    }
+    if (t.t <= 0) this.tourEnd();
+  }
+
+  private tourMatchDone(winner: 1 | 2): void {
+    const t = this.tour!;
+    const mt = t.rounds[t.r]!.matches[t.m]!;
+    mt.w = winner;
+    const id = winner === 1 ? mt.a : mt.b;
+    const s = this.slots.get(id);
+    t.winner = this.tourName(id);
+    t.step = "outro";
+    t.t = TOURNAMENT_OUTRO_SEC;
+    if (s) {
+      s.stats.wins++;
+      const gold = TOURNAMENT_WIN_GOLD * this.stage;
+      s.state.gold += gold;
+      s.stats.gold += gold;
+    }
+    this.bullets = [];
+  }
+
+  /** 결승이 끝났다: 우승·준우승 보상을 주고 우승자를 발표한다 */
+  private tourFinalDone(): void {
+    const t = this.tour!;
+    const mt = t.rounds[t.rounds.length - 1]!.matches[0]!;
+    const champ = mt.w === 2 ? mt.b : mt.a;
+    const second = mt.w === 2 ? mt.a : mt.b;
+    t.champion = this.tourName(champ);
+    t.step = "end";
+    t.t = TOURNAMENT_END_SEC;
+    t.r = t.rounds.length - 1;
+    t.m = 0;
+    const cs = this.slots.get(champ);
+    if (cs) {
+      cs.stats.champion++;
+      const gold = TOURNAMENT_CHAMPION_GOLD * this.stage;
+      cs.state.gold += gold;
+      cs.stats.gold += gold;
+      this.giveXp(champ, TOURNAMENT_CHAMPION_XP * this.stage);
+    }
+    const ss = this.slots.get(second);
+    if (ss) {
+      const gold = TOURNAMENT_RUNNERUP_GOLD * this.stage;
+      ss.state.gold += gold;
+      ss.stats.gold += gold;
+    }
+  }
+
+  /** 토너먼트를 마치고 모두를 회복시킨 뒤 쉬는 시간으로 돌아간다. 마지막 스테이지라면 이것으로 승리한다. */
+  private tourEnd(): void {
+    for (const s of this.slots.values()) {
+      this.tourRestore(s);
+      s.state.invuln = 2;
+    }
+    this.tour = null;
+    this.bullets = [];
+    this.phase = "break";
+    this.phaseT = STAGE_BREAK_SEC;
+    if (this.stage >= STAGE_COUNT) this.status = "victory";
+  }
+
+  tourInfo(): TourInfo | null {
+    const t = this.tour;
+    if (!t) return null;
+    const mt = t.rounds[t.r]?.matches[t.m];
+    const a = mt?.a ?? 0;
+    const b = mt?.b ?? 0;
+    return {
+      title: t.rounds[t.r]?.title ?? "",
+      step: t.step,
+      t: Math.ceil(Math.max(0, t.t)),
+      a,
+      b,
+      an: mt?.an ?? "",
+      bn: mt?.bn ?? "",
+      ha: Math.round(this.tourPower(a) * 100),
+      hb: Math.round(this.tourPower(b) * 100),
+      winner: t.winner,
+      champion: t.champion,
+      rounds: t.rounds.map((r) => ({ title: r.title, matches: r.matches.map((m): TourMatchInfo => ({ a: m.an, b: m.bn, w: m.w })) })),
+      now: [t.r, t.m],
+    };
+  }
+
+  /**
+   * 경기 중 용병: 상대 선수의 주인공·용병 중 가장 가까운 대상에게 달려가 싸운다. 경기와 상관없는 플레이어의 용병은 가만히 있고,
+   * 쓰러진 용병은 경기가 끝날 때까지 돌아오지 않는다.
+   */
+  private stepDuelMercs(dt: number): void {
+    const t = this.tour;
+    const fighting = !!t && t.step === "fight";
+    const all = fighting ? this.collectFriendlies() : [];
+    const foesOf = new Map<number, Friendly[]>();
+    for (const m of this.mercs.values()) {
+      if (m.respawn > 0 || !fighting || !this.isFighter(m.owner)) continue;
+      const st = this.mercStats(m);
+      this.regenShield(m, st.shield, dt);
+      m.cd = Math.max(0, m.cd - dt);
+      if (m.atkT > 0) {
+        m.atkT -= dt;
+        if (m.atkT <= 0) {
+          m.atkT = 0;
+          m.cd = st.cooldown;
+          this.resolveMercAttack(m, st);
+        }
+        continue;
+      }
+      let foes = foesOf.get(m.owner);
+      if (!foes) {
+        foes = this.duelFoes(m.owner, all);
+        foesOf.set(m.owner, foes);
+      }
+      let target: Friendly | null = null;
+      let best = Infinity;
+      for (const f of foes) {
+        const d = Math.hypot(f.x - m.x, f.y - m.y);
+        if (d < best) {
+          best = d;
+          target = f;
+        }
+      }
+      if (!target) continue;
+      const ang = Math.atan2(target.y - m.y, target.x - m.x);
+      m.face = ang;
+      if (st.ranged) {
+        // 궁병: 사거리 안이면 서서 쏘고, 근접한 상대가 다가오면 물러난다
+        const near = foes.find((f) => !f.merc || !MERC_STATS[f.merc.type]!.ranged ? Math.hypot(f.x - m.x, f.y - m.y) < 110 : false);
+        if (near) {
+          const away = Math.atan2(m.y - near.y, m.x - near.x);
+          m.x += Math.cos(away) * st.speed * ARCHER_KITE_SPEED_MULT * dt;
+          m.y += Math.sin(away) * st.speed * ARCHER_KITE_SPEED_MULT * dt;
+        } else if (best > st.reach * 0.85) this.moveToward(m, target.x, target.y, st.speed, dt, st.reach * 0.8);
+        if (best <= st.reach && m.cd <= 0) {
+          m.atkT = st.windup;
+          m.atkAng = ang;
+        }
+      } else {
+        const reachNow = st.reach + target.radius;
+        if (best <= reachNow) {
+          if (m.cd <= 0) {
+            m.atkT = st.windup;
+            m.atkAng = ang;
+            if (m.type === CAVALRY) m.chargeSnap = chargeBonus(st.speed, m.momentum);
+          }
+          if (m.type === CAVALRY) this.updateMomentum(m, false, dt);
+        } else {
+          const speed = m.type === CAVALRY ? cavSpeed(st.speed, m.momentum) : st.speed;
+          const moved = this.moveToward(m, target.x, target.y, speed, dt, reachNow * 0.7);
+          if (m.type === CAVALRY) this.updateMomentum(m, moved, dt);
+        }
+      }
+      const r = Math.hypot(m.x, m.y);
+      if (r > TOURNAMENT_ARENA_RADIUS) {
+        m.x *= TOURNAMENT_ARENA_RADIUS / r;
+        m.y *= TOURNAMENT_ARENA_RADIUS / r;
+      }
+    }
+  }
+
   /** 장군이 쓰러지면 스테이지 클리어: 남은 병사는 흩어져 일반 적이 되고, 보상과 쓰러진 동료의 부활이 주어진다 */
-  private onBossDown(): void {
+  private onBossDown(at: { x: number; y: number }): void {
     for (const e of this.enemies.values()) {
       e.army = false;
       e.boss = false;
     }
     this.army = null;
+    this.dropChests(at.x, at.y);
     for (const s of this.slots.values()) {
       const bonus = Math.round(STAGE_CLEAR_GOLD * this.stage * s.mods.bounty);
       s.state.gold += bonus;
@@ -1006,7 +1451,64 @@ export class Game {
     }
     this.phase = "break";
     this.phaseT = STAGE_BREAK_SEC;
+    // 3·6·9·10 스테이지: 보스를 잡으면 남은 적을 모두 없애고 플레이어끼리 토너먼트를 연다(2명 이상일 때). 끝난 뒤에 승리 판정이 난다.
+    if (isTournamentStage(this.stage) && this.slots.size >= 2) {
+      this.tourPending = true;
+      return;
+    }
     if (this.stage >= STAGE_COUNT) this.status = "victory";
+  }
+
+  /** 보스를 못 잡고 제한 시간이 지났다: 보스군은 사라지고 보상 없이 다음 스테이지로 넘어간다 */
+  private skipBoss(): void {
+    for (const e of [...this.enemies.values()]) if (e.army) this.enemies.delete(e.id);
+    this.army = null;
+    for (const s of this.slots.values()) if (s.state.down) this.standUp(s);
+    this.phase = "break";
+    this.phaseT = STAGE_BREAK_SEC;
+  }
+
+  /** 보스를 쓰러뜨린 자리 둘레에 접속한 인원 수만큼 상자를 떨어뜨린다. 상자마다 주인이 있다. */
+  private dropChests(x: number, y: number): void {
+    const owners = [...this.slots.values()].filter((s) => !s.away).map((s) => s.state.id);
+    owners.forEach((owner, i) => {
+      const ang = (i / owners.length) * Math.PI * 2 + 0.4;
+      const id = this.nextEntityId++;
+      this.chests.set(id, {
+        id,
+        x: clampToWorld(x + Math.cos(ang) * 70, 20),
+        y: clampToWorld(y + Math.sin(ang) * 70, 20),
+        owner,
+        left: CHEST_LIFETIME_SEC,
+      });
+    });
+  }
+
+  /** 주인이 다가가면 상자가 열리고, 레벨업과 별개로 카드 한 장을 고른다(상자 카드는 높은 등급이 잘 나온다) */
+  private stepChests(dt: number): void {
+    for (const c of [...this.chests.values()]) {
+      const s = this.slots.get(c.owner);
+      if (!s) {
+        this.chests.delete(c.id);
+        continue;
+      }
+      if (this.phase !== "tournament") c.left -= dt;
+      if (c.left <= 0) {
+        this.chests.delete(c.id);
+        continue;
+      }
+      const p = s.state;
+      if (p.down || s.away || Math.hypot(p.x - c.x, p.y - c.y) > CHEST_OPEN_RADIUS) continue;
+      this.chests.delete(c.id);
+      p.pending++;
+      p.box++;
+      p.offer = this.rollOffer(s); // 지금 떠 있던 선택지가 있어도 상자 카드로 다시 뽑는다
+      this.pushEvent(EVT_REVIVE, c.x, c.y, 0);
+    }
+  }
+
+  snapshotChests(): ChestWire[] {
+    return [...this.chests.values()].map((c) => [c.id, round(c.x), round(c.y), c.owner, Math.ceil(c.left)]);
   }
 
   addMerc(owner: number, type: number, x: number, y: number, paid = 0, tier = 0): number {
@@ -1112,8 +1614,21 @@ export class Game {
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const speed = PLAYER_SPEED * s.mods.heroSpeed;
       p.hp = Math.min(p.maxHp, p.hp + s.mods.heroRegen * dt);
-      p.x = clampToWorld(p.x + s.input.dx * speed * dt, PLAYER_RADIUS);
-      p.y = clampToWorld(p.y + s.input.dy * speed * dt, PLAYER_RADIUS);
+      const duel = this.phase === "tournament";
+      const fighter = duel && this.isFighter(p.id);
+      // 토너먼트: 선수는 경기 시작 전·후에는 움직일 수 없고, 경기장 밖으로 나갈 수 없다. 선수가 아니면 싸울 수 없다.
+      const frozen = fighter && this.tour?.step !== "fight";
+      if (!frozen) {
+        p.x = clampToWorld(p.x + s.input.dx * speed * dt, PLAYER_RADIUS);
+        p.y = clampToWorld(p.y + s.input.dy * speed * dt, PLAYER_RADIUS);
+      }
+      if (fighter) {
+        const r = Math.hypot(p.x, p.y);
+        if (r > TOURNAMENT_ARENA_RADIUS) {
+          p.x *= TOURNAMENT_ARENA_RADIUS / r;
+          p.y *= TOURNAMENT_ARENA_RADIUS / r;
+        }
+      }
       p.aim = s.input.aim;
       const turn = FORMATION_TURN_RATE * dt;
       s.facing += Math.max(-turn, Math.min(turn, angleDiff(p.aim, s.facing)));
@@ -1127,9 +1642,9 @@ export class Game {
           p.wind = 0;
           this.strikeHero(s);
         }
-      } else if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0) this.useWeapon(s);
+      } else if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight"))) this.useWeapon(s);
     }
-    this.stepRevive(dt);
+    if (this.phase !== "tournament") this.stepRevive(dt);
   }
 
   /** 쓰러진 동료 곁에서 부활 키를 누르고 있으면 진행도가 차오르고, 떼면 서서히 줄어든다 */
@@ -1206,6 +1721,29 @@ export class Game {
     }
     p.swing = SWING_VISUAL_SEC;
     const arc = Math.min(AREA_ARC_MAX, w.arc * s.mods.heroArea);
+    if (this.phase === "tournament") {
+      // 토너먼트: 상대 선수의 주인공과 용병이 대상이다
+      const foes = this.duelFoes(p.id);
+      const hitFoes: Friendly[] = [];
+      for (const f of foes) {
+        if (w.type === SPEAR) {
+          if (!inSpearBox(p.x, p.y, p.aim, f.x, f.y, f.radius, reach, s.mods.heroArea)) continue;
+        } else {
+          if (Math.hypot(f.x - p.x, f.y - p.y) > reach + f.radius) continue;
+          if (Math.abs(angleDiff(Math.atan2(f.y - p.y, f.x - p.x), p.aim)) > arc) continue;
+        }
+        hitFoes.push(f);
+      }
+      for (const f of hitFoes) f.hit({ damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit });
+      if (w.splash > 0) {
+        const radius = w.splash * s.mods.heroArea;
+        for (const f of foes) {
+          if (hitFoes.includes(f) || !hitFoes.some((h) => Math.hypot(f.x - h.x, f.y - h.y) <= radius + f.radius)) continue;
+          f.hit({ damage: damage * this.splashFactor(s.mods, "hero"), charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit });
+        }
+      }
+      return;
+    }
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
       if (w.type === SPEAR) {
@@ -1356,6 +1894,7 @@ export class Game {
         ownerId: m.owner,
         merc: m,
         hit: (h) => {
+          if (m.respawn > 0 || m.hp <= 0) return 0; // 이미 쓰러졌다
           const mods = this.slots.get(m.owner)?.mods;
           if (this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
           const r = resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
@@ -1700,6 +2239,29 @@ export class Game {
       m.momentum *= CAV_MOMENTUM_AFTER_HIT; // 부딪히면 속도를 잃는다
     }
     m.chargeSnap = 0;
+    if (this.phase === "tournament") {
+      const foes = this.duelFoes(m.owner);
+      const hitFoes: Friendly[] = [];
+      for (const f of foes) {
+        if (m.type === SPEAR) {
+          if (!inSpearBox(m.x, m.y, m.atkAng, f.x, f.y, f.radius, st.reach, st.arc / MERC_STATS[SPEAR]!.arc)) continue;
+        } else {
+          if (Math.hypot(f.x - m.x, f.y - m.y) > st.reach + f.radius) continue;
+          if (Math.abs(angleDiff(Math.atan2(f.y - m.y, f.x - m.x), m.atkAng)) > st.arc) continue;
+        }
+        hitFoes.push(f);
+      }
+      let back = 0;
+      for (const f of hitFoes) back += f.hit({ damage: dmg, charge, srcType: m.type, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit });
+      if (st.splash > 0) {
+        for (const f of foes) {
+          if (hitFoes.includes(f) || !hitFoes.some((h) => Math.hypot(f.x - h.x, f.y - h.y) <= st.splash + f.radius)) continue;
+          f.hit({ damage: dmg * this.splashFactor(mods, m.type), charge: 0, srcType: m.type, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit });
+        }
+      }
+      if (back > 0) this.hurtMerc(m, back);
+      return;
+    }
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
       if (m.type === SPEAR) {
@@ -1807,7 +2369,7 @@ export class Game {
     for (const s of this.slots.values()) this.giveXp(s.state.id, shared);
     if (owner) this.giveXp(owner.state.id, xp * (1 - XP_TEAM_SHARE));
     if (e.squad) this.onSquadMemberDown(e.squad);
-    if (e.boss) this.onBossDown();
+    if (e.boss) this.onBossDown(e);
   }
 
   /** 경험치를 주고, 레벨업하면 선택 횟수를 쌓는다. 선택지는 한 번에 하나씩 뜬다. */
@@ -1853,6 +2415,7 @@ export class Game {
     this.applyCard(s, card.effect);
     s.state.rerolls = Math.min(REROLL_MAX, s.state.rerolls + REROLL_PER_PICK); // 고를 때마다 새로고침 1회 적립
     s.state.pending--;
+    if (s.state.box > 0) s.state.box--; // 상자 카드가 먼저 나온다
     s.state.offer = s.state.pending > 0 ? this.rollOffer(s) : [];
     return true;
   }
@@ -1884,7 +2447,7 @@ export class Game {
     // 통솔력이 거의 다 찼으면 통솔력 카드가 더 자주 나온다(자리가 없어 용병을 못 사는 일이 없도록)
     const leadFull = this.leadershipUsed(s.state.id) >= s.state.leadership - 1 ? 2.5 : 1;
     const weightOf = (c: (typeof CARDS)[number]) =>
-      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck) * (c.effect.k === "leadership" ? leadFull : 1); // 행운이 높을수록 높은 등급이 잘 뜬다
+      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck + (s.state.box > 0 ? CHEST_LUCK_BONUS : 0)) * (c.effect.k === "leadership" ? leadFull : 1); // 행운이 높을수록 높은 등급이 잘 뜬다
     let best: number[] = [];
     for (let attempt = 0; attempt < 8; attempt++) {
       const pool = [...eligible];
@@ -2158,6 +2721,23 @@ export class Game {
             if (Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
             f.hit({ damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }); // 날아온 쪽이 정면인지 본다
             this.pushEvent(EVT_ENEMY_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
+            hit = true;
+            break;
+          }
+        } else if (this.phase === "tournament") {
+          // 토너먼트: 상대 선수의 주인공·용병을 맞힌다
+          const opp = this.opponentOf(b.owner);
+          for (const f of friendlies) {
+            if (f.ownerId !== opp) continue;
+            const key = f.merc ? f.merc.id : -f.ownerId;
+            if (b.hitIds.has(key) || Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
+            b.hitIds.add(key);
+            f.hit({ damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit });
+            this.pushEvent(EVT_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
+            if (b.pierce > 0) {
+              b.pierce--;
+              continue;
+            }
             hit = true;
             break;
           }
