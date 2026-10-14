@@ -29,6 +29,7 @@ import {
   REVIVE_INVULN_SEC,
   REVIVE_RADIUS,
   REVIVE_SEC,
+  REVIVE_DECAY_FACTOR,
   STAGE_BREAK_SEC,
   STAGE_CLEAR_GOLD,
   STAGE_CLEAR_XP,
@@ -973,7 +974,7 @@ export class Game {
         (r) => !r.state.down && !r.away && r.input.revive && Math.hypot(r.state.x - dp.x, r.state.y - dp.y) <= REVIVE_RADIUS,
       );
       if (!helper) {
-        dp.revive = Math.max(0, dp.revive - dt / REVIVE_SEC);
+        dp.revive = Math.max(0, dp.revive - (dt / REVIVE_SEC) * REVIVE_DECAY_FACTOR);
         continue;
       }
       dp.revive = Math.min(1, dp.revive + dt / REVIVE_SEC);

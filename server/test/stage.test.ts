@@ -11,6 +11,7 @@ import {
   REVIVE_HP_FRAC,
   REVIVE_INVULN_SEC,
   REVIVE_RADIUS,
+  REVIVE_DECAY_FACTOR,
   REVIVE_SEC,
   STAGE_BREAK_SEC,
   STAGE_CLEAR_GOLD,
@@ -235,9 +236,34 @@ test("멀리 있거나 키를 떼면 부활이 진행되지 않고 줄어든다"
   pa.x = pb.x;
   run(g, REVIVE_SEC * 0.5);
   assert.ok(me(g, b).revive > 0);
+  const held = me(g, b).revive;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: false });
   run(g, REVIVE_SEC * 0.5);
-  assert.ok(me(g, b).revive < 1e-9);
+  const after = me(g, b).revive;
+  assert.ok(after < held && after > held * 0.6, "멈춰도 한 번에 사라지지 않고 조금씩 줄어든다");
+  assert.ok(Math.abs(held - after - (REVIVE_DECAY_FACTOR * 0.5)) < 0.02, "채울 때의 4분의 1 속도");
+  run(g, REVIVE_SEC * 10);
+  assert.ok(me(g, b).revive < 1e-9, "오래 두면 결국 0");
+});
+
+test("멈췄다가 다시 시작하면 남은 진행도에서 이어서 채운다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const b = g.addPlayer("b")!;
+  knockDown(g, b);
+  const pa = g.getPlayer(a)!;
+  const pb = g.getPlayer(b)!;
+  pa.x = pb.x;
+  pa.y = pb.y;
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: true });
+  run(g, REVIVE_SEC * 0.6);
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: false });
+  run(g, 1);
+  const resume = me(g, b).revive;
+  assert.ok(resume > 0.5, `이어서 시작 (${resume})`);
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: true });
+  run(g, REVIVE_SEC * 0.5); // 처음부터라면 절반밖에 못 채우는 시간
+  assert.equal(me(g, b).down, false);
 });
 
 test("쓰러진 주인공은 적의 목표가 되지 않고, 한 명이라도 서 있으면 게임이 계속된다", () => {

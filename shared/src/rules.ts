@@ -108,7 +108,7 @@ export const START_LEADERSHIP = 5;
 /** 통솔력과 별개로 개체 수를 묶어 두는 안전 한도 */
 export const MAX_MERCS_PER_PLAYER = 16;
 /** 쓰러진 뒤 부활까지(초). 기병은 유지 부담으로 더 오래 걸린다. */
-export const MERC_RESPAWN_SEC = [25, 15, 15, 15, 15] as const;
+export const MERC_RESPAWN_SEC = [60, 45, 45, 45, 45] as const;
 export const DISMISS_REFUND = 0.5; // 해고하면 지불한 금화의 이 비율을 돌려받는다
 export const START_GOLD = 100;
 
@@ -201,7 +201,8 @@ export const BOSS_SPEED_MULT = 0.9;
 // 주인공은 체력이 0이 되면 쓰러지고 저절로 일어나지 않는다. 다른 주인공이 곁에서 부활 키를 누르고 있으면 일으켜 세울 수 있다.
 // 모든 주인공이 동시에 쓰러져 있으면 게임 오버. 스테이지를 클리어하면 모두 회복·부활한다.
 export const REVIVE_RADIUS = 70;
-export const REVIVE_SEC = 3; // 한 명이 눌렀을 때 걸리는 시간. 둘 이상이면 더 빠르다
+export const REVIVE_SEC = 5; // 한 명이 눌러서 가득 채우는 데 걸리는 시간
+export const REVIVE_DECAY_FACTOR = 0.25; // 멈추면 진행도가 채울 때의 이 배율로 천천히 줄어든다(이어서 할 수 있게)
 export const REVIVE_HP_FRAC = 0.5;
 export const REVIVE_INVULN_SEC = 2;
 
