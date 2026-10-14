@@ -163,6 +163,7 @@ import {
   MERC_XP_PER_HURT,
   mercXpNeed,
   MAX_TIER,
+  luckWeight,
   REROLL_MAX,
   REROLL_PER_PICK,
   REROLL_START,
@@ -185,10 +186,10 @@ const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mod
 
 /** 용병 능력치 강화 묶음(전체용 하나, 병종별 다섯). 배율 계열은 1에서, 가산 계열은 0에서 시작한다. */
 type MercMods = Record<MercStat, number>;
-const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn"];
+const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn", "xp"];
 const newMercMods = (): MercMods => ({
   hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1,
-  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0, knock: 0,
+  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0, knock: 0, xp: 1,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
 const mstat = (mods: Mods, type: number, stat: MercStat): number =>
@@ -198,6 +199,8 @@ const mstat = (mods: Mods, type: number, stat: MercStat): number =>
 interface Mods {
   legends: Set<string>; // 고른 전설 능력(legendKey: 능력@대상)
   goldMult: number;
+  xpMult: number;
+  bounty: number;
   all: MercMods;
   type: MercMods[];
   heroSpeed: number;
@@ -217,6 +220,8 @@ interface Mods {
 const newMods = (): Mods => ({
   legends: new Set(),
   goldMult: 1,
+  xpMult: 1,
+  bounty: 1,
   all: newMercMods(),
   type: UNIT_TYPES.map(() => newMercMods()),
   heroSpeed: 1,
@@ -453,6 +458,7 @@ export class Game {
         pending: 0,
         rerolls: REROLL_START,
         legends: [],
+        luck: 0,
         swarm: 0,
         shaken: 0,
         offer: [],
@@ -938,7 +944,7 @@ export class Game {
     if (sq.left > 0) return;
     this.squads.delete(id);
     // 소대를 전멸시키면 모두에게 보상
-    for (const sl of this.slots.values()) sl.state.gold += SQUAD_CLEAR_GOLD * sq.size;
+    for (const sl of this.slots.values()) sl.state.gold += Math.round(SQUAD_CLEAR_GOLD * sq.size * sl.mods.bounty);
   }
 
   /** 장군이 쓰러지면 스테이지 클리어: 남은 병사는 흩어져 일반 적이 되고, 보상과 쓰러진 동료의 부활이 주어진다 */
@@ -949,7 +955,7 @@ export class Game {
     }
     this.army = null;
     for (const s of this.slots.values()) {
-      s.state.gold += STAGE_CLEAR_GOLD * this.stage;
+      s.state.gold += Math.round(STAGE_CLEAR_GOLD * this.stage * s.mods.bounty);
       this.giveXp(s.state.id, STAGE_CLEAR_XP + 15 * this.stage);
       if (s.state.down) this.standUp(s);
     }
@@ -987,7 +993,9 @@ export class Game {
 
   private gainMercXp(m: Merc, amount: number): void {
     if (amount <= 0 || m.tier >= MAX_TIER) return;
-    m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + amount);
+    const mods = this.slots.get(m.owner)?.mods;
+    const gain = amount * (mods ? mstat(mods, m.type, "xp") : 1); // 경험치 획득 능력
+    m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + gain);
   }
 
   getMerc(id: number): Readonly<Merc> | undefined {
@@ -1678,7 +1686,7 @@ export class Game {
     const s = this.slots.get(playerId);
     if (!s || amount <= 0) return;
     const p = s.state;
-    p.xp += amount;
+    p.xp += amount * s.mods.xpMult; // 경험치 획득 능력
     let leveled = false;
     while (p.xp >= p.xpNeed) {
       p.xp -= p.xpNeed;
@@ -1744,7 +1752,8 @@ export class Game {
     const fresh = eligible.filter(({ i }) => !exclude.includes(i));
     if (fresh.length >= OFFER_SIZE) eligible = fresh;
     // 한 병종을 많이 거느릴수록 그 병종 카드가 더 자주 나온다(최대 2배)
-    const weightOf = (c: (typeof CARDS)[number]) => (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1)));
+    const weightOf = (c: (typeof CARDS)[number]) =>
+      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck); // 행운이 높을수록 높은 등급이 잘 뜬다
     let best: number[] = [];
     for (let attempt = 0; attempt < 8; attempt++) {
       const pool = [...eligible];
@@ -1771,6 +1780,9 @@ export class Game {
       case "leadership": p.leadership += e.v; break;
       case "priceMult": p.priceMult *= e.v; break;
       case "goldMult": m.goldMult += e.v; break;
+      case "xpMult": m.xpMult += e.v; break;
+      case "bounty": m.bounty += e.v; break;
+      case "luck": p.luck += e.v; break;
       case "mercStat": {
         const target = e.type === undefined ? m.all : m.type[e.type]!;
         if (e.stat === "respawn") target.respawn *= 1 + e.v;

@@ -45,12 +45,15 @@ export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: rea
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
 /** 용병 능력치 종류. 배율 계열(hp~area, respawn)은 곱해지고, 나머지는 더해진다. */
-export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "pierce" | "respawn" | "knock";
+export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "pierce" | "respawn" | "knock" | "xp";
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
   | { k: "priceMult"; v: number } // 고용 가격에 v를 곱한다
   | { k: "goldMult"; v: number } // 금화 획득 +v(비율)
+  | { k: "xpMult"; v: number } // 주인공 경험치 획득 +v(비율)
+  | { k: "luck"; v: number } // 행운 +v: 높은 등급 카드가 나올 확률이 올라간다
+  | { k: "bounty"; v: number } // 스테이지·소대 클리어 금화 +v(비율)
   | { k: "mercStat"; stat: MercStat; v: number; type?: number } // 용병 능력치. type을 생략하면 모든 용병(효과는 작다)
   | { k: "legend"; id: LegendId; scope: LegendScope }
   | { k: "heroRange"; v: number }
@@ -95,19 +98,20 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
   pierce: "관통",
   respawn: "부활 시간",
   knock: "넉백",
+  xp: "경험치 획득",
 };
 /** 병종 전용 일반 카드 한 장의 효과량. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.02, pierce: 1, respawn: -0.25, knock: 30,
+  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.02, pierce: 1, respawn: -0.25, knock: 30, xp: 0.3,
 };
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
-  ["hp", "dmg", "speed", "crit", "dodge", "atkSpeed", "area", "knock"], // 기병
-  ["hp", "dmg", "range", "defense", "atkSpeed", "area", "knock"], // 창병
-  ["dmg", "range", "atkSpeed", "crit", "pierce"], // 궁병(화살이라 범위는 없다)
-  ["hp", "defense", "regen", "dmg", "respawn", "atkSpeed", "area", "knock"], // 검방병
-  ["dmg", "area", "hp", "critMult", "atkSpeed", "knock"], // 둔기병
+  ["hp", "dmg", "speed", "crit", "dodge", "atkSpeed", "area", "knock", "xp"], // 기병
+  ["hp", "dmg", "range", "defense", "atkSpeed", "area", "knock", "xp"], // 창병
+  ["dmg", "range", "atkSpeed", "crit", "pierce", "xp"], // 궁병(화살이라 범위는 없다)
+  ["hp", "defense", "regen", "dmg", "respawn", "atkSpeed", "area", "knock", "xp"], // 검방병
+  ["dmg", "area", "hp", "critMult", "atkSpeed", "knock", "xp"], // 둔기병
 ];
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -210,6 +214,9 @@ const scaleCards = (): CardDef[] =>
     return [
       { name: `통솔력 +${lead}`, desc: `더 많은 용병을 거느린다 (통솔력 +${lead})`, category: 0, rarity: rr, weight: 10 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "leadership", v: lead } },
       { name: `고용 비용 -${Math.round((1 - price) * 100)}%`, desc: `캠프 고용 가격이 ${Math.round((1 - price) * 100)}% 내려간다`, category: 0, rarity: rr, weight: 5 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "priceMult", v: price } },
+      { name: `경험치 +${Math.round(15 * m.mult)}%`, desc: `주인공이 얻는 경험치가 ${Math.round(15 * m.mult)}% 늘어난다 (더 빨리 레벨업)`, category: 0, rarity: rr, weight: 6 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "xpMult", v: round3(0.15 * m.mult) } },
+      { name: `행운 +${Math.round(20 * m.mult)}%`, desc: `희귀·영웅·전설 카드가 나올 확률이 올라간다 (행운 +${Math.round(20 * m.mult)}%)`, category: 0, rarity: rr, weight: 4 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "luck", v: round3(0.2 * m.mult) } },
+      { name: `보상금 +${Math.round(30 * m.mult)}%`, desc: `스테이지·소대를 정리했을 때 받는 금화가 ${Math.round(30 * m.mult)}% 늘어난다`, category: 0, rarity: rr, weight: 4 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "bounty", v: round3(0.3 * m.mult) } },
       { name: `전리품 +${Math.round(gold * 100)}%`, desc: `적을 잡아 얻는 금화가 ${Math.round(gold * 100)}% 늘어난다`, category: 0, rarity: rr, weight: 5 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "goldMult", v: gold } },
     ];
   });
@@ -236,6 +243,10 @@ const legendCards = (): CardDef[] =>
 export const CARDS: readonly CardDef[] = [...scaleCards(), ...statCards(), ...legendCards(), ...heroCards()];
 
 export const OFFER_SIZE = 3;
+/** 행운 1.0이면 등급별 카드 확률 배율이 (1 + 행운 x 이 값)이 된다(일반 카드는 그대로). 전설 포함. */
+export const LUCK_RARITY_BOOST = [0, 3, 6, 8] as const;
+export const LUCK_MAX = 3;
+export const luckWeight = (rarity: number, luck: number): number => 1 + Math.min(LUCK_MAX, Math.max(0, luck)) * (LUCK_RARITY_BOOST[rarity] ?? 0);
 /** 카드를 고를 때마다 얻는 새로고침(제시된 카드 3장을 다시 뽑는다) 수와 보유 상한 */
 export const REROLL_START = 1;
 export const REROLL_PER_PICK = 1;

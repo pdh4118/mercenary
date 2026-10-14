@@ -401,7 +401,7 @@ async function main() {
       default: return -1;
     }
   };
-  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", heroCrit: "CRIT", heroCritMult: "x1.5+" };
+  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", xpMult: "XP", luck: "LUCK", bounty: "G+", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", heroCrit: "CRIT", heroCritMult: "x1.5+" };
   /** 뽑힐 확률이 낮을수록 별이 많다 */
   const starsOf = (weight: number) => (weight >= 8 ? 1 : weight >= 5 ? 2 : 3);
   const cardPanel = new Container();
@@ -464,7 +464,7 @@ async function main() {
       v.glyph.style.fontSize = 20;
       const ef = card.effect;
       v.glyph.text =
-        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
+        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»", xp: "XP" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
       v.tag.text = CARD_CATEGORY_NAMES[card.category];
       v.tag.style.fill = color;
       v.rar.text = card.rarity < 3 ? `· ${RARITY_NAMES[card.rarity]}` : ""; // 전설은 분류 이름이 곧 등급
@@ -1037,6 +1037,7 @@ async function main() {
       hudText.text =
         `HP ${Math.ceil(meState.hp)}/${meState.maxHp}   금화 ${meState.gold}   처치 ${meState.kills}   ${m}:${s}\n` +
         `통솔력 ${used}/${meState.leadership}   용병 ${mine.length}명` +
+        (meState.luck > 0 ? `   행운 +${Math.round(meState.luck * 100)}%` : "") +
         (meState.shaken > 0 ? `   [사기 저하! 공격력 -20% ${Math.ceil(meState.shaken)}초]` : meState.swarm > 0 ? `   [군세 공격력 +${Math.round(meState.swarm * 100)}%]` : "") +
         (down > 0 ? `  (쓰러짐 ${down}명, 부활 대기)` : "") +
         `\nLv ${meState.level}`;

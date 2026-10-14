@@ -495,3 +495,98 @@ test("넉백 카드: 주인공과 병종 전용이 있고 등급이 오를수록
   assert.ok(!CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === ARCHER_T), "궁병은 넉백 카드 없음");
   assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === undefined), "전체 용병용도 있다");
 });
+
+// --- 경험치·행운·보상금 ---------------------------------------------------------
+
+import { LUCK_MAX, luckWeight } from "@mercenary/shared";
+
+test("경험치 획득 카드: 주인공 경험치가 늘어난다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.applyCardForTest(a, { k: "xpMult", v: 0.5 });
+  const p = g.getPlayer(a)!;
+  g.giveXp(a, 4);
+  assert.ok(Math.abs(p.xp - 6) < 1e-9);
+});
+
+test("용병 경험치 카드: 병종 전용은 그 병종만, 전체는 모두(약하게) 더 빨리 쌓인다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const sp = g.addMerc(a, SPEAR, 0, 0);
+  const sh = g.addMerc(a, SHIELD, 0, 0);
+  g.applyCardForTest(a, { k: "mercStat", stat: "xp", v: 0.3, type: SPEAR });
+  g.grantMercXpForTest(sp, 10);
+  g.grantMercXpForTest(sh, 10);
+  assert.ok(Math.abs(g.getMerc(sp)!.xp - 13) < 1e-9);
+  assert.ok(Math.abs(g.getMerc(sh)!.xp - 10) < 1e-9);
+  g.applyCardForTest(a, { k: "mercStat", stat: "xp", v: 0.06 });
+  g.grantMercXpForTest(sh, 10);
+  assert.ok(Math.abs(g.getMerc(sh)!.xp - 20.6) < 1e-9);
+  assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "xp" && c.effect.type === undefined));
+  for (const t of UNIT_TYPES) assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "xp" && c.effect.type === t));
+});
+
+test("보상금 카드: 소대·스테이지 클리어 금화가 늘어난다", () => {
+  const goldAfterSquad = (bounty: boolean) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    if (bounty) g.applyCardForTest(a, { k: "bounty", v: 0.5 });
+    g.spawnSquad(4);
+    const gold = g.getPlayer(a)!.gold;
+    const dmg = g as unknown as { damageEnemy(e: unknown, h: unknown, o: number): number };
+    for (const e of g.snapshotEnemies()) {
+      const en = g.getEnemy(e[0]) as { hp: number; shield: number };
+      en.shield = 0;
+      en.hp = 0.1;
+    }
+    for (const e of g.snapshotEnemies()) dmg.damageEnemy(g.getEnemy(e[0]), { damage: 5, charge: 0, srcType: -1, fromAngle: 0 }, a);
+    // 처치 금화를 뺀 소대 보상만 비교하기 위해 총액 차이를 본다
+    return g.getPlayer(a)!.gold - gold;
+  };
+  assert.ok(goldAfterSquad(true) > goldAfterSquad(false));
+});
+
+test("행운: 높을수록 높은 등급 카드의 확률 배율이 커지고 일반은 그대로다", () => {
+  assert.equal(luckWeight(0, 1), 1);
+  assert.ok(luckWeight(1, 0.5) > luckWeight(1, 0));
+  assert.ok(luckWeight(2, 0.5) > luckWeight(1, 0.5));
+  assert.ok(luckWeight(3, 0.5) > luckWeight(2, 0.5));
+  assert.equal(luckWeight(1, 99), luckWeight(1, LUCK_MAX), "상한");
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.applyCardForTest(a, { k: "luck", v: 0.4 });
+  assert.ok(Math.abs(g.getPlayer(a)!.luck - 0.4) < 1e-9);
+  // 3종 카드 모두 등급별로 있다
+  for (const k of ["xpMult", "luck", "bounty"] as const) {
+    for (const r of [0, 1, 2]) assert.ok(CARDS.some((c) => c.effect.k === k && c.rarity === r), `${k} ${r}`);
+  }
+});
+
+test("행운이 높으면 제시되는 카드의 평균 등급이 실제로 올라간다", () => {
+  const meanRarity = (luck: number) => {
+    let seed = 12345;
+    const rng = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const g = new Game(rng);
+    g.autoSpawn = false;
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    p.level = 12; // 모든 등급이 나올 수 있는 레벨
+    p.luck = luck;
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 300; i++) {
+      p.offer = [];
+      p.pending = 0;
+      p.level = 12;
+      p.xp = 0;
+      p.xpNeed = xpNeeded(12);
+      g.giveXp(a, xpNeeded(12)); // 레벨업 한 번 → 카드 3장이 제시된다
+      for (const idx of p.offer) {
+        sum += CARDS[idx]!.rarity;
+        n++;
+      }
+    }
+    return sum / Math.max(1, n);
+  };
+  assert.ok(meanRarity(2) > meanRarity(0) + 0.1, `${meanRarity(0)} -> ${meanRarity(2)}`);
+});
