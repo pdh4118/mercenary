@@ -278,7 +278,7 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 | `enemy_die` | 적이 쓰러질 때 | `small fantasy soldier falls, short grunt-less thud and armor clatter, low volume` | 0.7~0.85초, 2종 |
 | `armor_fall` | 적이 쓰러질 때 갑옷 소리(비명과 함께) | `metal armor body falling and clattering on the ground, short` | 0.6~0.8초, 5종 (적용됨) |
 | `ally_hurt` | 내 유닛(주인공)이 맞을 때 | `player takes damage, dull body hit with short breathy grunt, not shrill` | 0.25초, 1종 |
-| `level_up` | 레벨업 | `short uplifting level-up chime, warm bells, about one second` | 0.9초, 1종 |
+| `level_up` | 레벨업 | `short uplifting level-up chime, warm bells, about one second` | 0.6초, 1종 |
 | `boss_warning` | 보스군이 나타날 때 | `distant war horn blast, deep and ominous, two long notes, with faint marching drums` | 3초, 1종 |
 
 ### 10-2. 2순위: 게임의 맛을 살립니다 (16종)
