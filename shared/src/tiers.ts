@@ -20,7 +20,7 @@ export const TIER_AREA = [0, 0, 0, 0, 0.08] as const;
 export const UPGRADE_COST_MULT = [1.2, 2.2, 3.6, 5.5] as const;
 
 /** 용병 경험치: 다음 단계로 강화하려면 이만큼 모아야 한다(현재 단계 기준). 피해를 주고받으면 조금씩, 막타를 치면 많이 오른다. */
-export const MERC_XP_NEED = [40, 80, 140, 220] as const;
+export const MERC_XP_NEED = [140, 280, 500, 800] as const;
 export const MERC_XP_PER_DAMAGE = 0.08; // 준 피해 1당
 export const MERC_XP_PER_HURT = 0.12; // 받은 피해 1당
 export const MERC_XP_KILL = 14; // 막타(보스는 x4). 적 병종과 무관한 기본값

@@ -73,14 +73,14 @@ const deg = rad;
 
 export const MERC_STATS: readonly UnitStats[] = [
   // 기병: speed는 최대 속도. 평소엔 느리게 출발해 점점 빨라진다. 피해는 기본 + 속도에 비례한 돌격 피해.
-  { hp: 110, speed: 230, reach: 30, damage: 8, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 450, shield: 0, splash: 0 },
-  // 창병: 사거리가 가장 길다
-  { hp: 100, speed: 95, reach: 64, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(25), ranged: false, radius: 13, leash: 150, shield: 0, splash: 0 },
-  { hp: 65, speed: 95, reach: 280, damage: 8, windup: 0.25, cooldown: 1.0, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
+  { hp: 160, speed: 230, reach: 30, damage: 12, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
+  // 창병: 사거리가 가장 길고 폭이 좁다(찌르기)
+  { hp: 145, speed: 95, reach: 100, damage: 15, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
+  { hp: 95, speed: 95, reach: 280, damage: 12, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
   // 검방병: 몸 체력과 별개로 방패 체력이 있다
-  { hp: 120, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 120, shield: 80, splash: 0 },
-  // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR)
-  { hp: 140, speed: 75, reach: 40, damage: 18, windup: 0.5, cooldown: 1.4, arc: deg(100), ranged: false, radius: 15, leash: 110, shield: 0, splash: 46 },
+  { hp: 170, speed: 90, reach: 32, damage: 12, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 110, splash: 0 },
+  // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
+  { hp: 200, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
@@ -88,7 +88,7 @@ export const ENEMY_STATS: readonly UnitStats[] = [
   { hp: 28, speed: 85, reach: 58, damage: 5, windup: 0.45, cooldown: 1.3, arc: deg(22), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
   { hp: 18, speed: 75, reach: 260, damage: 4.5, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 0 },
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },
-  { hp: 36, speed: 60, reach: 38, damage: 7.5, windup: 0.7, cooldown: 1.8, arc: deg(90), ranged: false, radius: 14, leash: 0, shield: 0, splash: 40 },
+  { hp: 36, speed: 60, reach: 38, damage: 9.5, windup: 0.9, cooldown: 1.8, arc: deg(90), ranged: false, radius: 14, leash: 0, shield: 0, splash: 40 },
 ];
 
 /** 적 생성 비율(기병, 창병, 궁병, 검방병, 둔기병) */
@@ -127,6 +127,11 @@ export const SPEAR_AVOID_RADIUS = 150; // 기병이 창병 적을 피해 도는 
 export const CHARGE_DURATION_SEC = 6;
 export const CHARGE_MAX_DISTANCE = 900; // 주인공으로부터 이 거리까지만 지정할 수 있다
 export const CHARGE_TARGET_RADIUS = 300; // 돌격 지점 주변에서 대상을 찾는 반경
+
+// 궁병 카이팅: 근접 적이 (적 사거리 + 이 여유) 안으로 들어오면 뒤로 물러나며 쏜다
+export const ARCHER_KITE_MARGIN = 55;
+export const ARCHER_KITE_SPEED_MULT = 1.15;
+export const ARCHER_KITE_HOME_PULL = 0.7; // 물러날 때 진형 자리 쪽으로 끌리는 정도(적진 반대편으로 달아나지 않게)
 
 // 캠프(용병을 고용할 수 있는 곳)
 export const CAMP_OFFERS = 3;
@@ -170,9 +175,14 @@ export const LEVELUP_STUN_SEC = 0.8;
 export const STAGE_COUNT = 10;
 export const STAGE_GROW_SEC = 180; // 스테이지당 자유 성장 시간
 export const STAGE_BREAK_SEC = 10; // 클리어 뒤 쉬는 시간(회복·부활·보상)
-export const STAGE_ENEMY_HP_GROWTH = 0.22; // 스테이지가 오를 때마다 적 체력 +22%
-export const STAGE_ENEMY_DMG_GROWTH = 0.1; // 적 피해 +10%
-export const STAGE_SPAWN_GROWTH = 0.12; // 일반 적 생성량 +12%
+export const STAGE_ENEMY_HP_GROWTH = 0.3; // 스테이지가 오를 때마다 적 체력 +30%
+export const STAGE_ENEMY_DMG_GROWTH = 0.14; // 적 피해 +14%
+export const STAGE_SPAWN_GROWTH = 0.18; // 일반 적 생성량 +18%
+// 같은 스테이지 안에서도 시간이 갈수록, 그리고 플레이어 레벨이 오를수록 적이 단단해진다(성장을 따라잡는다).
+export const ENEMY_TIME_HP_GROWTH = 0.12; // 스테이지 시작 후 60초마다 적 체력 +12%
+export const ENEMY_TIME_DMG_GROWTH = 0.05; // 60초마다 적 피해 +5%
+export const ENEMY_LEVEL_HP_GROWTH = 0.035; // 접속자 평균 레벨이 1 오를 때마다 적 체력 +3.5%
+export const ENEMY_LEVEL_DMG_GROWTH = 0.015; // 적 피해 +1.5%
 export const STAGE_CLEAR_GOLD = 40; // 클리어 보상 금화 = 이 값 x 스테이지 (모든 플레이어에게)
 export const STAGE_CLEAR_XP = 30; // 클리어 보상 경험치 = 이 값 + 15 x 스테이지
 

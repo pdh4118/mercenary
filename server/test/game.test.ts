@@ -233,8 +233,8 @@ test("적 기병의 돌격: 창병 용병은 돌격 피해를 받지 않고 되�
   };
   const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed, 1);
   const base = ENEMY_STATS[CAVALRY]!.damage;
-  const archer = run1(ARCHER);
-  assert.ok(Math.abs(archer.lost - (base + bonus)) < 1e-6, `궁병은 기본+돌격: ${archer.lost}`);
+  const blunt = run1(BLUNT); // 궁병은 근접 적이 오면 물러나 맞지 않으므로 제자리에서 맞는 병종으로 본다
+  assert.ok(Math.abs(blunt.lost - (base + bonus)) < 1e-6, `둔기병은 기본+돌격: ${blunt.lost}`);
   const spear = run1(SPEAR);
   assert.ok(Math.abs(spear.lost - base) < 1e-6, `창병은 기본만: ${spear.lost}`);
   assert.ok(spear.enemyHp <= ENEMY_STATS[CAVALRY]!.hp - bonus + 1e-6, "돌격 피해가 기병에게 되돌아간다");
@@ -437,7 +437,7 @@ test("용병도 체력이 0이면 쓰러졌다가 일정 시간 뒤 부활한다
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
-  const merc = g.addMerc(a, ARCHER, p.x + 300, p.y);
+  const merc = g.addMerc(a, SHIELD, p.x + 300, p.y);
   for (let i = 0; i < 400 && g.getMerc(merc)!.respawn === 0; i++) {
     if (i % 4 === 0) g.spawnEnemyAt(p.x + 300, p.y, BLUNT);
     g.step();
@@ -447,10 +447,10 @@ test("용병도 체력이 0이면 쓰러졌다가 일정 시간 뒤 부활한다
   // 남은 적을 치워 다시 쓰러지지 않게 한다
   const q = me(g, a);
   (g as unknown as { enemies: Map<number, unknown> }).enemies.clear();
-  run(g, MERC_RESPAWN_SEC[ARCHER] + 0.5);
+  run(g, MERC_RESPAWN_SEC[SHIELD] + 0.5);
   const m = g.getMerc(merc)!;
   assert.equal(m.respawn, 0);
-  assert.equal(m.hp, MERC_STATS[ARCHER]!.hp);
+  assert.equal(m.hp, MERC_STATS[SHIELD]!.hp);
   assert.ok(Math.hypot(m.x - q.x, m.y - q.y) < 200, "주인공 근처에서 부활한다");
 });
 
@@ -534,8 +534,9 @@ test("기병은 공격한 뒤 잠깐 물러난다(치고 빠지기)", () => {
   const home = { x: p.x + 30, y: p.y + 150 };
   const c = g.addMerc(a, CAVALRY, home.x, home.y);
   const e = g.spawnEnemyAt(home.x + 30, home.y, ARCHER);
-  for (let i = 0; i < 20 && g.getEnemy(e)!.hp === ENEMY_STATS[ARCHER]!.hp; i++) g.step(); // 공격이 들어갈 때까지
-  assert.ok(g.getEnemy(e)!.hp < ENEMY_STATS[ARCHER]!.hp);
+  (g.getEnemy(e) as { hp: number; maxHp: number }).hp = (g.getEnemy(e) as { maxHp: number }).maxHp = 500; // 한 방에 죽지 않게
+  for (let i = 0; i < 20 && g.getEnemy(e)!.hp === 500; i++) g.step(); // 공격이 들어갈 때까지
+  assert.ok(g.getEnemy(e)!.hp < 500);
   const x0 = g.getMerc(c)!.x;
   run(g, 0.3);
   assert.ok(x0 - g.getMerc(c)!.x > 15, "공격 방향의 반대쪽으로 물러난다");
@@ -746,7 +747,7 @@ test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
   forceCard(g, a, "heroRegen");
   g.getPlayer(a)!.hp = 50;
   run(g, 10);
-  assert.ok(Math.abs(g.getPlayer(a)!.hp - 58) < 0.01);
+  assert.ok(Math.abs(g.getPlayer(a)!.hp - 52) < 0.01);
 });
 
 test("카드 효과: 용병 부활 시간 단축", () => {
@@ -847,13 +848,13 @@ test("무기를 바꾼 직후에는 잠깐 공격할 수 없다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
-  const e = g.spawnEnemyAt(p.x + 40, p.y, SHIELD);
-  g.setWeapon(a, 3);
+  const e = g.spawnEnemyAt(p.x + 40, p.y, SPEAR);
+  g.setWeapon(a, 2); // 검(준비 동작 없음). 방패가 없는 적으로 본다
   g.setInput(a, { ...idle, fire: true });
   run(g, WEAPON_SWITCH_DELAY_SEC - 0.1);
-  assert.equal(g.getEnemy(e)!.hp, ENEMY_STATS[SHIELD]!.hp);
+  assert.equal(g.getEnemy(e)!.hp, ENEMY_STATS[SPEAR]!.hp);
   run(g, 0.3);
-  assert.ok(g.getEnemy(e)!.hp < ENEMY_STATS[SHIELD]!.hp);
+  assert.ok(g.getEnemy(e)!.hp < ENEMY_STATS[SPEAR]!.hp);
 });
 
 test("무기 변경 검증: 범위 밖·소수·같은 무기는 무시된다", () => {
@@ -899,7 +900,7 @@ test("철퇴는 맞힌 대상 주변의 다른 적에게 절반 피해(범위 �
   const near = g.spawnEnemyAt(p.x - 10, p.y + 20, SPEAR); // 부채꼴(반각 100도) 밖이지만 대상 가까이
   const far = g.spawnEnemyAt(p.x + 30, p.y + 160, SPEAR); // 멀리 떨어진 적은 안 맞는다
   g.setInput(a, { ...idle, fire: true });
-  g.step();
+  run(g, WEAPONS[3]!.windup + 0.2); // 준비 동작이 끝나야 휘두른다
   const dmg = WEAPONS[3]!.damage;
   assert.equal(g.getEnemy(main)?.hp ?? 0, Math.max(0, ENEMY_STATS[SPEAR]!.hp - dmg), "정면의 대상은 전부 맞는다");
   assert.ok(Math.abs(g.getEnemy(near)!.hp - (ENEMY_STATS[SPEAR]!.hp - dmg * SPLASH_FACTOR)) < 1e-6, "주변 적은 절반만 맞는다");
@@ -1016,14 +1017,14 @@ test("치명타: 확률이 100%면 기본 피해의 1.5배가 들어가고 이�
   const p = g.getPlayer(a)!;
   g.jumpToStage(10); // 체력이 높은 적(한 방에 죽지 않게)
   g.applyCardForTest(a, { k: "heroCrit", v: 1 });
-  g.setWeapon(a, 3); // 철퇴
+  g.setWeapon(a, 2); // 검
   run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
   const id = g.spawnEnemyAt(p.x + 40, p.y, 4);
   const base = g.getEnemy(id)!.hp;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
   g.step();
   const dealt = base - g.getEnemy(id)!.hp;
-  assert.ok(Math.abs(dealt - WEAPONS[3]!.damage * 1.5) < 1e-6, `${dealt}`);
+  assert.ok(Math.abs(dealt - WEAPONS[2]!.damage * 1.5) < 1e-6, `${dealt}`);
   assert.ok(g.takeEvents().some((e) => e[0] === 5));
 });
 
@@ -1137,7 +1138,7 @@ test("피해 숫자: 내가 적에게 준 피해와 적이 방패로 막은 피�
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
   g.jumpToStage(10);
-  g.setWeapon(a, 3); // 철퇴
+  g.setWeapon(a, 2); // 검
   run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
   const e = g.spawnEnemyAt(p.x + 40, p.y, BLUNT);
   (g.getEnemy(e) as { hp: number; maxHp: number }).hp = (g.getEnemy(e) as { maxHp: number }).maxHp = 99999;
@@ -1146,7 +1147,7 @@ test("피해 숫자: 내가 적에게 준 피해와 적이 방패로 막은 피�
   const ev = g.takeEvents().filter((x) => x[0] === EVT_DMG_ENEMY);
   assert.equal(ev.length, 1);
   assert.equal(ev[0]![5], a, "때린 사람 번호");
-  assert.ok(Math.abs(ev[0]![4] - WEAPONS[3]!.damage) < 0.11, `${ev[0]![4]}`);
+  assert.ok(Math.abs(ev[0]![4] - WEAPONS[2]!.damage) < 0.11, `${ev[0]![4]}`);
   // 적이 때리면 입은 피해(받은 사람 번호)
   g.setInput(a, idle);
   run(g, 2);

@@ -297,7 +297,7 @@ test("전설 효과: 피의 갈증은 준 피해만큼 체력을 회복한다", 
   p.hp = 50;
   g.jumpToStage(10);
   const e = g.spawnEnemyAt(p.x + 40, p.y, 4);
-  g.setWeapon(a, 3);
+  g.setWeapon(a, 2);
   run(g, 0.3);
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
   g.step();
@@ -453,7 +453,7 @@ test("넉백: 맞은 적이 공격해 온 반대쪽으로 밀려나고 공격 �
   const p = g.getPlayer(a)!;
   g.jumpToStage(10); // 한 방에 죽지 않게
   const e = g.spawnEnemyAt(p.x + 40, p.y, 4);
-  g.setWeapon(a, 3);
+  g.setWeapon(a, 2);
   run(g, 0.3);
   const x0 = g.getEnemy(e)!.x;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });

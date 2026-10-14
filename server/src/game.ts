@@ -43,6 +43,13 @@ import {
   STAGE_CLEAR_GOLD,
   STAGE_CLEAR_XP,
   STAGE_COUNT,
+  ARCHER_KITE_HOME_PULL,
+  ARCHER_KITE_MARGIN,
+  ARCHER_KITE_SPEED_MULT,
+  ENEMY_LEVEL_DMG_GROWTH,
+  ENEMY_LEVEL_HP_GROWTH,
+  ENEMY_TIME_DMG_GROWTH,
+  ENEMY_TIME_HP_GROWTH,
   STAGE_ENEMY_DMG_GROWTH,
   STAGE_ENEMY_HP_GROWTH,
   STAGE_GROW_SEC,
@@ -246,6 +253,7 @@ interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
+  windT: number; // 공격 준비 동작이 남은 시간(철퇴). 0이면 준비 중이 아니다
   deaths: number[]; // 최근 용병이 쓰러진 시각(사기 저하 판정)
   shakenGrace: number; // 사기 저하가 다시 걸리지 않는 남은 시간
   haste: Record<string, number>; // 전장의 함성 중첩(대상별: hero 또는 병종 번호)
@@ -450,6 +458,7 @@ export class Game {
         maxHp: PLAYER_MAX_HP,
         weapon: 0,
         swing: 0,
+        wind: 0,
         aim: 0,
         kills: 0,
         gold: START_GOLD,
@@ -477,6 +486,7 @@ export class Game {
       switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
+      windT: 0,
       deaths: [],
       shakenGrace: 0,
       haste: {},
@@ -701,18 +711,32 @@ export class Game {
     return this.makeEnemy(x, y, type).id;
   }
 
+  /** 접속한 플레이어의 평균 레벨(적 강화 기준) */
+  private averageLevel(): number {
+    let sum = 0;
+    let n = 0;
+    for (const sl of this.slots.values()) {
+      if (sl.away) continue;
+      sum += sl.state.level;
+      n++;
+    }
+    return n > 0 ? sum / n : 1;
+  }
+
   /** 지금 스테이지의 강화가 반영된 적을 만든다 */
   private makeEnemy(x: number, y: number, type: number, extra: Partial<Enemy> = {}): Enemy {
     const id = this.nextEntityId++;
     const st = ENEMY_STATS[type]!;
-    const hpMult = (1 + STAGE_ENEMY_HP_GROWTH * (this.stage - 1)) * (extra.boss ? BOSS_HP_BASE + BOSS_HP_PER_STAGE * (this.stage - 1) : 1);
+    const minutes = Math.min(this.stageTime, GROW_SEC) / 60;
+    const lv = this.averageLevel() - 1;
+    const hpMult = (1 + STAGE_ENEMY_HP_GROWTH * (this.stage - 1) + ENEMY_TIME_HP_GROWTH * minutes + ENEMY_LEVEL_HP_GROWTH * lv) * (extra.boss ? BOSS_HP_BASE + BOSS_HP_PER_STAGE * (this.stage - 1) : 1);
     const e: Enemy = {
       id, type, x, y,
       hp: st.hp * hpMult,
       maxHp: st.hp * hpMult,
       shield: st.shield * hpMult,
       shieldMax: st.shield * hpMult,
-      dmgMult: (1 + STAGE_ENEMY_DMG_GROWTH * (this.stage - 1)) * (extra.boss ? BOSS_DMG_MULT : 1),
+      dmgMult: (1 + STAGE_ENEMY_DMG_GROWTH * (this.stage - 1) + ENEMY_TIME_DMG_GROWTH * minutes + ENEMY_LEVEL_DMG_GROWTH * lv) * (extra.boss ? BOSS_DMG_MULT : 1),
       atkT: 0, atkAng: 0, face: Math.atan2(-y, -x), cd: 0, regenT: 0, momentum: 0, chargeSnap: 0, // 처음에는 중앙(플레이어가 있는 쪽)을 본다
       boss: false, army: false, squad: 0, slotF: 0, slotL: 0,
       ...extra,
@@ -1059,6 +1083,8 @@ export class Game {
       }
       if (p.down) {
         p.chargeLeft = 0;
+        s.windT = 0;
+        p.wind = 0;
         continue;
       }
       p.invuln = Math.max(0, p.invuln - dt);
@@ -1073,7 +1099,15 @@ export class Game {
       s.facing += Math.max(-turn, Math.min(turn, angleDiff(p.aim, s.facing)));
       s.switchCd = Math.max(0, s.switchCd - dt);
       p.swing = Math.max(0, p.swing - dt);
-      if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0) this.useWeapon(s);
+      if (s.windT > 0) {
+        s.windT -= dt;
+        p.wind = Math.max(0, s.windT);
+        if (s.windT <= 0) {
+          s.windT = 0;
+          p.wind = 0;
+          this.strikeHero(s);
+        }
+      } else if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0) this.useWeapon(s);
     }
     this.stepRevive(dt);
   }
@@ -1111,10 +1145,25 @@ export class Game {
   private useWeapon(s: Slot): void {
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
+    const rate = s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0));
+    if (!w.ranged && w.windup > 0) {
+      // 준비 동작: 이 동안은 움직일 수 있지만 공격은 나가지 않고, 끝나는 순간 조준 방향으로 휘두른다
+      s.windT = w.windup / rate;
+      p.wind = s.windT;
+      s.fireCd = s.windT + w.cooldown / rate;
+      return;
+    }
+    this.strikeHero(s);
+  }
+
+  /** 주인공 공격이 실제로 나가는 순간 */
+  private strikeHero(s: Slot): void {
+    const p = s.state;
+    const w = WEAPONS[p.weapon]!;
     const crit = this.rollCrit(s.mods.heroCrit);
     const damage = w.damage * s.mods.heroDmg * (crit ? s.mods.heroCritMult : 1);
     const reach = w.reach * s.mods.heroRange;
-    s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
+    if (w.windup <= 0 || w.ranged) s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
     if (crit && hasLegend(s.mods, "stormfire", "hero")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
     if (w.ranged) {
       this.bullets.push({
@@ -1170,6 +1219,9 @@ export class Game {
     if (s.state.weapon === index) return false;
     s.state.weapon = index;
     s.switchCd = WEAPON_SWITCH_DELAY_SEC;
+    s.windT = 0;
+    s.state.wind = 0;
+    s.fireCd = Math.min(s.fireCd, WEAPON_SWITCH_DELAY_SEC);
     return true;
   }
 
@@ -1412,6 +1464,42 @@ export class Game {
         if (!st.ranged && Math.hypot(e.x - home[0], e.y - home[1]) > search) continue;
         target = e;
         targetDist = d;
+      }
+
+      // 궁병 카이팅: 근접 적이 다가오면 근접 사거리 밖으로 물러나며 쏜다(진형 쪽으로 끌려 적진 반대편으로 달아나지 않는다)
+      if (st.ranged) {
+        let threat: Enemy | null = null;
+        let threatGap = Infinity;
+        for (const e of this.enemies.values()) {
+          if (ENEMY_STATS[e.type]!.ranged) continue;
+          const d = Math.hypot(e.x - m.x, e.y - m.y);
+          const danger = ENEMY_STATS[e.type]!.reach + radiusOf(e) + st.radius + ARCHER_KITE_MARGIN;
+          if (d >= danger || d - danger >= threatGap) continue;
+          threat = e;
+          threatGap = d - danger;
+        }
+        if (threat) {
+          m.face = Math.atan2(threat.y - m.y, threat.x - m.x);
+          if (target && m.cd <= 0 && threatGap > -ARCHER_KITE_MARGIN * 0.6) {
+            m.atkT = st.windup; // 아주 가깝지 않을 때는 한 발 쏘고 다시 물러난다
+            m.atkAng = Math.atan2(target.y - m.y, target.x - m.x);
+            m.face = m.atkAng;
+            continue;
+          }
+          let ax = m.x - threat.x;
+          let ay = m.y - threat.y;
+          const al = Math.hypot(ax, ay) || 1;
+          ax /= al;
+          ay /= al;
+          const hl = homeDist || 1;
+          ax += ((home[0] - m.x) / hl) * ARCHER_KITE_HOME_PULL;
+          ay += ((home[1] - m.y) / hl) * ARCHER_KITE_HOME_PULL;
+          const ll = Math.hypot(ax, ay) || 1;
+          const step = st.speed * ARCHER_KITE_SPEED_MULT * dt;
+          m.x += (ax / ll) * step;
+          m.y += (ay / ll) * step;
+          continue;
+        }
       }
 
       if (target) {
@@ -1754,8 +1842,10 @@ export class Game {
     const fresh = eligible.filter(({ i }) => !exclude.includes(i));
     if (fresh.length >= OFFER_SIZE) eligible = fresh;
     // 한 병종을 많이 거느릴수록 그 병종 카드가 더 자주 나온다(최대 2배)
+    // 통솔력이 거의 다 찼으면 통솔력 카드가 더 자주 나온다(자리가 없어 용병을 못 사는 일이 없도록)
+    const leadFull = this.leadershipUsed(s.state.id) >= s.state.leadership - 1 ? 2.5 : 1;
     const weightOf = (c: (typeof CARDS)[number]) =>
-      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck); // 행운이 높을수록 높은 등급이 잘 뜬다
+      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck) * (c.effect.k === "leadership" ? leadFull : 1); // 행운이 높을수록 높은 등급이 잘 뜬다
     let best: number[] = [];
     for (let attempt = 0; attempt < 8; attempt++) {
       const pool = [...eligible];
