@@ -1,4 +1,4 @@
-import { UNIT_COST, mercName, mercXpNeed, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
+import { unitCost, mercName, mercXpNeed, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -7,7 +7,7 @@ export interface MercPanel {
   isOpen(): boolean;
   show(visible: boolean): void;
   /** 매 프레임 호출해도 된다. 내용이 바뀌었을 때만 다시 그린다. */
-  update(mercs: readonly MercWire[], myId: number, gold: number): void;
+  update(mercs: readonly MercWire[], myId: number, gold: number, freeLeadership: number): void;
   /** 목록에서 가리키고 있는 용병(월드에서 강조 표시) */
   hovered(): number;
 }
@@ -39,7 +39,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       }
     },
     hovered: () => hover,
-    update(mercs, myId, gold) {
+    update(mercs, myId, gold, freeLeadership) {
       if (!visible) return;
       const mine = mercs.filter((w) => w[5] === myId);
       // 경험치를 다 채운 용병이 새로 생기면 알려 준다
@@ -49,7 +49,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       first = false;
       if (!panel.classList.contains("open")) return;
       mine.sort((a, b) => Number(isReady(b)) - Number(isReady(a)) || a[4] - b[4] || b[15] - a[15] || a[0] - b[0]);
-      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${w[8] > 0 ? 1 : 0}:${w[17]}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}`).join("|");
+      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${w[8] > 0 ? 1 : 0}:${w[17]}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}`).join("|");
       if (next === sig) return;
       sig = next;
       title.textContent = `내 용병 ${mine.length}명 · 금화 ${gold}G · 강화 가능 ${nowReady.size}`;
@@ -70,7 +70,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
         nm.textContent = `${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}`;
         const sub = document.createElement("div");
         sub.className = "stat";
-        sub.textContent = respawn > 0 ? `쓰러짐 (${Math.ceil(respawn)}초)` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${UNIT_COST[type]}`;
+        sub.textContent = respawn > 0 ? `쓰러짐 (${Math.ceil(respawn)}초)` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${unitCost(type, tier)}`;
         name.append(nm, sub);
         const need = mercXpNeed(tier);
         if (Number.isFinite(need)) {
@@ -91,9 +91,11 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           row.append(t);
         } else if (xp >= need) {
           const btn = document.createElement("button");
+          const noLeader = freeLeadership < 1;
           btn.textContent = `${tierName(type, tier + 1)} ${cost}G`;
+          btn.title = noLeader ? "통솔력이 부족합니다 (강화하면 통솔력 +1)" : "강화하면 통솔력 +1";
           btn.className = "primary";
-          btn.disabled = gold < cost || respawn > 0;
+          btn.disabled = gold < cost || respawn > 0 || noLeader;
           btn.onclick = () => opts.send({ t: "upgrade", merc: id });
           row.append(btn);
         } else {

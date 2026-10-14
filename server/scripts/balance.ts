@@ -5,7 +5,9 @@ import {
   CAVALRY,
   SHIELD,
   MAX_PLAYERS,
-  UNIT_COST,
+  unitCost,
+  decodeOffer,
+  TIER_BUY_MULT,
   WEAPONS,
   mercPrice,
   CAMP_USE_RADIUS,
@@ -106,7 +108,7 @@ function simulate(players: number, seconds: number, seed: number): Result {
         dy = p.y - cy / cn;
       } else {
         const owned = [...g.snapshotMercs()].filter((m) => m[5] === id);
-        const used = owned.reduce((n, m) => n + UNIT_COST[m[4]]!, 0);
+        const used = owned.reduce((n, m) => n + unitCost(m[4], m[15]), 0);
         const wantCamp = camps.find((c) => Math.hypot(c[1] - p.x, c[2] - p.y) < 1200 && p.gold >= 45 && used < p.leadership);
         if (wantCamp) {
           dx = wantCamp[1] - p.x;
@@ -136,9 +138,10 @@ function simulate(players: number, seconds: number, seed: number): Result {
       if (camp && t % 10 === 0) {
         const mine = g.snapshotMercs().filter((m) => m[5] === id);
         const have = new Set(mine.map((m) => m[4]));
-        const order = [4, 5, 6].map((k, slot) => ({ slot, type: camp[k]! })).sort((x, y) => Number(have.has(x.type)) - Number(have.has(y.type)) || botRng() - 0.5);
+        const used = mine.reduce((n, m) => n + unitCost(m[4], m[15]), 0);
+        const order = [4, 5, 6].map((k, slot) => ({ slot, type: decodeOffer(camp[k]!).type, tier: decodeOffer(camp[k]!).tier })).sort((x, y) => Number(have.has(x.type)) - Number(have.has(y.type)) || botRng() - 0.5);
         for (const o of order) {
-          if (mercPrice(o.type, mine.length) * p.priceMult <= p.gold) {
+          if (mercPrice(o.type, mine.length) * TIER_BUY_MULT[o.tier]! * p.priceMult <= p.gold && used + unitCost(o.type, o.tier) <= p.leadership) {
             g.buy(id, camp[0], o.slot);
             break;
           }

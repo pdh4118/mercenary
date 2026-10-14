@@ -101,7 +101,6 @@ import {
   START_GOLD,
   START_LEADERSHIP,
   TICK_RATE,
-  UNIT_COST,
   UNIT_TYPES,
   WORLD_SIZE,
   angleDiff,
@@ -121,6 +120,19 @@ import {
   type StagePhase,
   type MercWire,
   type MercStat,
+  CAMP_TIER_SEC,
+  SHAKEN_DEATHS,
+  SHAKEN_DMG,
+  SHAKEN_SEC,
+  SHAKEN_WINDOW_SEC,
+  SWARM_MAX,
+  SWARM_PER_MERC,
+  TIER_BUY_MULT,
+  TIER_RESPAWN_EXTRA,
+  campMaxTier,
+  decodeOffer,
+  encodeOffer,
+  unitCost,
   type LegendId,
   type LegendScope,
   legendKey,
@@ -207,6 +219,7 @@ interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
+  deaths: number[]; // 최근 용병이 쓰러진 시각(사기 저하 판정)
   haste: Record<string, number>; // 전장의 함성 중첩(대상별: hero 또는 병종 번호)
   hasteT: Record<string, number>;
   zones: number[]; // 진형: 병종별 구역
@@ -409,6 +422,8 @@ export class Game {
         pending: 0,
         rerolls: REROLL_START,
         legends: [],
+        swarm: 0,
+        shaken: 0,
         offer: [],
         priceMult: 1,
         leadership: START_LEADERSHIP,
@@ -424,6 +439,7 @@ export class Game {
       switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
+      deaths: [],
       haste: {},
       hasteT: {},
       zones: [...DEFAULT_PRESETS[0]!.zones],
@@ -464,17 +480,19 @@ export class Game {
     if (Math.hypot(camp.x - s.state.x, camp.y - s.state.y) > CAMP_USE_RADIUS) {
       return { ok: false, reason: "캠프가 너무 멉니다" };
     }
-    const type = Number.isInteger(offerIndex) ? camp.offers[offerIndex] : undefined;
-    if (type === undefined) return { ok: false, reason: "잘못된 선택입니다" };
+    const code = Number.isInteger(offerIndex) ? camp.offers[offerIndex] : undefined;
+    if (code === undefined) return { ok: false, reason: "잘못된 선택입니다" };
+    const { type, tier } = decodeOffer(code);
     const owned = this.countMercs(playerId);
     if (owned >= MAX_MERCS_PER_PLAYER) return { ok: false, reason: `용병은 최대 ${MAX_MERCS_PER_PLAYER}명입니다` };
-    if (this.leadershipUsed(playerId) + UNIT_COST[type]! > s.state.leadership) {
-      return { ok: false, reason: `통솔력이 부족합니다 (${UNIT_COST[type]} 필요)` };
+    const need = unitCost(type, tier);
+    if (this.leadershipUsed(playerId) + need > s.state.leadership) {
+      return { ok: false, reason: `통솔력이 부족합니다 (${need} 필요)` };
     }
-    const price = Math.round(mercPrice(type, owned) * s.state.priceMult);
+    const price = Math.round(mercPrice(type, owned) * TIER_BUY_MULT[tier]! * s.state.priceMult);
     if (s.state.gold < price) return { ok: false, reason: `금화가 부족합니다 (${price}G 필요)` };
     s.state.gold -= price;
-    this.addMerc(playerId, type, s.state.x, s.state.y, price);
+    this.addMerc(playerId, type, s.state.x, s.state.y, price, tier);
     return { ok: true };
   }
 
@@ -487,7 +505,7 @@ export class Game {
     let pick: Merc | null = null;
     for (const m of this.mercs.values()) {
       if (m.owner !== playerId || m.type !== type) continue;
-      const rank = (x: Merc) => (x.respawn > 0 ? -1 : x.hp);
+      const rank = (x: Merc) => (x.respawn > 0 ? -1 : x.tier * 100000 + x.hp); // 쓰러진 용병, 낮은 단계, 체력 낮은 순
       if (!pick || rank(m) < rank(pick)) pick = m;
     }
     if (!pick) return { ok: false, reason: "해당 병종 용병이 없습니다" };
@@ -512,7 +530,7 @@ export class Game {
 
   leadershipUsed(owner: number): number {
     let n = 0;
-    for (const m of this.mercs.values()) if (m.owner === owner) n += UNIT_COST[m.type]!;
+    for (const m of this.mercs.values()) if (m.owner === owner) n += unitCost(m.type, m.tier);
     return n;
   }
 
@@ -835,9 +853,9 @@ export class Game {
     if (this.stage >= STAGE_COUNT) this.status = "victory";
   }
 
-  addMerc(owner: number, type: number, x: number, y: number, paid = 0): number {
+  addMerc(owner: number, type: number, x: number, y: number, paid = 0, tier = 0): number {
     const id = this.nextEntityId++;
-    const merc: Merc = { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier: 0, nameId: this.pickName(owner), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
+    const merc: Merc = { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier, nameId: this.pickName(owner), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
     this.mercs.set(id, merc);
     merc.hp = this.mercStats(merc).hp; // 이미 받은 강화가 반영된 체력으로 시작한다
     merc.shield = this.mercStats(merc).shield;
@@ -1064,11 +1082,15 @@ export class Game {
     }
   }
 
+  /** 캠프 선택지: 시간이 지날수록 높은 단계 용병이 섞여 나온다(그만큼 비싸고 통솔력도 더 든다) */
   private pickOffers(): number[] {
     const pool: number[] = [...UNIT_TYPES];
+    const cap = campMaxTier(this.time);
     const offers: number[] = [];
     while (offers.length < CAMP_OFFERS && pool.length > 0) {
-      offers.push(pool.splice(Math.floor(this.rng() * pool.length), 1)[0]!);
+      const type = pool.splice(Math.floor(this.rng() * pool.length), 1)[0]!;
+      const tier = cap === 0 ? 0 : this.rng() < 0.45 ? cap : Math.floor(this.rng() * (cap + 1));
+      offers.push(encodeOffer(type, tier));
     }
     return offers;
   }
@@ -1189,8 +1211,19 @@ export class Game {
       return;
     }
     m.hp = 0;
-    m.respawn = MERC_RESPAWN_SEC[m.type]! * (owner ? mstat(owner.mods, m.type, "respawn") : 1);
+    m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * (owner ? mstat(owner.mods, m.type, "respawn") : 1);
+    if (owner) this.noteDeath(owner);
     m.atkT = 0;
+  }
+
+  /** 짧은 시간에 여럿이 쓰러지면 사기가 꺾여 한동안 약해진다 */
+  private noteDeath(owner: Slot): void {
+    owner.deaths.push(this.time);
+    owner.deaths = owner.deaths.filter((t) => this.time - t <= SHAKEN_WINDOW_SEC);
+    if (owner.deaths.length >= SHAKEN_DEATHS && owner.state.shaken <= 0) {
+      owner.state.shaken = SHAKEN_SEC;
+      owner.deaths = [];
+    }
   }
 
   /** 기병의 속도: 움직이면 최대 속도를 향해 점점 오르고, 멈추면 줄어든다 */
@@ -1199,6 +1232,12 @@ export class Game {
   }
 
   private stepMercs(dt: number): void {
+    const alive = new Map<number, number>();
+    for (const m of this.mercs.values()) if (m.respawn <= 0) alive.set(m.owner, (alive.get(m.owner) ?? 0) + 1);
+    for (const sl of this.slots.values()) {
+      sl.state.swarm = Math.min(SWARM_MAX, (alive.get(sl.state.id) ?? 0) * SWARM_PER_MERC);
+      sl.state.shaken = Math.max(0, sl.state.shaken - dt);
+    }
     const slotsByOwner = new Map<number, Map<number, [number, number]>>();
     for (const owner of this.slots.keys()) slotsByOwner.set(owner, this.formationSlots(owner));
     const spears = [...this.enemies.values()].filter((e) => e.type === SPEAR);
@@ -1643,7 +1682,8 @@ export class Game {
   /** 레벨업 카드와 강화 단계가 반영된 용병 능력치 */
   private mercStats(m: Merc): UnitStats {
     const base = MERC_STATS[m.type]!;
-    const mods = this.slots.get(m.owner)?.mods;
+    const slot = this.slots.get(m.owner);
+    const mods = slot?.mods;
     if (!mods) return base;
     const t = m.type;
     const tier = m.tier;
@@ -1653,7 +1693,7 @@ export class Game {
       ...base,
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
-      damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]!,
+      damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)) * ((slot?.state.shaken ?? 0) > 0 ? SHAKEN_DMG : 1),
       cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
       reach: base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier),
@@ -1671,6 +1711,7 @@ export class Game {
     if (m.tier >= MAX_TIER) return { ok: false, reason: "이미 최고 단계입니다" };
     const need = mercXpNeed(m.tier);
     if (m.xp < need) return { ok: false, reason: `경험치가 부족합니다 (${Math.floor(m.xp)}/${need})` };
+    if (this.leadershipUsed(playerId) + 1 > s.state.leadership) return { ok: false, reason: "통솔력이 부족합니다 (강화하면 통솔력 +1 필요)" };
     const cost = upgradeCost(m.type, m.tier)!;
     if (s.state.gold < cost) return { ok: false, reason: `금화가 부족합니다 (${cost}G 필요)` };
     const before = this.mercStats(m);

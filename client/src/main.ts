@@ -30,7 +30,10 @@ import {
   mercName,
   PLAYER_RADIUS,
   TICK_RATE,
-  UNIT_COST,
+  unitCost,
+  decodeOffer,
+  TIER_BUY_MULT,
+  tierName,
   UNIT_NAMES,
   UNIT_TYPES,
   WORLD_SIZE,
@@ -972,10 +975,11 @@ async function main() {
       const s = Math.floor(latest.time % 60).toString().padStart(2, "0");
       const mine = latest.mercs.filter((w) => w[5] === myId);
       const down = mine.filter((w) => w[8] > 0).length;
-      const used = mine.reduce((sum, w) => sum + UNIT_COST[w[4]]!, 0);
+      const used = mine.reduce((sum, w) => sum + unitCost(w[4], w[15]), 0);
       hudText.text =
         `HP ${Math.ceil(meState.hp)}/${meState.maxHp}   금화 ${meState.gold}   처치 ${meState.kills}   ${m}:${s}\n` +
         `통솔력 ${used}/${meState.leadership}   용병 ${mine.length}명` +
+        (meState.shaken > 0 ? `   [사기 저하! 공격력 -25% ${Math.ceil(meState.shaken)}초]` : meState.swarm > 0 ? `   [군세 공격력 +${Math.round(meState.swarm * 100)}%]` : "") +
         (down > 0 ? `  (쓰러짐 ${down}명, 부활 대기)` : "") +
         `\nLv ${meState.level}`;
       xpBar
@@ -984,7 +988,7 @@ async function main() {
         .fill(0x2a2d36)
         .roundRect(52, 91, 160 * Math.min(1, meState.xp / meState.xpNeed), 7, 3)
         .fill(0xffe08a);
-      mercPanel.update(latest.mercs, myId, meState.gold);
+      mercPanel.update(latest.mercs, myId, meState.gold, meState.leadership - used);
       const hv = mercs.views.get(mercPanel.hovered());
       if (hv) fxLayer.circle(hv.x, hv.y, 26).stroke({ width: 3, color: 0xffe08a, alpha: 0.9 });
       showOffer(meState.offer, meState.pending, meState.rerolls);
@@ -1018,11 +1022,13 @@ async function main() {
         nearCampId = best[0];
         const owned = mine.length;
         const lines = ["캠프 - 고용 (숫자 키)"];
-        [best[4], best[5], best[6]].forEach((t, i) => {
-          const price = Math.round(mercPrice(t, owned) * meState.priceMult);
-          const noLeader = used + UNIT_COST[t]! > meState.leadership;
+        [best[4], best[5], best[6]].forEach((code, i) => {
+          const { type: t, tier } = decodeOffer(code);
+          const price = Math.round(mercPrice(t, owned) * TIER_BUY_MULT[tier]! * meState.priceMult);
+          const need = unitCost(t, tier);
+          const noLeader = used + need > meState.leadership;
           lines.push(
-            `[${i + 1}] ${UNIT_NAMES[t]}  ${price}G  통솔 ${UNIT_COST[t]}` +
+            `[${i + 1}] ${tierName(t, tier)}${tier > 0 ? " " + "★".repeat(tier) : ""}  ${price}G  통솔 ${need}` +
               (noLeader ? "  (통솔력 부족)" : meState.gold < price ? "  (금화 부족)" : ""),
           );
         });

@@ -43,6 +43,7 @@ import {
   SPLASH_FACTOR,
   HERO_SWORD_FRONT_BLOCK,
   chargeBonus,
+  SWARM_PER_MERC,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -414,10 +415,10 @@ test("용병의 공격: 방패 정면은 창이 60%만 들어가고, 방패 없�
     return { hp: e2.hp, shield: e2.shield };
   };
   const vsArcher = after(ARCHER);
-  assert.equal(vsArcher.hp, ENEMY_STATS[ARCHER]!.hp - MERC_STATS[SPEAR]!.damage);
+  assert.ok(Math.abs(vsArcher.hp - (ENEMY_STATS[ARCHER]!.hp - MERC_STATS[SPEAR]!.damage * (1 + SWARM_PER_MERC))) < 1e-9); // 용병 1명의 군세 보너스 포함
   const vsShield = after(SHIELD);
   assert.equal(vsShield.hp, ENEMY_STATS[SHIELD]!.hp, "몸은 맞지 않는다");
-  assert.ok(Math.abs(vsShield.shield - (ENEMY_STATS[SHIELD]!.shield - MERC_STATS[SPEAR]!.damage * SHIELD_DAMAGE_FACTOR[SPEAR]!)) < 1e-6);
+  assert.ok(Math.abs(vsShield.shield - (ENEMY_STATS[SHIELD]!.shield - MERC_STATS[SPEAR]!.damage * (1 + SWARM_PER_MERC) * SHIELD_DAMAGE_FACTOR[SPEAR]!)) < 1e-6);
 });
 
 test("용병이 처치하면 주인이 금화를 얻는다", () => {
@@ -968,7 +969,7 @@ test("기병 용병이 창병 적에게 돌격하면 돌격 피해가 자신에�
   run(g, 0.4);
   const bonus = chargeBonus(MERC_STATS[CAVALRY]!.speed, 1);
   assert.ok(g.getMerc(c)!.hp <= full - bonus + 1e-6, "자신이 입힌 만큼의 돌격 피해를 되돌려받는다");
-  assert.ok(g.getEnemy(e)!.hp > ENEMY_STATS[SPEAR]!.hp - MERC_STATS[CAVALRY]!.damage - 1e-6, "창병은 돌격 피해를 받지 않는다");
+  assert.ok(g.getEnemy(e)!.hp > ENEMY_STATS[SPEAR]!.hp - MERC_STATS[CAVALRY]!.damage * (1 + SWARM_PER_MERC) - 1e-6, "창병은 돌격 피해를 받지 않는다");
 });
 
 test("방패는 깨져도 일정 시간 뒤 다시 생기고, 재생 중에는 정면에서도 막지 못한다", () => {

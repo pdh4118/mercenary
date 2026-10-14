@@ -81,6 +81,8 @@ export interface PlayerState {
   pending: number; // 아직 고르지 않은 레벨업 선택 횟수
   rerolls: number; // 남은 카드 새로고침 횟수
   legends: string[]; // 고른 전설 능력(LegendId)
+  swarm: number; // 군세 보너스(용병 공격력 +swarm)
+  shaken: number; // 사기 저하가 남은 시간(초), 0이면 정상
   offer: number[]; // 지금 고를 수 있는 카드(CARDS 인덱스). 없으면 빈 배열
   priceMult: number; // 고용 가격 배율(할인 카드)
   leadership: number; // 통솔력(보유할 수 있는 용병 비용 합의 최대치)

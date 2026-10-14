@@ -1,4 +1,4 @@
-import { MERC_BASE_PRICE } from "./rules.js";
+import { MERC_BASE_PRICE, UNIT_COST } from "./rules.js";
 
 /** 용병 단계(0~4). 한 명씩 금화를 내고 다음 단계로 강화한다. */
 export const MAX_TIER = 4;
@@ -26,6 +26,28 @@ export const MERC_XP_PER_HURT = 0.12; // 받은 피해 1당
 export const MERC_XP_KILL = 14; // 막타(보스는 x4). 적 병종과 무관한 기본값
 export const MERC_XP_OVERFLOW = 1.5; // 필요량의 이 배수까지는 쌓아 둔다
 export const mercXpNeed = (tier: number): number => MERC_XP_NEED[tier] ?? Infinity;
+
+/** 통솔력: 병종 기본 비용에 단계마다 +1. 정예는 자리를 많이 차지하므로 숫자로 밀어붙이는 쪽이 통솔력당 더 강하다. */
+export const unitCost = (type: number, tier: number): number => (UNIT_COST[type] ?? 1) + tier;
+
+/** 캠프에서 단계가 높은 용병을 바로 사는 값 배율(0단계는 1). 하나씩 강화하는 비용의 합에 20%를 더한 값이다. */
+export const TIER_BUY_MULT = [1, 2.64, 5.28, 9.6, 16.2] as const;
+/** 캠프에 이 시간(초)이 지날 때마다 나올 수 있는 최고 단계가 1씩 오른다 */
+export const CAMP_TIER_SEC = 240;
+export const campMaxTier = (time: number): number => Math.min(MAX_TIER, Math.floor(time / CAMP_TIER_SEC));
+/** 캠프 선택지는 병종 + 10 x 단계 한 숫자로 보낸다 */
+export const encodeOffer = (type: number, tier: number): number => type + 10 * tier;
+export const decodeOffer = (code: number): { type: number; tier: number } => ({ type: code % 10, tier: Math.floor(code / 10) });
+/** 높은 단계 용병은 부활이 오래 걸린다 */
+export const TIER_RESPAWN_EXTRA = 0.15;
+
+// 군세: 살아 있는 용병 수에 비례해 공격력이 오른다(물량의 강점). 짧은 시간에 여럿이 쓰러지면 사기가 꺾여 약해진다(물량의 약점).
+export const SWARM_PER_MERC = 0.025;
+export const SWARM_MAX = 0.4;
+export const SHAKEN_DEATHS = 3; // 이 시간 안에 이만큼 쓰러지면
+export const SHAKEN_WINDOW_SEC = 6;
+export const SHAKEN_SEC = 8; // 사기 저하가 이어지는 시간
+export const SHAKEN_DMG = 0.75; // 그동안 용병 공격력 배율
 
 export const tierName = (type: number, tier: number): string => TIER_NAMES[type]?.[tier] ?? "";
 
