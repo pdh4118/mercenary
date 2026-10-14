@@ -69,9 +69,9 @@ export interface UnitStats {
 }
 export const SPLASH_FACTOR = 0.5;
 
-// 창 찌르기 범위: 부채꼴이 아니라 앞으로 뻗은 직사각형(사다리꼴). 가까운 쪽은 넓고 끝으로 갈수록 좁아진다.
-export const SPEAR_HALF_WIDTH_NEAR = 28; // 몸 바로 앞의 반폭(px)
-export const SPEAR_HALF_WIDTH_FAR = 10; // 사거리 끝의 반폭(px)
+// 창 찌르기 범위: 부채꼴이 아니라 앞으로 뻗은 직사각형. 몸 앞에서 끝까지 폭이 같다(두 값을 다르게 두면 사다리꼴이 된다).
+export const SPEAR_HALF_WIDTH_NEAR = 18; // 몸 바로 앞의 반폭(px)
+export const SPEAR_HALF_WIDTH_FAR = 18; // 사거리 끝의 반폭(px)
 /** 사거리 reach인 창의 찌르기 범위가 앞에서 f만큼 떨어진 곳에서 갖는 반폭. widthMult는 범위 증가 능력 배율 */
 export function spearHalfWidth(f: number, reach: number, widthMult = 1): number {
   const t = Math.max(0, Math.min(1, f / reach));

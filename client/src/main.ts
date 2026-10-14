@@ -896,7 +896,7 @@ async function main() {
   setInterval(() => pushInput(true), 1000 / TICK_RATE);
 
   /** 공격 예고(부채꼴 또는 직선). 진행될수록 진해지고, 끝나는 순간 판정이 일어난다. */
-  /** 창 찌르기 범위(앞으로 뻗은 사다리꼴: 가까운 쪽이 넓고 끝이 좁다) */
+  /** 창 찌르기 범위(앞으로 뻗은 직사각형. 폭 상수가 다르면 사다리꼴) */
   const drawSpearBox = (x: number, y: number, ang: number, reach: number, widthMult: number, color: number, alpha: number) => {
     const c = Math.cos(ang);
     const s = Math.sin(ang);
