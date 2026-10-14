@@ -7,21 +7,15 @@ import {
   BLUNT,
   BOSS_TYPES,
   EVT_ARROW_HIT,
-  PLAYER_MAX_HP,
   REVIVE_HP_FRAC,
   REVIVE_INVULN_SEC,
   REVIVE_RADIUS,
   REVIVE_DECAY_FACTOR,
-  REVIVE_SEC,
-  STAGE_BREAK_SEC,
-  STAGE_CLEAR_GOLD,
   STAGE_COUNT,
-  STAGE_ENEMY_HP_GROWTH,
-  STAGE_GROW_SEC,
-  START_GOLD,
   ENEMY_STATS,
   SPEAR,
   TICK_RATE,
+  TUNE,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 import { armyComposition, armyLayout, armySize } from "../src/stage.js";
@@ -90,7 +84,7 @@ test("성장 시간이 지나면 보스군이 진형을 갖추고 등장한다",
   g.addPlayer("a");
   g.addPlayer("b");
   assert.equal(g.info().phase, "grow");
-  assert.equal(g.info().timer, STAGE_GROW_SEC);
+  assert.equal(g.info().timer, TUNE.STAGE_GROW_SEC);
   g.forceBoss();
   const info = g.info();
   assert.equal(info.phase, "boss");
@@ -110,8 +104,8 @@ test("성장 시간이 흐르면 저절로 보스가 등장한다", () => {
   const g = new Game();
   g.addPlayer("a");
   g.autoSpawn = true;
-  for (let i = 0; i < STAGE_GROW_SEC * TICK_RATE + 5 && g.info().phase === "grow"; i++) {
-    g.getPlayer(1)!.hp = PLAYER_MAX_HP; // 일반 적에게 죽지 않게
+  for (let i = 0; i < TUNE.STAGE_GROW_SEC * TICK_RATE + 5 && g.info().phase === "grow"; i++) {
+    g.getPlayer(1)!.hp = TUNE.PLAYER_MAX_HP; // 일반 적에게 죽지 않게
     g.step();
   }
   assert.equal(g.info().phase, "boss");
@@ -149,10 +143,10 @@ test("장군을 쓰러뜨리면 스테이지가 클리어되고 보상·휴식�
   const info = g.info();
   assert.equal(info.phase, "break");
   assert.equal(info.stage, 1);
-  assert.ok(me(g, a).gold >= gold0 + STAGE_CLEAR_GOLD);
+  assert.ok(me(g, a).gold >= gold0 + TUNE.STAGE_CLEAR_GOLD);
   assert.ok(g.snapshotEnemies().every((en) => en[11] === 0), "남은 병사는 더 이상 보스군이 아니다");
   assert.equal(g.status, "playing");
-  run(g, STAGE_BREAK_SEC + 0.5);
+  run(g, TUNE.STAGE_BREAK_SEC + 0.5);
   assert.equal(g.info().stage, 2);
   assert.equal(g.info().phase, "grow");
 });
@@ -173,7 +167,7 @@ test("스테이지가 오를수록 적이 단단해진다", () => {
   g.jumpToStage(4);
   const id2 = g.spawnEnemyAt(100, 100, SPEAR);
   assert.equal(g.getEnemy(id1)!.maxHp, ENEMY_STATS[SPEAR]!.hp);
-  assert.ok(Math.abs(g.getEnemy(id2)!.maxHp - ENEMY_STATS[SPEAR]!.hp * (1 + 3 * STAGE_ENEMY_HP_GROWTH)) < 1e-6);
+  assert.ok(Math.abs(g.getEnemy(id2)!.maxHp - ENEMY_STATS[SPEAR]!.hp * (1 + 3 * TUNE.STAGE_ENEMY_HP_GROWTH)) < 1e-6);
 });
 
 test("적 체력은 비율로 전송된다", () => {
@@ -208,13 +202,13 @@ test("동료가 곁에서 부활 키를 누르고 있으면 일으켜 세운다"
   pa.x = pb.x + REVIVE_RADIUS - 5;
   pa.y = pb.y;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: true });
-  run(g, REVIVE_SEC * 0.5);
+  run(g, TUNE.REVIVE_SEC * 0.5);
   assert.ok(me(g, b).down);
   assert.ok(me(g, b).revive > 0.4 && me(g, b).revive < 0.6);
-  run(g, REVIVE_SEC * 0.6);
+  run(g, TUNE.REVIVE_SEC * 0.6);
   const rb = me(g, b);
   assert.equal(rb.down, false);
-  assert.equal(rb.hp, Math.round(PLAYER_MAX_HP * REVIVE_HP_FRAC));
+  assert.equal(rb.hp, Math.round(TUNE.PLAYER_MAX_HP * REVIVE_HP_FRAC));
   assert.ok(rb.invuln > 0 && rb.invuln <= REVIVE_INVULN_SEC);
   assert.equal(g.status, "playing");
   assert.equal(g.result().players.find((p) => p.name === "a")!.revives, 1);
@@ -230,19 +224,19 @@ test("멀리 있거나 키를 떼면 부활이 진행되지 않고 줄어든다"
   pa.x = pb.x + REVIVE_RADIUS + 40;
   pa.y = pb.y;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: true });
-  run(g, REVIVE_SEC * 1.5);
+  run(g, TUNE.REVIVE_SEC * 1.5);
   assert.ok(me(g, b).down);
   assert.ok(me(g, b).revive < 1e-9);
   pa.x = pb.x;
-  run(g, REVIVE_SEC * 0.5);
+  run(g, TUNE.REVIVE_SEC * 0.5);
   assert.ok(me(g, b).revive > 0);
   const held = me(g, b).revive;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: false });
-  run(g, REVIVE_SEC * 0.5);
+  run(g, TUNE.REVIVE_SEC * 0.5);
   const after = me(g, b).revive;
   assert.ok(after < held && after > held * 0.6, "멈춰도 한 번에 사라지지 않고 조금씩 줄어든다");
   assert.ok(Math.abs(held - after - (REVIVE_DECAY_FACTOR * 0.5)) < 0.02, "채울 때의 4분의 1 속도");
-  run(g, REVIVE_SEC * 10);
+  run(g, TUNE.REVIVE_SEC * 10);
   assert.ok(me(g, b).revive < 1e-9, "오래 두면 결국 0");
 });
 
@@ -256,13 +250,13 @@ test("멈췄다가 다시 시작하면 남은 진행도에서 이어서 채운�
   pa.x = pb.x;
   pa.y = pb.y;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: true });
-  run(g, REVIVE_SEC * 0.6);
+  run(g, TUNE.REVIVE_SEC * 0.6);
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: false });
   run(g, 1);
   const resume = me(g, b).revive;
   assert.ok(resume > 0.5, `이어서 시작 (${resume})`);
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: true });
-  run(g, REVIVE_SEC * 0.5); // 처음부터라면 절반밖에 못 채우는 시간
+  run(g, TUNE.REVIVE_SEC * 0.5); // 처음부터라면 절반밖에 못 채우는 시간
   assert.equal(me(g, b).down, false);
 });
 
@@ -303,7 +297,7 @@ test("부활한 직후에는 공격을 받아도 체력이 줄지 않는다", ()
   pa.x = pb.x;
   pa.y = pb.y;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: true });
-  run(g, REVIVE_SEC + 0.3);
+  run(g, TUNE.REVIVE_SEC + 0.3);
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false, revive: false });
   const hp = me(g, b).hp;
   pa.x = 1500;
@@ -354,6 +348,6 @@ test("다시 하기: 같은 참가자로 처음 상태가 된다", () => {
   assert.equal(g.info().stage, 1);
   assert.equal(g.enemyCount, 0);
   assert.equal(me(g, a).down, false);
-  assert.equal(me(g, a).gold, START_GOLD);
-  assert.equal(me(g, a).hp, PLAYER_MAX_HP);
+  assert.equal(me(g, a).gold, TUNE.START_GOLD);
+  assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP);
 });

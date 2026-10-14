@@ -74,6 +74,10 @@
       .tag.quit { background: #2a3040; color: #9fb4d8; }
       .victory { color: #ffe08a; }
       .defeat { color: #ff9b8f; }
+      #stanceBar { position: fixed; left: 10px; bottom: 76px; display: flex; gap: 6px; z-index: 5; align-items: center; }
+      #stanceBar b { color: #9aa1b0; font-size: 12px; margin-right: 2px; }
+      #stanceBar button { padding: 5px 10px; font-size: 12px; background: rgba(0,0,0,.55); border-color: #3f4659; }
+      #stanceBar button.active { border-color: #e0c05d; color: #ffe08a; background: rgba(60,48,20,.8); }
       #formBar { position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); display: flex; gap: 6px; z-index: 5; }
       #formBar button { padding: 5px 10px; font-size: 12px; background: rgba(0,0,0,.55); border-color: #3f4659; }
       #formBar button.active { border-color: #e0c05d; color: #ffe08a; background: rgba(60,48,20,.8); }
@@ -192,6 +196,7 @@
 
     <div id="mercPanel"><header><span id="mercTitle">내 용병</span><span class="stat" style="color:#9aa1b0">U 닫기</span></header><div id="mercList"></div></div>
     <div id="formBar"></div>
+    <div id="stanceBar"><b>용병 [V]</b><button id="stance0">기본 진형</button><button id="stance1">돌격 진형</button></div>
     <div id="formEditor" class="overlay">
       <div class="panel">
         <h1>진형 편성</h1>

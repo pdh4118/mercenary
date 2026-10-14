@@ -8,10 +8,7 @@ import {
   ARMY_LEASH,
   ARMY_MARCH_SPEED,
   ARMY_SPAWN_DISTANCE,
-  BOSS_DMG_MULT,
-  CRIT_BASE_MULT,
   KNOCK_BOSS_FACTOR,
-  KNOCK_MAX,
   KNOCK_STUN_SEC,
   DEFENSE_MAX,
   DODGE_MAX,
@@ -25,8 +22,6 @@ import {
   EVT_DMG_ENEMY,
   EVT_DMG_ENEMY_CRIT,
   EVT_DMG_SHIELD,
-  BOSS_HP_BASE,
-  BOSS_HP_PER_STAGE,
   BOSS_SIZE,
   BOSS_SPEED_MULT,
   EVT_ARROW_HIT,
@@ -37,26 +32,12 @@ import {
   REVIVE_HP_FRAC,
   REVIVE_INVULN_SEC,
   REVIVE_RADIUS,
-  REVIVE_SEC,
   REVIVE_DECAY_FACTOR,
-  STAGE_BREAK_SEC,
-  STAGE_CLEAR_GOLD,
-  STAGE_CLEAR_XP,
   STAGE_COUNT,
   ARCHER_KITE_HOME_PULL,
   inSpearBox,
-  ARCHER_KITE_MARGIN,
   ARCHER_KITE_SPEED_MULT,
-  ENEMY_LEVEL_DMG_GROWTH,
-  ENEMY_LEVEL_HP_GROWTH,
-  ENEMY_TIME_DMG_GROWTH,
-  ENEMY_TIME_HP_GROWTH,
-  STAGE_ENEMY_DMG_GROWTH,
-  STAGE_ENEMY_HP_GROWTH,
-  STAGE_GROW_SEC,
-  STAGE_SPAWN_GROWTH,
   OFFER_SIZE,
-  XP_TEAM_SHARE,
   xpNeeded,
   type CardEffect,
   BULLET_DAMAGE,
@@ -74,7 +55,6 @@ import {
   CAV_EVADE_SPEED_FRAC,
   CAV_DECAY_SEC,
   CAV_MOMENTUM_AFTER_HIT,
-  CAV_RAMP_SEC,
   CAV_FLANK_MAX_SEC,
   CAV_RETREAT_HP,
   CAV_SELF_DEFENSE,
@@ -82,24 +62,17 @@ import {
   CHARGE_DURATION_SEC,
   CHARGE_MAX_DISTANCE,
   CHARGE_TARGET_RADIUS,
-  CAMP_LIFETIME_SEC,
   CAMP_MAX,
   CAMP_OFFERS,
-  CAMP_SPAWN_INTERVAL_SEC,
   CAMP_USE_RADIUS,
-  DISMISS_REFUND,
   HERO_SWORD_FRONT_BLOCK,
   SHIELD,
-  SHIELD_REGEN_SEC,
-  SPLASH_FACTOR,
   cavSpeed,
   chargeBonus,
   ENEMY_ARROW_SPEED,
   ENEMY_GOLD,
   ENEMY_MAX,
-  ENEMY_SPAWN_BASE_PER_SEC,
   ENEMY_SPAWN_DISTANCE,
-  ENEMY_SPAWN_GROWTH_PER_SEC,
   ENEMY_SPAWN_WEIGHTS,
   ENEMY_STATS,
   FIRE_COOLDOWN_SEC,
@@ -111,13 +84,9 @@ import {
   MERC_STATS,
   NAME_MAX_LENGTH,
   NO_TYPE,
-  PLAYER_MAX_HP,
   PLAYER_RADIUS,
-  PLAYER_SPEED,
   SPEAR,
   SPEAR_AVOID_RADIUS,
-  START_GOLD,
-  START_LEADERSHIP,
   TICK_RATE,
   UNIT_TYPES,
   WORLD_SIZE,
@@ -141,44 +110,28 @@ import {
   type StagePhase,
   type MercWire,
   type MercStat,
-  ARCHER_REACH_FRAC,
   SHIELD_FRONT_ARC,
-  ARCHER_ROAM,
   ARCHER_STRAFE_SEC,
-  ASSAULT_ADVANCE,
-  ASSAULT_LEASH_MULT,
   ASSAULT_LEASH_MULT_CAVALRY,
   BLUNT_SHIELD_PREF,
-  BOSS_TIMEOUT_SEC,
   CAV_TARGET_WEIGHT,
-  GUARD_DIST,
   GUARD_THREAT_RADIUS,
   HERO_WARD_WEIGHT,
-  SPEAR_COVER_DIST,
   SPEAR_WATCH_RANGE,
   STANCE_ASSAULT,
   STANCE_DEFEND,
   WARD_WEIGHT,
-  CHEST_LIFETIME_SEC,
-  CHEST_LUCK_BONUS,
   CHEST_OPEN_RADIUS,
   TOURNAMENT_ARENA_RADIUS,
-  TOURNAMENT_CHAMPION_GOLD,
-  TOURNAMENT_CHAMPION_XP,
   TOURNAMENT_END_SEC,
-  TOURNAMENT_INTRO_SEC,
-  TOURNAMENT_MATCH_SEC,
   TOURNAMENT_OUTRO_SEC,
-  TOURNAMENT_RUNNERUP_GOLD,
   TOURNAMENT_START_DIST,
-  TOURNAMENT_WIN_GOLD,
   isTournamentStage,
   tournamentRoundName,
   CAMP_TIER_SEC,
   SHAKEN_DEATHS,
   SQUAD_CLEAR_GOLD,
   SQUAD_FIRST_SEC,
-  SQUAD_INTERVAL_BASE,
   SQUAD_INTERVAL_MIN,
   SQUAD_INTERVAL_STAGE,
   SQUAD_MARCH_MULT,
@@ -222,6 +175,7 @@ import {
   type PlayerInput,
   type PlayerState,
   type UnitStats,
+  TUNE,
 } from "@mercenary/shared";
 import { resolveHit, type Hit } from "./combat.js";
 import { SQUAD_KINDS, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
@@ -276,7 +230,7 @@ const newMods = (): Mods => ({
   heroRange: 1,
   heroPierce: 0,
   heroCrit: 0,
-  heroCritMult: CRIT_BASE_MULT,
+  heroCritMult: TUNE.CRIT_BASE_MULT,
   heroArea: 1,
   heroKnock: 0,
   heroFireRate: 1,
@@ -435,7 +389,7 @@ interface Tournament {
 }
 
 /** 시험 플레이용: MERC_STAGE_GROW_SEC=20 처럼 지정하면 성장 시간이 짧아진다 */
-const GROW_SEC = Number(process.env.MERC_STAGE_GROW_SEC) > 0 ? Number(process.env.MERC_STAGE_GROW_SEC) : STAGE_GROW_SEC;
+const growSec = (): number => (Number(process.env.MERC_STAGE_GROW_SEC) > 0 ? Number(process.env.MERC_STAGE_GROW_SEC) : TUNE.STAGE_GROW_SEC);
 /** 시험 플레이용: MERC_SQUAD_FIRST_SEC=3 처럼 지정하면 첫 소대가 빨리 온다 */
 const SQUAD_FIRST = Number(process.env.MERC_SQUAD_FIRST_SEC) > 0 ? Number(process.env.MERC_SQUAD_FIRST_SEC) : SQUAD_FIRST_SEC;
 const SEPARATION_CELL = 32;
@@ -475,7 +429,7 @@ export class Game {
   private army: Army | null = null;
   stage = 1;
   phase: StagePhase = "grow";
-  private phaseT = GROW_SEC; // grow: 보스군 도착까지, break: 다음 스테이지까지
+  private phaseT = growSec(); // grow: 보스군 도착까지, break: 다음 스테이지까지
   private stageTime = 0; // 이번 스테이지에서 흐른 성장 시간(적 생성량 계산용)
   status: GameStatus = "playing";
   private armyTotal = 0;
@@ -532,7 +486,7 @@ export class Game {
     this.time = 0;
     this.stage = 1;
     this.phase = "grow";
-    this.phaseT = GROW_SEC;
+    this.phaseT = growSec();
     this.stageTime = 0;
     this.status = "playing";
     this.spawnBudget = 0;
@@ -554,14 +508,14 @@ export class Game {
         name,
         x: 0,
         y: 0,
-        hp: PLAYER_MAX_HP,
-        maxHp: PLAYER_MAX_HP,
+        hp: TUNE.PLAYER_MAX_HP,
+        maxHp: TUNE.PLAYER_MAX_HP,
         weapon: 0,
         swing: 0,
         wind: 0,
         aim: 0,
         kills: 0,
-        gold: START_GOLD,
+        gold: TUNE.START_GOLD,
         level: 1,
         xp: 0,
         xpNeed: xpNeeded(1),
@@ -575,7 +529,7 @@ export class Game {
         shaken: 0,
         offer: [],
         priceMult: 1,
-        leadership: START_LEADERSHIP,
+        leadership: TUNE.START_LEADERSHIP,
         chargeLeft: 0,
         chargeX: 0,
         chargeY: 0,
@@ -662,7 +616,7 @@ export class Game {
     }
     if (!pick) return { ok: false, reason: "해당 병종 용병이 없습니다" };
     this.mercs.delete(pick.id);
-    s.state.gold += Math.floor(pick.paid * DISMISS_REFUND);
+    s.state.gold += Math.floor(pick.paid * TUNE.DISMISS_REFUND);
     return { ok: true };
   }
 
@@ -698,7 +652,7 @@ export class Game {
       this.time = 0;
       this.stage = 1;
       this.phase = "grow";
-      this.phaseT = GROW_SEC;
+      this.phaseT = growSec();
       this.stageTime = 0;
       this.status = "playing";
       this.army = null;
@@ -844,16 +798,16 @@ export class Game {
   private makeEnemy(x: number, y: number, type: number, extra: Partial<Enemy> = {}): Enemy {
     const id = this.nextEntityId++;
     const st = ENEMY_STATS[type]!;
-    const minutes = Math.min(this.stageTime, GROW_SEC) / 60;
+    const minutes = Math.min(this.stageTime, growSec()) / 60;
     const lv = this.averageLevel() - 1;
-    const hpMult = (1 + STAGE_ENEMY_HP_GROWTH * (this.stage - 1) + ENEMY_TIME_HP_GROWTH * minutes + ENEMY_LEVEL_HP_GROWTH * lv) * (extra.boss ? BOSS_HP_BASE + BOSS_HP_PER_STAGE * (this.stage - 1) : 1);
+    const hpMult = (1 + TUNE.STAGE_ENEMY_HP_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_HP_GROWTH * minutes + TUNE.ENEMY_LEVEL_HP_GROWTH * lv) * (extra.boss ? TUNE.BOSS_HP_BASE + TUNE.BOSS_HP_PER_STAGE * (this.stage - 1) : 1);
     const e: Enemy = {
       id, type, x, y,
       hp: st.hp * hpMult,
       maxHp: st.hp * hpMult,
       shield: st.shield * hpMult,
       shieldMax: st.shield * hpMult,
-      dmgMult: (1 + STAGE_ENEMY_DMG_GROWTH * (this.stage - 1) + ENEMY_TIME_DMG_GROWTH * minutes + ENEMY_LEVEL_DMG_GROWTH * lv) * (extra.boss ? BOSS_DMG_MULT : 1),
+      dmgMult: (1 + TUNE.STAGE_ENEMY_DMG_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_DMG_GROWTH * minutes + TUNE.ENEMY_LEVEL_DMG_GROWTH * lv) * (extra.boss ? TUNE.BOSS_DMG_MULT : 1),
       atkT: 0, atkAng: 0, face: Math.atan2(-y, -x), cd: 0, regenT: 0, momentum: 0, chargeSnap: 0, // 처음에는 중앙(플레이어가 있는 쪽)을 본다
       boss: false, army: false, squad: 0, slotF: 0, slotL: 0,
       ...extra,
@@ -874,7 +828,7 @@ export class Game {
     return {
       stage: this.stage,
       phase: this.phase,
-      timer: this.phase === "boss" ? (this.stage < STAGE_COUNT ? Math.max(0, Math.ceil(BOSS_TIMEOUT_SEC - this.bossT)) : 0) : this.phase === "tournament" ? 0 : Math.ceil(Math.max(0, this.phaseT)),
+      timer: this.phase === "boss" ? (this.stage < STAGE_COUNT ? Math.max(0, Math.ceil(TUNE.BOSS_TIMEOUT_SEC - this.bossT)) : 0) : this.phase === "tournament" ? 0 : Math.ceil(Math.max(0, this.phaseT)),
       status: this.status,
       bossType: bossTypeOf(this.stage),
       bossHp,
@@ -942,7 +896,7 @@ export class Game {
   jumpToStage(stage: number): void {
     this.stage = Math.max(1, Math.min(STAGE_COUNT, Math.floor(stage)));
     this.phase = "grow";
-    this.phaseT = GROW_SEC;
+    this.phaseT = growSec();
     this.stageTime = 0;
     this.army = null;
     this.armyTotal = 0;
@@ -960,7 +914,7 @@ export class Game {
       this.stepArmy(dt);
       this.bossT += dt;
       // 보스를 못 잡아도 제한 시간이 지나면 보스군은 물러나고 다음 스테이지로 넘어간다(마지막 스테이지는 끝까지 잡아야 한다)
-      if (this.autoSpawn && this.bossT >= BOSS_TIMEOUT_SEC && this.stage < STAGE_COUNT) this.skipBoss();
+      if (this.autoSpawn && this.bossT >= TUNE.BOSS_TIMEOUT_SEC && this.stage < STAGE_COUNT) this.skipBoss();
     } else if (this.phase === "tournament") {
       this.stepTournament(dt);
     } else {
@@ -969,7 +923,7 @@ export class Game {
         this.stage++;
         this.squadTimer = SQUAD_FIRST;
         this.phase = "grow";
-        this.phaseT = GROW_SEC;
+        this.phaseT = growSec();
         this.stageTime = 0;
       }
     }
@@ -1066,7 +1020,7 @@ export class Game {
     if (!this.autoSpawn || this.phase !== "grow") return;
     this.squadTimer -= dt;
     if (this.squadTimer > 0) return;
-    this.squadTimer = Math.max(SQUAD_INTERVAL_MIN, SQUAD_INTERVAL_BASE - SQUAD_INTERVAL_STAGE * this.stage);
+    this.squadTimer = Math.max(SQUAD_INTERVAL_MIN, TUNE.SQUAD_INTERVAL_BASE - SQUAD_INTERVAL_STAGE * this.stage);
     if (this.squads.size >= 2 + Math.floor(this.slots.size / 3)) return; // 한꺼번에 너무 많이 오지 않게
     this.spawnSquad();
   }
@@ -1176,7 +1130,7 @@ export class Game {
       mt.bn = this.tourName(mt.b);
     });
     this.phase = "tournament";
-    this.tour = { rounds, r: 0, m: 0, step: "intro", t: TOURNAMENT_INTRO_SEC, winner: "", champion: "" };
+    this.tour = { rounds, r: 0, m: 0, step: "intro", t: TUNE.TOURNAMENT_INTRO_SEC, winner: "", champion: "" };
     this.tourAdvance();
   }
 
@@ -1215,7 +1169,7 @@ export class Game {
   private tourSetup(mt: TourMatch): void {
     const t = this.tour!;
     t.step = "intro";
-    t.t = TOURNAMENT_INTRO_SEC;
+    t.t = TUNE.TOURNAMENT_INTRO_SEC;
     t.winner = "";
     let spectator = 0;
     const spectators = [...this.slots.values()].filter((s) => s.state.id !== mt.a && s.state.id !== mt.b);
@@ -1291,14 +1245,14 @@ export class Game {
     const t = this.tour;
     if (!t) {
       this.phase = "break";
-      this.phaseT = STAGE_BREAK_SEC;
+      this.phaseT = TUNE.STAGE_BREAK_SEC;
       return;
     }
     t.t -= dt;
     if (t.step === "intro") {
       if (t.t <= 0) {
         t.step = "fight";
-        t.t = TOURNAMENT_MATCH_SEC;
+        t.t = TUNE.TOURNAMENT_MATCH_SEC;
       }
       return;
     }
@@ -1339,7 +1293,7 @@ export class Game {
     t.t = TOURNAMENT_OUTRO_SEC;
     if (s) {
       s.stats.wins++;
-      const gold = TOURNAMENT_WIN_GOLD * this.stage;
+      const gold = TUNE.TOURNAMENT_WIN_GOLD * this.stage;
       s.state.gold += gold;
       s.stats.gold += gold;
     }
@@ -1360,14 +1314,14 @@ export class Game {
     const cs = this.slots.get(champ);
     if (cs) {
       cs.stats.champion++;
-      const gold = TOURNAMENT_CHAMPION_GOLD * this.stage;
+      const gold = TUNE.TOURNAMENT_CHAMPION_GOLD * this.stage;
       cs.state.gold += gold;
       cs.stats.gold += gold;
-      this.giveXp(champ, TOURNAMENT_CHAMPION_XP * this.stage);
+      this.giveXp(champ, TUNE.TOURNAMENT_CHAMPION_XP * this.stage);
     }
     const ss = this.slots.get(second);
     if (ss) {
-      const gold = TOURNAMENT_RUNNERUP_GOLD * this.stage;
+      const gold = TUNE.TOURNAMENT_RUNNERUP_GOLD * this.stage;
       ss.state.gold += gold;
       ss.stats.gold += gold;
     }
@@ -1382,7 +1336,7 @@ export class Game {
     this.tour = null;
     this.bullets = [];
     this.phase = "break";
-    this.phaseT = STAGE_BREAK_SEC;
+    this.phaseT = TUNE.STAGE_BREAK_SEC;
     if (this.stage >= STAGE_COUNT) this.status = "victory";
   }
 
@@ -1419,14 +1373,14 @@ export class Game {
     this.army = null;
     this.dropChests(at.x, at.y);
     for (const s of this.slots.values()) {
-      const bonus = Math.round(STAGE_CLEAR_GOLD * this.stage * s.mods.bounty);
+      const bonus = Math.round(TUNE.STAGE_CLEAR_GOLD * this.stage * s.mods.bounty);
       s.state.gold += bonus;
       s.stats.gold += bonus;
-      this.giveXp(s.state.id, STAGE_CLEAR_XP + 15 * this.stage);
+      this.giveXp(s.state.id, TUNE.STAGE_CLEAR_XP + 15 * this.stage);
       if (s.state.down) this.standUp(s);
     }
     this.phase = "break";
-    this.phaseT = STAGE_BREAK_SEC;
+    this.phaseT = TUNE.STAGE_BREAK_SEC;
     // 3·6·9·10 스테이지: 보스를 잡으면 남은 적을 모두 없애고 플레이어끼리 토너먼트를 연다(2명 이상일 때). 끝난 뒤에 승리 판정이 난다.
     if (isTournamentStage(this.stage) && this.slots.size >= 2) {
       this.tourPending = true;
@@ -1441,7 +1395,7 @@ export class Game {
     this.army = null;
     for (const s of this.slots.values()) if (s.state.down) this.standUp(s);
     this.phase = "break";
-    this.phaseT = STAGE_BREAK_SEC;
+    this.phaseT = TUNE.STAGE_BREAK_SEC;
   }
 
   /** 보스를 쓰러뜨린 자리 둘레에 접속한 인원 수만큼 상자를 떨어뜨린다. 상자마다 주인이 있다. */
@@ -1455,7 +1409,7 @@ export class Game {
         x: clampToWorld(x + Math.cos(ang) * 70, 20),
         y: clampToWorld(y + Math.sin(ang) * 70, 20),
         owner,
-        left: CHEST_LIFETIME_SEC,
+        left: TUNE.CHEST_LIFETIME_SEC,
       });
     });
   }
@@ -1498,7 +1452,7 @@ export class Game {
 
   spawnCampAt(x: number, y: number, offers: number[]): number {
     const id = this.nextEntityId++;
-    this.camps.set(id, { id, x, y, left: CAMP_LIFETIME_SEC, offers });
+    this.camps.set(id, { id, x, y, left: TUNE.CAMP_LIFETIME_SEC, offers });
     return id;
   }
 
@@ -1542,7 +1496,7 @@ export class Game {
     const rel = layoutFormation(alive, s.zones, s.spacing);
     const fx = Math.cos(s.facing);
     const fy = Math.sin(s.facing);
-    const adv = s.state.stance === STANCE_ASSAULT ? ASSAULT_ADVANCE : 0; // 돌격 진형은 대열이 앞으로 나간다
+    const adv = s.state.stance === STANCE_ASSAULT ? TUNE.ASSAULT_ADVANCE : 0; // 돌격 진형은 대열이 앞으로 나간다
     for (const [id, [fwd, lat]] of rel) out.set(id, [s.state.x + fx * (fwd + adv) - fy * lat, s.state.y + fy * (fwd + adv) + fx * lat]);
     return out;
   }
@@ -1597,7 +1551,7 @@ export class Game {
       p.invuln = Math.max(0, p.invuln - dt);
       s.fireCd = Math.max(0, s.fireCd - dt);
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
-      const speed = PLAYER_SPEED * s.mods.heroSpeed;
+      const speed = TUNE.PLAYER_SPEED * s.mods.heroSpeed;
       p.hp = Math.min(p.maxHp, p.hp + s.mods.heroRegen * dt);
       const duel = this.phase === "tournament";
       const fighter = duel && this.isFighter(p.id);
@@ -1641,10 +1595,10 @@ export class Game {
         (r) => !r.state.down && !r.away && r.input.revive && Math.hypot(r.state.x - dp.x, r.state.y - dp.y) <= REVIVE_RADIUS,
       );
       if (!helper) {
-        dp.revive = Math.max(0, dp.revive - (dt / REVIVE_SEC) * REVIVE_DECAY_FACTOR);
+        dp.revive = Math.max(0, dp.revive - (dt / TUNE.REVIVE_SEC) * REVIVE_DECAY_FACTOR);
         continue;
       }
-      dp.revive = Math.min(1, dp.revive + dt / REVIVE_SEC);
+      dp.revive = Math.min(1, dp.revive + dt / TUNE.REVIVE_SEC);
       if (dp.revive >= 1) {
         this.standUp(d);
         helper.revives++;
@@ -1752,7 +1706,7 @@ export class Game {
   }
 
   private splashFactor(mods: Mods, scope: LegendScope): number {
-    return SPLASH_FACTOR * (hasLegend(mods, "splashBoost", scope) ? LEGEND_CONST.splashMult : 1);
+    return TUNE.SPLASH_FACTOR * (hasLegend(mods, "splashBoost", scope) ? LEGEND_CONST.splashMult : 1);
   }
 
   /** 치명타 판정(공격 한 번에 한 번) */
@@ -1782,7 +1736,7 @@ export class Game {
     this.campTimer -= dt;
     const alive = this.alivePlayers();
     if (this.campTimer > 0 || alive.length === 0) return;
-    this.campTimer = CAMP_SPAWN_INTERVAL_SEC;
+    this.campTimer = TUNE.CAMP_SPAWN_INTERVAL_SEC;
     if (this.camps.size >= Math.min(CAMP_MAX, Math.ceil(alive.length / 2) + 1)) return;
     for (let attempt = 0; attempt < 6; attempt++) {
       const around = alive[Math.floor(this.rng() * alive.length)]!.state;
@@ -1814,8 +1768,8 @@ export class Game {
     const alive = this.alivePlayers();
     if (alive.length === 0) return;
     if (this.phase === "break") return;
-    const stageMult = (1 + STAGE_SPAWN_GROWTH * (this.stage - 1)) * (this.phase === "boss" ? 0.25 : 1);
-    const perPlayer = (ENEMY_SPAWN_BASE_PER_SEC + ENEMY_SPAWN_GROWTH_PER_SEC * this.stageTime) * stageMult;
+    const stageMult = (1 + TUNE.STAGE_SPAWN_GROWTH * (this.stage - 1)) * (this.phase === "boss" ? 0.25 : 1);
+    const perPlayer = (TUNE.ENEMY_SPAWN_BASE_PER_SEC + TUNE.ENEMY_SPAWN_GROWTH_PER_SEC * this.stageTime) * stageMult;
     // 인원이 늘수록 적도 늘지만, 아군 전력도 함께 늘어나므로 인원 수에 정비례시키지는 않는다
     this.spawnBudget += perPlayer * Math.pow(alive.length, 0.75) * dt;
     const totalWeight = ENEMY_SPAWN_WEIGHTS.reduce((a, b) => a + b, 0);
@@ -1902,7 +1856,7 @@ export class Game {
     f.shield = Math.max(0, f.shield - amount);
     if (broke || f.shield <= 0) {
       f.shield = 0;
-      f.regenT = SHIELD_REGEN_SEC;
+      f.regenT = TUNE.SHIELD_REGEN_SEC;
       this.pushEvent(EVT_SHIELD_BREAK, f.x, f.y, f.face);
     } else {
       this.pushEvent(EVT_SHIELD_BLOCK, f.x, f.y, f.face);
@@ -1953,7 +1907,7 @@ export class Game {
 
   /** 기병의 속도: 움직이면 최대 속도를 향해 점점 오르고, 멈추면 줄어든다 */
   private updateMomentum(f: Fighter, moved: boolean, dt: number): void {
-    f.momentum = moved ? Math.min(1, f.momentum + dt / CAV_RAMP_SEC) : Math.max(0, f.momentum - dt / CAV_DECAY_SEC);
+    f.momentum = moved ? Math.min(1, f.momentum + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, f.momentum - dt / CAV_DECAY_SEC);
   }
 
   /** 용병 AI가 보는 대상: 일반 전투에서는 적, 토너먼트에서는 상대 선수의 주인공·용병 */
@@ -1990,7 +1944,7 @@ export class Game {
   /** 진형 자리에서 벗어나 적을 쫓을 수 있는 거리: 돌격 진형이면 훨씬 멀리까지 쫓는다 */
   private leashOf(st: UnitStats, type: number, owner: Slot | undefined): number {
     const assault = owner?.state.stance === STANCE_ASSAULT;
-    return st.leash * (assault ? (type === CAVALRY ? ASSAULT_LEASH_MULT_CAVALRY : ASSAULT_LEASH_MULT) : 1);
+    return st.leash * (assault ? (type === CAVALRY ? ASSAULT_LEASH_MULT_CAVALRY : TUNE.ASSAULT_LEASH_MULT) : 1);
   }
 
   private stepMercs(dt: number): void {
@@ -2140,8 +2094,8 @@ export class Game {
       if (threat) {
         const ux = (threat.t.x - ward.x) / (threat.d || 1);
         const uy = (threat.t.y - ward.y) / (threat.d || 1);
-        const gx = ward.x + ux * GUARD_DIST;
-        const gy = ward.y + uy * GUARD_DIST;
+        const gx = ward.x + ux * TUNE.GUARD_DIST;
+        const gy = ward.y + uy * TUNE.GUARD_DIST;
         if (Math.hypot(gx - c.home[0], gy - c.home[1]) <= guardLimit) {
           m.face = Math.atan2(threat.t.y - m.y, threat.t.x - m.x); // 방패 정면을 위협 쪽으로
           if (near) {
@@ -2172,14 +2126,14 @@ export class Game {
    */
   private aiArcher(c: AiCtx): void {
     const { m, st, dt } = c;
-    const roam = ARCHER_ROAM * (c.assault ? 1.8 : 1);
+    const roam = TUNE.ARCHER_ROAM * (c.assault ? 1.8 : 1);
     // 근접 위협 카이팅
     let threat: Target | null = null;
     let gapBest = Infinity;
     for (const t of c.targets) {
       if (t.ranged) continue;
       const d = Math.hypot(t.x - m.x, t.y - m.y);
-      const danger = (t.hero ? 50 : ENEMY_STATS[t.type]?.reach ?? MERC_STATS[t.type]?.reach ?? 40) + t.r + st.radius + ARCHER_KITE_MARGIN;
+      const danger = (t.hero ? 50 : ENEMY_STATS[t.type]?.reach ?? MERC_STATS[t.type]?.reach ?? 40) + t.r + st.radius + TUNE.ARCHER_KITE_MARGIN;
       if (d >= danger || d - danger >= gapBest) continue;
       threat = t;
       gapBest = d - danger;
@@ -2201,7 +2155,7 @@ export class Game {
     }
     if (threat) {
       m.face = Math.atan2(threat.y - m.y, threat.x - m.x);
-      if (target && m.cd <= 0 && gapBest > -ARCHER_KITE_MARGIN * 0.6 && !frontal) {
+      if (target && m.cd <= 0 && gapBest > -TUNE.ARCHER_KITE_MARGIN * 0.6 && !frontal) {
         this.startAttack(m, st, Math.atan2(target.y - m.y, target.x - m.x)); // 아주 가깝지 않을 때는 한 발 쏘고 다시 물러난다
         return;
       }
@@ -2226,7 +2180,7 @@ export class Game {
     }
     const d = Math.hypot(target.x - m.x, target.y - m.y);
     const ang = Math.atan2(target.y - m.y, target.x - m.x);
-    const desired = st.reach * ARCHER_REACH_FRAC;
+    const desired = st.reach * TUNE.ARCHER_REACH_FRAC;
     m.face = ang;
     if (frontal && m.flankT < ARCHER_STRAFE_SEC) {
       // 방패 정면을 피해 대상 둘레를 돌며 사거리 끝 거리를 유지한다
@@ -2317,8 +2271,8 @@ export class Game {
       // 기병과 지킬 아군 사이에 서서 창끝을 기병 쪽으로 겨눈다
       const ux = (cav.x - ref.x) / (cd || 1);
       const uy = (cav.y - ref.y) / (cd || 1);
-      const gx = ref.x + ux * SPEAR_COVER_DIST;
-      const gy = ref.y + uy * SPEAR_COVER_DIST;
+      const gx = ref.x + ux * TUNE.SPEAR_COVER_DIST;
+      const gy = ref.y + uy * TUNE.SPEAR_COVER_DIST;
       if (Math.hypot(gx - c.home[0], gy - c.home[1]) <= c.leash * 1.6 + 160) {
         this.moveToward(m, gx, gy, st.speed * (c.homeDist > 150 ? 1.4 : 1), c.dt, 8);
         return;
@@ -2456,7 +2410,7 @@ export class Game {
   private resolveMercAttack(m: Merc, st: UnitStats): void {
     const mods = this.slots.get(m.owner)?.mods ?? newMods();
     const crit = this.rollCrit(mstat(mods, m.type, "crit"));
-    const critMult = CRIT_BASE_MULT + mstat(mods, m.type, "critMult");
+    const critMult = TUNE.CRIT_BASE_MULT + mstat(mods, m.type, "critMult");
     const dmg = st.damage * (crit ? critMult : 1);
     if (crit && hasLegend(mods, "stormfire", m.type)) m.cd = 0;
     if (st.ranged) {
@@ -2563,7 +2517,7 @@ export class Game {
   /** 넉백: 맞은 적이 공격해 온 쪽 반대로 밀려나고, 하던 공격 동작이 끊기며 잠깐 공격하지 못한다. 보스는 덜 밀린다. */
   private knockBack(e: Enemy, fromAngle: number, amount: number): void {
     if (amount <= 0) return;
-    const dist = Math.min(KNOCK_MAX, amount * (e.boss ? KNOCK_BOSS_FACTOR : 1));
+    const dist = Math.min(TUNE.KNOCK_MAX, amount * (e.boss ? KNOCK_BOSS_FACTOR : 1));
     e.x = clampToWorld(e.x - Math.cos(fromAngle) * dist, 14);
     e.y = clampToWorld(e.y - Math.sin(fromAngle) * dist, 14);
     e.atkT = 0;
@@ -2611,9 +2565,9 @@ export class Game {
     }
     // 경험치: 일부는 처치한 사람에게, 나머지는 모든 플레이어에게 똑같이 나눈다
     const xp = (ENEMY_XP[e.type] ?? 0) * (e.boss ? 5 : 1);
-    const shared = (xp * XP_TEAM_SHARE) / this.slots.size;
+    const shared = (xp * TUNE.XP_TEAM_SHARE) / this.slots.size;
     for (const s of this.slots.values()) this.giveXp(s.state.id, shared);
-    if (owner) this.giveXp(owner.state.id, xp * (1 - XP_TEAM_SHARE));
+    if (owner) this.giveXp(owner.state.id, xp * (1 - TUNE.XP_TEAM_SHARE));
     if (e.squad) this.onSquadMemberDown(e.squad);
     if (e.boss) this.onBossDown(e);
   }
@@ -2693,7 +2647,7 @@ export class Game {
     // 통솔력이 거의 다 찼으면 통솔력 카드가 더 자주 나온다(자리가 없어 용병을 못 사는 일이 없도록)
     const leadFull = this.leadershipUsed(s.state.id) >= s.state.leadership - 1 ? 2.5 : 1;
     const weightOf = (c: (typeof CARDS)[number]) =>
-      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck + (s.state.box > 0 ? CHEST_LUCK_BONUS : 0)) * (c.effect.k === "leadership" ? leadFull : 1); // 행운이 높을수록 높은 등급이 잘 뜬다
+      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck + (s.state.box > 0 ? TUNE.CHEST_LUCK_BONUS : 0)) * (c.effect.k === "leadership" ? leadFull : 1); // 행운이 높을수록 높은 등급이 잘 뜬다
     let best: number[] = [];
     for (let attempt = 0; attempt < 8; attempt++) {
       const pool = [...eligible];
@@ -2908,7 +2862,7 @@ export class Game {
       for (const f of friendlies) {
         if (struck.includes(f)) continue;
         if (!struck.some((s) => Math.hypot(s.x - f.x, s.y - f.y) <= st.splash)) continue;
-        f.hit({ damage: st.damage * e.dmgMult * SPLASH_FACTOR, charge: 0, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x), src: e });
+        f.hit({ damage: st.damage * e.dmgMult * TUNE.SPLASH_FACTOR, charge: 0, srcType: e.type, fromAngle: Math.atan2(e.y - f.y, e.x - f.x), src: e });
       }
     }
   }

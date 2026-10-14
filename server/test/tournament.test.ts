@@ -1,17 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  BOSS_TIMEOUT_SEC,
   CHEST_OPEN_RADIUS,
-  STAGE_GROW_SEC,
   TICK_RATE,
-  TOURNAMENT_INTRO_SEC,
-  TOURNAMENT_MATCH_SEC,
   TOURNAMENT_OUTRO_SEC,
   TOURNAMENT_END_SEC,
-  TOURNAMENT_WIN_GOLD,
   isTournamentStage,
   tournamentRoundName,
+  TUNE,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -28,7 +24,7 @@ type Priv = { onBossDown(at: { x: number; y: number }): void; phaseT: number; st
 const bossDown = (g: Game, x = 0, y = 0) => (g as unknown as Priv).onBossDown({ x, y });
 
 test("한 라운드(성장 시간)는 2분 30초다", () => {
-  assert.equal(STAGE_GROW_SEC, 150);
+  assert.equal(TUNE.STAGE_GROW_SEC, 150);
   assert.deepEqual([3, 6, 9, 10].map(isTournamentStage), [true, true, true, true]);
   assert.ok(!isTournamentStage(1) && !isTournamentStage(5));
   assert.deepEqual([1, 2, 3, 4].map(tournamentRoundName), ["결승", "준결승", "8강", "16강"]);
@@ -40,9 +36,9 @@ test("보스를 못 잡아도 보스 단계가 시작되고 1분이 지나면 �
   (g as unknown as Priv).phaseT = 0.01;
   run(g, 0.2);
   assert.equal(g.info().phase, "boss");
-  assert.equal(g.info().timer, BOSS_TIMEOUT_SEC);
+  assert.equal(g.info().timer, TUNE.BOSS_TIMEOUT_SEC);
   g.getPlayer(a)!.invuln = 9999;
-  run(g, BOSS_TIMEOUT_SEC - 2);
+  run(g, TUNE.BOSS_TIMEOUT_SEC - 2);
   assert.equal(g.info().phase, "boss", "아직 제한 시간 안");
   assert.ok(g.info().timer <= 3);
   run(g, 3);
@@ -129,7 +125,7 @@ test("3스테이지 보스를 잡으면 적이 모두 사라지고 두 사람이
   const x0 = pa.x;
   assert.ok(pa.x < 0 && pb.x > 0, "양끝에 선다");
   g.setInput(tour.a, { dx: 1, dy: 0, aim: 0, fire: true });
-  run(g, TOURNAMENT_INTRO_SEC - 0.5);
+  run(g, TUNE.TOURNAMENT_INTRO_SEC - 0.5);
   assert.equal(pa.x, x0, "소개 중에는 움직일 수 없다");
   assert.equal(pb.hp, pb.maxHp);
   run(g, 1);
@@ -151,7 +147,7 @@ test("3스테이지 보스를 잡으면 적이 모두 사라지고 두 사람이
   assert.equal(tour.step, "outro");
   assert.equal(tour.winner, g.getPlayer(tour.a)!.name);
   assert.ok(pb.down && !pa.down);
-  assert.equal(g.getPlayer(tour.a)!.gold - gold0, TOURNAMENT_WIN_GOLD * 3, "승리 보상 금화");
+  assert.equal(g.getPlayer(tour.a)!.gold - gold0, TUNE.TOURNAMENT_WIN_GOLD * 3, "승리 보상 금화");
   g.setInput(tour.a, idle);
   run(g, TOURNAMENT_OUTRO_SEC + 0.2);
   assert.equal(g.info().tour!.step, "end");
@@ -171,7 +167,7 @@ test("10스테이지 토너먼트가 끝나야 승리가 된다", () => {
   run(g, 0.2);
   assert.equal(g.info().status, "playing", "토너먼트가 끝나기 전에는 승리가 아니다");
   assert.equal(g.info().phase, "tournament");
-  run(g, TOURNAMENT_INTRO_SEC + TOURNAMENT_MATCH_SEC + TOURNAMENT_OUTRO_SEC + TOURNAMENT_END_SEC + 1); // 아무도 안 싸우면 시간 초과 판정
+  run(g, TUNE.TOURNAMENT_INTRO_SEC + TUNE.TOURNAMENT_MATCH_SEC + TOURNAMENT_OUTRO_SEC + TOURNAMENT_END_SEC + 1); // 아무도 안 싸우면 시간 초과 판정
   assert.equal(g.info().status, "victory");
 });
 
@@ -189,11 +185,11 @@ test("선수가 아닌 사람은 공격할 수 없고, 3명이면 준결승 뒤 
   assert.equal(byes.length, 1, "3명이면 한 명은 부전승");
   const spectator = ids.find((id) => id !== tour.a && id !== tour.b)!;
   g.setInput(spectator, { ...idle, fire: true });
-  run(g, TOURNAMENT_INTRO_SEC + 1);
+  run(g, TUNE.TOURNAMENT_INTRO_SEC + 1);
   const fighters = [tour.a, tour.b];
   assert.ok(fighters.every((id) => g.getPlayer(id)!.hp === g.getPlayer(id)!.maxHp));
   // 시간 초과로 첫 경기를 끝내고 결승으로 넘어간다
-  run(g, TOURNAMENT_MATCH_SEC + TOURNAMENT_OUTRO_SEC + 1);
+  run(g, TUNE.TOURNAMENT_MATCH_SEC + TOURNAMENT_OUTRO_SEC + 1);
   tour = g.info().tour!;
   assert.equal(tour.title, "결승");
 });

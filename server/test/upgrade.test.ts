@@ -22,6 +22,7 @@ import {
   UNIT_TYPES,
   upgradeCost,
   xpNeeded,
+  TUNE,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -174,7 +175,6 @@ import {
   MERC_NAME_COUNT,
   MERC_XP_KILL,
   MERC_XP_NEED,
-  PLAYER_MAX_HP,
   mercName,
   type LegendId,
 } from "@mercenary/shared";
@@ -284,7 +284,7 @@ test("전설 효과: 가시 갑옷은 받은 피해의 일부를 공격자에게
   const e = g.spawnEnemyAt(p.x + 20, p.y, 4);
   const hp0 = g.getEnemy(e)!.hp;
   run(g, 2);
-  const taken = PLAYER_MAX_HP - g.getPlayer(a)!.hp;
+  const taken = TUNE.PLAYER_MAX_HP - g.getPlayer(a)!.hp;
   assert.ok(taken > 0);
   assert.ok(Math.abs(hp0 - g.getEnemy(e)!.hp - taken * LEGEND_CONST.thornsFrac) < 1e-6 || g.getEnemy(e)!.hp < hp0);
 });

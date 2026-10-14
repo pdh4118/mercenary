@@ -2,9 +2,10 @@ import { createServer, type IncomingMessage } from "node:http";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
-import { TICK_RATE, type ClientMsg, type ServerMsg } from "@mercenary/shared";
+import { TICK_RATE, tuneOverrides, type ClientMsg, type ServerMsg } from "@mercenary/shared";
 import { RoomManager, type Conn } from "./rooms.js";
 import { serveStatic } from "./static.js";
+import { handleTuningApi, loadTuning, TUNING_FILE } from "./tuning-store.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -19,12 +20,20 @@ const MAX_MESSAGE_BYTES = 2048; // 정상적인 메시지는 훨씬 작다
 const MAX_MESSAGES_PER_SEC = 120; // 입력 20회/초 + 클릭 등을 넉넉히 허용
 const PING_INTERVAL_MS = 15000;
 
+const loadedTuning = loadTuning();
+if (loadedTuning > 0) console.log(`[mercenary] 수치 조정 ${loadedTuning}개를 ${TUNING_FILE}에서 불러왔습니다`);
 const manager = new RoomManager();
 const hasClient = existsSync(STATIC_DIR);
 
 const http = createServer((req, res) => {
   if (req.url === "/healthz") {
     res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true, rooms: manager.roomCount(), connections: metas.size }));
+    return;
+  }
+  if (req.url?.startsWith("/api/tuning")) {
+    void handleTuningApi(req, res, (values) => {
+      for (const m of metas.values()) m.conn.send({ t: "tuning", values }); // 접속 중인 모두에게 바로 전달
+    });
     return;
   }
   if (!hasClient) {
@@ -83,6 +92,8 @@ wss.on("connection", (ws, req) => {
   const meta: Meta = { conn, alive: true, windowStart: Date.now(), count: 0 };
   metas.set(ws, meta);
   manager.connect(conn);
+  const tuned = tuneOverrides();
+  if (Object.keys(tuned).length > 0) conn.send({ t: "tuning", values: tuned }); // 조정된 수치가 있으면 클라이언트도 같은 값을 쓰게 한다
 
   ws.on("pong", () => (meta.alive = true));
   ws.on("message", (raw) => {

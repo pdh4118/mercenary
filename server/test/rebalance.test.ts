@@ -6,18 +6,16 @@ import {
   ENEMY_STATS,
   MERC_STATS,
   CAVALRY,
-  ASSAULT_ADVANCE,
-  GUARD_DIST,
   STANCE_ASSAULT,
   SHIELD,
   SPEAR,
   TICK_RATE,
   WEAPONS,
   WEAPON_SWITCH_DELAY_SEC,
-  ENEMY_TIME_HP_GROWTH,
   CARDS,
   LEGENDS,
   MERC_XP_NEED,
+  TUNE,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -95,7 +93,7 @@ test("적은 시간이 갈수록, 플레이어 레벨이 오를수록 단단해�
   };
   const base = hpAt(0, 1);
   assert.ok(Math.abs(base - ENEMY_STATS[SPEAR]!.hp) < 1e-6);
-  assert.ok(Math.abs(hpAt(60, 1) - base * (1 + ENEMY_TIME_HP_GROWTH)) < 1e-3, "60초 뒤에는 +12%");
+  assert.ok(Math.abs(hpAt(60, 1) - base * (1 + TUNE.ENEMY_TIME_HP_GROWTH)) < 1e-3, "60초 뒤에는 +12%");
   assert.ok(hpAt(60, 10) > hpAt(60, 1) * 1.2, "레벨이 높으면 더 단단하다");
 });
 
@@ -143,14 +141,14 @@ test("결과 기록에 준 피해·받은 피해·쓰러짐·금화·용병 수�
 });
 
 test("창 찌르기 범위는 폭이 일정한 직사각형이다", async () => {
-  const { inSpearBox, spearHalfWidth, SPEAR_HALF_WIDTH_NEAR, SPEAR_HALF_WIDTH_FAR } = await import("@mercenary/shared");
+  const { inSpearBox, spearHalfWidth } = await import("@mercenary/shared");
   const reach = 112;
-  assert.equal(SPEAR_HALF_WIDTH_NEAR, SPEAR_HALF_WIDTH_FAR);
-  for (const f of [0, 30, 60, 90, reach]) assert.equal(spearHalfWidth(f, reach), SPEAR_HALF_WIDTH_NEAR);
+  assert.equal(TUNE.SPEAR_HALF_WIDTH_NEAR, TUNE.SPEAR_HALF_WIDTH_FAR);
+  for (const f of [0, 30, 60, 90, reach]) assert.equal(spearHalfWidth(f, reach), TUNE.SPEAR_HALF_WIDTH_NEAR);
   // 가까운 곳이든 끝이든 같은 옆 거리에서 똑같이 맞고 빗나간다(반경 0인 대상)
   for (const f of [10, 60, reach - 2]) {
-    assert.ok(inSpearBox(0, 0, 0, f, SPEAR_HALF_WIDTH_NEAR - 2, 0, reach));
-    assert.ok(!inSpearBox(0, 0, 0, f, SPEAR_HALF_WIDTH_NEAR + 2, 0, reach));
+    assert.ok(inSpearBox(0, 0, 0, f, TUNE.SPEAR_HALF_WIDTH_NEAR - 2, 0, reach));
+    assert.ok(!inSpearBox(0, 0, 0, f, TUNE.SPEAR_HALF_WIDTH_NEAR + 2, 0, reach));
   }
   // 부채꼴과 달리 사거리 안에서도 옆으로 많이 벗어나면 안 맞고, 뒤쪽·사거리 밖도 안 맞는다
   assert.ok(!inSpearBox(0, 0, 0, 50, 40, 0, reach));
@@ -281,7 +279,7 @@ test("돌격 진형이면 대열이 앞으로 나가고 더 멀리 적을 쫓는
   assert.ok(g.setStance(a, STANCE_ASSAULT));
   assert.equal(g.getPlayer(a)!.stance, STANCE_ASSAULT);
   const after = g.formationSlots(a).get(merc)!;
-  assert.ok(Math.abs(Math.hypot(after[0] - before[0], after[1] - before[1]) - ASSAULT_ADVANCE) < 1e-6, "앞으로 ASSAULT_ADVANCE만큼");
+  assert.ok(Math.abs(Math.hypot(after[0] - before[0], after[1] - before[1]) - TUNE.ASSAULT_ADVANCE) < 1e-6, "앞으로 ASSAULT_ADVANCE만큼");
   assert.ok(!g.setStance(a, 7) && !g.setStance(a, "1" as unknown as number), "잘못된 값은 무시");
   // 기본 진형 leash 밖의 적은 따라가지 않고, 돌격 진형에서는 따라간다
   const chase = (stance: number) => {

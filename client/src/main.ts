@@ -33,8 +33,8 @@ import {
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
   STAGE_COUNT,
+  applyTuning,
   TOURNAMENT_ARENA_RADIUS,
-  TOURNAMENT_MATCH_SEC,
   CHEST_OPEN_RADIUS,
   MERC_STATS,
   mercName,
@@ -57,6 +57,7 @@ import {
   type PlayerState,
   type GameInfo,
   type ServerMsg,
+  TUNE,
 } from "@mercenary/shared";
 
 const params = new URLSearchParams(location.search);
@@ -456,7 +457,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · V 용병 진형(기본/돌격) · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -757,6 +758,10 @@ async function main() {
     };
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data) as ServerMsg;
+      if (msg.t === "tuning") {
+        applyTuning(msg.values, true); // 서버에서 조정한 수치를 같이 쓴다(화면의 사거리·범위 표시 등)
+        return;
+      }
       if (lobby.handle(msg)) return;
       if (msg.t === "notice") {
         toast.text = msg.text;
@@ -825,6 +830,10 @@ async function main() {
       send({ t: "input", dx, dy, aim, fire, revive });
     }
   };
+  // 용병 진형 모드: 기본 진형(주인공 주변을 지킨다) / 돌격 진형(대열이 앞으로 나가 더 멀리 쫓는다). V 키로 바꾼다.
+  const stanceBtns = [document.getElementById("stance0")!, document.getElementById("stance1")!];
+  const setStance = (v: number) => send({ t: "stance", v });
+  stanceBtns.forEach((b, i) => (b.onclick = () => setStance(i)));
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (formations.isOpen()) formations.close();
@@ -846,6 +855,11 @@ async function main() {
     }
     if (k === "u" && !e.repeat) {
       mercPanel.toggle();
+      return;
+    }
+    if (k === "v" && !e.repeat) {
+      const cur = latest?.players.find((p) => p.id === myId)?.stance ?? 0;
+      setStance(cur === 0 ? 1 : 0);
       return;
     }
     if (k === "r" && !e.repeat) {
@@ -960,7 +974,7 @@ async function main() {
     let big = "";
     if (tour.step === "intro") {
       big = `<div class="a">${esc(tour.title)}</div><div class="b">${esc(tour.an)} vs ${esc(tour.bn)}</div><div class="c">${fighter ? "준비하세요!" : "관전 중입니다"} ${tour.t}</div>`;
-    } else if (tour.step === "fight" && tour.t >= TOURNAMENT_MATCH_SEC - 1.5) {
+    } else if (tour.step === "fight" && tour.t >= TUNE.TOURNAMENT_MATCH_SEC - 1.5) {
       big = `<div class="b">시작!</div>`;
     } else if (tour.step === "outro") {
       big = `<div class="a">${esc(tour.title)}</div><div class="b">승자: ${esc(tour.winner)}</div>`;
@@ -1288,6 +1302,7 @@ async function main() {
       const mine = latest.mercs.filter((w) => w[5] === myId);
       const down = mine.filter((w) => w[8] > 0).length;
       const used = mine.reduce((sum, w) => sum + unitCost(w[4], w[15]), 0);
+      stanceBtns.forEach((b, i) => b.classList.toggle("active", (meState.stance ?? 0) === i));
       hudLv.text = `Lv ${meState.level}`;
       hudTime.text = `${m}:${s}`;
       hudHp.text = `HP ${Math.ceil(meState.hp)} / ${meState.maxHp}`;

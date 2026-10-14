@@ -1,6 +1,7 @@
 // 서버와 클라이언트가 함께 쓰는 규칙·프로토콜. 전투 규칙은 여기에 두어 양쪽이 어긋나지 않게 한다.
 
 export * from "./rules.js";
+export * from "./tuning.js";
 export * from "./cards.js";
 export * from "./formation.js";
 export * from "./tiers.js";
@@ -22,9 +23,7 @@ export const JOIN_FAIL_BLOCK_SEC = 60; // 이 시간 동안 참가 시도를 막
 export const RECONNECT_GRACE_SEC = 30; // 접속이 끊겨도 이 시간 안에 돌아오면 같은 캐릭터로 이어서 한다
 
 // 주인공
-export const PLAYER_SPEED = 220; // px/s
 export const PLAYER_RADIUS = 16;
-export const PLAYER_MAX_HP = 100;
 
 // 주인공 기본 공격(투사체). 병종이 없으므로 상성 배율은 적용되지 않는다.
 export const FIRE_COOLDOWN_SEC = 0.3;
@@ -62,8 +61,6 @@ export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 �
 // 적 생성
 export const ENEMY_SPAWN_DISTANCE = 650; // 플레이어로부터 이 거리(화면 밖)에서 생성
 export const ENEMY_MAX = 400;
-export const ENEMY_SPAWN_BASE_PER_SEC = 1.1; // 플레이어 1명당
-export const ENEMY_SPAWN_GROWTH_PER_SEC = 0.012; // 시간이 지날수록 초당 늘어나는 양
 
 export interface PlayerState {
   id: number;
@@ -265,6 +262,7 @@ export type ClientMsg =
 
 export type ServerMsg =
   | { t: "rooms"; rooms: RoomInfo[] } // 로비에 있는 동안 방 목록이 바뀔 때마다 온다
+  | { t: "tuning"; values: Record<string, number> } // 수치 조정 값(기본값과 다른 것만). 받으면 기본값으로 되돌린 뒤 적용한다
   | { t: "welcome"; id: number; tick: number; code: string; token: string } // token은 재접속에 쓴다
   | { t: "room"; code: string; name: string; hostId: number; phase: RoomPhase; private: boolean; players: RoomMember[] } // 방 구성이 바뀔 때마다
   | { t: "left"; reason: string } // 방에서 나왔다(스스로, 내보내짐, 방 종료)

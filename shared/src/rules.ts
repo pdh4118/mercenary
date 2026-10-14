@@ -1,5 +1,66 @@
 // 병종, 상성, 능력치, 가격. 서버 계산과 클라이언트 표시가 같은 값을 쓰도록 한 곳에 둔다.
 
+/** 서버 실행 중에도 수치 조정 도구로 바꿀 수 있는 숫자들(shared/src/tuning.ts가 이름·범위·설명을 관리한다) */
+export const TUNE = {
+  XP_BASE: 12, // 1레벨에서 필요한 경험치
+  XP_PER_LEVEL: 9, // 레벨이 오를 때마다 늘어나는 필요 경험치
+  START_LEADERSHIP: 5,
+  MERC_PRICE_GROWTH: 0.3, // 이미 가진 용병 1명당 가격 +30%
+  DISMISS_REFUND: 0.5, // 해고하면 지불한 금화의 이 비율을 돌려받는다
+  START_GOLD: 100,
+  CAMP_LIFETIME_SEC: 60,
+  CAMP_SPAWN_INTERVAL_SEC: 18,
+  XP_TEAM_SHARE: 0.5, // 팀 공유 비율. 나머지(0.5)는 처치한 사람 몫
+  STAGE_GROW_SEC: 150, // 스테이지당 자유 성장 시간(2분 30초)
+  STAGE_BREAK_SEC: 10, // 클리어 뒤 쉬는 시간(회복·부활·보상)
+  STAGE_ENEMY_HP_GROWTH: 0.3, // 스테이지가 오를 때마다 적 체력 +30%
+  STAGE_ENEMY_DMG_GROWTH: 0.14, // 적 피해 +14%
+  STAGE_SPAWN_GROWTH: 0.18, // 일반 적 생성량 +18%
+  ENEMY_TIME_HP_GROWTH: 0.12, // 스테이지 시작 후 60초마다 적 체력 +12%
+  ENEMY_TIME_DMG_GROWTH: 0.05, // 60초마다 적 피해 +5%
+  ENEMY_LEVEL_HP_GROWTH: 0.035, // 접속자 평균 레벨이 1 오를 때마다 적 체력 +3.5%
+  ENEMY_LEVEL_DMG_GROWTH: 0.015, // 적 피해 +1.5%
+  STAGE_CLEAR_GOLD: 40, // 클리어 보상 금화 = 이 값 x 스테이지 (모든 플레이어에게)
+  STAGE_CLEAR_XP: 30, // 클리어 보상 경험치 = 이 값 + 15 x 스테이지
+  BOSS_HP_BASE: 7, // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
+  BOSS_HP_PER_STAGE: 2.5,
+  BOSS_DMG_MULT: 1.6,
+  BOSS_TIMEOUT_SEC: 60,
+  REVIVE_SEC: 5, // 한 명이 눌러서 가득 채우는 데 걸리는 시간
+  CRIT_BASE_MULT: 1.5, // 치명타 기본 피해 배율
+  BACKSTAB_MULT: 1.5,
+  SHIELD_REGEN_SEC: 8, // 방패가 깨진 뒤 재생될 때까지
+  SPLASH_FACTOR: 0.5,
+  CAV_DAMAGE_PER_SPEED: 0.07, // 현재 속도(px/s) 1당 돌격 추가 피해
+  CAV_RAMP_SEC: 2, // 최대 속도까지 걸리는 시간
+  KNOCK_MAX: 160, // 한 번에 밀려나는 최대 거리
+  ARMY_BASE_UNITS: 10,
+  ARMY_UNITS_PER_STAGE: 6,
+  SQUAD_INTERVAL_BASE: 42, // 소대 간격(초). 스테이지가 오를수록 짧아진다
+  SQUAD_BASE_SIZE: 4,
+  TOURNAMENT_MATCH_SEC: 60, // 한 경기 제한 시간
+  TOURNAMENT_INTRO_SEC: 5, // 대진 소개(움직일 수 없다)
+  TOURNAMENT_WIN_GOLD: 30, // 경기 승리 보상 금화 = 이 값 x 스테이지
+  TOURNAMENT_CHAMPION_GOLD: 100, // 우승 보상 금화 = 이 값 x 스테이지
+  TOURNAMENT_CHAMPION_XP: 60, // 우승 보상 경험치 = 이 값 x 스테이지
+  TOURNAMENT_RUNNERUP_GOLD: 50, // 준우승 보상 금화 = 이 값 x 스테이지
+  CHEST_LUCK_BONUS: 1.5, // 상자 카드는 행운이 이만큼 더해진 것처럼 높은 등급이 잘 나온다
+  CHEST_LIFETIME_SEC: 300,
+  ASSAULT_ADVANCE: 200, // 돌격 진형은 대열의 중심이 주인공보다 이만큼 앞에 선다
+  ASSAULT_LEASH_MULT: 2.4, // 돌격 진형에서 용병이 진형 자리를 벗어날 수 있는 거리 배율
+  GUARD_DIST: 46, // 검방병이 지키는 아군과 위협 사이에서 서는 거리(아군으로부터)
+  SPEAR_COVER_DIST: 70, // 창병이 기병 위협을 막으려고 지키는 아군 앞에 서는 거리
+  ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
+  ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
+  ARCHER_KITE_MARGIN: 55,
+  SPEAR_HALF_WIDTH_NEAR: 18, // 몸 바로 앞의 반폭(px)
+  SPEAR_HALF_WIDTH_FAR: 18, // 사거리 끝의 반폭(px)
+  PLAYER_MAX_HP: 100,
+  PLAYER_SPEED: 220, // px/s
+  ENEMY_SPAWN_BASE_PER_SEC: 1.1, // 플레이어 1명당
+  ENEMY_SPAWN_GROWTH_PER_SEC: 0.012, // 시간이 지날수록 초당 늘어나는 양
+};
+
 export const CAVALRY = 0;
 export const SPEAR = 1;
 export const ARCHER = 2;
@@ -31,7 +92,6 @@ export const SHIELD_FRONT_ARC = rad(70); // 정면 반각. 이 안에서 오는 
  * 화살은 거의 막혀 방패가 오래 버티고, 철퇴는 방패를 쉽게 부순다. 기병의 돌격도 정면에서는 일부 흡수된다.
  */
 export const SHIELD_DAMAGE_FACTOR = [0.5, 0.6, 0.25, 1.0, 2.5] as const;
-export const SHIELD_REGEN_SEC = 8; // 방패가 깨진 뒤 재생될 때까지
 export const HERO_SWORD_FRONT_BLOCK = 0.5; // 주인공이 검을 들면 정면 피해가 이 배율로 줄어든다
 export function shieldFactor(srcType: number): number {
   return SHIELD_DAMAGE_FACTOR[srcType] ?? 1;
@@ -39,9 +99,7 @@ export function shieldFactor(srcType: number): number {
 
 // 기병 돌격
 export const CAV_SPEED_MIN_FRAC = 0.4; // 출발 속도(최대 속도 대비)
-export const CAV_RAMP_SEC = 2; // 최대 속도까지 걸리는 시간
 export const CAV_DECAY_SEC = 0.5; // 멈췄을 때 속도가 사라지는 시간
-export const CAV_DAMAGE_PER_SPEED = 0.07; // 현재 속도(px/s) 1당 돌격 추가 피해
 export const CAV_MOMENTUM_AFTER_HIT = 0.3; // 공격하면 속도가 이 비율로 줄어든다
 export const CAV_EVADE_SPEED_FRAC = 0.6; // 공격 직후 물러날 때의 속도(최대 속도 대비)
 /** 기병의 현재 속도. momentum 0..1 */
@@ -50,7 +108,7 @@ export function cavSpeed(maxSpeed: number, momentum: number): number {
 }
 /** 현재 속도에 비례한 돌격 추가 피해 */
 export function chargeBonus(maxSpeed: number, momentum: number): number {
-  return CAV_DAMAGE_PER_SPEED * cavSpeed(maxSpeed, momentum);
+  return TUNE.CAV_DAMAGE_PER_SPEED * cavSpeed(maxSpeed, momentum);
 }
 
 export interface UnitStats {
@@ -67,15 +125,12 @@ export interface UnitStats {
   shield: number; // 방패 체력(검방병만). 0이면 방패가 없다
   splash: number; // 범위 공격 반경(둔기병). 맞힌 대상 주변의 다른 적에게 SPLASH_FACTOR만큼 피해. 0이면 없음
 }
-export const SPLASH_FACTOR = 0.5;
 
 // 창 찌르기 범위: 부채꼴이 아니라 앞으로 뻗은 직사각형. 몸 앞에서 끝까지 폭이 같다(두 값을 다르게 두면 사다리꼴이 된다).
-export const SPEAR_HALF_WIDTH_NEAR = 18; // 몸 바로 앞의 반폭(px)
-export const SPEAR_HALF_WIDTH_FAR = 18; // 사거리 끝의 반폭(px)
 /** 사거리 reach인 창의 찌르기 범위가 앞에서 f만큼 떨어진 곳에서 갖는 반폭. widthMult는 범위 증가 능력 배율 */
 export function spearHalfWidth(f: number, reach: number, widthMult = 1): number {
   const t = Math.max(0, Math.min(1, f / reach));
-  return (SPEAR_HALF_WIDTH_NEAR + (SPEAR_HALF_WIDTH_FAR - SPEAR_HALF_WIDTH_NEAR) * t) * widthMult;
+  return (TUNE.SPEAR_HALF_WIDTH_NEAR + (TUNE.SPEAR_HALF_WIDTH_FAR - TUNE.SPEAR_HALF_WIDTH_NEAR) * t) * widthMult;
 }
 /** 대상(tx,ty, 반경 r)이 (ox,oy)에서 aim 방향으로 찌르는 창 범위 안에 있는가 */
 export function inSpearBox(ox: number, oy: number, aim: number, tx: number, ty: number, r: number, reach: number, widthMult = 1): boolean {
@@ -119,20 +174,16 @@ export const ENEMY_ARROW_SPEED = 260;
 
 // 용병 고용
 export const MERC_BASE_PRICE = [70, 40, 45, 50, 60] as const;
-export const MERC_PRICE_GROWTH = 0.3; // 이미 가진 용병 1명당 가격 +30%
 /** 통솔력 비용: 보유 용병의 비용 합이 통솔력(최대 병력 규모)을 넘을 수 없다. 기병만 2. */
 export const UNIT_COST = [2, 1, 1, 1, 1] as const;
-export const START_LEADERSHIP = 5;
 /** 통솔력과 별개로 개체 수를 묶어 두는 안전 한도 */
 export const MAX_MERCS_PER_PLAYER = 16;
 /** 쓰러진 뒤 부활까지(초). 기병은 유지 부담으로 더 오래 걸린다. */
 export const MERC_RESPAWN_SEC = [40, 30, 30, 30, 30] as const;
-export const DISMISS_REFUND = 0.5; // 해고하면 지불한 금화의 이 비율을 돌려받는다
-export const START_GOLD = 100;
 
 export function mercPrice(type: number, owned: number): number {
   const base = MERC_BASE_PRICE[type] ?? 0;
-  return Math.round(base * (1 + MERC_PRICE_GROWTH * owned));
+  return Math.round(base * (1 + TUNE.MERC_PRICE_GROWTH * owned));
 }
 
 // 기병 운용
@@ -147,7 +198,6 @@ export const CHARGE_MAX_DISTANCE = 900; // 주인공으로부터 이 거리까�
 export const CHARGE_TARGET_RADIUS = 300; // 돌격 지점 주변에서 대상을 찾는 반경
 
 // 궁병 카이팅: 근접 적이 (적 사거리 + 이 여유) 안으로 들어오면 뒤로 물러나며 쏜다
-export const ARCHER_KITE_MARGIN = 55;
 export const ARCHER_KITE_SPEED_MULT = 1.15;
 export const ARCHER_KITE_HOME_PULL = 0.7; // 물러날 때 진형 자리 쪽으로 끌리는 정도(적진 반대편으로 달아나지 않게)
 
@@ -155,20 +205,14 @@ export const ARCHER_KITE_HOME_PULL = 0.7; // 물러날 때 진형 자리 쪽으�
 export const STANCE_DEFEND = 0;
 export const STANCE_ASSAULT = 1;
 export const STANCE_NAMES = ["기본 진형", "돌격 진형"] as const;
-export const ASSAULT_ADVANCE = 200; // 돌격 진형은 대열의 중심이 주인공보다 이만큼 앞에 선다
-export const ASSAULT_LEASH_MULT = 2.4; // 돌격 진형에서 용병이 진형 자리를 벗어날 수 있는 거리 배율
 export const ASSAULT_LEASH_MULT_CAVALRY = 1.6;
 
 // 병종별 역할 AI
 /** 검방병이 지키려는 아군의 취약도(병종별: 기병, 창병, 궁병, 검방병, 둔기병). 주인공은 HERO_WARD_WEIGHT */
 export const WARD_WEIGHT = [1.2, 1.6, 3, 0.9, 1.4] as const;
 export const HERO_WARD_WEIGHT = 2.6;
-export const GUARD_DIST = 46; // 검방병이 지키는 아군과 위협 사이에서 서는 거리(아군으로부터)
 export const GUARD_THREAT_RADIUS = 320; // 지키는 아군 둘레에서 위협으로 보는 거리
-export const ARCHER_REACH_FRAC = 0.88; // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
-export const ARCHER_ROAM = 240; // 궁병이 진형 자리에서 벗어날 수 있는 거리
 export const ARCHER_STRAFE_SEC = 2.5; // 방패 정면을 피해 돌아가려고 시도하는 최대 시간
-export const SPEAR_COVER_DIST = 70; // 창병이 기병 위협을 막으려고 지키는 아군 앞에 서는 거리
 export const SPEAR_WATCH_RANGE = 520; // 창병이 적 기병을 주시하는 거리
 /** 기병이 노릴 가치(적 병종별: 기병, 창병, 궁병, 검방병, 둔기병). 궁병과 둔기병을 먼저, 정면의 방패는 나중에 */
 export const CAV_TARGET_WEIGHT = [1, 1, 2.2, 0.5, 1.8] as const;
@@ -177,9 +221,7 @@ export const BLUNT_SHIELD_PREF = 2.6;
 
 // 캠프(용병을 고용할 수 있는 곳)
 export const CAMP_OFFERS = 3;
-export const CAMP_LIFETIME_SEC = 60;
 export const CAMP_FIRST_SPAWN_SEC = 5;
-export const CAMP_SPAWN_INTERVAL_SEC = 18;
 export const CAMP_USE_RADIUS = 120;
 export const CAMP_MAX = 4;
 
@@ -202,9 +244,8 @@ export function angleDiff(a: number, b: number): number {
 
 // 경험치와 레벨: 처치 경험치의 일부는 처치한 사람에게, 나머지는 모든 플레이어에게 똑같이 나뉜다(뒤처져도 따라갈 수 있게).
 export const ENEMY_XP = [3, 2.5, 2.5, 3, 4] as const; // 병종별 처치 경험치
-export const XP_TEAM_SHARE = 0.5; // 팀 공유 비율. 나머지(0.5)는 처치한 사람 몫
 export function xpNeeded(level: number): number {
-  return 12 + 9 * (level - 1); // 레벨업이 잦도록 낮게 잡았다
+  return TUNE.XP_BASE + TUNE.XP_PER_LEVEL * (level - 1); // 레벨업이 잦도록 낮게 잡았다
 }
 
 // 레벨업 순간의 밀어내기: 주변 적을 밀쳐 내고 잠깐 공격하지 못하게 한다(카드를 고를 숨 돌릴 틈)
@@ -215,22 +256,9 @@ export const LEVELUP_STUN_SEC = 0.8;
 // --- 스테이지와 보스군 -----------------------------------------------------------
 // 스테이지마다 자유 성장 시간(적이 계속 몰려옴) → 보스군 진격 → 보스(장군)를 쓰러뜨리면 클리어. 10스테이지를 모두 깨면 승리.
 export const STAGE_COUNT = 10;
-export const STAGE_GROW_SEC = 150; // 스테이지당 자유 성장 시간(2분 30초)
-export const STAGE_BREAK_SEC = 10; // 클리어 뒤 쉬는 시간(회복·부활·보상)
-export const STAGE_ENEMY_HP_GROWTH = 0.3; // 스테이지가 오를 때마다 적 체력 +30%
-export const STAGE_ENEMY_DMG_GROWTH = 0.14; // 적 피해 +14%
-export const STAGE_SPAWN_GROWTH = 0.18; // 일반 적 생성량 +18%
 // 같은 스테이지 안에서도 시간이 갈수록, 그리고 플레이어 레벨이 오를수록 적이 단단해진다(성장을 따라잡는다).
-export const ENEMY_TIME_HP_GROWTH = 0.12; // 스테이지 시작 후 60초마다 적 체력 +12%
-export const ENEMY_TIME_DMG_GROWTH = 0.05; // 60초마다 적 피해 +5%
-export const ENEMY_LEVEL_HP_GROWTH = 0.035; // 접속자 평균 레벨이 1 오를 때마다 적 체력 +3.5%
-export const ENEMY_LEVEL_DMG_GROWTH = 0.015; // 적 피해 +1.5%
-export const STAGE_CLEAR_GOLD = 40; // 클리어 보상 금화 = 이 값 x 스테이지 (모든 플레이어에게)
-export const STAGE_CLEAR_XP = 30; // 클리어 보상 경험치 = 이 값 + 15 x 스테이지
 
 // 보스군: 진형과 병종 조합을 갖춰 천천히 행군해 온다. 인원 수에 비례해 커진다.
-export const ARMY_BASE_UNITS = 10;
-export const ARMY_UNITS_PER_STAGE = 6;
 export const ARMY_PLAYER_EXPONENT = 0.8; // 병력 = (기본 + 스테이지 x 증가) x 인원^0.8
 export const ARMY_MAX_UNITS = 260;
 export const ARMY_SPAWN_DISTANCE = 900;
@@ -244,42 +272,28 @@ export const ARMY_RANK_WIDTH = 10; // 한 줄 최대 인원
 /** 스테이지별 보스(장군) 병종: 방패, 창, 기병, 둔기, 궁, 방패, 둔기, 기병, 창, 둔기 */
 // 소대: 보스가 아닐 때도 가끔 소규모 혼성 부대가 진형을 갖추고 다가온다
 export const SQUAD_FIRST_SEC = 30; // 스테이지 시작 뒤 첫 소대까지
-export const SQUAD_INTERVAL_BASE = 42; // 소대 간격(초). 스테이지가 오를수록 짧아진다
 export const SQUAD_INTERVAL_STAGE = 3;
 export const SQUAD_INTERVAL_MIN = 20;
-export const SQUAD_BASE_SIZE = 4;
 export const SQUAD_MAX_SIZE = 14;
 export const SQUAD_SPAWN_DISTANCE = 700;
 export const SQUAD_MARCH_MULT = 1.3; // 보스군보다 빠르게 행군한다
 export const SQUAD_CLEAR_GOLD = 4; // 소대를 전멸시키면 병사 1명당 모든 플레이어가 받는 금화
 export const BOSS_TYPES = [SHIELD, SPEAR, CAVALRY, BLUNT, ARCHER, SHIELD, BLUNT, CAVALRY, SPEAR, BLUNT] as const;
-export const BOSS_HP_BASE = 7; // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
-export const BOSS_HP_PER_STAGE = 2.5;
-export const BOSS_DMG_MULT = 1.6;
 export const BOSS_SIZE = 1.7; // 반경·그림 크기 배율
 export const BOSS_SPEED_MULT = 0.9;
 
 // 보스를 못 잡아도 보스군이 나타난 지 이만큼 지나면 다음 스테이지로 넘어간다(보스군은 사라지고 보상은 없다). 마지막 스테이지는 예외.
-export const BOSS_TIMEOUT_SEC = 60;
 // 보스를 쓰러뜨리면 접속한 인원 수만큼 상자가 떨어진다. 상자마다 주인이 있고, 주인이 다가가면 열려 카드 한 장을 고른다(레벨업과 별개).
 export const CHEST_OPEN_RADIUS = 60;
-export const CHEST_LIFETIME_SEC = 300;
-export const CHEST_LUCK_BONUS = 1.5; // 상자 카드는 행운이 이만큼 더해진 것처럼 높은 등급이 잘 나온다
 
 // --- 토너먼트 ----------------------------------------------------------------------
 // 이 스테이지의 보스를 쓰러뜨리면 남은 적을 모두 없애고, 접속한 플레이어끼리 1대1 토너먼트를 연다(2명 이상일 때).
 // 각자 자기 용병을 데리고 싸우고, 주인공이 쓰러지면 진다. 시간이 다 되면 남은 체력 비율이 높은 쪽이 이긴다.
 export const TOURNAMENT_STAGES = [3, 6, 9, 10] as const;
-export const TOURNAMENT_INTRO_SEC = 5; // 대진 소개(움직일 수 없다)
-export const TOURNAMENT_MATCH_SEC = 60; // 한 경기 제한 시간
 export const TOURNAMENT_OUTRO_SEC = 4; // 경기 뒤 결과 표시
 export const TOURNAMENT_END_SEC = 7; // 우승자 발표
 export const TOURNAMENT_ARENA_RADIUS = 450; // 경기장 반지름(px). 월드 중앙
 export const TOURNAMENT_START_DIST = 300; // 두 선수가 중앙에서 떨어져 서는 거리
-export const TOURNAMENT_WIN_GOLD = 30; // 경기 승리 보상 금화 = 이 값 x 스테이지
-export const TOURNAMENT_CHAMPION_GOLD = 100; // 우승 보상 금화 = 이 값 x 스테이지
-export const TOURNAMENT_CHAMPION_XP = 60; // 우승 보상 경험치 = 이 값 x 스테이지
-export const TOURNAMENT_RUNNERUP_GOLD = 50; // 준우승 보상 금화 = 이 값 x 스테이지
 export const isTournamentStage = (stage: number): boolean => (TOURNAMENT_STAGES as readonly number[]).includes(stage);
 /** n명이 겨루는 토너먼트의 라운드 이름: 결승, 준결승, 8강... (roundsLeft는 이 라운드를 포함해 남은 라운드 수) */
 export const tournamentRoundName = (roundsLeft: number): string => (roundsLeft <= 1 ? "결승" : roundsLeft === 2 ? "준결승" : `${2 ** roundsLeft}강`);
@@ -288,20 +302,16 @@ export const tournamentRoundName = (roundsLeft: number): string => (roundsLeft <
 // 주인공은 체력이 0이 되면 쓰러지고 저절로 일어나지 않는다. 다른 주인공이 곁에서 부활 키를 누르고 있으면 일으켜 세울 수 있다.
 // 모든 주인공이 동시에 쓰러져 있으면 게임 오버. 스테이지를 클리어하면 모두 회복·부활한다.
 export const REVIVE_RADIUS = 70;
-export const REVIVE_SEC = 5; // 한 명이 눌러서 가득 채우는 데 걸리는 시간
 export const REVIVE_DECAY_FACTOR = 0.25; // 멈추면 진행도가 채울 때의 이 배율로 천천히 줄어든다(이어서 할 수 있게)
 export const REVIVE_HP_FRAC = 0.5;
 export const REVIVE_INVULN_SEC = 2;
 
 // 공격 능력치(레벨업 카드)
-export const CRIT_BASE_MULT = 1.5; // 치명타 기본 피해 배율
 export const CRIT_MAX_CHANCE = 0.75; // 치명타 확률 상한
 export const DEFENSE_MAX = 0.6; // 방어력(피해 감소) 상한
 export const DODGE_MAX = 0.5; // 회피율 상한
 // 배후 공격: 방어하는 쪽의 등 뒤에서 오는 공격은 피해가 늘어난다(기병의 우회가 빛난다). 적·아군 모두에게 적용된다.
-export const BACKSTAB_MULT = 1.5;
 export const BACKSTAB_ARC = rad(60); // 등 뒤 반각(전체 120도)
 export const KNOCK_BOSS_FACTOR = 0.25; // 보스는 넉백이 이만큼만 먹힌다
-export const KNOCK_MAX = 160; // 한 번에 밀려나는 최대 거리
 export const KNOCK_STUN_SEC = 0.4; // 밀려난 적이 공격하지 못하는 시간
 export const AREA_ARC_MAX = 2.4; // 범위 증가로 넓어지는 근접 부채꼴 반각 상한(라디안)

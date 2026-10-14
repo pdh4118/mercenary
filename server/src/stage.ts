@@ -1,25 +1,23 @@
 import {
   ARCHER,
-  ARMY_BASE_UNITS,
   ARMY_LATERAL_SPACING,
   ARMY_MAX_UNITS,
   ARMY_PLAYER_EXPONENT,
   ARMY_RANK_SPACING,
   ARMY_RANK_WIDTH,
-  ARMY_UNITS_PER_STAGE,
   BLUNT,
   BOSS_TYPES,
   CAVALRY,
   SHIELD,
   SPEAR,
-  SQUAD_BASE_SIZE,
   SQUAD_MAX_SIZE,
   STAGE_COUNT,
+  TUNE,
 } from "@mercenary/shared";
 
 /** 보스군 병력(장군 제외) = (기본 + 증가 x (스테이지-1)) x 접속 인원^0.8 */
 export function armySize(stage: number, players: number): number {
-  const raw = (ARMY_BASE_UNITS + ARMY_UNITS_PER_STAGE * (stage - 1)) * Math.pow(Math.max(1, players), ARMY_PLAYER_EXPONENT);
+  const raw = (TUNE.ARMY_BASE_UNITS + TUNE.ARMY_UNITS_PER_STAGE * (stage - 1)) * Math.pow(Math.max(1, players), ARMY_PLAYER_EXPONENT);
   return Math.min(ARMY_MAX_UNITS, Math.round(raw));
 }
 
@@ -111,7 +109,7 @@ export const SQUAD_KINDS: readonly SquadKind[] = [
 
 /** 소대 규모: 스테이지와 접속 인원이 늘수록 커진다 */
 export function squadSize(stage: number, players: number): number {
-  return Math.min(SQUAD_MAX_SIZE, SQUAD_BASE_SIZE + stage + Math.round(0.8 * Math.max(1, players)));
+  return Math.min(SQUAD_MAX_SIZE, TUNE.SQUAD_BASE_SIZE + stage + Math.round(0.8 * Math.max(1, players)));
 }
 
 /** 소대 구성: 비율대로 나누되, 충분히 큰 소대라면 비중이 있는 병종이 최소 1명은 들어가게 한다(보완하는 짝이 비지 않게). */

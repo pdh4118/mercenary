@@ -6,13 +6,13 @@ import {
   MAX_PLAYERS,
   MAX_ROOMS,
   NAME_MAX_LENGTH,
-  PLAYER_MAX_HP,
   RECONNECT_GRACE_SEC,
   ROOM_CODE_LENGTH,
   ROOM_NAME_MAX_LENGTH,
   SPEAR,
   TICK_RATE,
   type ServerMsg,
+  TUNE,
 } from "@mercenary/shared";
 import { RoomManager, type Conn } from "../src/rooms.js";
 
@@ -277,7 +277,7 @@ test("끊긴 동안 주인공은 적의 목표가 되지 않는다", () => {
   for (let i = 0; i < 5; i++) game.spawnEnemyAt(p.x + 10, p.y, SPEAR);
   m.disconnect(a);
   seconds(m, 5);
-  assert.equal(game.getPlayer(id)!.hp, PLAYER_MAX_HP);
+  assert.equal(game.getPlayer(id)!.hp, TUNE.PLAYER_MAX_HP);
 });
 
 test("같은 토큰으로 다른 곳에서 다시 접속하면 이전 연결은 밀려난다", () => {

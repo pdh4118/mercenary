@@ -13,12 +13,10 @@ import {
   CARDS,
   ENEMY_XP,
   OFFER_SIZE,
-  XP_TEAM_SHARE,
   xpNeeded,
   CAVALRY,
   CHARGE_DURATION_SEC,
   CHARGE_MAX_DISTANCE,
-  DISMISS_REFUND,
   ENEMY_GOLD,
   ENEMY_MAX,
   ENEMY_SPAWN_DISTANCE,
@@ -28,22 +26,17 @@ import {
   MAX_PLAYERS,
   MERC_RESPAWN_SEC,
   MERC_STATS,
-  PLAYER_MAX_HP,
-  PLAYER_SPEED,
   SHIELD,
   SPEAR,
-  START_GOLD,
-  START_LEADERSHIP,
   UNIT_COST,
   TICK_RATE,
   WORLD_SIZE,
   mercPrice,
   SHIELD_DAMAGE_FACTOR,
-  SHIELD_REGEN_SEC,
-  SPLASH_FACTOR,
   HERO_SWORD_FRONT_BLOCK,
   chargeBonus,
   SWARM_PER_MERC,
+  TUNE,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -98,9 +91,9 @@ test("입력대로 이동하고 대각선도 같은 속도다", () => {
   g.setInput(a, { ...idle, dx: 1 });
   g.setInput(b, { ...idle, dx: 1, dy: 1 });
   run(g, 1);
-  assert.ok(Math.abs(me(g, a).x - a0.x - PLAYER_SPEED) < 1e-6);
+  assert.ok(Math.abs(me(g, a).x - a0.x - TUNE.PLAYER_SPEED) < 1e-6);
   const b1 = me(g, b);
-  assert.ok(Math.abs(Math.hypot(b1.x - b0.x, b1.y - b0.y) - PLAYER_SPEED) < 1e-6);
+  assert.ok(Math.abs(Math.hypot(b1.x - b0.x, b1.y - b0.y) - TUNE.PLAYER_SPEED) < 1e-6);
 });
 
 test("조작된 입력(범위 초과·NaN)은 보정된다", () => {
@@ -110,7 +103,7 @@ test("조작된 입력(범위 초과·NaN)은 보정된다", () => {
   g.setInput(a, { dx: 999, dy: Number.NaN, aim: Infinity, fire: "yes" });
   run(g, 1);
   const a1 = me(g, a);
-  assert.ok(a1.x - a0.x <= PLAYER_SPEED + 1e-6);
+  assert.ok(a1.x - a0.x <= TUNE.PLAYER_SPEED + 1e-6);
   assert.equal(a1.y, a0.y);
   assert.equal(g.snapshotBullets().length, 0); // fire는 true일 때만 인정
 });
@@ -170,7 +163,7 @@ test("주인공 투사체로 적을 처치하면 처치 수와 금화가 오른�
   g.setInput(a, { ...idle, fire: true });
   run(g, 3);
   assert.ok(me(g, a).kills >= 1);
-  assert.equal(me(g, a).gold, START_GOLD + ENEMY_GOLD[SPEAR]!);
+  assert.equal(me(g, a).gold, TUNE.START_GOLD + ENEMY_GOLD[SPEAR]!);
 });
 
 test("연사 속도(쿨다운)가 지켜진다", () => {
@@ -191,9 +184,9 @@ test("닿는다고 바로 피해를 입지 않고, 공격 예비 동작이 끝�
   g.step();
   const e = g.snapshotEnemies()[0]!;
   assert.ok(e[5] > 0, "공격 예비 동작이 시작되어야 한다");
-  assert.equal(me(g, a).hp, PLAYER_MAX_HP);
+  assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP);
   run(g, ENEMY_STATS[SPEAR]!.windup + 0.1);
-  assert.equal(me(g, a).hp, PLAYER_MAX_HP - ENEMY_STATS[SPEAR]!.damage);
+  assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP - ENEMY_STATS[SPEAR]!.damage);
 });
 
 test("예비 동작 중에 피하면 맞지 않는다", () => {
@@ -204,7 +197,7 @@ test("예비 동작 중에 피하면 맞지 않는다", () => {
   g.step();
   g.setInput(a, { ...idle, dx: -1 }); // 반대쪽으로 도망
   run(g, ENEMY_STATS[SPEAR]!.windup + 0.1);
-  assert.equal(me(g, a).hp, PLAYER_MAX_HP);
+  assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP);
 });
 
 test("공격 부채꼴 바깥에 있으면 맞지 않는다", () => {
@@ -216,7 +209,7 @@ test("공격 부채꼴 바깥에 있으면 맞지 않는다", () => {
   // 창병의 부채꼴은 좁다(약 22도). 예비 동작 동안 옆으로 비켜 서면 빗나간다.
   g.setInput(a, { ...idle, dy: 1 });
   run(g, ENEMY_STATS[SPEAR]!.windup);
-  assert.equal(me(g, a).hp, PLAYER_MAX_HP);
+  assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP);
 });
 
 test("적 기병의 돌격: 창병 용병은 돌격 피해를 받지 않고 되돌려주며, 다른 병종은 속도에 비례해 더 아프게 맞는다", () => {
@@ -248,7 +241,7 @@ test("적 궁병의 화살은 날아가서 맞는다", () => {
   const p = me(g, a);
   g.spawnEnemyAt(p.x + 200, p.y, ARCHER);
   run(g, 2);
-  assert.ok(me(g, a).hp < PLAYER_MAX_HP);
+  assert.ok(me(g, a).hp < TUNE.PLAYER_MAX_HP);
 });
 
 test("체력이 0이 되면 쓰러지고, 혼자뿐이면 게임오버가 된다", () => {
@@ -294,7 +287,7 @@ test("캠프 근처에서 금화로 용병을 고용한다", () => {
   const camp = g.spawnCampAt(p.x + 30, p.y, [ARCHER, SPEAR, SHIELD]);
   assert.deepEqual(g.buy(a, camp, 0), { ok: true });
   assert.equal(g.countMercs(a), 1);
-  assert.equal(me(g, a).gold, START_GOLD - mercPrice(ARCHER, 0));
+  assert.equal(me(g, a).gold, TUNE.START_GOLD - mercPrice(ARCHER, 0));
   // 두 번째는 더 비싸다
   const before = me(g, a).gold;
   const second = g.buy(a, camp, 1);
@@ -322,12 +315,12 @@ test("고용 검증: 금화 부족·거리·잘못된 선택·보유 한도", ()
   assert.equal(g.countMercs(a), 0);
   // 통솔력: 시작 통솔력만큼만 보유할 수 있다
   live.gold = 100000;
-  for (let i = 0; i < START_LEADERSHIP; i++) assert.equal(g.buy(a, near, 1).ok, true);
+  for (let i = 0; i < TUNE.START_LEADERSHIP; i++) assert.equal(g.buy(a, near, 1).ok, true);
   const refused = g.buy(a, near, 1);
   assert.equal(refused.ok, false);
   // 통솔력을 늘리면 더 고용할 수 있고, 개체 수 안전 한도는 그대로 지킨다
   g.addLeadership(a, 100);
-  for (let i = START_LEADERSHIP; i < MAX_MERCS_PER_PLAYER; i++) assert.equal(g.buy(a, near, 1).ok, true);
+  for (let i = TUNE.START_LEADERSHIP; i < MAX_MERCS_PER_PLAYER; i++) assert.equal(g.buy(a, near, 1).ok, true);
   assert.equal(g.buy(a, near, 1).ok, false);
 });
 
@@ -360,7 +353,7 @@ test("해고: 캠프 근처에서만, 지불한 금화의 절반을 돌려받고
   assert.equal(g.buy(a, camp, 0).ok, true);
   assert.equal(live.gold, 1000 - mercPrice(SPEAR, 0));
   assert.equal(g.dismiss(a, SPEAR).ok, true);
-  assert.equal(live.gold, 1000 - mercPrice(SPEAR, 0) + Math.floor(mercPrice(SPEAR, 0) * DISMISS_REFUND));
+  assert.equal(live.gold, 1000 - mercPrice(SPEAR, 0) + Math.floor(mercPrice(SPEAR, 0) * TUNE.DISMISS_REFUND));
   assert.equal(g.leadershipUsed(a), 0);
 
   // 체력이 낮은 쪽이 먼저 나간다
@@ -429,7 +422,7 @@ test("용병이 처치하면 주인이 금화를 얻는다", () => {
   g.spawnEnemyAt(p.x + 60 + 30, p.y, ARCHER); // 둔기병은 궁병에게 배율 1, 피해 18 ≥ 체력 18
   run(g, 1.5);
   assert.equal(g.enemyCount, 0);
-  assert.equal(me(g, a).gold, START_GOLD + ENEMY_GOLD[ARCHER]!);
+  assert.equal(me(g, a).gold, TUNE.START_GOLD + ENEMY_GOLD[ARCHER]!);
   assert.equal(me(g, a).kills, 1);
 });
 
@@ -489,7 +482,7 @@ test("기병은 오래 걸리는 부활 시간을 가진다", () => {
   const c = g.addMerc(a, CAVALRY, p.x + 300, p.y);
   const spear = g.addMerc(a, SPEAR, p.x - 300, p.y);
   for (let i = 0; i < 400 && (g.getMerc(c)!.respawn === 0 || g.getMerc(spear)!.respawn === 0); i++) {
-    g.getPlayer(a)!.hp = PLAYER_MAX_HP; // 주인공이 먼저 쓰러져 게임이 끝나지 않게
+    g.getPlayer(a)!.hp = TUNE.PLAYER_MAX_HP; // 주인공이 먼저 쓰러져 게임이 끝나지 않게
     if (i % 4 === 0) {
       g.spawnEnemyAt(g.getMerc(c)!.x, g.getMerc(c)!.y, BLUNT);
       g.spawnEnemyAt(g.getMerc(spear)!.x, g.getMerc(spear)!.y, BLUNT);
@@ -609,8 +602,8 @@ test("경험치: 처치한 사람 50%, 나머지 50%는 모두에게 똑같이 �
   g.getPlayer(b)!.x = -1500; // 멀리 떨어져 있어도 팀 몫은 받는다
   killOne(g, a);
   const xp = ENEMY_XP[SPEAR]!;
-  const share = (xp * XP_TEAM_SHARE) / 3;
-  assert.ok(Math.abs(g.getPlayer(a)!.xp - (xp * (1 - XP_TEAM_SHARE) + share)) < 1e-9);
+  const share = (xp * TUNE.XP_TEAM_SHARE) / 3;
+  assert.ok(Math.abs(g.getPlayer(a)!.xp - (xp * (1 - TUNE.XP_TEAM_SHARE) + share)) < 1e-9);
   assert.ok(Math.abs(g.getPlayer(b)!.xp - share) < 1e-9);
   assert.ok(Math.abs(g.getPlayer(c)!.xp - share) < 1e-9);
 });
@@ -667,7 +660,7 @@ test("레벨업 선택: 효과가 적용되고 쌓인 선택이 이어서 뜬다
   const leadershipCard = CARDS.findIndex((c) => c.effect.k === "leadership" && c.effect.v === 1);
   p.offer = [leadershipCard, p.offer[1]!, p.offer[2]!];
   assert.equal(g.pick(a, 0), true);
-  assert.equal(p.leadership, START_LEADERSHIP + 1);
+  assert.equal(p.leadership, TUNE.START_LEADERSHIP + 1);
   assert.equal(p.pending, 1);
   assert.equal(p.offer.length, OFFER_SIZE, "남은 선택이 이어서 뜬다");
   assert.equal(g.pick(a, 1), true);
@@ -720,8 +713,8 @@ test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   forceCard(g, a, "heroMaxHp");
-  assert.equal(g.getPlayer(a)!.maxHp, PLAYER_MAX_HP + 25);
-  assert.equal(g.getPlayer(a)!.hp, PLAYER_MAX_HP + 25);
+  assert.equal(g.getPlayer(a)!.maxHp, TUNE.PLAYER_MAX_HP + 25);
+  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 25);
   forceCard(g, a, "priceMult");
   assert.ok(Math.abs(g.getPlayer(a)!.priceMult - 0.85) < 1e-9);
   const p = me(g, a);
@@ -742,7 +735,7 @@ test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
   const x0 = me(g, a).x;
   g.setInput(a, { ...idle, dx: 1 });
   run(g, 1);
-  assert.ok(Math.abs(me(g, a).x - x0 - PLAYER_SPEED * 1.08) < 1e-6);
+  assert.ok(Math.abs(me(g, a).x - x0 - TUNE.PLAYER_SPEED * 1.08) < 1e-6);
   g.setInput(a, idle);
   forceCard(g, a, "heroRegen");
   g.getPlayer(a)!.hp = 50;
@@ -885,7 +878,7 @@ test("레벨업하면 주변 적이 밀려나고 하던 공격이 끊기며 잠�
   assert.ok(e.cd >= LEVELUP_STUN_SEC - 1e-9);
   assert.equal(g.getEnemy(far)!.x, farX, "범위 밖의 적은 그대로");
   run(g, 0.5);
-  assert.equal(me(g, a).hp, PLAYER_MAX_HP, "그 사이 피해를 입지 않는다");
+  assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP, "그 사이 피해를 입지 않는다");
 });
 
 // --- 새 병종 규칙(방패·돌격·반사·범위) ---------------------------------------------
@@ -903,7 +896,7 @@ test("철퇴는 맞힌 대상 주변의 다른 적에게 절반 피해(범위 �
   run(g, WEAPONS[3]!.windup + 0.2); // 준비 동작이 끝나야 휘두른다
   const dmg = WEAPONS[3]!.damage;
   assert.equal(g.getEnemy(main)?.hp ?? 0, Math.max(0, ENEMY_STATS[SPEAR]!.hp - dmg), "정면의 대상은 전부 맞는다");
-  assert.ok(Math.abs(g.getEnemy(near)!.hp - (ENEMY_STATS[SPEAR]!.hp - dmg * SPLASH_FACTOR)) < 1e-6, "주변 적은 절반만 맞는다");
+  assert.ok(Math.abs(g.getEnemy(near)!.hp - (ENEMY_STATS[SPEAR]!.hp - dmg * TUNE.SPLASH_FACTOR)) < 1e-6, "주변 적은 절반만 맞는다");
   assert.equal(g.getEnemy(far)!.hp, ENEMY_STATS[SPEAR]!.hp);
 });
 
@@ -917,7 +910,7 @@ test("검을 들면 정면 피해가 절반이고, 창을 들면 기병의 돌�
     const e = g.spawnEnemyAt(p.x + 25, p.y, enemyType); // 정면
     if (momentum) (g.getEnemy(e) as { momentum: number }).momentum = momentum;
     run(g, 0.9);
-    return { lost: PLAYER_MAX_HP - me(g, a).hp, enemyHp: g.getEnemy(e)?.hp ?? 0 };
+    return { lost: TUNE.PLAYER_MAX_HP - me(g, a).hp, enemyHp: g.getEnemy(e)?.hp ?? 0 };
   };
   const bow = hpLost(0, SPEAR).lost;
   const sword = hpLost(2, SPEAR).lost;
@@ -983,12 +976,12 @@ test("방패는 깨져도 일정 시간 뒤 다시 생기고, 재생 중에는 �
   const max = MERC_STATS[SHIELD]!.shield;
   assert.equal(live.shield, max);
   live.shield = 0;
-  live.regenT = SHIELD_REGEN_SEC;
+  live.regenT = TUNE.SHIELD_REGEN_SEC;
   const wire = g.snapshotMercs().find((w) => w[0] === m)!;
   assert.equal(wire[10], 0);
   assert.equal(wire[11], max);
   assert.ok(wire[14] > 0, "재생 대기 시간이 전달된다");
-  run(g, SHIELD_REGEN_SEC - 1);
+  run(g, TUNE.SHIELD_REGEN_SEC - 1);
   assert.equal(g.getMerc(m)!.shield, 0);
   run(g, 1.2);
   assert.equal(g.getMerc(m)!.shield, max);
@@ -1078,7 +1071,7 @@ test("방어력: 받는 피해가 비율만큼 줄어든다", () => {
     const p = g.getPlayer(a)!;
     g.spawnEnemyAt(p.x + 20, p.y, 4);
     run(g, 1.5);
-    return PLAYER_MAX_HP - g.getPlayer(a)!.hp;
+    return TUNE.PLAYER_MAX_HP - g.getPlayer(a)!.hp;
   };
   const base = dealt(0);
   assert.ok(base > 0);
@@ -1093,7 +1086,7 @@ test("회피율: 확률 100%(상한 50%)에 rng가 0이면 공격을 완전히 �
   const p = g.getPlayer(a)!;
   g.spawnEnemyAt(p.x + 20, p.y, 4);
   run(g, 2);
-  assert.equal(g.getPlayer(a)!.hp, PLAYER_MAX_HP);
+  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP);
   assert.ok(g.takeEvents().some((e) => e[0] === 6));
 });
 
