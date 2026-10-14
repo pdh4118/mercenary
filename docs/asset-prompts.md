@@ -251,18 +251,81 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 
 ## 10. 사운드 (효과음) 요청 목록
 
-효과음 생성 도구에 쓰실 문구입니다. 짧게(0.1~0.6초) 만들고, **같은 소리가 수십 번 겹쳐도 거슬리지 않게** 낮고 둥근 소리로 요청하세요.
+효과음 생성 도구(예: 텍스트로 효과음을 만드는 AI)나 음향 작가에게 그대로 붙여 넣는 문구입니다. 영어 문구가 도구에 잘 먹히므로 영어로 적었고, 괄호는 설명입니다.
 
-- 활 쏘기: `short bow release twang, dry, 0.2s`
-- 화살 명중: `soft arrow hit thud, 0.15s`
-- 창 찌르기: `quick spear thrust whoosh with a light impact, 0.25s`
-- 검 휘두르기: `sword swing whoosh, light metallic, 0.25s`
-- 철퇴 타격: `heavy mace smash, deep thud, 0.4s`
-- 적 처치: `small enemy defeated pop, low volume, 0.15s`
-- 금화 획득: `coin pickup chime, bright, 0.2s`
-- 용병 고용: `hire confirmation sound, coins and a short horn, 0.5s`
-- 레벨업: `level up fanfare, short, uplifting, 0.8s`
-- 돌격 지시: `cavalry charge horn call, 0.6s`
-- 주인공 피격: `player hurt grunt with a dull hit, 0.25s`
-- 쓰러짐/부활: `defeat low tone` / `revive rising shimmer`
-- 배경음악: `loopable dark fantasy battle theme, drums and low strings, 120 bpm, 2 minutes, seamless loop`
+### 10-0. 공통 규칙 (모든 소리에 같이 적어 주세요)
+
+- **길이**: 대부분 0.1~0.5초. 꼬리(울림)를 짧게 끊습니다. 전투 중 같은 소리가 **초당 수십 번** 겹치므로, 길거나 날카로우면 금방 시끄럽습니다.
+- **음색**: 둥글고 낮은 소리 위주. 3kHz 이상의 쨍한 고음, 귀를 찌르는 소리는 피합니다. 말소리는 넣지 않습니다.
+- **변형**: 자주 나는 소리(화살, 타격, 방패, 사망)는 **같은 문구로 3~4개씩** 뽑아 주세요(`_1`, `_2`, `_3`). 게임이 번갈아 틀어 반복 느낌을 줄입니다.
+- **형식**: WAV 또는 OGG, 44.1kHz, 모노(효과음) / 스테레오(음악·팡파르). 최대 볼륨 -1dB 이하, 소리끼리 크기 차이가 크지 않게 맞춰 주세요(작은 소리를 지나치게 키우지 않기).
+- **분위기**: 어두운 판타지 전장(중세풍, 나무·가죽·쇠). 현대·SF 느낌 금지.
+- **파일 이름과 위치**: `client/public/assets/audio/<이름>_<번호>.ogg` (예: `arrow_hit_1.ogg`). 아래 표의 **파일 이름**을 그대로 쓰면 코드 연결이 바로 됩니다.
+
+### 10-1. 1순위: 이것만 있어도 체감이 큽니다 (10종)
+
+게임에서 가장 자주, 가장 중요하게 일어나는 일입니다.
+
+| 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
+| --- | --- | --- | --- |
+| `bow_shot` | 활을 쏠 때(주인공·궁병) | `short wooden bow release, dry string twang, no echo` | 0.2초, 3종 |
+| `arrow_hit` | 화살이 적에게 맞을 때 | `soft arrow thud into leather and flesh, short, low volume` | 0.15초, 4종 |
+| `melee_hit` | 근접 타격(검·창·철퇴로 몸을 때림) | `quick melee weapon hit, dull cloth and metal impact, medium thud` | 0.2초, 4종 |
+| `shield_block` | 방패가 공격을 막을 때 | `wooden shield block, solid knock with a faint metal ring` | 0.2초, 3종 |
+| `shield_break` | 방패가 깨질 때 | `shield shattering, splintering wood and a metal snap, short` | 0.5초, 2종 |
+| `crit_hit` | 치명타 | `sharp critical strike, bright metallic slash with a heavy thump` | 0.3초, 2종 |
+| `enemy_die` | 적이 쓰러질 때 | `small fantasy soldier falls, short grunt-less thud and armor clatter, low volume` | 0.25초, 4종 |
+| `ally_hurt` | 내 유닛(주인공)이 맞을 때 | `player takes damage, dull body hit with short breathy grunt, not shrill` | 0.25초, 3종 |
+| `level_up` | 레벨업 | `short uplifting level-up chime, warm bells, about one second` | 0.9초, 1종 |
+| `boss_warning` | 보스군이 나타날 때 | `distant war horn blast, deep and ominous, two long notes, with faint marching drums` | 3초, 1종 |
+
+### 10-2. 2순위: 게임의 맛을 살립니다 (16종)
+
+| 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
+| --- | --- | --- | --- |
+| `spear_thrust` | 창을 찌를 때 | `quick spear thrust, short airy whoosh with a light tip impact` | 0.25초, 2종 |
+| `sword_swing` | 검을 휘두를 때 | `light sword swing whoosh, short, slightly metallic` | 0.25초, 2종 |
+| `mace_smash` | 철퇴 타격·범위 공격 | `heavy mace smash, deep low thud with a little crunch, short tail` | 0.4초, 2종 |
+| `backstab` | 배후 공격 | `sneaky backstab slash, quick low whoosh with a sharper cut` | 0.25초, 2종 |
+| `knockback` | 넉백으로 적이 밀려날 때 | `short heavy shove impact, muffled whomp` | 0.2초, 2종 |
+| `dodge` | 회피 | `quick evasive whoosh, soft cloth swish` | 0.15초, 2종 |
+| `cavalry_charge` | 우클릭 돌격 지시 | `short cavalry charge horn call, brave and rising, with galloping hooves` | 0.8초, 1종 |
+| `hoof_gallop` | 기병이 속도를 낼 때(반복) | `light horse gallop loop, soft hooves on dirt, seamless loop` | 1초 루프 |
+| `coin_gain` | 금화를 얻을 때(처치 보상) | `tiny soft coin clink, very short, low volume` | 0.1초, 3종 |
+| `hire` | 캠프에서 용병 고용 | `hire confirmation: coins clinking into a purse and a short low horn`   | 0.6초, 1종 |
+| `upgrade_ready` | 용병이 강화 가능해질 때 | `gentle ready-to-upgrade notification, two soft rising bell tones` | 0.5초, 1종 |
+| `upgrade_done` | 용병 강화 완료 | `merc upgrade complete, anvil strike with a bright ring and short uplift` | 0.8초, 1종 |
+| `card_pick` | 카드를 고를 때 | `card chosen, crisp paper-and-wood tap with a faint sparkle` | 0.3초, 2종 |
+| `card_reroll` | 카드 새로고침 | `cards reshuffle, quick paper flutter` | 0.4초, 1종 |
+| `legend_card` | 전설 카드를 고를 때 | `legendary power gained, deep resonant chord swell with shimmering overtones, about 1.5 seconds` | 1.5초, 1종 |
+| `hero_down` | 주인공이 쓰러질 때 | `hero collapses, heavy thud with a low mournful tone` | 0.8초, 1종 |
+
+### 10-3. 3순위: 상태 변화와 진행 알림 (10종)
+
+| 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
+| --- | --- | --- | --- |
+| `revive_loop` | 동료를 일으키는 동안(E 누르는 중) | `soft rising healing shimmer loop, gentle, seamless loop` | 1.5초 루프 |
+| `revive_done` | 부활 완료 | `revive complete, warm rising shimmer and a soft chime` | 0.8초, 1종 |
+| `morale_break` | 사기 저하가 걸릴 때 | `morale breaks, low dissonant drone drop with a faint distant groan` | 1초, 1종 |
+| `squad_warning` | 적 소대 접근 | `short enemy scouts horn, two quick notes` | 1초, 1종 |
+| `stage_clear` | 스테이지 클리어 | `stage victory fanfare, short brass and drums, triumphant but compact` | 3초, 1종 |
+| `victory` | 최종 승리 | `grand victory fanfare, full brass, choir pad and drums, about 6 seconds` | 6초, 1종 |
+| `defeat` | 전멸 | `defeat sting, slow descending low brass and a muted drum, about 4 seconds` | 4초, 1종 |
+| `camp_open` | 캠프 범위에 들어갔을 때 | `soft campfire crackle with a small tent-flap rustle, calm` | 0.5초, 1종 |
+| `ui_click` | 로비·버튼 클릭 | `subtle wooden UI click, very short` | 0.08초, 2종 |
+| `merc_respawn` | 용병이 부활해 합류할 때 | `small reinforcement arrives, quick cloth and armor rustle with a short rising tone` | 0.4초, 2종 |
+
+### 10-4. 배경 음악 (효과음 다음에)
+
+- `bgm_lobby`: `calm dark fantasy lobby theme, lute and soft strings, slow 70 bpm, 90 seconds, seamless loop`
+- `bgm_grow`: `tense but steady mercenary camp theme, low strings and light war drums, 100 bpm, 2 minutes, seamless loop, leaves room for sound effects (not too busy)` (성장 시간에 깔림)
+- `bgm_boss`: `epic dark fantasy boss battle, pounding war drums, brass stabs and driving low strings, 130 bpm, 2 minutes, seamless loop`
+- 음악은 **효과음이 묻히지 않도록** 중저음과 잡음이 적게, 볼륨은 효과음보다 확실히 낮게(-18dB 안팎) 맞춰 주세요. 루프가 끊기는 느낌이 없어야 합니다.
+
+### 10-5. 부탁드리는 순서
+
+1. 10-1의 10종부터(변형 포함 약 30개 파일). 이것만 들어가도 전투가 훨씬 살아납니다.
+2. 이어서 10-2, 10-3.
+3. 배경 음악은 마지막에.
+
+넘겨 주시면 코드에서 소리를 틀어 주는 부분도 같이 만듭니다(같은 소리가 너무 자주 겹치지 않게 간격 제한, 화면 밖이나 먼 소리는 작게, 종류별 볼륨, 음소거·볼륨 설정 포함).
