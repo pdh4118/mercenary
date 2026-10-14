@@ -13,7 +13,8 @@
     "typecheck": "tsc -p shared --noEmit && tsc -p server --noEmit && tsc -p client --noEmit",
     "test": "npm run test -w server",
     "build": "npm run build -w client",
-    "start": "npm run start -w server"
+    "start": "npm run start -w server",
+    "serve": "node scripts/auto-update.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.0"
