@@ -67,3 +67,16 @@ Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~
 | `level_up_1` | `126422__makofox__level-up.wav` | 0.6초, 중심 약 1.15kHz로 다른 후보보다 낮고 따뜻함. 원본이 끝에서 갑자기 끊겨 끝 0.15초를 줄임. 제작자 makofox, **라이선스 확인 필요** |
 | (미사용) `level_up_3note2_jivatma07.ogg` | `76234__jivatma07__level_up_3note2.wav` | 레벨업 후보였다가 교체(더 밝고 게임 효과음 같음). 이 폴더에 보관. 제작자 jivatma07 |
 | (미사용) `level_up_2_ecofuture3.ogg` | `346425__soneproject__ecofuture3.wav` | 레벨업 후보였으나 탈락(미래적인 신스 소리라 분위기에 안 맞고 여운이 길어 자주 나기엔 부담). 게임 폴더에서 빼고 이 폴더에 보관. 제작자 soneproject |
+
+## 정리: 기타 소리가 섞인 것으로 의심되는 소리를 뺌
+
+플레이 중 "기타를 튕기는 소리" 같은 울림이 들린다는 의견이 있어, 음높이가 또렷하게 울리는(음악 소리가 섞였을 가능성이 있는) 파일을 분석해 다음과 같이 바꿨습니다. **직접 들어 본 것이 아니라 수치로 고른 것**이라, 여전히 들리면 어떤 상황(활 쏠 때 / 화살 맞을 때 / 방패 깨질 때 등)에서 나는지 알려 주세요.
+
+| 바꾼 것 | 이유 | 처리 |
+| --- | --- | --- |
+| `bow_shot_1` (활 쏘는 소리) | 시위가 울리는 음이 0.3초 가까이 이어짐(291Hz 중심, 뚜렷함). 가장 자주 나는 소리 | 0.16초로 줄이고 291/582/873Hz 부근을 깎음. 원본은 `removed/bow_shot_1_original.ogg` |
+| `arrow_hit_1` | Suno 곡에서 자른 것, 226Hz가 또렷하게 울림 | 뺌. 깨끗한 `melee_hit_3`·`melee_hit_4`를 높여 `arrow_hit_1`, `arrow_hit_3`으로 대체 |
+| `shield_break_1, 2` (Suno) | 226Hz·441Hz가 뚜렷하게 울림 | 뺌. 외부 소리(`shield_break_3`)가 `shield_break_1`이 됨 |
+| `melee_hit_3, 4` (Suno) | 낮은 음이 또렷하게 남음(86~108Hz) | 뺌. 남은 소리는 번호를 앞당겨 `melee_hit_1 ~ 6`이 됨 |
+
+뺀 파일은 `removed/` 폴더에 보관했습니다. (위의 출처 표에 적힌 `melee_hit_5~8`, `shield_break_3`은 각각 `melee_hit_3~6`, `shield_break_1`로 번호가 바뀌었습니다.)
