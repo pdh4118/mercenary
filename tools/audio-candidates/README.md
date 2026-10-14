@@ -21,3 +21,9 @@
 | `shield_break_1, 2` | Foley_1 21.81초 / 22.93초 (0.6초) |
 
 (`Foley_1`은 `Medieval_Combat_Foley_1.mp3`, `Foley`는 `Medieval_Combat_Foley.mp3`)
+
+## 외부에서 받은 소리와 출처
+
+| 게임 파일 | 원본 파일 이름 | 비고 |
+| --- | --- | --- |
+| `melee_hit_5` | `496192__luminousfridge__bash-hit-sfx.ogg` | 0.2초 단일 타격, Freesound 형식의 이름(제작자 luminousfridge). **라이선스(CC0 / 저작자 표시 필요 등)를 원본 페이지에서 확인하고, 표시가 필요하면 크레딧에 넣어야 합니다.** |
