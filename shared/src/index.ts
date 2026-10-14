@@ -141,7 +141,12 @@ export const EVT_REVIVE = 4; // 부활
 export const EVT_CRIT = 5; // 치명타
 export const EVT_DODGE = 6; // 회피
 export const EVT_BACKSTAB = 7; // 배후 공격
-export type EventWire = [kind: number, x: number, y: number, ang: number];
+// 피해 숫자: val은 피해량, owner는 때린 쪽(적에게 준 피해) 또는 맞은 쪽(받은 피해) 플레이어. 같은 대상에게 한 틱에 들어간 피해는 합쳐서 보낸다.
+export const EVT_DMG_ENEMY = 8; // 아군이 적의 몸에 준 피해
+export const EVT_DMG_ENEMY_CRIT = 9; // 같은데 치명타
+export const EVT_DMG_SHIELD = 10; // 적의 방패가 흡수한 피해
+export const EVT_DMG_ALLY = 11; // 아군(주인공·용병)이 입은 피해
+export type EventWire = [kind: number, x: number, y: number, ang: number, val: number, owner: number];
 
 export type StagePhase = "grow" | "boss" | "break";
 export type GameStatus = "playing" | "victory" | "defeat";

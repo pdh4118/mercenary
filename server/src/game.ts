@@ -20,6 +20,10 @@ import {
   AREA_ARC_MAX,
   EVT_CRIT,
   EVT_BACKSTAB,
+  EVT_DMG_ALLY,
+  EVT_DMG_ENEMY,
+  EVT_DMG_ENEMY_CRIT,
+  EVT_DMG_SHIELD,
   BOSS_HP_BASE,
   BOSS_HP_PER_STAGE,
   BOSS_SIZE,
@@ -325,7 +329,7 @@ const GROW_SEC = Number(process.env.MERC_STAGE_GROW_SEC) > 0 ? Number(process.en
 /** 시험 플레이용: MERC_SQUAD_FIRST_SEC=3 처럼 지정하면 첫 소대가 빨리 온다 */
 const SQUAD_FIRST = Number(process.env.MERC_SQUAD_FIRST_SEC) > 0 ? Number(process.env.MERC_SQUAD_FIRST_SEC) : SQUAD_FIRST_SEC;
 const SEPARATION_CELL = 32;
-const EVENT_CAP = 80;
+const EVENT_CAP = 160;
 
 interface Army {
   x: number; // 진형 기준점(장군 뒤 중앙이 아니라 진형 맨 앞 중앙)
@@ -353,6 +357,7 @@ export class Game {
   private spawnBudget = 0;
   private campTimer = CAMP_FIRST_SPAWN_SEC;
   private events: EventWire[] = [];
+  private dmgIndex = new Map<string, number>(); // 이번 묶음에서 피해 숫자 이벤트의 위치
   private army: Army | null = null;
   stage = 1;
   phase: StagePhase = "grow";
@@ -744,11 +749,26 @@ export class Game {
   takeEvents(): EventWire[] {
     const out = this.events;
     this.events = [];
+    this.dmgIndex.clear();
     return out;
   }
 
-  private pushEvent(kind: number, x: number, y: number, ang: number): void {
-    if (this.events.length < EVENT_CAP) this.events.push([kind, Math.round(x), Math.round(y), Math.round(ang * 100) / 100]);
+  private pushEvent(kind: number, x: number, y: number, ang: number, val = 0, owner = 0): void {
+    if (this.events.length < EVENT_CAP) this.events.push([kind, Math.round(x), Math.round(y), Math.round(ang * 100) / 100, val, owner]);
+  }
+
+  /** 피해 숫자 이벤트. 같은 대상에게 같은 종류로 한 틱에 여러 번 들어가면 합친다(전송량을 줄이고 숫자가 겹치지 않게). */
+  private pushDamage(kind: number, targetId: number, x: number, y: number, amount: number, owner: number): void {
+    if (amount <= 0.05 || owner <= 0) return;
+    const key = `${kind}:${targetId}:${owner}`;
+    const idx = this.dmgIndex.get(key);
+    if (idx !== undefined) {
+      this.events[idx]![4] = Math.round((this.events[idx]![4] + amount) * 10) / 10;
+      return;
+    }
+    if (this.events.length >= EVENT_CAP) return;
+    this.dmgIndex.set(key, this.events.length);
+    this.pushEvent(kind, x, y, 0, Math.round(amount * 10) / 10, owner);
   }
 
   /** 테스트용: 성장 시간을 건너뛰고 곧바로 보스군을 부른다 */
@@ -1119,9 +1139,9 @@ export class Game {
   }
 
   /** 회피 판정: 피했으면 true(효과 표시를 띄운다) */
-  private dodged(chance: number, x: number, y: number): boolean {
+  private dodged(chance: number, x: number, y: number, owner = 0): boolean {
     if (chance <= 0 || this.rng() >= Math.min(DODGE_MAX, chance)) return false;
-    this.pushEvent(EVT_DODGE, x, y, 0);
+    this.pushEvent(EVT_DODGE, x, y, 0, 0, owner);
     return true;
   }
 
@@ -1218,7 +1238,7 @@ export class Game {
         ownerId: p.id,
         hit: (h) => {
           if (p.invuln > 0) return 0; // 부활 직후 잠깐 무적
-          if (this.dodged(s.mods.heroDodge, p.x, p.y)) return 0;
+          if (this.dodged(s.mods.heroDodge, p.x, p.y, p.id)) return 0;
           // 창을 들면 창병처럼 돌격을 반사하고, 검을 들면 정면 피해를 절반으로 막는다
           const w = WEAPONS[p.weapon]!;
           const r = resolveHit(
@@ -1227,6 +1247,7 @@ export class Game {
           );
           const taken = r.body * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense));
           p.hp -= taken;
+          this.pushDamage(EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
           this.thorns(s, h, taken);
           if (p.hp <= 0) {
             p.hp = 0;
@@ -1248,11 +1269,12 @@ export class Game {
         merc: m,
         hit: (h) => {
           const mods = this.slots.get(m.owner)?.mods;
-          if (this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y)) return 0;
+          if (this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
           const r = resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
           const taken = r.body * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
           this.hurtMerc(m, taken);
+          this.pushDamage(EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner);
           this.thorns(this.slots.get(m.owner), h, taken, m);
           return r.reflected;
         },
@@ -1588,6 +1610,8 @@ export class Game {
     if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
     if (has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
+    this.pushDamage(hit.crit ? EVT_DMG_ENEMY_CRIT : EVT_DMG_ENEMY, e.id, e.x, e.y, r.body, ownerId);
+    this.pushDamage(EVT_DMG_SHIELD, e.id, e.x, e.y, r.shield, ownerId);
     if (r.backstab && r.body + r.shield > 0) this.pushEvent(EVT_BACKSTAB, e.x, e.y, hit.fromAngle + Math.PI);
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
     else if (owner && r.body + r.shield > 0) this.knockBack(e, hit.fromAngle, src ? mstat(owner.mods, src.type, "knock") : owner.mods.heroKnock);

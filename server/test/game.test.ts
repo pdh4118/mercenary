@@ -1127,3 +1127,75 @@ test("배후 공격: 등 뒤에서 용병이 찌르면 같은 공격이 1.5배 �
   assert.ok(back > 0 && front > 0, `${back} ${front}`);
   assert.ok(Math.abs(back / front - 1.5) < 0.01, `${back / front}`);
 });
+
+// --- 피해 숫자 이벤트 ---------------------------------------------------------
+
+import { EVT_DMG_ALLY, EVT_DMG_ENEMY, EVT_DMG_ENEMY_CRIT, EVT_DMG_SHIELD } from "@mercenary/shared";
+
+test("피해 숫자: 내가 적에게 준 피해와 적이 방패로 막은 피해, 내가 입은 피해가 따로 나온다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.jumpToStage(10);
+  g.setWeapon(a, 3); // 철퇴
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  const e = g.spawnEnemyAt(p.x + 40, p.y, BLUNT);
+  (g.getEnemy(e) as { hp: number; maxHp: number }).hp = (g.getEnemy(e) as { maxHp: number }).maxHp = 99999;
+  g.setInput(a, { ...idle, fire: true });
+  g.step();
+  const ev = g.takeEvents().filter((x) => x[0] === EVT_DMG_ENEMY);
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0]![5], a, "때린 사람 번호");
+  assert.ok(Math.abs(ev[0]![4] - WEAPONS[3]!.damage) < 0.11, `${ev[0]![4]}`);
+  // 적이 때리면 입은 피해(받은 사람 번호)
+  g.setInput(a, idle);
+  run(g, 2);
+  const taken = g.takeEvents().filter((x) => x[0] === EVT_DMG_ALLY);
+  assert.ok(taken.length > 0 && taken.every((x) => x[5] === a));
+});
+
+test("피해 숫자: 치명타는 따로 표시되고, 방패에 막힌 피해는 방패 종류로 나온다", () => {
+  const g = new Game(() => 0);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  g.applyCardForTest(a, { k: "heroCrit", v: 1 });
+  const p = g.getPlayer(a)!;
+  g.jumpToStage(10);
+  const e = g.spawnEnemyAt(p.x + 40, p.y, SHIELD);
+  const en = g.getEnemy(e) as { face: number; hp: number; maxHp: number };
+  en.face = Math.PI; // 주인공을 바라본다(정면에서 맞는다)
+  g.setWeapon(a, 2);
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  g.takeEvents();
+  g.setInput(a, { ...idle, fire: true });
+  g.step();
+  const ev = g.takeEvents();
+  assert.ok(ev.some((x) => x[0] === EVT_DMG_SHIELD && x[4] > 0), "방패가 막은 피해");
+  const g2 = new Game(() => 0);
+  g2.autoSpawn = false;
+  const b = g2.addPlayer("b")!;
+  g2.applyCardForTest(b, { k: "heroCrit", v: 1 });
+  const pb = g2.getPlayer(b)!;
+  g2.jumpToStage(10);
+  g2.spawnEnemyAt(pb.x + 40, pb.y, ARCHER);
+  g2.setWeapon(b, 2);
+  run(g2, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  g2.takeEvents();
+  g2.setInput(b, { ...idle, fire: true });
+  g2.step();
+  assert.ok(g2.takeEvents().some((x) => x[0] === EVT_DMG_ENEMY_CRIT));
+});
+
+test("피해 숫자: 같은 대상에게 한 틱에 여러 번 들어간 피해는 하나로 합쳐진다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.jumpToStage(10);
+  const e = g.spawnEnemyAt(500, 500, BLUNT);
+  const en = g.getEnemy(e) as { hp: number; maxHp: number; shield: number };
+  en.hp = en.maxHp = 99999;
+  const dmg = g as unknown as { damageEnemy(e: unknown, h: unknown, o: number): number };
+  for (let i = 0; i < 3; i++) dmg.damageEnemy(en, { damage: 10, charge: 0, srcType: -1, fromAngle: Math.atan2(-500, -500) }, a); // 적이 바라보는 쪽(정면)에서
+  const ev = g.takeEvents().filter((x) => x[0] === EVT_DMG_ENEMY);
+  assert.equal(ev.length, 1);
+  assert.ok(Math.abs(ev[0]![4] - 30) < 0.5, `${ev[0]![4]}`);
+});

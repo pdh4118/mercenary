@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture } from "pixi.js";
+import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
 import { createMercPanel, isReady } from "./mercpanel.js";
@@ -23,6 +23,10 @@ import {
   EVT_CRIT,
   EVT_DODGE,
   EVT_BACKSTAB,
+  EVT_DMG_ALLY,
+  EVT_DMG_ENEMY,
+  EVT_DMG_ENEMY_CRIT,
+  EVT_DMG_SHIELD,
   EVT_SHIELD_BREAK,
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
@@ -164,7 +168,8 @@ async function main() {
   const chargeLabel = new Text({ text: "돌격", style: { fill: 0xffc27a, fontSize: 13 } });
   chargeLabel.anchor.set(0.5, 1);
   chargeMark.visible = chargeLabel.visible = false;
-  world.addChild(campLayer, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, chargeMark, chargeLabel);
+  const dmgLayer = new Container(); // 피해 숫자는 모든 그림 위에
+  world.addChild(campLayer, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, chargeMark, chargeLabel, dmgLayer);
 
   /** 스프라이트는 오른쪽을 보고 그려져 있어, 왼쪽으로 움직이거나 공격할 때는 좌우 반전한다 */
   interface Facing {
@@ -530,6 +535,26 @@ async function main() {
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
+  /** 떠오르는 피해 숫자. 내가 준 피해(흰색, 치명타는 굵은 금색), 방패가 막은 피해(하늘색), 내가 입은 피해(빨강)를 구분한다. */
+  interface FloatText {
+    node: Text;
+    x: number;
+    y: number;
+    vx: number;
+    age: number;
+    life: number;
+    pop: number; // 처음에 커졌다가 줄어드는 정도
+  }
+  const floats: FloatText[] = [];
+  const FLOAT_MAX = 90;
+  const spawnFloat = (text: string, x: number, y: number, style: TextStyleOptions, life: number, pop: number) => {
+    if (floats.length >= FLOAT_MAX) floats.shift()!.node.destroy();
+    const node = new Text({ text, style });
+    node.anchor.set(0.5, 1);
+    dmgLayer.addChild(node);
+    floats.push({ node, x: x + (Math.random() - 0.5) * 16, y: y - 18, vx: (Math.random() - 0.5) * 18, age: 0, life, pop });
+  };
+  const numFmt = (v: number) => (v >= 10 ? String(Math.round(v)) : String(Math.max(0.1, Math.round(v * 10) / 10)));
   const bursts: { kind: number; x: number; y: number; ang: number; age: number }[] = [];
   const BURST_SEC = 0.35;
   const RING_SEC = 0.5;
@@ -623,7 +648,13 @@ async function main() {
         toastLeft = 2.5;
       } else if (msg.t === "state") {
         latest = msg;
-        for (const [kind, x, y, ang] of msg.ev ?? []) {
+        for (const [kind, x, y, ang, val, owner] of msg.ev ?? []) {
+          // 피해 숫자는 내 유닛(주인공·용병)이 관련된 것만 띄운다
+          if (owner === myId && kind === EVT_DMG_ENEMY) spawnFloat(numFmt(val), x, y, { fill: 0xffffff, fontSize: 15, fontWeight: "600", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);
+          else if (owner === myId && kind === EVT_DMG_ENEMY_CRIT) spawnFloat(`${numFmt(val)}!`, x, y, { fill: 0xffd45d, fontSize: 25, fontWeight: "900", stroke: { color: 0x7a2e00, width: 5 } }, 1.1, 0.5);
+          else if (owner === myId && kind === EVT_DMG_SHIELD) spawnFloat(numFmt(val), x, y, { fill: 0x9fdcff, fontSize: 13, fontWeight: "600", stroke: { color: 0x0a1a2a, width: 3 } }, 0.6, 0);
+          else if (owner === myId && kind === EVT_DMG_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xff5a5a, fontSize: 17, fontWeight: "700", stroke: { color: 0x2a0000, width: 4 } }, 0.9, 0.15);
+          else if (owner === myId && kind === EVT_DODGE) spawnFloat("회피", x, y, { fill: 0xd8e0ee, fontSize: 14, fontStyle: "italic", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);
           if (kind === EVT_ARROW_HIT || kind === EVT_ENEMY_ARROW_HIT) {
             const fx = new Sprite((kind === EVT_ENEMY_ARROW_HIT ? enemyArrow : allyArrow)[4]!);
             fx.anchor.set(0.85, 0.5);
@@ -632,7 +663,7 @@ async function main() {
             fx.rotation = ang;
             bulletLayer.addChild(fx);
             hitFx.push({ node: fx, age: 0 });
-          } else if (bursts.length < 60) {
+          } else if (bursts.length < 60 && kind < EVT_DMG_ENEMY) {
             bursts.push({ kind, x, y, ang, age: 0 });
           }
         }
@@ -775,6 +806,21 @@ async function main() {
       v.x0 = w[1];
       v.y0 = w[2];
     });
+    // 피해 숫자: 위로 떠오르며 사라진다(치명타는 처음에 크게 튀어 오른다)
+    for (let i = floats.length - 1; i >= 0; i--) {
+      const f = floats[i]!;
+      f.age += ticker.deltaMS / 1000;
+      if (f.age >= f.life) {
+        f.node.destroy();
+        floats.splice(i, 1);
+        continue;
+      }
+      const t = f.age / f.life;
+      f.x += f.vx * (ticker.deltaMS / 1000);
+      f.node.position.set(f.x, f.y - 46 * t);
+      f.node.alpha = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45;
+      f.node.scale.set(1 + f.pop * Math.max(0, 1 - t * 4));
+    }
     // 명중 이펙트: 잠깐 보였다가 사라진다
     for (let i = hitFx.length - 1; i >= 0; i--) {
       const fx = hitFx[i]!;
