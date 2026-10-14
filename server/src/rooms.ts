@@ -154,6 +154,14 @@ export class RoomManager {
       case "pick":
         room.game.pick(id, Number(msg.index));
         return;
+      case "reroll":
+        room.game.reroll(id);
+        return;
+      case "upgrade": {
+        const r = room.game.upgrade(id, msg.merc);
+        if (!r.ok) conn.send({ t: "notice", text: r.reason });
+        return;
+      }
       case "weapon":
         room.game.setWeapon(id, msg.index);
         return;

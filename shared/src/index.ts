@@ -3,6 +3,7 @@
 export * from "./rules.js";
 export * from "./cards.js";
 export * from "./formation.js";
+export * from "./tiers.js";
 import { ARCHER, BLUNT, SHIELD, SPEAR } from "./rules.js";
 
 export const TICK_RATE = 20; // 서버가 초당 계산·전송하는 횟수
@@ -77,6 +78,7 @@ export interface PlayerState {
   xp: number; // 현재 레벨에서 모은 경험치
   xpNeed: number; // 다음 레벨까지 필요한 경험치
   pending: number; // 아직 고르지 않은 레벨업 선택 횟수
+  rerolls: number; // 남은 카드 새로고침 횟수
   offer: number[]; // 지금 고를 수 있는 카드(CARDS 인덱스). 없으면 빈 배열
   priceMult: number; // 고용 가격 배율(할인 카드)
   leadership: number; // 통솔력(보유할 수 있는 용병 비용 합의 최대치)
@@ -122,6 +124,7 @@ export type MercWire = [
   face: number,
   mom: number,
   regen: number,
+  tier: number, // 강화 단계 0~4
 ];
 /** 서버가 알려 주는 순간 효과(그 틱에 일어난 일): [종류, x, y, 방향] */
 export const EVT_ARROW_HIT = 0; // 아군 화살 명중
@@ -200,6 +203,8 @@ export type ClientMsg =
   | { t: "weapon"; index: number } // 무기 변경(WEAPONS 인덱스)
   | { t: "formation"; zones: number[]; spacing: number } // 진형 변경(병종별 구역 + 간격)
   | { t: "pick"; index: number } // 레벨업 카드 선택(0..2)
+  | { t: "reroll" } // 지금 제시된 카드를 새로 뽑는다(새로고침 1회 소모)
+  | { t: "upgrade"; merc: number } // 용병 한 명을 다음 단계로 강화
   | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number }; // 기병 돌격 지시(월드 좌표)
 

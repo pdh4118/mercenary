@@ -695,12 +695,12 @@ test("카드 효과: 용병 체력 강화는 이미 있는 용병의 체력도 �
   const a = g.addPlayer("a")!;
   const m = g.addMerc(a, SHIELD, 0, 0);
   const before = MERC_STATS[SHIELD]!.hp;
-  forceCard(g, a, "mercHp");
-  assert.equal(g.getMerc(m)!.hp, Math.round(before * 1.15));
+  forceCard(g, a, "mercStat", (e) => e.stat === "hp" && e.type === undefined);
+  assert.equal(g.getMerc(m)!.hp, Math.round(before * 1.05));
   const wire = g.snapshotMercs().find((w) => w[0] === m)!;
-  assert.equal(wire[9], Math.round(before * 1.15)); // 최대 체력
+  assert.equal(wire[9], Math.round(before * 1.05)); // 최대 체력
   const m2 = g.addMerc(a, SHIELD, 0, 0); // 새로 고용한 용병도 강화된 체력으로 시작
-  assert.equal(g.getMerc(m2)!.hp, Math.round(before * 1.15));
+  assert.equal(g.getMerc(m2)!.hp, Math.round(before * 1.05));
 });
 
 test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
@@ -708,7 +708,7 @@ test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
   const a = g.addPlayer("a")!;
   const spear = g.addMerc(a, SPEAR, 0, 0);
   const shield = g.addMerc(a, SHIELD, 0, 0);
-  forceCard(g, a, "typeBoost", (e) => e.type === SPEAR);
+  forceCard(g, a, "mercStat", (e) => e.stat === "hp" && e.type === SPEAR);
   assert.equal(g.getMerc(spear)!.hp, Math.round(MERC_STATS[SPEAR]!.hp * 1.25));
   assert.equal(g.getMerc(shield)!.hp, MERC_STATS[SHIELD]!.hp);
 });
@@ -752,13 +752,13 @@ test("카드 효과: 용병 부활 시간 단축", () => {
   const a = g.addPlayer("a")!;
   const p = me(g, a);
   const m = g.addMerc(a, SPEAR, p.x + 300, p.y);
-  forceCard(g, a, "mercRespawn");
+  forceCard(g, a, "mercStat", (e) => e.stat === "respawn" && e.type === undefined);
   for (let i = 0; i < 400 && g.getMerc(m)!.respawn === 0; i++) {
     if (i % 4 === 0) g.spawnEnemyAt(g.getMerc(m)!.x, g.getMerc(m)!.y, BLUNT);
     g.step();
   }
   assert.ok(g.getMerc(m)!.respawn > 0);
-  assert.ok(g.getMerc(m)!.respawn <= MERC_RESPAWN_SEC[SPEAR] * 0.8 + 1e-9);
+  assert.ok(g.getMerc(m)!.respawn <= MERC_RESPAWN_SEC[SPEAR] * 0.95 + 1e-9);
 });
 
 // --- 주인공 무기 ------------------------------------------------------------
@@ -1059,11 +1059,11 @@ test("용병 능력치 카드: 사거리·범위가 용병 능력치에 반영�
   const a = g.addPlayer("a")!;
   const sp = g.addMerc(a, SPEAR, 0, 0);
   const before = g.mercStatsForTest(sp).reach;
-  g.applyCardForTest(a, { k: "mercRange", v: 0.5 });
+  g.applyCardForTest(a, { k: "mercStat", stat: "range", v: 0.5 });
   assert.ok(Math.abs(g.mercStatsForTest(sp).reach - before * 1.5) < 1e-9);
   const mace = g.addMerc(a, BLUNT, 0, 0);
   const sp0 = g.mercStatsForTest(mace).splash;
-  g.applyCardForTest(a, { k: "mercArea", v: 0.5 });
+  g.applyCardForTest(a, { k: "mercStat", stat: "area", v: 0.5 });
   assert.ok(Math.abs(g.mercStatsForTest(mace).splash - sp0 * 1.5) < 1e-9);
 });
 
@@ -1098,7 +1098,7 @@ test("용병 체력 재생: 상처 입은 용병이 시간이 지나면 회복�
   const g = quiet();
   const a = g.addPlayer("a")!;
   const m = g.addMerc(a, SHIELD, 0, 0);
-  g.applyCardForTest(a, { k: "mercRegen", v: 0.1 });
+  g.applyCardForTest(a, { k: "mercStat", stat: "regen", v: 0.1 });
   (g.getMerc(m) as { hp: number }).hp = 10;
   run(g, 2);
   assert.ok(g.getMerc(m)!.hp > 10 + MERC_STATS[SHIELD]!.hp * 0.15);

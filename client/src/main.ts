@@ -1,6 +1,7 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture } from "pixi.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
+import { createMercPanel } from "./mercpanel.js";
 import {
   CARDS,
   CARD_CATEGORY_NAMES,
@@ -331,7 +332,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 진형 편성",
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -355,28 +356,32 @@ async function main() {
   /** 카드 일러스트: 병종 단련은 그 병종, 그 밖은 비슷한 성격의 그림을 빌려 쓴다. 없으면 글자 아이콘(-1). */
   const artOf = (c: (typeof CARDS)[number]): number => {
     const e = c.effect;
+    if (e.k === "mercStat") {
+      if (e.type !== undefined) return e.type; // 병종 전용 카드는 그 병종 그림
+      switch (e.stat) {
+        case "hp":
+        case "defense": return SHIELD;
+        case "dmg":
+        case "area": return BLUNT_TYPE;
+        case "atkSpeed":
+        case "range": return SPEAR_TYPE;
+        case "speed":
+        case "dodge": return 0;
+        default: return -1;
+      }
+    }
     switch (e.k) {
-      case "typeBoost": return e.type;
-      case "mercHp":
-      case "mercDefense":
       case "heroDefense": return SHIELD;
-      case "mercDmg":
-      case "mercArea":
-      case "heroArea": return BLUNT_TYPE;
-      case "mercAtkSpeed":
-      case "mercRange": return SPEAR_TYPE;
-      case "mercSpeed":
-      case "mercDodge":
       case "heroDodge": return 0;
+      case "heroArea": return BLUNT_TYPE;
       case "heroDmg":
       case "heroFireRate":
       case "heroRange":
-      case "heroPierce":
-      case "mercPierce": return ARCHER_TYPE;
+      case "heroPierce": return ARCHER_TYPE;
       default: return -1;
     }
   };
-  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", mercRespawn: "↺", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", mercRegen: "♥", mercCrit: "CRIT", heroCrit: "CRIT", mercCritMult: "x1.5+", heroCritMult: "x1.5+" };
+  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", heroCrit: "CRIT", heroCritMult: "x1.5+" };
   /** 뽑힐 확률이 낮을수록 별이 많다 */
   const starsOf = (weight: number) => (weight >= 8 ? 1 : weight >= 5 ? 2 : 3);
   const cardPanel = new Container();
@@ -415,12 +420,12 @@ async function main() {
   });
   cardPanel.visible = false;
   let shownOffer = "";
-  const showOffer = (offer: number[], pending: number) => {
-    const key = `${offer.join(",")}|${pending}`;
+  const showOffer = (offer: number[], pending: number, rerolls: number) => {
+    const key = `${offer.join(",")}|${pending}|${rerolls}`;
     if (key === shownOffer) return;
     shownOffer = key;
     cardPanel.visible = offer.length > 0;
-    cardHeader.text = offer.length > 0 ? `LEVEL UP!  카드를 고르세요${pending > 1 ? `  (대기 ${pending}회)` : ""}` : "";
+    cardHeader.text = offer.length > 0 ? `LEVEL UP!${pending > 1 ? ` x${pending}` : ""}  ·  [R] 새로고침 ${rerolls}` : "";
     cardViews.forEach((v, i) => {
       const card = offer[i] !== undefined ? CARDS[offer[i]!] : undefined;
       v.node.visible = !!card;
@@ -435,12 +440,14 @@ async function main() {
       }
       v.glyph.visible = art < 0;
       v.glyph.style.fontSize = 20;
-      v.glyph.text = card.effect.k === "leadership" ? `+${card.effect.v}` : (GLYPHS[card.effect.k] ?? "★");
+      const ef = card.effect;
+      v.glyph.text =
+        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
       v.tag.text = CARD_CATEGORY_NAMES[card.category];
       v.tag.style.fill = color;
       v.title.text = card.name;
       v.desc.text = card.desc;
-      const n = starsOf(card.weight);
+      const n = card.stars ?? starsOf(card.weight);
       v.starOn.text = "★".repeat(n);
       v.starOff.text = "★".repeat(3);
       v.bg
@@ -525,16 +532,19 @@ async function main() {
       toastLeft = 2;
     },
   });
+  const mercPanel = createMercPanel({ send, colors: TYPE_COLORS });
   const lobby = createLobby({
     send,
     onEnter: (id) => {
       myId = id;
       formations.show(true);
+      mercPanel.show(true);
       formations.resend();
     },
     onLeave: () => {
       myId = -1;
       formations.show(false);
+      mercPanel.show(false);
       formations.close();
       latest = null;
       levelOf.clear();
@@ -641,6 +651,14 @@ async function main() {
       formations.apply(Number(e.key[1]) - 1);
       return;
     }
+    if (k === "u" && !e.repeat) {
+      mercPanel.toggle();
+      return;
+    }
+    if (k === "r" && !e.repeat) {
+      send({ t: "reroll" });
+      return;
+    }
     if (k === "b" && !e.repeat) {
       formations.toggle();
       return;
@@ -736,13 +754,15 @@ async function main() {
     mercs.update(latest.mercs, k, (v, w) => {
       v.node.visible = w[8] <= 0; // 쓰러진 용병은 부활할 때까지 숨긴다
       faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
-      v.sprite.scale.set(SPRITE_SCALE * v.face, SPRITE_SCALE);
+      const grow = 1 + 0.05 * w[15]; // 강화할수록 조금 커진다
+      v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
       v.node.zIndex = v.y;
-      const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}`;
+      const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}/${w[15]}`;
       if (v.lastKey !== key) {
         v.lastKey = key;
         const top = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 6;
         drawBar(v.bar, w[3], w[9], 26, top);
+        for (let i = 0; i < w[15]; i++) v.bar.circle(-10 + i * 6, top - (w[11] > 0 ? 12 : 7), 2.2).fill(0xffd45d); // 강화 단계 점
         if (w[11] > 0) {
           // 방패 체력: 몸 체력 막대 위에 파란색으로. 깨졌으면 비어 보인다.
           v.bar
@@ -935,7 +955,10 @@ async function main() {
         .fill(0x2a2d36)
         .roundRect(52, 91, 160 * Math.min(1, meState.xp / meState.xpNeed), 7, 3)
         .fill(0xffe08a);
-      showOffer(meState.offer, meState.pending);
+      mercPanel.update(latest.mercs, myId, meState.gold);
+      const hv = mercs.views.get(mercPanel.hovered());
+      if (hv) fxLayer.circle(hv.x, hv.y, 26).stroke({ width: 3, color: 0xffe08a, alpha: 0.9 });
+      showOffer(meState.offer, meState.pending, meState.rerolls);
       weaponBar.visible = true;
       drawWeaponBar(meState.weapon);
       if (lastLevel > 0 && meState.level > lastLevel) {
