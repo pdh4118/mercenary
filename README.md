@@ -77,6 +77,8 @@ npm test
 
 스프라이트는 `client/public/assets/`에 있다: 병종 유닛(`units/`), 주인공 무기별 포즈(`hero/`), 캠프(`camp/`), 바닥 타일(`tiles/`), 화살(`fx/`). 이미지 도구: 시트를 한 장씩 자르는 `tools/slice_sheet.py`, 흰 배경(가짜 투명 포함)을 투명으로 바꾸는 `tools/remove_bg.py`, 바닥 타일 이음새 검사 `tools/tile_preview.py`(사용법은 각 파일 머리말과 `docs/asset-prompts.md`). 남은 에셋(카드 아이콘, 무기·HUD 아이콘, 효과음)의 제작 프롬프트는 `docs/asset-prompts.md`.
 
+레벨업 카드는 시안(`client/public/assets/cards/art_*.png`, 병종 5종 일러스트)을 반영했다. 병종 단련·용병 체력/공격/속도·주인공 사격 카드는 이 그림을 쓰고, 나머지 카드(통솔력·가격·전리품 등)는 글자 아이콘이라 전용 일러스트가 더 필요하다. 별은 등장 확률이 낮을수록 많다.
+
 이미지·소리 생성 AI나 아티스트에게 의뢰할 때 쓰는 프롬프트: [`docs/asset-prompts.md`](docs/asset-prompts.md)
 
 ## 현재 상태

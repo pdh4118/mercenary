@@ -7,6 +7,9 @@ import {
   CAMP_USE_RADIUS,
   SHIELD,
   SHIELD_FRONT_ARC,
+  ARCHER as ARCHER_TYPE,
+  BLUNT as BLUNT_TYPE,
+  SPEAR as SPEAR_TYPE,
   LEVELUP_PUSH_RADIUS,
   SWING_VISUAL_SEC,
   WEAPONS,
@@ -340,27 +343,63 @@ async function main() {
   const levelToast = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 20, stroke: { color: 0x000000, width: 3 } } });
   levelToast.anchor.set(0.5, 0);
 
-  // 레벨업 카드: 게임을 멈추지 않는 작은 카드. Z/X/C 한 번으로 고른다.
-  const CARD_W = 244;
-  const CARD_H = 78;
+  // 레벨업 카드: 게임을 멈추지 않는 작은 카드. Z/X/C 한 번으로 고른다. 시안(강철 테두리·일러스트 창·별)을 따라 그린다.
+  const CARD_W = 264;
+  const CARD_H = 96;
   const CARD_GAP = 8;
+  const ART = 72;
   const CATEGORY_COLORS = [0xe0c05d, 0x6fd16f, 0x5da6e0];
+  const cardArt = await Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/cards/art_${f}.png`)));
+  /** 카드 일러스트: 병종 단련은 그 병종, 그 밖은 비슷한 성격의 그림을 빌려 쓴다. 없으면 글자 아이콘(-1). */
+  const artOf = (c: (typeof CARDS)[number]): number => {
+    const e = c.effect;
+    switch (e.k) {
+      case "typeBoost": return e.type;
+      case "mercHp": return SHIELD;
+      case "mercDmg": return BLUNT_TYPE;
+      case "mercAtkSpeed": return SPEAR_TYPE;
+      case "mercSpeed": return 0;
+      case "heroDmg":
+      case "heroFireRate": return ARCHER_TYPE;
+      default: return -1;
+    }
+  };
+  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", mercRespawn: "↺", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥" };
+  /** 뽑힐 확률이 낮을수록 별이 많다 */
+  const starsOf = (weight: number) => (weight >= 8 ? 1 : weight >= 5 ? 2 : 3);
   const cardPanel = new Container();
-  const cardHeader = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 14 } });
+  const cardHeader = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 14, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
   cardPanel.addChild(cardHeader);
   const cardViews = [0, 1, 2].map((i) => {
     const node = new Container();
     node.position.set(0, 26 + i * (CARD_H + CARD_GAP));
     const bg = new Graphics();
-    const key = new Text({ text: "ZXC"[i]!, style: { fill: 0xffffff, fontSize: 22, fontWeight: "bold" } });
-    key.position.set(14, 22);
-    const title = new Text({ text: "", style: { fill: 0xffffff, fontSize: 15, fontWeight: "bold" } });
-    title.position.set(46, 8);
-    const desc = new Text({ text: "", style: { fill: 0xc8ccd6, fontSize: 12, wordWrap: true, wordWrapWidth: CARD_W - 60 } });
-    desc.position.set(46, 30);
-    node.addChild(bg, key, title, desc);
+    const artSprite = new Sprite();
+    artSprite.position.set(12, 12);
+    const artMask = new Graphics().roundRect(12, 12, ART, ART, 8).fill(0xffffff);
+    artSprite.mask = artMask;
+    const artFrame = new Graphics();
+    const glyph = new Text({ text: "", style: { fill: 0xffffff, fontSize: 28, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
+    glyph.anchor.set(0.5);
+    glyph.position.set(12 + ART / 2, 12 + ART / 2);
+    const keyBg = new Graphics().circle(0, 0, 11).fill(0x11141b).stroke({ width: 2, color: 0xffd45d });
+    keyBg.position.set(12, 12 + ART);
+    const key = new Text({ text: "ZXC"[i]!, style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" } });
+    key.anchor.set(0.5);
+    key.position.set(12, 12 + ART);
+    const tag = new Text({ text: "", style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
+    tag.position.set(ART + 26, 8);
+    const title = new Text({ text: "", style: { fill: 0xffffff, fontSize: 16, fontWeight: "bold" } });
+    title.position.set(ART + 26, 24);
+    const desc = new Text({ text: "", style: { fill: 0xc8ccd6, fontSize: 12, wordWrap: true, wordWrapWidth: CARD_W - ART - 40 } });
+    desc.position.set(ART + 26, 46);
+    const starOn = new Text({ text: "", style: { fill: 0xffd45d, fontSize: 13 } });
+    const starOff = new Text({ text: "", style: { fill: 0x3b4152, fontSize: 13 } });
+    starOn.position.set(CARD_W - 62, CARD_H - 22);
+    starOff.position.set(CARD_W - 62, CARD_H - 22);
+    node.addChild(bg, artSprite, artMask, artFrame, glyph, keyBg, key, tag, title, desc, starOff, starOn);
     cardPanel.addChild(node);
-    return { node, bg, title, desc };
+    return { node, bg, artSprite, artFrame, glyph, tag, title, desc, starOn, starOff };
   });
   cardPanel.visible = false;
   let shownOffer = "";
@@ -369,20 +408,45 @@ async function main() {
     if (key === shownOffer) return;
     shownOffer = key;
     cardPanel.visible = offer.length > 0;
-    cardHeader.text = offer.length > 0 ? `레벨 업! 카드를 고르세요${pending > 1 ? `  (대기 ${pending}회)` : ""}` : "";
+    cardHeader.text = offer.length > 0 ? `LEVEL UP!  카드를 고르세요${pending > 1 ? `  (대기 ${pending}회)` : ""}` : "";
     cardViews.forEach((v, i) => {
       const card = offer[i] !== undefined ? CARDS[offer[i]!] : undefined;
       v.node.visible = !!card;
       if (!card) return;
+      const color = CATEGORY_COLORS[card.category]!;
+      const art = artOf(card);
+      v.artSprite.visible = art >= 0;
+      if (art >= 0) {
+        const tex = cardArt[art]!;
+        v.artSprite.texture = tex;
+        v.artSprite.scale.set(ART / tex.width, ART / tex.height);
+      }
+      v.glyph.visible = art < 0;
+      v.glyph.text = card.effect.k === "leadership" ? `+${card.effect.v}` : (GLYPHS[card.effect.k] ?? "★");
+      v.tag.text = CARD_CATEGORY_NAMES[card.category];
+      v.tag.style.fill = color;
       v.title.text = card.name;
-      v.desc.text = `[${CARD_CATEGORY_NAMES[card.category]}] ${card.desc}`;
+      v.desc.text = card.desc;
+      const n = starsOf(card.weight);
+      v.starOn.text = "★".repeat(n);
+      v.starOff.text = "★".repeat(3);
       v.bg
         .clear()
-        .roundRect(0, 0, CARD_W, CARD_H, 8)
-        .fill({ color: 0x000000, alpha: 0.7 })
-        .stroke({ width: 1, color: CATEGORY_COLORS[card.category]! })
-        .rect(0, 0, 6, CARD_H)
-        .fill(CATEGORY_COLORS[card.category]!);
+        .roundRect(0, 0, CARD_W, CARD_H, 10)
+        .fill({ color: 0x1b1f2a, alpha: 0.94 })
+        .stroke({ width: 3, color: 0x050608 })
+        .roundRect(2.5, 2.5, CARD_W - 5, CARD_H - 5, 8)
+        .stroke({ width: 1.5, color: 0x59627a })
+        .roundRect(8, 8, ART + 8, ART + 8, 10) // 일러스트 창 바탕
+        .fill({ color: darken(color, 0.35) })
+        .poly([CARD_W - 12, 3, CARD_W - 5, 10, CARD_W - 12, 17, CARD_W - 19, 10]) // 모서리 보석
+        .fill(0x6fb8ff);
+      v.artFrame
+        .clear()
+        .roundRect(12, 12, ART, ART, 8)
+        .stroke({ width: 2, color: 0x0a0c11 })
+        .roundRect(12, 12, ART, ART, 8)
+        .stroke({ width: 1, color, alpha: 0.7 });
     });
   };
   // 무기 바: 현재 무기와 그 특징(방패·돌격 규칙 등)을 보여 준다
@@ -924,7 +988,7 @@ async function main() {
     levelToast.visible = levelToastLeft > 0;
     levelToast.position.set(app.screen.width / 2, 100);
     weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 100);
-    cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(110, app.screen.height / 2 - 130));
+    cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(110, app.screen.height / 2 - 150));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 120);
