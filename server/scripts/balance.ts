@@ -12,7 +12,12 @@ import {
   mercPrice,
   CAMP_USE_RADIUS,
 } from "@mercenary/shared";
+import { MERC_RESPAWN_SEC } from "@mercenary/shared";
 import { Game } from "../src/game.js";
+
+// RESPAWN_SCALE=0.67 처럼 주면 용병 부활 시간을 그 배율로 바꿔서 비교할 수 있다
+const respawnScale = Number(process.env.RESPAWN_SCALE ?? 1);
+if (respawnScale !== 1) (MERC_RESPAWN_SEC as unknown as number[]).forEach((v, i, arr) => (arr[i] = v * respawnScale));
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -46,6 +51,7 @@ interface Result {
   bossHp: number;
   armyLeft: number;
   phase: string;
+  downPct: number;
 }
 
 function simulate(players: number, seconds: number, seed: number): Result {
@@ -69,6 +75,8 @@ function simulate(players: number, seconds: number, seed: number): Result {
   let shakenOnsets = 0;
   let shakenTicks = 0;
   let mercSum = 0;
+  let mercDownTicks = 0;
+  let mercTicks = 0;
   const wasShaken = new Map<number, boolean>();
 
   for (let t = 0; t < ticks; t++) {
@@ -187,6 +195,10 @@ function simulate(players: number, seconds: number, seed: number): Result {
       if (sh) shakenTicks++;
     }
     mercSum += g.snapshotMercs().length / ids.length;
+    for (const m of g.snapshotMercs()) {
+      mercTicks++;
+      if (m[8] > 0) mercDownTicks++;
+    }
     if (t > 0 && t % (60 * 20) === 0) enemiesAt.push(g.enemyCount);
     if (g.status !== "playing") {
       endSec = t / 20;
@@ -215,6 +227,7 @@ function simulate(players: number, seconds: number, seed: number): Result {
     bossHp: g.info().bossHp,
     armyLeft: g.info().armyLeft,
     phase: g.info().phase,
+    downPct: (100 * mercDownTicks) / Math.max(1, mercTicks),
   };
 }
 
@@ -223,7 +236,7 @@ const counts = (process.argv[3] ?? "1,3,6").split(",").map(Number).filter((n) =>
 const seeds = Number(process.argv[4] ?? 3);
 
 console.log(`시뮬레이션 최대 ${seconds}초, 시드 ${seeds}개 (봇: 물러서며 사격, 캠프에서 고용, 카드 무작위, 쓰러진 동료 부활)`);
-console.log("인원 | 결과(승/패) | 도달 스테이지(평균) | 종료(초) | 주인공 쓰러짐(1인당) | 부활 | 용병 쓰러짐(1인당) | 평균 레벨 | 용병 수 | 사기저하(1인당 횟수/시간%/평균 용병) | 종료 시 보스HP%/남은 병력");
+console.log("인원 | 결과(승/패) | 도달 스테이지(평균) | 종료(초) | 주인공 쓰러짐(1인당) | 부활 | 용병 쓰러짐(1인당) | 평균 레벨 | 용병 수 | 사기저하(1인당 횟수/시간%/평균 용병) | 종료 시 보스HP%/남은 병력 | 용병 쓰러져 있는 시간%");
 for (const n of counts) {
   const rs = Array.from({ length: seeds }, (_, i) => simulate(n, seconds, 7 + i * 101));
   const avg = (f: (r: Result) => number) => rs.reduce((s, r) => s + f(r), 0) / rs.length;
@@ -231,7 +244,7 @@ for (const n of counts) {
   const losses = rs.filter((r) => r.status === "defeat").length;
   console.log(
     `${String(n).padStart(2)}명 | ${wins}/${losses} | ${avg((r) => r.stage).toFixed(1).padStart(5)} | ${avg((r) => r.endSec).toFixed(0).padStart(5)}` +
-      ` | ${(avg((r) => r.heroDeaths) / n).toFixed(1).padStart(5)} | ${avg((r) => r.revives).toFixed(1).padStart(4)} | ${(avg((r) => r.mercDeaths) / n).toFixed(1).padStart(6)} | ${avg((r) => r.level).toFixed(1).padStart(5)} | ${avg((r) => r.mercs).toFixed(1).padStart(4)} | ${avg((r) => r.shakenOnsets).toFixed(1)}/${avg((r) => r.shakenPct).toFixed(0)}%/${avg((r) => r.avgMercs).toFixed(1)} | ${rs.map((r) => `${r.phase === "boss" ? r.bossHp : "-"}/${r.armyLeft}`).join(" ")}`,
+      ` | ${(avg((r) => r.heroDeaths) / n).toFixed(1).padStart(5)} | ${avg((r) => r.revives).toFixed(1).padStart(4)} | ${(avg((r) => r.mercDeaths) / n).toFixed(1).padStart(6)} | ${avg((r) => r.level).toFixed(1).padStart(5)} | ${avg((r) => r.mercs).toFixed(1).padStart(4)} | ${avg((r) => r.shakenOnsets).toFixed(1)}/${avg((r) => r.shakenPct).toFixed(0)}%/${avg((r) => r.avgMercs).toFixed(1)} | ${rs.map((r) => `${r.phase === "boss" ? r.bossHp : "-"}/${r.armyLeft}`).join(" ")} | ${avg((r) => r.downPct).toFixed(0)}%`,
   );
 }
 if (process.env.DETAIL) {
