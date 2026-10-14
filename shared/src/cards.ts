@@ -25,6 +25,11 @@ export type CardEffect =
   | { k: "heroCrit"; v: number }
   | { k: "heroCritMult"; v: number }
   | { k: "heroArea"; v: number }
+  | { k: "mercDefense"; v: number } // 받는 피해 -v(비율)
+  | { k: "mercDodge"; v: number } // 회피율 +v
+  | { k: "mercRegen"; v: number } // 초당 최대 체력의 v 회복
+  | { k: "heroDefense"; v: number }
+  | { k: "heroDodge"; v: number }
   | { k: "heroMaxHp"; v: number }
   | { k: "heroSpeed"; v: number }
   | { k: "heroDmg"; v: number }
@@ -67,6 +72,9 @@ export const CARDS: readonly CardDef[] = [
   { name: "용병 치명타 피해 +30%", desc: "용병 치명타 피해 배율 +0.3", category: 1, weight: 4, minLevel: 3, effect: { k: "mercCritMult", v: 0.3 } },
   { name: "용병 범위 +15%", desc: "용병의 공격 범위(부채꼴·범위 공격) +15%", category: 1, weight: 4, effect: { k: "mercArea", v: 0.15 } },
   { name: "궁병 관통 +1", desc: "용병 화살이 적 1명을 더 뚫고 나간다", category: 1, weight: 4, minLevel: 3, unitType: ARCHER, effect: { k: "mercPierce", v: 1 } },
+  { name: "용병 방어력 +8%", desc: "모든 용병이 받는 피해 -8%", category: 1, weight: 7, effect: { k: "mercDefense", v: 0.08 } },
+  { name: "용병 회피 +6%", desc: "용병이 6% 확률로 공격을 완전히 피한다", category: 1, weight: 5, effect: { k: "mercDodge", v: 0.06 } },
+  { name: "용병 체력 재생", desc: "용병이 초당 최대 체력의 1.5%를 회복한다", category: 1, weight: 5, effect: { k: "mercRegen", v: 0.015 } },
   ...typeCards,
   // 주인공 강화
   { name: "최대 체력 +25", desc: "주인공의 최대 체력 +25", category: 2, weight: 8, effect: { k: "heroMaxHp", v: 25 } },
@@ -78,6 +86,8 @@ export const CARDS: readonly CardDef[] = [
   { name: "치명타 확률 +8%", desc: "주인공 공격이 8% 확률로 치명타(기본 피해 x1.5)", category: 2, weight: 6, effect: { k: "heroCrit", v: 0.08 } },
   { name: "치명타 피해 +30%", desc: "주인공 치명타 피해 배율 +0.3", category: 2, weight: 4, minLevel: 3, effect: { k: "heroCritMult", v: 0.3 } },
   { name: "범위 +15%", desc: "주인공의 근접 부채꼴·범위 공격 +15%", category: 2, weight: 4, effect: { k: "heroArea", v: 0.15 } },
+  { name: "방어력 +8%", desc: "주인공이 받는 피해 -8%", category: 2, weight: 7, effect: { k: "heroDefense", v: 0.08 } },
+  { name: "회피율 +6%", desc: "6% 확률로 공격을 완전히 피한다", category: 2, weight: 5, effect: { k: "heroDodge", v: 0.06 } },
   { name: "체력 재생", desc: "주인공이 초당 체력 0.8을 회복한다", category: 2, weight: 5, effect: { k: "heroRegen", v: 0.8 } },
 ];
 

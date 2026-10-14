@@ -1066,3 +1066,40 @@ test("용병 능력치 카드: 사거리·범위가 용병 능력치에 반영�
   g.applyCardForTest(a, { k: "mercArea", v: 0.5 });
   assert.ok(Math.abs(g.mercStatsForTest(mace).splash - sp0 * 1.5) < 1e-9);
 });
+
+test("방어력: 받는 피해가 비율만큼 줄어든다", () => {
+  const dealt = (def: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    if (def > 0) g.applyCardForTest(a, { k: "heroDefense", v: def });
+    const p = g.getPlayer(a)!;
+    g.spawnEnemyAt(p.x + 20, p.y, 4);
+    run(g, 1.5);
+    return PLAYER_MAX_HP - g.getPlayer(a)!.hp;
+  };
+  const base = dealt(0);
+  assert.ok(base > 0);
+  assert.ok(Math.abs(dealt(0.5) - base * 0.5) < 1e-6);
+});
+
+test("회피율: 확률 100%(상한 50%)에 rng가 0이면 공격을 완전히 피하고 이벤트가 나온다", () => {
+  const g = new Game(() => 0);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  g.applyCardForTest(a, { k: "heroDodge", v: 1 });
+  const p = g.getPlayer(a)!;
+  g.spawnEnemyAt(p.x + 20, p.y, 4);
+  run(g, 2);
+  assert.equal(g.getPlayer(a)!.hp, PLAYER_MAX_HP);
+  assert.ok(g.takeEvents().some((e) => e[0] === 6));
+});
+
+test("용병 체력 재생: 상처 입은 용병이 시간이 지나면 회복한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const m = g.addMerc(a, SHIELD, 0, 0);
+  g.applyCardForTest(a, { k: "mercRegen", v: 0.1 });
+  (g.getMerc(m) as { hp: number }).hp = 10;
+  run(g, 2);
+  assert.ok(g.getMerc(m)!.hp > 10 + MERC_STATS[SHIELD]!.hp * 0.15);
+});

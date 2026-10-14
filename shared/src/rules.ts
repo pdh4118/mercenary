@@ -208,4 +208,6 @@ export const REVIVE_INVULN_SEC = 2;
 // 공격 능력치(레벨업 카드)
 export const CRIT_BASE_MULT = 1.5; // 치명타 기본 피해 배율
 export const CRIT_MAX_CHANCE = 0.75; // 치명타 확률 상한
+export const DEFENSE_MAX = 0.6; // 방어력(피해 감소) 상한
+export const DODGE_MAX = 0.5; // 회피율 상한
 export const AREA_ARC_MAX = 2.4; // 범위 증가로 넓어지는 근접 부채꼴 반각 상한(라디안)

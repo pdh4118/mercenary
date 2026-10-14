@@ -10,6 +10,9 @@ import {
   ARMY_SPAWN_DISTANCE,
   BOSS_DMG_MULT,
   CRIT_BASE_MULT,
+  DEFENSE_MAX,
+  DODGE_MAX,
+  EVT_DODGE,
   CRIT_MAX_CHANCE,
   AREA_ARC_MAX,
   EVT_CRIT,
@@ -136,6 +139,11 @@ interface Mods {
   typeDmg: number[];
   heroSpeed: number;
   heroDmg: number;
+  mercDefense: number;
+  mercDodge: number;
+  mercRegen: number; // 초당 최대 체력 비율
+  heroDefense: number;
+  heroDodge: number;
   mercRange: number;
   mercPierce: number;
   mercCrit: number; // 치명타 확률(0..1)
@@ -161,6 +169,11 @@ const newMods = (): Mods => ({
   typeDmg: UNIT_TYPES.map(() => 1),
   heroSpeed: 1,
   heroDmg: 1,
+  mercDefense: 0,
+  mercDodge: 0,
+  mercRegen: 0,
+  heroDefense: 0,
+  heroDodge: 0,
   mercRange: 1,
   mercPierce: 0,
   mercCrit: 0,
@@ -945,6 +958,13 @@ export class Game {
     if (w.splash > 0) this.splashEnemies(struck, w.splash * s.mods.heroArea, damage * SPLASH_FACTOR, w.type, p.x, p.y, p.id);
   }
 
+  /** 회피 판정: 피했으면 true(효과 표시를 띄운다) */
+  private dodged(chance: number, x: number, y: number): boolean {
+    if (chance <= 0 || this.rng() >= Math.min(DODGE_MAX, chance)) return false;
+    this.pushEvent(EVT_DODGE, x, y, 0);
+    return true;
+  }
+
   /** 치명타 판정(공격 한 번에 한 번) */
   private rollCrit(chance: number): boolean {
     return chance > 0 && this.rng() < Math.min(CRIT_MAX_CHANCE, chance);
@@ -1030,13 +1050,14 @@ export class Game {
         ownerId: p.id,
         hit: (h) => {
           if (p.invuln > 0) return 0; // 부활 직후 잠깐 무적
+          if (this.dodged(s.mods.heroDodge, p.x, p.y)) return 0;
           // 창을 들면 창병처럼 돌격을 반사하고, 검을 들면 정면 피해를 절반으로 막는다
           const w = WEAPONS[p.weapon]!;
           const r = resolveHit(
             { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
             h,
           );
-          p.hp -= r.body;
+          p.hp -= r.body * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense));
           if (p.hp <= 0) {
             p.hp = 0;
             p.down = true;
@@ -1055,9 +1076,11 @@ export class Game {
         radius: MERC_STATS[m.type]!.radius,
         ownerId: m.owner,
         hit: (h) => {
+          const mods = this.slots.get(m.owner)?.mods;
+          if (this.dodged(mods?.mercDodge ?? 0, m.x, m.y)) return 0;
           const r = resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
-          this.hurtMerc(m, r.body);
+          this.hurtMerc(m, r.body * (1 - Math.min(DEFENSE_MAX, mods?.mercDefense ?? 0)));
           return r.reflected;
         },
       });
@@ -1123,6 +1146,7 @@ export class Game {
         continue;
       }
       this.regenShield(m, st.shield, dt);
+      if (ownerSlot && ownerSlot.mods.mercRegen > 0) m.hp = Math.min(st.hp, m.hp + st.hp * ownerSlot.mods.mercRegen * dt);
       m.cd = Math.max(0, m.cd - dt);
 
       if (m.atkT > 0) {
@@ -1468,6 +1492,11 @@ export class Game {
         break;
       case "heroSpeed": m.heroSpeed += e.v; break;
       case "heroDmg": m.heroDmg += e.v; break;
+      case "mercDefense": m.mercDefense += e.v; break;
+      case "mercDodge": m.mercDodge += e.v; break;
+      case "mercRegen": m.mercRegen += e.v; break;
+      case "heroDefense": m.heroDefense += e.v; break;
+      case "heroDodge": m.heroDodge += e.v; break;
       case "mercRange": m.mercRange += e.v; break;
       case "mercPierce": m.mercPierce += e.v; break;
       case "mercCrit": m.mercCrit += e.v; break;

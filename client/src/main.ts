@@ -19,6 +19,7 @@ import {
   EVT_ENEMY_ARROW_HIT,
   EVT_REVIVE,
   EVT_CRIT,
+  EVT_DODGE,
   EVT_SHIELD_BREAK,
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
@@ -356,13 +357,17 @@ async function main() {
     const e = c.effect;
     switch (e.k) {
       case "typeBoost": return e.type;
-      case "mercHp": return SHIELD;
+      case "mercHp":
+      case "mercDefense":
+      case "heroDefense": return SHIELD;
       case "mercDmg":
       case "mercArea":
       case "heroArea": return BLUNT_TYPE;
       case "mercAtkSpeed":
       case "mercRange": return SPEAR_TYPE;
-      case "mercSpeed": return 0;
+      case "mercSpeed":
+      case "mercDodge":
+      case "heroDodge": return 0;
       case "heroDmg":
       case "heroFireRate":
       case "heroRange":
@@ -371,7 +376,7 @@ async function main() {
       default: return -1;
     }
   };
-  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", mercRespawn: "↺", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", mercCrit: "CRIT", heroCrit: "CRIT", mercCritMult: "x1.5+", heroCritMult: "x1.5+" };
+  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", mercRespawn: "↺", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", mercRegen: "♥", mercCrit: "CRIT", heroCrit: "CRIT", mercCritMult: "x1.5+", heroCritMult: "x1.5+" };
   /** 뽑힐 확률이 낮을수록 별이 많다 */
   const starsOf = (weight: number) => (weight >= 8 ? 1 : weight >= 5 ? 2 : 3);
   const cardPanel = new Container();
@@ -843,6 +848,8 @@ async function main() {
           .stroke({ width: 4 * (1 - t) + 1, color: 0xbfe6ff, alpha: 0.9 * (1 - t) });
       } else if (b.kind === EVT_SHIELD_BREAK) {
         fxLayer.circle(b.x, b.y, 14 + 34 * t).stroke({ width: 5 * (1 - t) + 1, color: 0x8fd0ff, alpha: 0.9 * (1 - t) });
+      } else if (b.kind === EVT_DODGE) {
+        fxLayer.circle(b.x, b.y, 10 + 22 * t).stroke({ width: 2, color: 0xffffff, alpha: 0.8 * (1 - t) });
       } else if (b.kind === EVT_CRIT) {
         fxLayer.star(b.x, b.y - 10 * t, 5, 12 + 10 * t, 5).fill({ color: 0xffd45d, alpha: 0.95 * (1 - t) }).stroke({ width: 1.5, color: 0xff8a3b, alpha: 1 - t });
       } else if (b.kind === EVT_REVIVE) {
