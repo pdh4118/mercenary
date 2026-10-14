@@ -46,7 +46,8 @@ let updating = false; // 업데이트로 서버를 내려 둔 중
 
 function startServer() {
   log(`서버를 켭니다 (포트 ${PORT})`);
-  const c = spawn("npm", ["start"], { cwd: ROOT, shell: WIN, stdio: "inherit", env: { ...process.env, TRUST_PROXY: process.env.TRUST_PROXY ?? "1" } });
+  // 윈도우 밖에서는 별도 프로세스 그룹으로 띄워, 끌 때 npm 아래의 서버 프로세스까지 함께 끈다
+  const c = spawn("npm", ["start"], { cwd: ROOT, shell: WIN, detached: !WIN, stdio: "inherit", env: { ...process.env, TRUST_PROXY: process.env.TRUST_PROXY ?? "1" } });
   child = c;
   c.on("exit", (code) => {
     if (child !== c || stopping || updating) return; // 우리가 일부러 끈 것
@@ -63,7 +64,12 @@ async function stopServer() {
   await new Promise((done) => {
     c.once("exit", done);
     if (WIN) spawnSync("taskkill", ["/pid", String(c.pid), "/T", "/F"], { stdio: "ignore" });
-    else c.kill("SIGTERM");
+    else
+      try {
+        process.kill(-c.pid, "SIGTERM"); // 프로세스 그룹 전체
+      } catch {
+        c.kill("SIGTERM");
+      }
     setTimeout(done, 8000);
   });
 }
@@ -82,7 +88,7 @@ async function check() {
   if (updating) return;
   if (!git("fetch", "origin", BRANCH).ok) return log("GitHub에서 새 버전을 확인하지 못했습니다(인터넷 연결?). 다음에 다시 확인합니다.");
   const local = head();
-  const remote = git("rev-parse", `origin/${BRANCH}`).out;
+  const remote = git("rev-parse", "FETCH_HEAD").out; // 방금 받아 온 원격 최신 커밋
   if (!remote || local === remote) {
     waitingSince = 0;
     return;
@@ -133,7 +139,7 @@ if (!existsSync(join(ROOT, "node_modules"))) {
 }
 // 켜기 전에 한 번 최신으로 맞추고 빌드한다
 let needBuild = !existsSync(join(ROOT, "client", "dist", "index.html"));
-if (git("fetch", "origin", BRANCH).ok && git("rev-parse", `origin/${BRANCH}`).out !== head()) {
+if (git("fetch", "origin", BRANCH).ok && git("rev-parse", "FETCH_HEAD").out !== head()) {
   const before = head();
   const pull = git("pull", "--ff-only", "origin", BRANCH);
   if (pull.ok) {
