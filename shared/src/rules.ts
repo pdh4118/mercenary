@@ -221,6 +221,9 @@ export const CRIT_BASE_MULT = 1.5; // 치명타 기본 피해 배율
 export const CRIT_MAX_CHANCE = 0.75; // 치명타 확률 상한
 export const DEFENSE_MAX = 0.6; // 방어력(피해 감소) 상한
 export const DODGE_MAX = 0.5; // 회피율 상한
+// 배후 공격: 방어하는 쪽의 등 뒤에서 오는 공격은 피해가 늘어난다(기병의 우회가 빛난다). 적·아군 모두에게 적용된다.
+export const BACKSTAB_MULT = 1.5;
+export const BACKSTAB_ARC = rad(60); // 등 뒤 반각(전체 120도)
 export const KNOCK_BOSS_FACTOR = 0.25; // 보스는 넉백이 이만큼만 먹힌다
 export const KNOCK_MAX = 160; // 한 번에 밀려나는 최대 거리
 export const KNOCK_STUN_SEC = 0.4; // 밀려난 적이 공격하지 못하는 시간

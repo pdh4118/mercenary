@@ -1,4 +1,6 @@
 import {
+  BACKSTAB_ARC,
+  BACKSTAB_MULT,
   SHIELD_FRONT_ARC,
   SPEAR,
   angleDiff,
@@ -29,6 +31,7 @@ export interface HitResult {
   shield: number; // 방패 체력에서 깎이는 양
   reflected: number; // 공격자에게 되돌아가는 피해(창병의 돌격 반사)
   shieldBroke: boolean; // 이번 공격으로 방패가 깨졌다
+  backstab: boolean; // 등 뒤에서 맞았다(피해 x1.5)
 }
 
 /**
@@ -41,17 +44,20 @@ export interface HitResult {
 export function resolveHit(g: Guard, h: Hit): HitResult {
   const spear = g.type === SPEAR || g.spearStance === true;
   const reflected = spear ? h.charge : 0;
-  const base = h.damage + (spear ? 0 : h.charge);
+  // 등 뒤에서 오는 공격은 피해가 늘어난다(돌격 피해도 포함). 방패는 정면만 막으므로 등 뒤에서는 어차피 소용없다.
+  const backstab = Math.abs(angleDiff(h.fromAngle, g.face + Math.PI)) <= BACKSTAB_ARC;
+  const mult = backstab ? BACKSTAB_MULT : 1;
+  const base = (h.damage + (spear ? 0 : h.charge)) * mult;
   const frontal = Math.abs(angleDiff(h.fromAngle, g.face)) <= SHIELD_FRONT_ARC;
 
   if (g.shield > 0 && frontal) {
     const factor = shieldFactor(h.srcType);
     const onShield = base * factor;
-    if (onShield <= g.shield) return { body: 0, shield: onShield, reflected, shieldBroke: onShield >= g.shield };
+    if (onShield <= g.shield) return { body: 0, shield: onShield, reflected, shieldBroke: onShield >= g.shield, backstab };
     // 방패가 버티지 못하면 남은 몫이 몸에 들어간다(방패에 곱해진 배율은 되돌려서 계산)
-    return { body: (onShield - g.shield) / factor, shield: g.shield, reflected, shieldBroke: true };
+    return { body: (onShield - g.shield) / factor, shield: g.shield, reflected, shieldBroke: true, backstab };
   }
   let body = base;
   if (g.frontBlock !== undefined && frontal) body *= g.frontBlock;
-  return { body, shield: 0, reflected, shieldBroke: false };
+  return { body, shield: 0, reflected, shieldBroke: false, backstab };
 }

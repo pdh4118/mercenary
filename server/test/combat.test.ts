@@ -55,7 +55,7 @@ test("옆이나 뒤에서 오는 공격은 방패를 무시하고 몸에 그대�
   for (const from of [Math.PI, Math.PI / 2, -Math.PI / 2, SHIELD_FRONT_ARC + 0.2]) {
     const r = resolveHit(shield(), { damage: 10, charge: 0, srcType: ARCHER, fromAngle: from });
     assert.equal(r.shield, 0, `방향 ${from}`);
-    assert.equal(r.body, 10);
+    assert.equal(r.body, from === Math.PI ? 15 : 10, "등 뒤는 x1.5, 옆은 그대로");
   }
   // 정면 경계 안쪽은 막는다
   assert.ok(resolveHit(shield(), { damage: 10, charge: 0, srcType: ARCHER, fromAngle: SHIELD_FRONT_ARC - 0.05 }).shield > 0);
@@ -112,7 +112,8 @@ test("창을 든 주인공도 돌격을 반사하고, 검을 든 주인공은 �
   assert.equal(r.reflected, 13);
   const sword: Guard = { type: -1, shield: 0, face: 0, frontBlock: 0.5 };
   assert.equal(resolveHit(sword, front(SPEAR, 10)).body, 5);
-  assert.equal(resolveHit(sword, { damage: 10, charge: 0, srcType: SPEAR, fromAngle: Math.PI }).body, 10, "뒤에서는 막지 못한다");
+  assert.equal(resolveHit(sword, { damage: 10, charge: 0, srcType: SPEAR, fromAngle: Math.PI }).body, 15, "뒤에서는 막지 못하고 배후 보너스까지 받는다");
+  assert.equal(resolveHit(sword, { damage: 10, charge: 0, srcType: SPEAR, fromAngle: Math.PI / 2 }).body, 10, "옆에서는 막지 못할 뿐 보너스는 없다");
 });
 
 test("기병 속도: 점점 빨라지고, 돌격 피해는 현재 속도에 비례한다", () => {
@@ -126,4 +127,26 @@ test("기병 속도: 점점 빨라지고, 돌격 피해는 현재 속도에 비�
   close(chargeBonus(max, 1) / cavSpeed(max, 1), chargeBonus(max, 0) / cavSpeed(max, 0));
   assert.ok(chargeBonus(max, 1) > 2 * chargeBonus(max, 0) * 0.99 === false || true);
   assert.ok(chargeBonus(max, 1) > chargeBonus(max, 0));
+});
+
+test("배후 공격: 등 뒤(반각 60도)에서 오면 피해와 돌격 피해가 1.5배, 옆·정면은 그대로", () => {
+  const g: Guard = { type: SHIELD, shield: 0, face: 0 };
+  const from = (deg: number) => (deg * Math.PI) / 180;
+  const body = (deg: number, dmg = 10, charge = 0) => resolveHit(g, { damage: dmg, charge, srcType: CAVALRY, fromAngle: from(deg) });
+  close(body(180).body, 15);
+  assert.equal(body(180).backstab, true);
+  close(body(180 - 59).body, 15); // 경계 안쪽
+  close(body(180 - 61).body, 10); // 경계 바깥
+  close(body(90).body, 10);
+  close(body(0).body, 10);
+  assert.equal(body(0).backstab, false);
+  close(body(180, 10, 8).body, 27); // 돌격 피해도 1.5배
+  // 방패는 정면만 막으므로 등 뒤에서는 방패 체력이 깎이지 않고 몸으로 들어간다
+  const shielded = resolveHit({ type: SHIELD, shield: 50, face: 0 }, { damage: 10, charge: 0, srcType: BLUNT, fromAngle: Math.PI });
+  assert.equal(shielded.shield, 0);
+  close(shielded.body, 15);
+  // 창병은 뒤에서 와도 돌격 피해를 받지 않고 돌려준다(반사량은 원래 돌격 피해)
+  const sp = resolveHit({ type: SPEAR, shield: 0, face: 0 }, { damage: 10, charge: 8, srcType: CAVALRY, fromAngle: Math.PI });
+  close(sp.body, 15);
+  assert.equal(sp.reflected, 8);
 });

@@ -19,6 +19,7 @@ import {
   CRIT_MAX_CHANCE,
   AREA_ARC_MAX,
   EVT_CRIT,
+  EVT_BACKSTAB,
   BOSS_HP_BASE,
   BOSS_HP_PER_STAGE,
   BOSS_SIZE,
@@ -700,7 +701,7 @@ export class Game {
       shield: st.shield * hpMult,
       shieldMax: st.shield * hpMult,
       dmgMult: (1 + STAGE_ENEMY_DMG_GROWTH * (this.stage - 1)) * (extra.boss ? BOSS_DMG_MULT : 1),
-      atkT: 0, atkAng: 0, face: 0, cd: 0, regenT: 0, momentum: 0, chargeSnap: 0,
+      atkT: 0, atkAng: 0, face: Math.atan2(-y, -x), cd: 0, regenT: 0, momentum: 0, chargeSnap: 0, // 처음에는 중앙(플레이어가 있는 쪽)을 본다
       boss: false, army: false, squad: 0, slotF: 0, slotL: 0,
       ...extra,
     };
@@ -1587,6 +1588,7 @@ export class Game {
     if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
     if (has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
+    if (r.backstab && r.body + r.shield > 0) this.pushEvent(EVT_BACKSTAB, e.x, e.y, hit.fromAngle + Math.PI);
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
     else if (owner && r.body + r.shield > 0) this.knockBack(e, hit.fromAngle, src ? mstat(owner.mods, src.type, "knock") : owner.mods.heroKnock);
     return r.reflected;

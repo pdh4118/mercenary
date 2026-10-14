@@ -507,7 +507,8 @@ test("기병은 가까운 창병 적을 피해 다른 적을 노린다", () => {
   const home = { x: p.x + 30, y: p.y + 150 }; // 첫 기병의 날개 자리
   const c = g.addMerc(a, CAVALRY, home.x, home.y);
   g.spawnEnemyAt(home.x + 130, home.y, SPEAR); // 가깝지만 창병(상성 불리)
-  g.spawnEnemyAt(home.x, home.y + 200, SHIELD); // 더 멀지만 상성이 유리
+  const far = g.spawnEnemyAt(home.x, home.y + 200, SHIELD); // 더 멀지만 상성이 유리
+  (g.getEnemy(far) as { face: number }).face = 0; // 우회하지 않고 곧장 가도록 방향을 고정
   run(g, 0.25);
   const m = g.getMerc(c)!;
   assert.ok(m.y - home.y > 5, "검방병 쪽(아래)으로 움직인다");
@@ -1103,4 +1104,26 @@ test("용병 체력 재생: 상처 입은 용병이 시간이 지나면 회복�
   (g.getMerc(m) as { hp: number }).hp = 10;
   run(g, 2);
   assert.ok(g.getMerc(m)!.hp > 10 + MERC_STATS[SHIELD]!.hp * 0.15);
+});
+
+test("배후 공격: 등 뒤에서 용병이 찌르면 같은 공격이 1.5배 들어간다", () => {
+  const dealt = (heroSide: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    p.x = 0;
+    p.y = 0;
+    // 적(둔기병)은 가장 가까운 아군(주인공)을 바라본다. 주인공이 반대편에 있으면 용병에게 등을 보인 셈이다.
+    const e = g.spawnEnemyAt(300 + 0, 0, BLUNT);
+    const en = g.getEnemy(e)!;
+    p.x = en.x + heroSide * 20;
+    const m = g.addMerc(a, SPEAR, en.x - 45, 0);
+    void m;
+    run(g, 0.4);
+    return ENEMY_STATS[BLUNT]!.hp - g.getEnemy(e)!.hp;
+  };
+  const back = dealt(+1); // 주인공은 동쪽, 용병은 서쪽 → 용병이 등 뒤
+  const front = dealt(-1); // 주인공도 서쪽 → 적이 서쪽을 보고 있다
+  assert.ok(back > 0 && front > 0, `${back} ${front}`);
+  assert.ok(Math.abs(back / front - 1.5) < 0.01, `${back / front}`);
 });

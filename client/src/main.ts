@@ -22,6 +22,7 @@ import {
   EVT_REVIVE,
   EVT_CRIT,
   EVT_DODGE,
+  EVT_BACKSTAB,
   EVT_SHIELD_BREAK,
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
@@ -903,6 +904,14 @@ async function main() {
           .stroke({ width: 4 * (1 - t) + 1, color: 0xbfe6ff, alpha: 0.9 * (1 - t) });
       } else if (b.kind === EVT_SHIELD_BREAK) {
         fxLayer.circle(b.x, b.y, 14 + 34 * t).stroke({ width: 5 * (1 - t) + 1, color: 0x8fd0ff, alpha: 0.9 * (1 - t) });
+      } else if (b.kind === EVT_BACKSTAB) {
+        // 등 뒤에서 베는 주황 사선
+        const dx = Math.cos(b.ang);
+        const dy = Math.sin(b.ang);
+        fxLayer
+          .moveTo(b.x - dx * 4 - dy * 16, b.y - dy * 4 + dx * 16)
+          .lineTo(b.x + dx * 4 + dy * 16, b.y + dy * 4 - dx * 16)
+          .stroke({ width: 4 * (1 - t) + 1, color: 0xff8a3b, alpha: 0.95 * (1 - t) });
       } else if (b.kind === EVT_DODGE) {
         fxLayer.circle(b.x, b.y, 10 + 22 * t).stroke({ width: 2, color: 0xffffff, alpha: 0.8 * (1 - t) });
       } else if (b.kind === EVT_CRIT) {

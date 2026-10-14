@@ -140,6 +140,7 @@ export const EVT_SHIELD_BREAK = 3; // 방패가 깨짐
 export const EVT_REVIVE = 4; // 부활
 export const EVT_CRIT = 5; // 치명타
 export const EVT_DODGE = 6; // 회피
+export const EVT_BACKSTAB = 7; // 배후 공격
 export type EventWire = [kind: number, x: number, y: number, ang: number];
 
 export type StagePhase = "grow" | "boss" | "break";
