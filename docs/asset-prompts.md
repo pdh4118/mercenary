@@ -273,7 +273,7 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 | `arrow_hit` | 화살이 적에게 맞을 때 | `soft arrow thud into leather and flesh, short, low volume` | 0.15초, 4종 |
 | `melee_hit` | 근접 타격(검·창·철퇴로 몸을 때림) | `quick melee weapon hit, dull cloth and metal impact, medium thud` | 0.2초, 7종 |
 | `shield_block` | 방패가 공격을 막을 때 | `wooden shield block, solid knock with a faint metal ring` | 0.2초, 3종 |
-| `shield_break` | 방패가 깨질 때 | `shield shattering, splintering wood and a metal snap, short` | 0.5초, 2종 |
+| `shield_break` | 방패가 깨질 때 | `shield shattering, splintering wood and a metal snap, short` | 0.5초(3번째는 1.2초), 3종 |
 | `crit_hit` | 치명타 | `sharp critical strike, bright metallic slash with a heavy thump` | 0.3초, 8종 (충격음 8개 적용됨) |
 | `enemy_die` | 적이 쓰러질 때 | `small fantasy soldier falls, short grunt-less thud and armor clatter, low volume` | 0.25초, 4종 |
 | `ally_hurt` | 내 유닛(주인공)이 맞을 때 | `player takes damage, dull body hit with short breathy grunt, not shrill` | 0.25초, 3종 |

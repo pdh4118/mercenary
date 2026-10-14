@@ -29,7 +29,7 @@ export const SOUNDS = {
   arrow_hit: d(4, 0.45, 60, 5),
   melee_hit: d(7, 0.55, 60, 5),
   shield_block: d(3, 0.55, 70, 4),
-  shield_break: d(2, 0.7, 150, 2),
+  shield_break: d(3, 0.7, 150, 2),
   crit_hit: d(8, 0.7, 90, 3, 0.05), // 충격음 8종을 번갈아
   enemy_die: d(4, 0.4, 80, 4),
   ally_hurt: d(3, 0.6, 120, 3, 0.05, false),

@@ -22,6 +22,19 @@
 
 (`Foley_1`은 `Medieval_Combat_Foley_1.mp3`, `Foley`는 `Medieval_Combat_Foley.mp3`)
 
+## 교체·크레딧 정리 (출시 전 확인)
+
+아래 파일은 외부 사이트(Freesound 형식 이름)에서 받은 것이라 **라이선스를 확인하지 않았습니다.** 상업 이용 가능 여부(CC0 / CC BY / CC BY-NC 등)와 저작자 표시 의무를 원본 페이지에서 확인해, 쓸 수 없으면 직접 만든 소리나 라이선스가 확실한 소리로 같은 파일 이름에 덮어쓰면 됩니다(코드 수정 불필요).
+
+| 게임 파일 | 제작자 | 라이선스 확인 | 교체 필요 여부 |
+| --- | --- | --- | --- |
+| `melee_hit_5` | luminousfridge (#496192) | 미확인 | 미정 |
+| `melee_hit_6` | sypherzent (#420673) | 미확인 | 미정 |
+| `melee_hit_7` | heckfricker (#797821) | 미확인 | 미정 |
+| `shield_break_3` | soundflakes (#492237) | 미확인 | 미정 |
+
+Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~2`와 직접 받은 `impact`, 활·방패 소리 파일(`bow_shot_1`, `arrow_volley_1`, `shield_block_*`, `crit_hit_*`)도 생성·출처 약관을 확인해야 합니다(Suno는 요금제에 따라 상업 이용 조건이 다릅니다).
+
 ## 외부에서 받은 소리와 출처
 
 | 게임 파일 | 원본 파일 이름 | 비고 |
@@ -29,3 +42,4 @@
 | `melee_hit_5` | `496192__luminousfridge__bash-hit-sfx.ogg` | 0.2초 단일 타격, Freesound 형식의 이름(제작자 luminousfridge). **라이선스(CC0 / 저작자 표시 필요 등)를 원본 페이지에서 확인하고, 표시가 필요하면 크레딧에 넣어야 합니다.** |
 | `melee_hit_6` | `420673__sypherzent__basic-melee-hit.wav` | 0.18초, 둔탁한 타격(중심 약 1.5kHz). 제작자 sypherzent, **라이선스 확인 필요** |
 | `melee_hit_7` | `797821__heckfricker__thwack-01.wav` | 0.21초 타격(중심 약 2.5kHz로 위 둘보다 밝음). 제작자 heckfricker, **라이선스 확인 필요** |
+| `shield_break_3` | `492237__soundflakes__shield-breaking-with-bludgeon.wav` | 1.2초(원본 1.9초에서 0.3~1.5초 구간), 둔기로 방패가 부서지는 소리. 제작자 soundflakes, **라이선스 확인 필요** |
