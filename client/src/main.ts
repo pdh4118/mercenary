@@ -201,7 +201,11 @@ async function main() {
     },
     (w) => [w[0], w[1], w[2]],
     true,
-    (v) => audio.play("enemy_die", { x: v.x, y: v.y }), // 사라졌다 = 쓰러졌다
+    (v) => {
+      // 사라졌다 = 쓰러졌다. 갑옷 소리는 늘 깔고, 비명은 가끔만 섞는다(많이 죽을 때 시끄럽지 않게).
+      audio.play("armor_fall", { x: v.x, y: v.y });
+      if (Math.random() < 0.4) audio.play("enemy_die", { x: v.x, y: v.y });
+    },
   );
   /** 화살은 날아가는 방향으로 돌려 그린다. 서버가 방향을 보내지 않으므로 이전 위치와의 차이로 구한다. */
   interface BulletView extends Tracked {

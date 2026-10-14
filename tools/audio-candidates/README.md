@@ -37,6 +37,7 @@
 | `bgm_grow` | code_box (#559485) | 미확인 | 미정(임시 음악) |
 | `enemy_die_1` | starkvind (#559975) | 미확인 | 미정 |
 | `enemy_die_2` | artmasterrich (#345456) | 미확인 | 미정 |
+| `armor_fall_1~4` | artninja / halleck (#704881) | 미확인 | 미정 |
 
 Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~2`와 직접 받은 `impact`, 활·방패 소리 파일(`bow_shot_1`, `arrow_volley_1`, `shield_block_*`, `crit_hit_*`)도 생성·출처 약관을 확인해야 합니다(Suno는 요금제에 따라 상업 이용 조건이 다릅니다).
 
@@ -53,3 +54,4 @@ Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~
 | `bgm_grow` | `559485__code_box__battle-tactics.wav` | 원본 74초 중 앞 69초(끝의 소리가 줄어드는 부분 제외), 처음부터 끝까지 꽉 찬 전투 분위기 음악. 임시 성장 시간 음악. 제작자 code_box, **라이선스 확인 필요** |
 | `enemy_die_1` | `559975__starkvind__man-dies.wav` | 0.7초, 남자가 쓰러지며 내는 비명(중심 약 1.2kHz). 한 종류뿐이라 높낮이를 매번 ±15% 바꿔 재생하고 간격을 150ms로 늘렸다. 제작자 starkvind, **라이선스 확인 필요** |
 | `enemy_die_2` | `345456__artmasterrich__male_death_04.wav` | 0.85초(원본 1.03초), 남자 죽는 비명. 원본이 0dB를 넘어 5dB 낮춤(중심 약 1.8kHz). 제작자 artmasterrich, **라이선스 확인 필요** |
+| `armor_fall_1 ~ 4` | `704881__artninja__121623__halleck__tf_prime_inspired_robot_body_falls_or_impacts_03.mp3` | 원본 12.6초에 로봇 몸체가 쓰러지는 소리 10개가 있어 그중 4개(0, 1.2, 4.65, 8.0초 시작, 각 0.8초)를 사용. 중심 약 3.6kHz로 금속성이 강함. 제작자 artninja(원 제작 halleck), **라이선스 확인 필요** |
