@@ -27,3 +27,5 @@
 | 게임 파일 | 원본 파일 이름 | 비고 |
 | --- | --- | --- |
 | `melee_hit_5` | `496192__luminousfridge__bash-hit-sfx.ogg` | 0.2초 단일 타격, Freesound 형식의 이름(제작자 luminousfridge). **라이선스(CC0 / 저작자 표시 필요 등)를 원본 페이지에서 확인하고, 표시가 필요하면 크레딧에 넣어야 합니다.** |
+| `melee_hit_6` | `420673__sypherzent__basic-melee-hit.wav` | 0.18초, 둔탁한 타격(중심 약 1.5kHz). 제작자 sypherzent, **라이선스 확인 필요** |
+| `melee_hit_7` | `797821__heckfricker__thwack-01.wav` | 0.21초 타격(중심 약 2.5kHz로 위 둘보다 밝음). 제작자 heckfricker, **라이선스 확인 필요** |
