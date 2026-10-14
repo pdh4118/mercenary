@@ -33,6 +33,9 @@ import {
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
   STAGE_COUNT,
+  TOURNAMENT_ARENA_RADIUS,
+  TOURNAMENT_MATCH_SEC,
+  CHEST_OPEN_RADIUS,
   MERC_STATS,
   mercName,
   PLAYER_RADIUS,
@@ -52,6 +55,7 @@ import {
   type EnemyWire,
   type MercWire,
   type PlayerState,
+  type GameInfo,
   type ServerMsg,
 } from "@mercenary/shared";
 
@@ -59,6 +63,10 @@ const params = new URLSearchParams(location.search);
 // 기본은 접속한 주소와 같은 곳의 /ws. HTTPS 페이지에서는 자동으로 wss가 된다. 개발 서버도 /ws를 게임 서버로 넘겨 준다.
 const serverUrl = params.get("server") ?? `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const statusEl = document.getElementById("status")!;
+const tourBannerEl = document.getElementById("tourBanner")!;
+const tourBracketEl = document.getElementById("tourBracket")!;
+const tourBigEl = document.getElementById("tourBig")!;
+const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 const PLAYER_COLORS = [0xe05d5d, 0x5da6e0, 0x6fd16f, 0xe0c05d, 0xb07be0, 0x5de0d0, 0xe08f5d, 0xd96fb0];
 /** 병종 색: 기병 주황, 창병 초록, 궁병 노랑, 검방병 파랑, 둔기병 보라 */
@@ -541,12 +549,12 @@ async function main() {
   });
   cardPanel.visible = false;
   let shownOffer = "";
-  const showOffer = (offer: number[], pending: number, rerolls: number) => {
-    const key = `${offer.join(",")}|${pending}|${rerolls}`;
+  const showOffer = (offer: number[], pending: number, rerolls: number, box: number) => {
+    const key = `${offer.join(",")}|${pending}|${rerolls}|${box}`;
     if (key === shownOffer) return;
     shownOffer = key;
     cardPanel.visible = offer.length > 0;
-    cardHeader.text = offer.length > 0 ? `LEVEL UP!${pending > 1 ? ` x${pending}` : ""}  ·  [R] 새로고침 ${rerolls}` : "";
+    cardHeader.text = offer.length > 0 ? `${box > 0 ? "보상 상자 카드!" : "LEVEL UP!"}${pending > 1 ? ` x${pending}` : ""}  ·  [R] 새로고침 ${rerolls}` : "";
     cardViews.forEach((v, i) => {
       const card = offer[i] !== undefined ? CARDS[offer[i]!] : undefined;
       v.node.visible = !!card;
@@ -925,9 +933,47 @@ async function main() {
       .fill({ color, alpha: 0.1 + 0.35 * prog });
   };
 
+  /** 토너먼트 화면(HTML): 위쪽 대진 배너, 오른쪽 대진표, 가운데 큰 안내 */
+  const renderTournament = (gi: GameInfo | undefined, me: number) => {
+    const tour = gi?.phase === "tournament" ? gi.tour : null;
+    if (!tour) {
+      tourBannerEl.style.display = tourBracketEl.style.display = tourBigEl.style.display = "none";
+      return;
+    }
+    const fighter = me === tour.a || me === tour.b;
+    tourBannerEl.style.display = tourBracketEl.style.display = "block";
+    tourBannerEl.innerHTML =
+      `<div class="tt">토너먼트 · ${esc(tour.title)}</div>` +
+      `<div class="vs"><div class="side"><div class="nm">${esc(tour.an)}</div><div class="bar"><div style="width:${tour.ha}%"></div></div></div>` +
+      `<span>VS</span><div class="side"><div class="nm">${esc(tour.bn)}</div><div class="bar b"><div style="width:${tour.hb}%"></div></div></div></div>` +
+      `<div class="tm">${tour.step === "fight" ? `남은 시간 ${tour.t}초 · 주인공이 쓰러지면 패배` : tour.step === "outro" ? "경기 종료" : tour.step === "end" ? "토너먼트 종료" : fighter ? "선수 입장" : "관전 중"}</div>`;
+    let html = "<h3>대진표</h3>";
+    tour.rounds.forEach((r, ri) => {
+      html += `<div class="rt">${esc(r.title)}</div>`;
+      r.matches.forEach((m, mi) => {
+        const now = tour.now[0] === ri && tour.now[1] === mi && tour.step !== "end";
+        const cls = (side: 1 | 2) => (m.w === 0 ? "" : m.w === side ? "w" : "l");
+        html += `<div class="mt${now ? " now" : ""}"><span class="${cls(1)}">${esc(m.a || "-")}</span><span class="${cls(2)}">${esc(m.b || (m.a ? "부전승" : "-"))}</span></div>`;
+      });
+    });
+    tourBracketEl.innerHTML = html;
+    let big = "";
+    if (tour.step === "intro") {
+      big = `<div class="a">${esc(tour.title)}</div><div class="b">${esc(tour.an)} vs ${esc(tour.bn)}</div><div class="c">${fighter ? "준비하세요!" : "관전 중입니다"} ${tour.t}</div>`;
+    } else if (tour.step === "fight" && tour.t >= TOURNAMENT_MATCH_SEC - 1.5) {
+      big = `<div class="b">시작!</div>`;
+    } else if (tour.step === "outro") {
+      big = `<div class="a">${esc(tour.title)}</div><div class="b">승자: ${esc(tour.winner)}</div>`;
+    } else if (tour.step === "end") {
+      big = `<div class="a">토너먼트 우승</div><div class="b">${esc(tour.champion)}</div><div class="c">상금과 경험치를 받았습니다</div>`;
+    }
+    tourBigEl.innerHTML = big;
+    tourBigEl.style.display = big ? "block" : "none";
+  };
+
   app.ticker.add((ticker) => {
     // 배경 음악: 로비/대기실, 성장 단계, 보스 단계(끝난 뒤에는 멈춘다)
-    audio.music(!latest ? "bgm_lobby" : latest.g && latest.g.status !== "playing" ? null : latest.g?.phase === "boss" ? "bgm_boss" : "bgm_grow");
+    audio.music(!latest ? "bgm_lobby" : latest.g && latest.g.status !== "playing" ? null : latest.g?.phase === "boss" || latest.g?.phase === "tournament" ? "bgm_boss" : "bgm_grow");
     if (!latest) return;
     const k = 1 - Math.exp(-ticker.deltaMS / SMOOTH_MS);
 
@@ -1060,6 +1106,35 @@ async function main() {
 
     // 공격 예고
     fxLayer.clear();
+    // 토너먼트 경기장
+    if (latest.g?.phase === "tournament") {
+      fxLayer
+        .circle(0, 0, TOURNAMENT_ARENA_RADIUS)
+        .fill({ color: 0xe0c05d, alpha: 0.05 })
+        .circle(0, 0, TOURNAMENT_ARENA_RADIUS)
+        .stroke({ width: 6, color: 0xe0c05d, alpha: 0.75 })
+        .circle(0, 0, TOURNAMENT_ARENA_RADIUS - 10)
+        .stroke({ width: 2, color: 0xffffff, alpha: 0.25 });
+    }
+    // 보스 보상 상자: 주인이 다가가면 열린다. 내 상자는 반짝이고 반경이 보인다.
+    for (const c of latest.chests ?? []) {
+      const mine = c[3] === myId;
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+      if (mine) {
+        fxLayer.circle(c[1], c[2], CHEST_OPEN_RADIUS).stroke({ width: 2, color: 0xffd45d, alpha: 0.25 + 0.35 * pulse });
+        fxLayer.circle(c[1], c[2], 34).fill({ color: 0xffd45d, alpha: 0.12 + 0.12 * pulse });
+      }
+      const body = mine ? 0x9a6a2b : 0x4a3a28;
+      const band = mine ? 0xffd45d : 0x7a6a4a;
+      fxLayer
+        .roundRect(c[1] - 17, c[2] - 12, 34, 24, 4)
+        .fill(body)
+        .stroke({ width: 2, color: 0x1a1208 })
+        .rect(c[1] - 17, c[2] - 4, 34, 6)
+        .fill(band)
+        .rect(c[1] - 3, c[2] - 6, 6, 10)
+        .fill(mine ? 0xfff0b0 : 0xb8a888);
+    }
     for (const w of latest.enemies) {
       if (w[5] <= 0) continue;
       const v = enemies.views.get(w[0]);
@@ -1242,7 +1317,7 @@ async function main() {
       mercPanel.update(latest.mercs, myId, meState.gold, meState.leadership - used);
       const hv = mercs.views.get(mercPanel.hovered());
       if (hv) fxLayer.circle(hv.x, hv.y, 26).stroke({ width: 3, color: 0xffe08a, alpha: 0.9 });
-      showOffer(meState.offer, meState.pending, meState.rerolls);
+      showOffer(meState.offer, meState.pending, meState.rerolls, meState.box ?? 0);
       weaponBar.visible = true;
       drawWeaponBar(meState.weapon);
       if (lastLevel > 0 && meState.level > lastLevel) {
@@ -1273,13 +1348,17 @@ async function main() {
       audio.loop("hoof_gallop", mine.some((w) => w[4] === 0 && w[13] > 0.6 && w[8] <= 0));
       lastLevel = meState.level;
       const fallen = latest.players.find((q) => q.id !== myId && q.down && Math.hypot(q.x - meState.x, q.y - meState.y) <= REVIVE_RADIUS * 1.5);
-      deadText.text = meState.down
+      deadText.text = latest.g?.phase === "tournament"
+        ? "" // 토너먼트 안내는 위쪽 배너가 한다
+        : meState.down
         ? meState.revive > 0
           ? `동료가 일으켜 세우는 중... ${Math.round(meState.revive * 100)}%`
           : "쓰러졌습니다 - 동료가 일으켜 주기를 기다리는 중"
         : fallen
           ? `${fallen.name} 부활: E 누르고 있기${fallen.revive > 0 ? ` (${Math.round(fallen.revive * 100)}%)` : ""}`
-          : "";
+          : (latest.chests ?? []).some((c) => c[3] === myId)
+            ? "보상 상자가 떨어졌습니다! 반짝이는 내 상자 곁으로 가세요"
+            : "";
 
       // 가까운 캠프의 고용 목록
       let best: CampWire | null = null;
@@ -1354,7 +1433,8 @@ async function main() {
       }
       lastSquads = gi.squads;
       if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · 보스군 도착까지 ${mmss(gi.timer)}${squadText}`;
-      else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${UNIT_NAMES[gi.bossType]} 장군의 군대 ${gi.armyLeft}/${gi.armyTotal}`;
+      else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${UNIT_NAMES[gi.bossType]} 장군의 군대 ${gi.armyLeft}/${gi.armyTotal}${gi.timer > 0 ? ` · 제한 ${gi.timer}초` : ""}`;
+      else if (gi.phase === "tournament") stageText.text = ""; // 위쪽 대진 배너가 대신한다
       else stageText.text = `스테이지 ${gi.stage} 클리어! 다음 스테이지까지 ${gi.timer}초`;
       stageText.position.set(app.screen.width / 2, 8);
       bossBar.clear();
@@ -1364,6 +1444,7 @@ async function main() {
         bossBar.roundRect(bx, 36, bw, 10, 4).fill({ color: 0x000000, alpha: 0.6 }).roundRect(bx, 36, (bw * gi.bossHp) / 100, 10, 4).fill(0xe8883a);
       }
     }
+    renderTournament(gi, myId);
     snd.near = nearCampId;
     levelToastLeft = Math.max(0, levelToastLeft - ticker.deltaMS / 1000);
     levelToast.visible = levelToastLeft > 0;

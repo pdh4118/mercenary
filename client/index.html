@@ -44,6 +44,27 @@
       .tag.ready { background: #1f3a26; color: #7be08f; }
       .stat { color: #9aa1b0; font-size: 12px; white-space: nowrap; }
       #resultPanel { z-index: 12; } /* 저장된 기록을 볼 때 기록 목록 위에 뜬다 */
+      #tourBanner { position: fixed; top: 6px; left: 50%; transform: translateX(-50%); z-index: 7; display: none; min-width: 420px; max-width: calc(100vw - 420px); padding: 8px 16px 10px; text-align: center; background: rgba(10,11,15,.86); border: 2px solid #e0c05d; border-radius: 12px; color: #e6e9f0; pointer-events: none; }
+      #tourBanner .tt { font-size: 15px; color: #ffe08a; font-weight: 700; letter-spacing: 1px; }
+      #tourBanner .vs { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 4px; font-size: 22px; font-weight: 800; }
+      #tourBanner .side { flex: 1; min-width: 0; }
+      #tourBanner .side .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #tourBanner .bar { height: 10px; margin-top: 4px; background: #2a2d36; border-radius: 5px; overflow: hidden; }
+      #tourBanner .bar > div { height: 100%; background: #4caf50; }
+      #tourBanner .bar.b > div { background: #e0a43a; float: right; }
+      #tourBanner .tm { margin-top: 4px; font-size: 14px; color: #b8bdc9; }
+      #tourBracket { position: fixed; right: 10px; top: 52px; z-index: 6; display: none; width: 236px; padding: 10px 12px; background: rgba(10,11,15,.82); border: 1px solid #343949; border-radius: 10px; color: #e6e9f0; font-size: 13px; pointer-events: none; }
+      #tourBracket h3 { margin: 0 0 6px; font-size: 13px; color: #ffe08a; }
+      #tourBracket .rt { margin: 8px 0 3px; font-size: 12px; color: #9aa1b0; }
+      #tourBracket .mt { padding: 3px 6px; border-radius: 6px; background: #1b1f2a; margin-bottom: 3px; display: flex; justify-content: space-between; gap: 6px; }
+      #tourBracket .mt.now { outline: 1px solid #e0c05d; background: #2a2517; }
+      #tourBracket .mt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #tourBracket .mt .w { color: #7be08f; font-weight: 700; }
+      #tourBracket .mt .l { color: #6a7184; text-decoration: line-through; }
+      #tourBig { position: fixed; top: 34%; left: 50%; transform: translate(-50%, -50%); z-index: 7; display: none; text-align: center; color: #fff; text-shadow: 0 2px 8px #000, 0 0 3px #000; pointer-events: none; }
+      #tourBig .a { font-size: 22px; color: #ffe08a; font-weight: 700; }
+      #tourBig .b { font-size: 44px; font-weight: 800; margin-top: 4px; }
+      #tourBig .c { font-size: 20px; margin-top: 6px; color: #cfd3dc; }
       .item.click { cursor: pointer; }
       .item.click:hover { background: #262b3a; }
       .item .pstats { flex-basis: 100%; color: #9aa1b0; font-size: 12px; line-height: 1.5; }
@@ -87,6 +108,9 @@
   <body>
     <div id="status">연결 중...</div>
     <button id="soundBtn" title="소리 켜기/끄기 (M)">🔊</button>
+    <div id="tourBanner"></div>
+    <div id="tourBracket"></div>
+    <div id="tourBig"></div>
 
     <div id="lobby" class="overlay open">
       <div class="panel">

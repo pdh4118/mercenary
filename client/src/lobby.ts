@@ -240,7 +240,8 @@ export function createLobby(opts: Options): Lobby {
     more.className = "pstats";
     more.textContent =
       `준 피해 ${(p.dealt ?? 0).toLocaleString()} · 받은 피해 ${(p.taken ?? 0).toLocaleString()} · 쓰러짐 ${p.downs ?? 0}회 · 부활시킴 ${p.revives}회\n` +
-      `번 금화 ${(p.gold ?? 0).toLocaleString()} · 용병 ${p.mercs ?? 0}명 (쓰러진 횟수 ${p.mercDeaths ?? 0})`;
+      `번 금화 ${(p.gold ?? 0).toLocaleString()} · 용병 ${p.mercs ?? 0}명 (쓰러진 횟수 ${p.mercDeaths ?? 0})` +
+      ((p.wins ?? 0) > 0 || (p.champion ?? 0) > 0 ? `\n토너먼트 ${p.wins ?? 0}승${(p.champion ?? 0) > 0 ? ` · 우승 ${p.champion}회` : ""}` : "");
     more.style.whiteSpace = "pre-line";
     item.append(nm, st, more);
     return item;
