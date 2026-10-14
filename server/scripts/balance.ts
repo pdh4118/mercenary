@@ -40,6 +40,9 @@ interface Result {
   status: string;
   endSec: number;
   revives: number;
+  shakenOnsets: number;
+  shakenPct: number;
+  avgMercs: number;
 }
 
 function simulate(players: number, seconds: number, seed: number): Result {
@@ -60,6 +63,10 @@ function simulate(players: number, seconds: number, seed: number): Result {
   let totalTicks = 0;
   const ticks = seconds * 20;
   let endSec = seconds;
+  let shakenOnsets = 0;
+  let shakenTicks = 0;
+  let mercSum = 0;
+  const wasShaken = new Map<number, boolean>();
 
   for (let t = 0; t < ticks; t++) {
     const enemies = g.snapshotEnemies();
@@ -170,6 +177,13 @@ function simulate(players: number, seconds: number, seed: number): Result {
         deathsByType[m[4]]!++;
       } else if (m[8] === 0) mercDown.delete(m[0]);
     }
+    for (const id of ids) {
+      const sh = g.getPlayer(id)!.shaken > 0;
+      if (sh && !wasShaken.get(id)) shakenOnsets++;
+      wasShaken.set(id, sh);
+      if (sh) shakenTicks++;
+    }
+    mercSum += g.snapshotMercs().length / ids.length;
     if (t > 0 && t % (60 * 20) === 0) enemiesAt.push(g.enemyCount);
     if (g.status !== "playing") {
       endSec = t / 20;
@@ -192,6 +206,9 @@ function simulate(players: number, seconds: number, seed: number): Result {
     status: g.status,
     endSec,
     revives: g.result().players.reduce((n, q) => n + q.revives, 0),
+    shakenOnsets: shakenOnsets / ids.length,
+    shakenPct: (100 * shakenTicks) / Math.max(1, totalTicks),
+    avgMercs: mercSum / Math.max(1, endSec * 20),
   };
 }
 
@@ -200,7 +217,7 @@ const counts = (process.argv[3] ?? "1,3,6").split(",").map(Number).filter((n) =>
 const seeds = Number(process.argv[4] ?? 3);
 
 console.log(`시뮬레이션 최대 ${seconds}초, 시드 ${seeds}개 (봇: 물러서며 사격, 캠프에서 고용, 카드 무작위, 쓰러진 동료 부활)`);
-console.log("인원 | 결과(승/패) | 도달 스테이지(평균) | 종료(초) | 주인공 쓰러짐(1인당) | 부활 | 용병 쓰러짐(1인당) | 평균 레벨 | 용병 수");
+console.log("인원 | 결과(승/패) | 도달 스테이지(평균) | 종료(초) | 주인공 쓰러짐(1인당) | 부활 | 용병 쓰러짐(1인당) | 평균 레벨 | 용병 수 | 사기저하(1인당 횟수/시간%/평균 용병)");
 for (const n of counts) {
   const rs = Array.from({ length: seeds }, (_, i) => simulate(n, seconds, 7 + i * 101));
   const avg = (f: (r: Result) => number) => rs.reduce((s, r) => s + f(r), 0) / rs.length;
@@ -208,7 +225,7 @@ for (const n of counts) {
   const losses = rs.filter((r) => r.status === "defeat").length;
   console.log(
     `${String(n).padStart(2)}명 | ${wins}/${losses} | ${avg((r) => r.stage).toFixed(1).padStart(5)} | ${avg((r) => r.endSec).toFixed(0).padStart(5)}` +
-      ` | ${(avg((r) => r.heroDeaths) / n).toFixed(1).padStart(5)} | ${avg((r) => r.revives).toFixed(1).padStart(4)} | ${(avg((r) => r.mercDeaths) / n).toFixed(1).padStart(6)} | ${avg((r) => r.level).toFixed(1).padStart(5)} | ${avg((r) => r.mercs).toFixed(1).padStart(4)}`,
+      ` | ${(avg((r) => r.heroDeaths) / n).toFixed(1).padStart(5)} | ${avg((r) => r.revives).toFixed(1).padStart(4)} | ${(avg((r) => r.mercDeaths) / n).toFixed(1).padStart(6)} | ${avg((r) => r.level).toFixed(1).padStart(5)} | ${avg((r) => r.mercs).toFixed(1).padStart(4)} | ${avg((r) => r.shakenOnsets).toFixed(1)}/${avg((r) => r.shakenPct).toFixed(0)}%/${avg((r) => r.avgMercs).toFixed(1)}`,
   );
 }
 if (process.env.DETAIL) {

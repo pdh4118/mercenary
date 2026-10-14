@@ -6,6 +6,7 @@ import {
   MERC_RESPAWN_SEC,
   MERC_STATS,
   SHAKEN_DEATHS,
+  SHAKEN_MIN_ARMY,
   SHAKEN_DMG,
   SHAKEN_SEC,
   SPEAR,
@@ -109,7 +110,7 @@ test("군세: 살아 있는 용병이 많을수록 공격력이 오르고 상한
 test("사기 저하: 짧은 시간에 여럿이 쓰러지면 한동안 공격력이 떨어지고, 시간이 지나면 풀린다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
-  const ids = Array.from({ length: SHAKEN_DEATHS + 2 }, () => g.addMerc(a, SPEAR, 0, 0));
+  const ids = Array.from({ length: 10 }, () => g.addMerc(a, SPEAR, 0, 0));
   g.step();
   const before = g.mercStatsForTest(ids[SHAKEN_DEATHS]!).damage;
   for (let i = 0; i < SHAKEN_DEATHS; i++) hurt(g, ids[i]!, 10_000);
@@ -144,4 +145,26 @@ test("부활 시간: 병종 기본값에 단계마다 15%가 더해진다", () =
   hurt(g, hi, 10_000);
   assert.ok(Math.abs(g.getMerc(lo)!.respawn - MERC_RESPAWN_SEC[SPEAR]) < 1e-9);
   assert.ok(Math.abs(g.getMerc(hi)!.respawn - MERC_RESPAWN_SEC[SPEAR] * (1 + 4 * TIER_RESPAWN_EXTRA)) < 1e-9);
+});
+
+test("사기 저하 조건: 작은 부대에는 걸리지 않고, 큰 부대는 비율 이상이 쓰러져야 하며, 풀린 직후에는 다시 걸리지 않는다", () => {
+  // 작은 부대: 5명 중 4명이 쓰러져도 걸리지 않는다
+  const small = quiet();
+  const a = small.addPlayer("a")!;
+  const sids = Array.from({ length: SHAKEN_MIN_ARMY - 1 }, () => small.addMerc(a, SPEAR, 0, 0));
+  for (let i = 0; i < 4; i++) hurt(small, sids[i]!, 10_000);
+  assert.equal(small.getPlayer(a)!.shaken, 0);
+  // 큰 부대: 12명 중 3명(25%)은 부족하고, 4명(33%)이면 걸린다
+  const big = quiet();
+  const b = big.addPlayer("b")!;
+  const bids = Array.from({ length: 12 }, () => big.addMerc(b, SPEAR, 0, 0));
+  for (let i = 0; i < 3; i++) hurt(big, bids[i]!, 10_000);
+  assert.equal(big.getPlayer(b)!.shaken, 0);
+  hurt(big, bids[3]!, 10_000);
+  assert.ok(big.getPlayer(b)!.shaken > 0);
+  // 풀린 직후 유예
+  for (let i = 0; i < (SHAKEN_SEC + 1) * 20; i++) big.step();
+  assert.equal(big.getPlayer(b)!.shaken, 0);
+  for (let i = 4; i < 9; i++) hurt(big, bids[i]!, 10_000);
+  assert.equal(big.getPlayer(b)!.shaken, 0, "유예 시간에는 다시 걸리지 않는다");
 });

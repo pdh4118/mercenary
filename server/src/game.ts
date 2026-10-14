@@ -123,6 +123,9 @@ import {
   type MercStat,
   CAMP_TIER_SEC,
   SHAKEN_DEATHS,
+  SHAKEN_FRAC,
+  SHAKEN_GRACE_SEC,
+  SHAKEN_MIN_ARMY,
   SHAKEN_DMG,
   SHAKEN_SEC,
   SHAKEN_WINDOW_SEC,
@@ -221,6 +224,7 @@ interface Slot {
   input: PlayerInput;
   fireCd: number;
   deaths: number[]; // 최근 용병이 쓰러진 시각(사기 저하 판정)
+  shakenGrace: number; // 사기 저하가 다시 걸리지 않는 남은 시간
   haste: Record<string, number>; // 전장의 함성 중첩(대상별: hero 또는 병종 번호)
   hasteT: Record<string, number>;
   zones: number[]; // 진형: 병종별 구역
@@ -441,6 +445,7 @@ export class Game {
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
       deaths: [],
+      shakenGrace: 0,
       haste: {},
       hasteT: {},
       zones: [...DEFAULT_PRESETS[0]!.zones],
@@ -1221,7 +1226,9 @@ export class Game {
   private noteDeath(owner: Slot): void {
     owner.deaths.push(this.time);
     owner.deaths = owner.deaths.filter((t) => this.time - t <= SHAKEN_WINDOW_SEC);
-    if (owner.deaths.length >= SHAKEN_DEATHS && owner.state.shaken <= 0) {
+    // 큰 부대가 짧은 시간에 크게 무너졌을 때만(작은 부대나 직후 재발 제외)
+    const army = this.countMercs(owner.state.id);
+    if (army >= SHAKEN_MIN_ARMY && owner.state.shaken <= 0 && owner.shakenGrace <= 0 && owner.deaths.length >= Math.max(SHAKEN_DEATHS, Math.ceil(army * SHAKEN_FRAC))) {
       owner.state.shaken = SHAKEN_SEC;
       owner.deaths = [];
     }
@@ -1237,7 +1244,10 @@ export class Game {
     for (const m of this.mercs.values()) if (m.respawn <= 0) alive.set(m.owner, (alive.get(m.owner) ?? 0) + 1);
     for (const sl of this.slots.values()) {
       sl.state.swarm = Math.min(SWARM_MAX, (alive.get(sl.state.id) ?? 0) * SWARM_PER_MERC);
-      sl.state.shaken = Math.max(0, sl.state.shaken - dt);
+      if (sl.state.shaken > 0) {
+        sl.state.shaken = Math.max(0, sl.state.shaken - dt);
+        if (sl.state.shaken === 0) sl.shakenGrace = SHAKEN_GRACE_SEC;
+      } else sl.shakenGrace = Math.max(0, sl.shakenGrace - dt);
     }
     const slotsByOwner = new Map<number, Map<number, [number, number]>>();
     for (const owner of this.slots.keys()) slotsByOwner.set(owner, this.formationSlots(owner));

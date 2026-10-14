@@ -979,7 +979,7 @@ async function main() {
       hudText.text =
         `HP ${Math.ceil(meState.hp)}/${meState.maxHp}   금화 ${meState.gold}   처치 ${meState.kills}   ${m}:${s}\n` +
         `통솔력 ${used}/${meState.leadership}   용병 ${mine.length}명` +
-        (meState.shaken > 0 ? `   [사기 저하! 공격력 -25% ${Math.ceil(meState.shaken)}초]` : meState.swarm > 0 ? `   [군세 공격력 +${Math.round(meState.swarm * 100)}%]` : "") +
+        (meState.shaken > 0 ? `   [사기 저하! 공격력 -20% ${Math.ceil(meState.shaken)}초]` : meState.swarm > 0 ? `   [군세 공격력 +${Math.round(meState.swarm * 100)}%]` : "") +
         (down > 0 ? `  (쓰러짐 ${down}명, 부활 대기)` : "") +
         `\nLv ${meState.level}`;
       xpBar
