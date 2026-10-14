@@ -5,6 +5,7 @@ import { createMercPanel, isReady } from "./mercpanel.js";
 import {
   CARDS,
   CARD_CATEGORY_NAMES,
+  RARITY_NAMES,
   CAMP_USE_RADIUS,
   SHIELD,
   SHIELD_FRONT_ARC,
@@ -358,6 +359,7 @@ async function main() {
   const CARD_GAP = 8;
   const ART = 72;
   const CATEGORY_COLORS = [0xe0c05d, 0x6fd16f, 0x5da6e0, 0xff7a2e];
+  const RARITY_COLORS = [0x8d96a8, 0x4d9dff, 0xc27bff, 0xff7a2e];
   const cardArt = await Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/cards/art_${f}.png`)));
   /** 카드 일러스트: 병종 단련은 그 병종, 그 밖은 비슷한 성격의 그림을 빌려 쓴다. 없으면 글자 아이콘(-1). */
   const artOf = (c: (typeof CARDS)[number]): number => {
@@ -376,6 +378,7 @@ async function main() {
         default: return -1;
       }
     }
+    if (e.k === "legend") return e.scope === "hero" ? -1 : e.scope;
     switch (e.k) {
       case "heroDefense": return SHIELD;
       case "heroDodge": return 0;
@@ -412,6 +415,8 @@ async function main() {
     key.position.set(12, 12 + ART);
     const tag = new Text({ text: "", style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
     tag.position.set(ART + 26, 8);
+    const rar = new Text({ text: "", style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
+    rar.position.set(ART + 26, 8);
     const title = new Text({ text: "", style: { fill: 0xffffff, fontSize: 16, fontWeight: "bold" } });
     title.position.set(ART + 26, 24);
     const desc = new Text({ text: "", style: { fill: 0xc8ccd6, fontSize: 12, wordWrap: true, wordWrapWidth: CARD_W - ART - 40 } });
@@ -420,9 +425,9 @@ async function main() {
     const starOff = new Text({ text: "", style: { fill: 0x3b4152, fontSize: 13 } });
     starOn.position.set(CARD_W - 70, 7);
     starOff.position.set(CARD_W - 70, 7);
-    node.addChild(bg, artSprite, artMask, artFrame, glyph, keyBg, key, tag, title, desc, starOff, starOn);
+    node.addChild(bg, artSprite, artMask, artFrame, glyph, keyBg, key, tag, rar, title, desc, starOff, starOn);
     cardPanel.addChild(node);
-    return { node, bg, artSprite, artFrame, glyph, tag, title, desc, starOn, starOff };
+    return { node, bg, artSprite, artFrame, glyph, tag, rar, title, desc, starOn, starOff };
   });
   cardPanel.visible = false;
   let shownOffer = "";
@@ -451,6 +456,10 @@ async function main() {
         ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
       v.tag.text = CARD_CATEGORY_NAMES[card.category];
       v.tag.style.fill = color;
+      v.rar.text = card.rarity < 3 ? `· ${RARITY_NAMES[card.rarity]}` : ""; // 전설은 분류 이름이 곧 등급
+      v.rar.style.fill = RARITY_COLORS[card.rarity]!;
+      v.rar.x = ART + 26 + v.tag.width + 6;
+      v.starOn.style.fill = RARITY_COLORS[card.rarity]!;
       v.title.text = card.name;
       v.desc.text = card.desc;
       const n = card.stars ?? starsOf(card.weight);
@@ -462,7 +471,7 @@ async function main() {
         .fill({ color: 0x1b1f2a, alpha: 0.94 })
         .stroke({ width: 3, color: 0x050608 })
         .roundRect(2.5, 2.5, CARD_W - 5, CARD_H - 5, 8)
-        .stroke({ width: 1.5, color: 0x59627a })
+        .stroke({ width: card.rarity > 0 ? 2.5 : 1.5, color: card.rarity > 0 ? RARITY_COLORS[card.rarity]! : 0x59627a })
         .roundRect(8, 8, ART + 8, ART + 8, 10) // 일러스트 창 바탕
         .fill({ color: darken(color, 0.35) })
         .poly([CARD_W - 12, 3, CARD_W - 5, 10, CARD_W - 12, 17, CARD_W - 19, 10]) // 모서리 보석

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  UNIT_NAMES as UNIT_NAMES_T,
   ARCHER,
   BLUNT,
   CARDS,
@@ -8,7 +9,9 @@ import {
   GLOBAL_CARD_FACTOR,
   MAX_TIER,
   MERC_STATS,
-  MERC_STAT_BASE,
+  MERC_TYPE_FOCUS,
+  RARITY,
+  RARITY_NAMES,
   OFFER_SIZE,
   REROLL_MAX,
   REROLL_START,
@@ -31,13 +34,16 @@ const quiet = () => {
 test("전체 용병 카드는 병종 전용 카드의 20% 효과다", () => {
   const globals = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.type === undefined);
   const types = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.type !== undefined);
-  assert.ok(globals.length >= 10 && types.length >= 25);
+  assert.ok(globals.length >= 30 && types.length >= 60);
   for (const c of globals) {
     if (c.effect.k !== "mercStat") continue;
-    assert.ok(Math.abs(c.effect.v - MERC_STAT_BASE[c.effect.stat] * GLOBAL_CARD_FACTOR) < 1e-3, c.name);
+    const stat = c.effect.stat;
+    const typed = types.find((t) => t.effect.k === "mercStat" && t.effect.stat === stat && t.rarity === c.rarity)!;
+    if (typed.effect.k !== "mercStat") continue;
+    assert.ok(Math.abs(c.effect.v - typed.effect.v * GLOBAL_CARD_FACTOR) < 1e-3, c.name);
   }
-  // 병종마다 5가지 전용 카드가 있고, 모두 그 병종을 가진 사람에게만 나온다
-  for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, 5);
+  // 병종마다 전용 능력치마다 일반/희귀/영웅 세 등급이 있고, 모두 그 병종을 가진 사람에게만 나온다
+  for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.length * 3);
 });
 
 test("카드를 고를 때마다 새로고침이 1회씩 쌓이고 상한이 있다", () => {
@@ -172,7 +178,7 @@ import {
   type LegendId,
 } from "@mercenary/shared";
 
-const legendIdx = (id: LegendId) => CARDS.findIndex((c) => c.effect.k === "legend" && c.effect.id === id);
+const legendIdx = (id: LegendId, scope: "hero" | number = "hero") => CARDS.findIndex((c) => c.effect.k === "legend" && c.effect.id === id && c.effect.scope === scope);
 const mercWire = (g: Game, id: number) => g.snapshotMercs().find((w) => w[0] === id)!;
 const run = (g: Game, sec: number) => {
   for (let i = 0; i < Math.round(sec * 20); i++) g.step();
@@ -228,8 +234,9 @@ test("레벨업이 잦다: 첫 레벨은 적 몇 마리로 오른다", () => {
 
 test("전설 카드: 드물고 한 번만 나오며 다섯 이상의 레벨에서부터 등장한다", () => {
   const legends = CARDS.filter((c) => c.category === 3);
-  assert.equal(legends.length, Object.keys(LEGENDS).length);
-  assert.ok(legends.every((c) => c.unique && (c.minLevel ?? 1) >= 5 && c.weight <= 2));
+  assert.equal(legends.length, Object.values(LEGENDS).reduce((n, l) => n + l.scopes.length, 0));
+  assert.ok(legends.every((c) => c.unique && (c.minLevel ?? 1) >= 5 && c.weight <= 1));
+  assert.ok(legends.every((c) => c.effect.k === "legend" && (c.effect.scope === "hero") === (c.unitType === undefined)), "주인공 전용이 아니면 병종 전용");
   const g = new Game(() => 0.999);
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;
@@ -239,7 +246,7 @@ test("전설 카드: 드물고 한 번만 나오며 다섯 이상의 레벨에�
   p.pending = 1;
   p.offer = [legendIdx("thorns"), 0, 1];
   g.pick(a, 0);
-  assert.deepEqual(p.legends, ["thorns"]);
+  assert.deepEqual(p.legends, ["thorns@hero"]);
   for (let n = 0; n < 60; n++) {
     g.giveXp(a, xpNeeded(p.level));
     assert.ok(!p.offer.includes(legendIdx("thorns")), "이미 고른 전설은 다시 나오지 않는다");
@@ -251,7 +258,7 @@ test("전설 효과: 처형은 체력이 낮은 적에게 피해가 2배", () =>
   const dmg = (legend: boolean) => {
     const g = quiet();
     const a = g.addPlayer("a")!;
-    if (legend) g.applyCardForTest(a, { k: "legend", id: "execute" });
+    if (legend) g.applyCardForTest(a, { k: "legend", id: "execute", scope: "hero" });
     const p = g.getPlayer(a)!;
     g.jumpToStage(10);
     const e = g.spawnEnemyAt(p.x + 40, p.y, 4);
@@ -271,7 +278,7 @@ test("전설 효과: 처형은 체력이 낮은 적에게 피해가 2배", () =>
 test("전설 효과: 가시 갑옷은 받은 피해의 일부를 공격자에게 되돌린다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
-  g.applyCardForTest(a, { k: "legend", id: "thorns" });
+  g.applyCardForTest(a, { k: "legend", id: "thorns", scope: "hero" });
   const p = g.getPlayer(a)!;
   const e = g.spawnEnemyAt(p.x + 20, p.y, 4);
   const hp0 = g.getEnemy(e)!.hp;
@@ -284,7 +291,7 @@ test("전설 효과: 가시 갑옷은 받은 피해의 일부를 공격자에게
 test("전설 효과: 피의 갈증은 준 피해만큼 체력을 회복한다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
-  g.applyCardForTest(a, { k: "legend", id: "bloodthirst" });
+  g.applyCardForTest(a, { k: "legend", id: "bloodthirst", scope: "hero" });
   const p = g.getPlayer(a)!;
   p.hp = 50;
   g.jumpToStage(10);
@@ -297,30 +304,68 @@ test("전설 효과: 피의 갈증은 준 피해만큼 체력을 회복한다", 
   void e;
 });
 
-test("전설 효과: 전장의 함성은 처치할수록 용병 공격 속도가 오르고 시간이 지나면 풀린다", () => {
+test("전설 효과: 전장의 함성은 적용 대상(병종)이 처치할 때만 쌓이고 시간이 지나면 풀린다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
-  g.applyCardForTest(a, { k: "legend", id: "warcry" });
-  const m = g.addMerc(a, SPEAR, 0, 0);
-  const base = g.mercStatsForTest(m).cooldown;
+  g.applyCardForTest(a, { k: "legend", id: "warcry", scope: SPEAR });
+  const sp = g.addMerc(a, SPEAR, 0, 0);
+  const sh = g.addMerc(a, SHIELD, 0, 0);
+  const base = g.mercStatsForTest(sp).cooldown;
   const p = g.getPlayer(a)!;
-  for (let i = 0; i < 3; i++) {
-    const e = g.spawnEnemyAt(p.x + 30, p.y, 0);
-    (g.getEnemy(e) as { hp: number }).hp = 0.1;
-    g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
-    run(g, 0.5);
-  }
-  assert.ok(g.mercStatsForTest(m).cooldown < base * 0.9, "공격 대기시간이 줄었다");
+  // 주인공이 처치해도 창병에게는 쌓이지 않는다
+  const e0 = g.spawnEnemyAt(p.x + 30, p.y, 0);
+  (g.getEnemy(e0) as { hp: number }).hp = 0.1;
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  run(g, 0.5);
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+  assert.equal(g.mercStatsForTest(sp).cooldown, base);
+  // 창병이 처치하면 쌓인다(다른 병종에는 영향 없음)
+  const shBase = g.mercStatsForTest(sh).cooldown;
+  for (let i = 0; i < 3; i++) {
+    const m = g.getMerc(sp)!;
+    const e = g.spawnEnemyAt(m.x + 30, m.y, 0);
+    (g.getEnemy(e) as { hp: number }).hp = 0.1;
+    run(g, 1.2);
+  }
+  assert.ok(g.mercStatsForTest(sp).cooldown < base * 0.9, "창병 공격 대기시간이 줄었다");
+  assert.equal(g.mercStatsForTest(sh).cooldown, shBase);
   run(g, LEGEND_CONST.warcrySec + 1);
-  assert.ok(Math.abs(g.mercStatsForTest(m).cooldown - base) < 1e-9);
+  assert.ok(Math.abs(g.mercStatsForTest(sp).cooldown - base) < 1e-9);
+});
+
+test("전설은 지정한 대상에게만 적용된다: 창병 불사는 검방병에게 효과가 없다", () => {
+  const g = new Game(() => 0);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  g.applyCardForTest(a, { k: "legend", id: "undying", scope: SPEAR });
+  const sh = g.addMerc(a, SHIELD, 0, 0);
+  (g as unknown as { hurtMerc(m: unknown, n: number): void }).hurtMerc(g.getMerc(sh), 10_000);
+  assert.ok(g.getMerc(sh)!.respawn > 0, "검방병은 그냥 쓰러진다");
+});
+
+test("주인공 전설은 용병에게 적용되지 않는다: 주인공 처형은 용병 피해를 늘리지 않는다", () => {
+  const dealt = (legend: boolean) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    if (legend) g.applyCardForTest(a, { k: "legend", id: "execute", scope: "hero" });
+    const p = g.getPlayer(a)!;
+    const m = g.addMerc(a, SPEAR, p.x + 40, p.y);
+    const e = g.spawnEnemyAt(p.x + 90, p.y, 4);
+    const en = g.getEnemy(e) as { hp: number; maxHp: number };
+    en.maxHp = 10_000;
+    en.hp = 2_000;
+    run(g, 1.5);
+    void m;
+    return 2_000 - g.getEnemy(e)!.hp;
+  };
+  assert.ok(Math.abs(dealt(true) - dealt(false)) < 1e-6);
 });
 
 test("전설 효과: 불사의 군단은 확률로 쓰러지지 않고 되살아난다", () => {
   const g = new Game(() => 0); // rng 0 → 확률 판정은 항상 통과
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;
-  g.applyCardForTest(a, { k: "legend", id: "undying" });
+  g.applyCardForTest(a, { k: "legend", id: "undying", scope: SPEAR });
   const m = g.addMerc(a, SPEAR, 0, 0);
   (g as unknown as { hurtMerc(m: unknown, n: number): void }).hurtMerc(g.getMerc(m), 10_000);
   assert.equal(g.getMerc(m)!.respawn, 0);
@@ -331,7 +376,7 @@ test("전설 효과: 관통 증폭·돌격 가속·광역 증폭·폭풍 연사�
   const g = new Game(() => 0);
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;
-  g.applyCardForTest(a, { k: "legend", id: "pierceRamp" });
+  g.applyCardForTest(a, { k: "legend", id: "pierceRamp", scope: "hero" });
   g.applyCardForTest(a, { k: "heroPierce", v: 2 });
   const p = g.getPlayer(a)!;
   const ids = [90, 140, 190].map((d) => g.spawnEnemyAt(p.x + d, p.y, 4));
@@ -345,7 +390,7 @@ test("전설 효과: 관통 증폭·돌격 가속·광역 증폭·폭풍 연사�
   const g2 = new Game(() => 0);
   g2.autoSpawn = false;
   const b = g2.addPlayer("b")!;
-  g2.applyCardForTest(b, { k: "legend", id: "stormfire" });
+  g2.applyCardForTest(b, { k: "legend", id: "stormfire", scope: "hero" });
   g2.applyCardForTest(b, { k: "heroCrit", v: 1 });
   const hits: number[] = [];
   const bp = g2.getPlayer(b)!;
@@ -361,4 +406,41 @@ test("전설 효과: 관통 증폭·돌격 가속·광역 증폭·폭풍 연사�
     hits.push(before - g2.getEnemy(target)!.hp);
   }
   assert.ok(hits.every((h) => h > 0), `매 틱 공격 ${hits}`);
+});
+
+test("모든 병종은 공격 속도 카드를 가진다(화살이 범위가 없는 궁병은 범위 제외)", () => {
+  const has = (t: number, stat: string) => CARDS.some((c) => c.effect.k === "mercStat" && c.effect.type === t && c.effect.stat === stat);
+  for (const t of UNIT_TYPES) assert.ok(has(t, "atkSpeed"), UNIT_NAMES_T[t]);
+  for (const t of UNIT_TYPES) if (t !== ARCHER_T) assert.ok(has(t, "area"));
+  assert.ok(CARDS.some((c) => c.effect.k === "heroFireRate") && CARDS.some((c) => c.effect.k === "heroArea"));
+});
+
+test("수치 카드 등급: 같은 능력치라도 희귀·영웅은 효과가 크고 드물며 늦게 나온다", () => {
+  const byRarity = (stat: string, r: number) => CARDS.find((c) => c.effect.k === "mercStat" && c.effect.type === SPEAR && c.effect.stat === stat && c.rarity === r)!;
+  const [c0, c1, c2] = [0, 1, 2].map((r) => byRarity("hp", r));
+  const v = (c: (typeof CARDS)[number]) => (c.effect.k === "mercStat" ? c.effect.v : 0);
+  assert.ok(v(c0!) < v(c1!) && v(c1!) < v(c2!));
+  assert.ok(Math.abs(v(c1!) / v(c0!) - RARITY[1].mult) < 0.01 && Math.abs(v(c2!) / v(c0!) - RARITY[2].mult) < 0.01);
+  assert.ok(c0!.weight > c1!.weight && c1!.weight > c2!.weight);
+  assert.ok((c0!.minLevel ?? 1) < (c1!.minLevel ?? 1) && (c1!.minLevel ?? 1) < (c2!.minLevel ?? 1));
+  assert.deepEqual([c0!.stars, c1!.stars, c2!.stars], [1, 2, 3]);
+  assert.deepEqual(RARITY_NAMES.slice(0, 3), ["일반", "희귀", "영웅"]);
+  // 관통은 1/2/3, 통솔력도 1/2/3
+  const pierce = [0, 1, 2].map((r) => CARDS.find((c) => c.effect.k === "heroPierce" && c.rarity === r)!.effect);
+  assert.deepEqual(pierce.map((e) => (e.k === "heroPierce" ? e.v : 0)), [1, 2, 3]);
+  const lead = [0, 1, 2].map((r) => CARDS.find((c) => c.effect.k === "leadership" && c.rarity === r)!.effect);
+  assert.deepEqual(lead.map((e) => (e.k === "leadership" ? e.v : 0)), [1, 2, 3]);
+});
+
+test("레벨이 낮으면 희귀·영웅 카드는 나오지 않는다", () => {
+  const g = new Game(() => 0.5);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  g.addMerc(a, ARCHER_T, 0, 0);
+  for (let n = 0; n < 1; n++) {
+    g.giveXp(a, xpNeeded(g.getPlayer(a)!.level));
+    const p = g.getPlayer(a)!;
+    for (const i of p.offer) assert.equal(CARDS[i]!.rarity, 0, `${p.level}레벨에서 ${CARDS[i]!.name}`);
+    g.pick(a, 0);
+  }
 });

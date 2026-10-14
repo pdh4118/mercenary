@@ -122,6 +122,8 @@ import {
   type MercWire,
   type MercStat,
   type LegendId,
+  type LegendScope,
+  legendKey,
   LEGEND_CONST,
   MERC_NAME_COUNT,
   MERC_XP_KILL,
@@ -147,6 +149,9 @@ import {
 import { resolveHit, type Hit } from "./combat.js";
 import { armyLayout, armySize, bossTypeOf } from "./stage.js";
 
+/** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
+const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mods.legends.has(legendKey(id, scope));
+
 /** 용병 능력치 강화 묶음(전체용 하나, 병종별 다섯). 배율 계열은 1에서, 가산 계열은 0에서 시작한다. */
 type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn"];
@@ -160,7 +165,7 @@ const mstat = (mods: Mods, type: number, stat: MercStat): number =>
 
 /** 레벨업 카드로 쌓이는 강화 수치(배율은 1이 기본) */
 interface Mods {
-  legends: Set<LegendId>; // 고른 전설 능력
+  legends: Set<string>; // 고른 전설 능력(legendKey: 능력@대상)
   goldMult: number;
   all: MercMods;
   type: MercMods[];
@@ -202,8 +207,8 @@ interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
-  haste: number; // 전장의 함성 중첩
-  hasteT: number;
+  haste: Record<string, number>; // 전장의 함성 중첩(대상별: hero 또는 병종 번호)
+  hasteT: Record<string, number>;
   zones: number[]; // 진형: 병종별 구역
   spacing: number; // 진형 간격 배율
   revives: number; // 동료를 일으켜 세운 횟수
@@ -419,8 +424,8 @@ export class Game {
       switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
-      haste: 0,
-      hasteT: 0,
+      haste: {},
+      hasteT: {},
       zones: [...DEFAULT_PRESETS[0]!.zones],
       spacing: DEFAULT_PRESETS[0]!.spacing,
       revives: 0,
@@ -913,8 +918,13 @@ export class Game {
   private stepPlayers(dt: number): void {
     for (const s of this.slots.values()) {
       const p = s.state;
-      s.hasteT = Math.max(0, s.hasteT - dt);
-      if (s.hasteT === 0) s.haste = 0;
+      for (const key of Object.keys(s.hasteT)) {
+        s.hasteT[key]! -= dt;
+        if (s.hasteT[key]! <= 0) {
+          delete s.hasteT[key];
+          delete s.haste[key];
+        }
+      }
       if (p.down) {
         p.chargeLeft = 0;
         continue;
@@ -972,8 +982,8 @@ export class Game {
     const crit = this.rollCrit(s.mods.heroCrit);
     const damage = w.damage * s.mods.heroDmg * (crit ? s.mods.heroCritMult : 1);
     const reach = w.reach * s.mods.heroRange;
-    s.fireCd = w.cooldown / s.mods.heroFireRate;
-    if (crit && s.mods.legends.has("stormfire")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
+    s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
+    if (crit && hasLegend(s.mods, "stormfire", "hero")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
     if (w.ranged) {
       this.bullets.push({
         id: this.nextEntityId++,
@@ -1002,7 +1012,7 @@ export class Game {
       struck.push(e);
     }
     for (const e of struck) this.damageEnemy(e, { damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x), crit }, p.id);
-    if (w.splash > 0) this.splashEnemies(struck, w.splash * s.mods.heroArea, damage * this.splashFactor(s.mods), w.type, p.x, p.y, p.id);
+    if (w.splash > 0) this.splashEnemies(struck, w.splash * s.mods.heroArea, damage * this.splashFactor(s.mods, "hero"), w.type, p.x, p.y, p.id);
   }
 
   /** 회피 판정: 피했으면 true(효과 표시를 띄운다) */
@@ -1012,8 +1022,8 @@ export class Game {
     return true;
   }
 
-  private splashFactor(mods: Mods): number {
-    return SPLASH_FACTOR * (mods.legends.has("splashBoost") ? LEGEND_CONST.splashMult : 1);
+  private splashFactor(mods: Mods, scope: LegendScope): number {
+    return SPLASH_FACTOR * (hasLegend(mods, "splashBoost", scope) ? LEGEND_CONST.splashMult : 1);
   }
 
   /** 치명타 판정(공격 한 번에 한 번) */
@@ -1173,7 +1183,7 @@ export class Game {
     if (m.hp > 0) return;
     const owner = this.slots.get(m.owner);
     // 불사의 군단: 쓰러지는 순간 확률로 체력 절반으로 되살아난다
-    if (owner?.mods.legends.has("undying") && this.rng() < LEGEND_CONST.undyingChance) {
+    if (owner && hasLegend(owner.mods, "undying", m.type) && this.rng() < LEGEND_CONST.undyingChance) {
       m.hp = Math.max(1, this.mercStats(m).hp * 0.5);
       this.pushEvent(EVT_REVIVE, m.x, m.y, 0);
       return;
@@ -1384,7 +1394,7 @@ export class Game {
     const crit = this.rollCrit(mstat(mods, m.type, "crit"));
     const critMult = CRIT_BASE_MULT + mstat(mods, m.type, "critMult");
     const dmg = st.damage * (crit ? critMult : 1);
-    if (crit && mods.legends.has("stormfire")) m.cd = 0;
+    if (crit && hasLegend(mods, "stormfire", m.type)) m.cd = 0;
     if (st.ranged) {
       this.bullets.push({
         id: this.nextEntityId++,
@@ -1405,7 +1415,7 @@ export class Game {
       });
       return;
     }
-    const charge = m.type === CAVALRY ? m.chargeSnap * (mods.legends.has("chargeBoost") ? LEGEND_CONST.chargeMult : 1) : 0;
+    const charge = m.type === CAVALRY ? m.chargeSnap * (hasLegend(mods, "chargeBoost", CAVALRY) ? LEGEND_CONST.chargeMult : 1) : 0;
     if (m.type === CAVALRY) {
       m.evadeT = CAV_EVADE_SEC; // 치고 빠지기
       m.momentum *= CAV_MOMENTUM_AFTER_HIT; // 부딪히면 속도를 잃는다
@@ -1421,7 +1431,7 @@ export class Game {
     for (const e of struck) {
       reflected += this.damageEnemy(e, { damage: dmg, charge, srcType: m.type, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit }, m.owner, m);
     }
-    if (st.splash > 0) this.splashEnemies(struck, st.splash, dmg * this.splashFactor(mods), m.type, m.x, m.y, m.owner, m);
+    if (st.splash > 0) this.splashEnemies(struck, st.splash, dmg * this.splashFactor(mods, m.type), m.type, m.x, m.y, m.owner, m);
     if (reflected > 0) this.hurtMerc(m, reflected); // 창병에게 돌격하면 그 피해가 자신에게 돌아온다
   }
 
@@ -1438,15 +1448,16 @@ export class Game {
   /** 적이 공격을 받는다. 방패·창병 반사 규칙을 적용하고, 되돌려줄 피해를 돌려준다. src는 때린 용병(없으면 주인공). */
   private damageEnemy(e: Enemy, hit: Hit, ownerId: number, src?: Merc): number {
     const owner = this.slots.get(ownerId);
-    const legends = owner?.mods.legends;
+    const scope: LegendScope = src ? src.type : "hero"; // 때린 쪽(주인공 또는 그 병종)에게만 전설이 적용된다
+    const has = (id: LegendId) => !!owner && hasLegend(owner.mods, id, scope);
     // 처형: 체력이 얼마 안 남은 적에게는 피해가 몇 배로 들어간다
-    if (legends?.has("execute") && e.hp < e.maxHp * LEGEND_CONST.executeBelow) hit = { ...hit, damage: hit.damage * LEGEND_CONST.executeMult };
+    if (has("execute") && e.hp < e.maxHp * LEGEND_CONST.executeBelow) hit = { ...hit, damage: hit.damage * LEGEND_CONST.executeMult };
     const r = resolveHit({ type: e.type, shield: e.shield, face: e.face }, hit);
     this.applyShield(e, r.shield, r.shieldBroke);
     const dealt = Math.min(r.body, Math.max(0, e.hp));
     e.hp -= r.body;
     if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
-    if (legends?.has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
+    if (has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
     return r.reflected;
@@ -1470,7 +1481,7 @@ export class Game {
 
   /** 가시 갑옷: 받은 피해의 일부를 공격자에게 돌려준다 */
   private thorns(owner: Slot | undefined, h: Hit, taken: number, src?: Merc): void {
-    if (!owner?.mods.legends.has("thorns") || taken <= 0 || !h.src) return;
+    if (!owner || !hasLegend(owner.mods, "thorns", src ? src.type : "hero") || taken <= 0 || !h.src) return;
     const attacker = h.src as Enemy;
     if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, taken * LEGEND_CONST.thornsFrac, owner.state.id, src);
   }
@@ -1479,9 +1490,10 @@ export class Game {
     if (!this.enemies.delete(e.id)) return; // 이미 쓰러짐
     const owner = this.slots.get(ownerId);
     if (src) this.gainMercXp(src, MERC_XP_KILL * (e.boss ? 4 : 1)); // 막타는 경험치를 크게 준다
-    if (owner?.mods.legends.has("warcry")) {
-      owner.haste = Math.min(LEGEND_CONST.warcryMax, owner.haste + 1);
-      owner.hasteT = LEGEND_CONST.warcrySec;
+    const wscope = String(src ? src.type : "hero");
+    if (owner && hasLegend(owner.mods, "warcry", src ? src.type : "hero")) {
+      owner.haste[wscope] = Math.min(LEGEND_CONST.warcryMax, (owner.haste[wscope] ?? 0) + 1);
+      owner.hasteT[wscope] = LEGEND_CONST.warcrySec;
     }
     if (owner) {
       owner.state.kills++;
@@ -1560,7 +1572,7 @@ export class Game {
       ({ c }) =>
         (c.minLevel ?? 1) <= s.state.level &&
         (c.unitType === undefined || owned.has(c.unitType)) &&
-        !(c.unique && c.effect.k === "legend" && s.state.legends.includes(c.effect.id)),
+        !(c.unique && c.effect.k === "legend" && s.state.legends.includes(legendKey(c.effect.id, c.effect.scope))),
     );
     // 새로고침은 방금 본 카드를 빼고 뽑는다(남는 카드가 모자라면 그대로 둔다)
     const fresh = eligible.filter(({ i }) => !exclude.includes(i));
@@ -1600,9 +1612,9 @@ export class Game {
         break;
       }
       case "legend":
-        if (!m.legends.has(e.id)) {
-          m.legends.add(e.id);
-          p.legends.push(e.id);
+        if (!m.legends.has(legendKey(e.id, e.scope))) {
+          m.legends.add(legendKey(e.id, e.scope));
+          p.legends.push(legendKey(e.id, e.scope));
         }
         break;
       case "heroMaxHp":
@@ -1642,7 +1654,7 @@ export class Game {
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
       damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]!,
-      cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste ?? 0))),
+      cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
       reach: base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier),
       splash: base.splash * area * (1 + TIER_AREA[t]! * tier),
@@ -1844,7 +1856,8 @@ export class Game {
             this.pushEvent(EVT_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             if (b.pierce > 0) {
               b.pierce--; // 뚫고 지나가 다음 적을 노린다
-              if (this.slots.get(b.owner)?.mods.legends.has("pierceRamp")) b.damage *= LEGEND_CONST.pierceRamp;
+              const ow = this.slots.get(b.owner);
+              if (ow && hasLegend(ow.mods, "pierceRamp", b.merc ? b.merc.type : "hero")) b.damage *= LEGEND_CONST.pierceRamp;
               continue;
             }
             hit = true;
