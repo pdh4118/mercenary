@@ -34,6 +34,7 @@
 | `shield_break_3` | soundflakes (#492237) | 미확인 | 미정 |
 | `boss_warning_1` | poligonstudio (#392618) | 미확인 | 미정 |
 | `bgm_boss` | harrisonlace (#871671) | 미확인 | 미정(임시 음악) |
+| `bgm_grow` | code_box (#559485) | 미확인 | 미정(임시 음악) |
 
 Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~2`와 직접 받은 `impact`, 활·방패 소리 파일(`bow_shot_1`, `arrow_volley_1`, `shield_block_*`, `crit_hit_*`)도 생성·출처 약관을 확인해야 합니다(Suno는 요금제에 따라 상업 이용 조건이 다릅니다).
 
@@ -47,3 +48,4 @@ Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~
 | `shield_break_3` | `492237__soundflakes__shield-breaking-with-bludgeon.wav` | 1.2초(원본 1.9초에서 0.3~1.5초 구간), 둔기로 방패가 부서지는 소리. 제작자 soundflakes, **라이선스 확인 필요** |
 | `boss_warning_1` | `392618__poligonstudio__movie-horn.wav` | 원본 29초 중 앞 3.4초(뒤는 잔향), 낮은 호른(기본음 약 110Hz). 제작자 poligonstudio, **라이선스 확인 필요** |
 | `bgm_boss` | `871671__harrisonlace__cinematic_drum_loop_shellshock_143.wav` | 60.4초 드럼만 있는 루프(143 BPM, 36마디). 임시 보스전 음악. 제작자 harrisonlace, **라이선스 확인 필요** |
+| `bgm_grow` | `559485__code_box__battle-tactics.wav` | 원본 74초 중 앞 69초(끝의 소리가 줄어드는 부분 제외), 처음부터 끝까지 꽉 찬 전투 분위기 음악. 임시 성장 시간 음악. 제작자 code_box, **라이선스 확인 필요** |
