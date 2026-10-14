@@ -151,6 +151,30 @@ export const ARCHER_KITE_MARGIN = 55;
 export const ARCHER_KITE_SPEED_MULT = 1.15;
 export const ARCHER_KITE_HOME_PULL = 0.7; // 물러날 때 진형 자리 쪽으로 끌리는 정도(적진 반대편으로 달아나지 않게)
 
+// 진형 모드: 기본 진형은 주인공 주변을 지키며 싸우고, 돌격 진형은 대열이 앞으로 나가 더 멀리 적을 쫓는다
+export const STANCE_DEFEND = 0;
+export const STANCE_ASSAULT = 1;
+export const STANCE_NAMES = ["기본 진형", "돌격 진형"] as const;
+export const ASSAULT_ADVANCE = 200; // 돌격 진형은 대열의 중심이 주인공보다 이만큼 앞에 선다
+export const ASSAULT_LEASH_MULT = 2.4; // 돌격 진형에서 용병이 진형 자리를 벗어날 수 있는 거리 배율
+export const ASSAULT_LEASH_MULT_CAVALRY = 1.6;
+
+// 병종별 역할 AI
+/** 검방병이 지키려는 아군의 취약도(병종별: 기병, 창병, 궁병, 검방병, 둔기병). 주인공은 HERO_WARD_WEIGHT */
+export const WARD_WEIGHT = [1.2, 1.6, 3, 0.9, 1.4] as const;
+export const HERO_WARD_WEIGHT = 2.6;
+export const GUARD_DIST = 46; // 검방병이 지키는 아군과 위협 사이에서 서는 거리(아군으로부터)
+export const GUARD_THREAT_RADIUS = 320; // 지키는 아군 둘레에서 위협으로 보는 거리
+export const ARCHER_REACH_FRAC = 0.88; // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
+export const ARCHER_ROAM = 240; // 궁병이 진형 자리에서 벗어날 수 있는 거리
+export const ARCHER_STRAFE_SEC = 2.5; // 방패 정면을 피해 돌아가려고 시도하는 최대 시간
+export const SPEAR_COVER_DIST = 70; // 창병이 기병 위협을 막으려고 지키는 아군 앞에 서는 거리
+export const SPEAR_WATCH_RANGE = 520; // 창병이 적 기병을 주시하는 거리
+/** 기병이 노릴 가치(적 병종별: 기병, 창병, 궁병, 검방병, 둔기병). 궁병과 둔기병을 먼저, 정면의 방패는 나중에 */
+export const CAV_TARGET_WEIGHT = [1, 1, 2.2, 0.5, 1.8] as const;
+/** 둔기병이 방패 있는 검방병을 노리는 가중치 */
+export const BLUNT_SHIELD_PREF = 2.6;
+
 // 캠프(용병을 고용할 수 있는 곳)
 export const CAMP_OFFERS = 3;
 export const CAMP_LIFETIME_SEC = 60;

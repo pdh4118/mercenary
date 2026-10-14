@@ -82,6 +82,7 @@ export interface PlayerState {
   xp: number; // 현재 레벨에서 모은 경험치
   xpNeed: number; // 다음 레벨까지 필요한 경험치
   pending: number; // 아직 고르지 않은 카드 선택 횟수(레벨업 + 보상 상자)
+  stance: number; // 용병 진형 모드(STANCE_DEFEND / STANCE_ASSAULT)
   box: number; // 그중 보상 상자에서 나온 선택 횟수(상자가 먼저 나온다)
   rerolls: number; // 남은 카드 새로고침 횟수
   legends: string[]; // 고른 전설 능력(LegendId)
@@ -259,6 +260,7 @@ export type ClientMsg =
   | { t: "upgrade"; merc: number } // 용병 한 명을 다음 단계로 강화
   | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number } // 기병 돌격 지시(월드 좌표)
+  | { t: "stance"; v: number } // 용병 진형 모드(0 기본, 1 돌격)
   | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)
 
 export type ServerMsg =
