@@ -39,6 +39,7 @@
 | `enemy_die_2` | artmasterrich (#345456) | 미확인 | 미정 |
 | `armor_fall_1~4` | artninja / halleck (#704881) | 미확인 | 미정 |
 | `armor_fall_5` | sgossner (#209405) | 미확인 | 미정 |
+| `melee_hit_8` | marb7e (#620355) | 미확인 | 미정 |
 
 Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~2`와 직접 받은 `impact`, 활·방패 소리 파일(`bow_shot_1`, `arrow_volley_1`, `shield_block_*`, `crit_hit_*`)도 생성·출처 약관을 확인해야 합니다(Suno는 요금제에 따라 상업 이용 조건이 다릅니다).
 
@@ -57,3 +58,4 @@ Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~
 | `enemy_die_2` | `345456__artmasterrich__male_death_04.wav` | 0.85초(원본 1.03초), 남자 죽는 비명. 원본이 0dB를 넘어 5dB 낮춤(중심 약 1.8kHz). 제작자 artmasterrich, **라이선스 확인 필요** |
 | `armor_fall_1 ~ 4` | `704881__artninja__121623__halleck__tf_prime_inspired_robot_body_falls_or_impacts_03.mp3` | 원본 12.6초에 로봇 몸체가 쓰러지는 소리 10개가 있어 그중 4개(0, 1.2, 4.65, 8.0초 시작, 각 0.8초)를 사용. 중심 약 3.6kHz로 금속성이 강함. 제작자 artninja(원 제작 halleck), **라이선스 확인 필요** |
 | `armor_fall_5` | `209405__sgossner__plate-armor-rustle-4.mp3` | 원본 0.97초(너무 작아 12dB 키움)에서 0.35~0.95초만 사용, 판금 갑옷이 스치며 달그락거리는 소리(중심 약 5.6kHz). 쓰러지는 소리보다는 부스럭에 가까움. 제작자 sgossner, **라이선스 확인 필요** |
+| `melee_hit_8` | `620355__marb7e__whooshsword_hit-armor.wav` | 원본 2.2초 중 0.1~0.5초(칼 휘두르는 바람 소리가 짧게 앞에 붙고 갑옷에 맞는 소리가 이어짐). 다른 타격음보다 앞이 살짝 길다. 제작자 marb7e, **라이선스 확인 필요** |
