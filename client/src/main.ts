@@ -341,15 +341,86 @@ async function main() {
   // --- HUD (화면 고정) -----------------------------------------------------
   const hud = new Container();
   app.stage.addChild(hud);
-  const hudText = new Text({ text: "", style: { fill: 0xe6e9f0, fontSize: 15 } });
-  hudText.position.set(12, 34);
+  // 왼쪽 위 상태 상자: 레벨·경험치·체력 막대와 금화·통솔력 등을 한 상자에 모아 큼직하게 보여 준다
+  const HUD_W = 320;
+  const hudPanel = new Container();
+  hudPanel.position.set(10, 30);
+  const hudBg = new Graphics();
+  const hudBars = new Graphics();
+  const hudTxt = (size: number, fill = 0xe6e9f0, bold = false) => new Text({ text: "", style: { fill, fontSize: size, fontWeight: bold ? "bold" : "normal" } });
+  const hudLv = hudTxt(24, 0xffe08a, true);
+  hudLv.position.set(14, 8);
+  const hudTime = hudTxt(20, 0xcfd3dc, true);
+  hudTime.anchor.set(1, 0);
+  hudTime.position.set(HUD_W - 14, 12);
+  const hudHp = hudTxt(15, 0xffffff, true);
+  hudHp.anchor.set(0.5);
+  hudHp.position.set(HUD_W / 2, 62);
+  const hudGold = hudTxt(19, 0xffd45d, true);
+  hudGold.position.set(14, 86);
+  const hudKills = hudTxt(19, 0xe6e9f0, true);
+  hudKills.anchor.set(1, 0);
+  hudKills.position.set(HUD_W - 14, 86);
+  const hudLead = hudTxt(19, 0x9fd0ff, true);
+  hudLead.position.set(14, 114);
+  const hudMercs = hudTxt(19, 0xe6e9f0, true);
+  hudMercs.anchor.set(1, 0);
+  hudMercs.position.set(HUD_W - 14, 114);
+  const hudExtra = hudTxt(16, 0xffb4a8, true);
+  hudExtra.position.set(14, 144);
+  hudPanel.addChild(hudBg, hudBars, hudLv, hudTime, hudHp, hudGold, hudKills, hudLead, hudMercs, hudExtra);
+  let hudH = 0;
+  const drawHudBg = (h: number) => {
+    if (h === hudH) return;
+    hudH = h;
+    hudBg
+      .clear()
+      .roundRect(0, 0, HUD_W, h, 12)
+      .fill({ color: 0x0b0d12, alpha: 0.78 })
+      .stroke({ width: 2, color: 0x59627a })
+      .roundRect(3, 3, HUD_W - 6, h - 6, 10)
+      .stroke({ width: 1, color: 0xe0c05d, alpha: 0.35 });
+  };
+  drawHudBg(142);
   const deadText = new Text({ text: "", style: { fill: 0xffffff, fontSize: 28, stroke: { color: 0x000000, width: 4 } } });
   deadText.anchor.set(0.5);
+  // 캠프 고용 창: 한 줄에 용병 하나(그림·이름·가격·통솔력)를 크게 보여 준다
+  const CAMP_W = 520;
+  const CAMP_ROW_H = 64;
   const campPanel = new Container();
   const campPanelBg = new Graphics();
-  const campPanelText = new Text({ text: "", style: { fill: 0xf2e6c0, fontSize: 15, lineHeight: 22 } });
-  campPanelText.position.set(14, 10);
-  campPanel.addChild(campPanelBg, campPanelText);
+  const campTitle = new Text({ text: "캠프 - 용병 고용", style: { fill: 0xffe08a, fontSize: 22, fontWeight: "bold" } });
+  campTitle.position.set(20, 14);
+  const campHint = new Text({ text: "", style: { fill: 0xb8bdc9, fontSize: 15 } });
+  campHint.anchor.set(1, 0);
+  campHint.position.set(CAMP_W - 20, 20);
+  campPanel.addChild(campPanelBg, campTitle, campHint);
+  const campRows = [0, 1, 2].map((i) => {
+    const node = new Container();
+    node.position.set(14, 52 + i * (CAMP_ROW_H + 8));
+    const bg = new Graphics();
+    const icon = new Sprite();
+    icon.anchor.set(0.5);
+    icon.position.set(34, CAMP_ROW_H / 2);
+    const key = new Text({ text: String(i + 1), style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold" } });
+    key.anchor.set(0.5);
+    key.position.set(26, 14);
+    const name = new Text({ text: "", style: { fill: 0xffffff, fontSize: 22, fontWeight: "bold" } });
+    name.position.set(68, 8);
+    const sub = new Text({ text: "", style: { fill: 0xb8bdc9, fontSize: 15 } });
+    sub.position.set(68, 38);
+    const price = new Text({ text: "", style: { fill: 0xffd45d, fontSize: 24, fontWeight: "bold" } });
+    price.anchor.set(1, 0);
+    price.position.set(CAMP_W - 28 - 0, 6);
+    const lead = new Text({ text: "", style: { fill: 0x9fd0ff, fontSize: 16 } });
+    lead.anchor.set(1, 0);
+    lead.position.set(CAMP_W - 28, 38);
+    node.addChild(bg, icon, key, name, sub, price, lead);
+    campPanel.addChild(node);
+    return { bg, icon, name, sub, price, lead };
+  });
+  const campDismiss = new Text({ text: "", style: { fill: 0xe6e9f0, fontSize: 16, lineHeight: 22 } });
+  campPanel.addChild(campDismiss);
   campPanel.visible = false;
   const toast = new Text({ text: "", style: { fill: 0xffb4a8, fontSize: 16, stroke: { color: 0x000000, width: 3 } } });
   toast.anchor.set(0.5, 0);
@@ -383,7 +454,6 @@ async function main() {
   legend.addChild(helpText);
   const LEGEND_H = 64;
   legendBg.rect(0, 0, Math.max(lx, legendText.width + 24, helpText.width + 24), LEGEND_H).fill({ color: 0x000000, alpha: 0.35 });
-  const xpBar = new Graphics();
   const stageText = new Text({ text: "", style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
   stageText.anchor.set(0.5, 0);
   const bossBar = new Graphics();
@@ -391,10 +461,10 @@ async function main() {
   levelToast.anchor.set(0.5, 0);
 
   // 레벨업 카드: 게임을 멈추지 않는 작은 카드. Z/X/C 한 번으로 고른다. 시안(강철 테두리·일러스트 창·별)을 따라 그린다.
-  const CARD_W = 264;
-  const CARD_H = 96;
-  const CARD_GAP = 8;
-  const ART = 72;
+  const CARD_W = 350;
+  const CARD_H = 134;
+  const CARD_GAP = 10;
+  const ART = 94;
   const CATEGORY_COLORS = [0xe0c05d, 0x6fd16f, 0x5da6e0, 0xff7a2e];
   const RARITY_COLORS = [0x8d96a8, 0x4d9dff, 0xc27bff, 0xff7a2e];
   const cardArt = await Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/cards/art_${f}.png`)));
@@ -433,37 +503,37 @@ async function main() {
   /** 뽑힐 확률이 낮을수록 별이 많다 */
   const starsOf = (weight: number) => (weight >= 8 ? 1 : weight >= 5 ? 2 : 3);
   const cardPanel = new Container();
-  const cardHeader = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 14, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+  const cardHeader = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 18, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
   cardPanel.addChild(cardHeader);
   const cardViews = [0, 1, 2].map((i) => {
     const node = new Container();
-    node.position.set(0, 26 + i * (CARD_H + CARD_GAP));
+    node.position.set(0, 32 + i * (CARD_H + CARD_GAP));
     const bg = new Graphics();
     const artSprite = new Sprite();
     artSprite.position.set(12, 12);
     const artMask = new Graphics().roundRect(12, 12, ART, ART, 8).fill(0xffffff);
     artSprite.mask = artMask;
     const artFrame = new Graphics();
-    const glyph = new Text({ text: "", style: { fill: 0xffffff, fontSize: 28, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
+    const glyph = new Text({ text: "", style: { fill: 0xffffff, fontSize: 34, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
     glyph.anchor.set(0.5);
     glyph.position.set(12 + ART / 2, 12 + ART / 2);
-    const keyBg = new Graphics().circle(0, 0, 11).fill(0x11141b).stroke({ width: 2, color: 0xffd45d });
+    const keyBg = new Graphics().circle(0, 0, 14).fill(0x11141b).stroke({ width: 2, color: 0xffd45d });
     keyBg.position.set(12, 12 + ART);
-    const key = new Text({ text: "ZXC"[i]!, style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" } });
+    const key = new Text({ text: "ZXC"[i]!, style: { fill: 0xffffff, fontSize: 17, fontWeight: "bold" } });
     key.anchor.set(0.5);
     key.position.set(12, 12 + ART);
-    const tag = new Text({ text: "", style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
+    const tag = new Text({ text: "", style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" } });
     tag.position.set(ART + 26, 8);
-    const rar = new Text({ text: "", style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
+    const rar = new Text({ text: "", style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" } });
     rar.position.set(ART + 26, 8);
-    const title = new Text({ text: "", style: { fill: 0xffffff, fontSize: 16, fontWeight: "bold" } });
-    title.position.set(ART + 26, 24);
-    const desc = new Text({ text: "", style: { fill: 0xc8ccd6, fontSize: 12, wordWrap: true, wordWrapWidth: CARD_W - ART - 40 } });
-    desc.position.set(ART + 26, 46);
-    const starOn = new Text({ text: "", style: { fill: 0xffd45d, fontSize: 13 } });
-    const starOff = new Text({ text: "", style: { fill: 0x3b4152, fontSize: 13 } });
-    starOn.position.set(CARD_W - 70, 7);
-    starOff.position.set(CARD_W - 70, 7);
+    const title = new Text({ text: "", style: { fill: 0xffffff, fontSize: 20, fontWeight: "bold" } });
+    title.position.set(ART + 26, 28);
+    const desc = new Text({ text: "", style: { fill: 0xd2d6e0, fontSize: 14, lineHeight: 18, wordWrap: true, wordWrapWidth: CARD_W - ART - 38 } });
+    desc.position.set(ART + 26, 58);
+    const starOn = new Text({ text: "", style: { fill: 0xffd45d, fontSize: 17 } });
+    const starOff = new Text({ text: "", style: { fill: 0x3b4152, fontSize: 17 } });
+    starOn.position.set(CARD_W - 78, 6);
+    starOff.position.set(CARD_W - 78, 6);
     node.addChild(bg, artSprite, artMask, artFrame, glyph, keyBg, key, tag, rar, title, desc, starOff, starOn);
     cardPanel.addChild(node);
     return { node, bg, artSprite, artFrame, glyph, tag, rar, title, desc, starOn, starOff };
@@ -489,7 +559,7 @@ async function main() {
         v.artSprite.scale.set(ART / tex.width, ART / tex.height);
       }
       v.glyph.visible = art < 0;
-      v.glyph.style.fontSize = 20;
+      v.glyph.style.fontSize = 26;
       const ef = card.effect;
       v.glyph.text =
         ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»", xp: "XP" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
@@ -500,6 +570,8 @@ async function main() {
       v.rar.x = ART + 26 + v.tag.width + 6;
       v.starOn.style.fill = RARITY_COLORS[card.rarity]!;
       v.title.text = card.name;
+      v.title.style.fontSize = 20; // 이름이 길면 칸에 맞게 줄인다
+      while (v.title.width > CARD_W - ART - 38 && v.title.style.fontSize > 13) v.title.style.fontSize--;
       v.desc.text = card.desc;
       const n = card.stars ?? starsOf(card.weight);
       v.starOn.text = "★".repeat(n);
@@ -559,7 +631,7 @@ async function main() {
     weaponHint.text = WEAPONS[active]!.note;
   };
   weaponBar.visible = false;
-  hud.addChild(hudText, xpBar, stageText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
+  hud.addChild(hudPanel, stageText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
@@ -1067,6 +1139,15 @@ async function main() {
     for (const p of latest.players) {
       const w = WEAPONS[p.weapon]!;
       const v = players.views.get(p.id);
+      if (v && p.wind > 0 && !w.ranged) {
+        // 철퇴 준비 동작: 범위가 점점 진하게 차오른다(맞기 직전까지 피하라는 신호가 아니라 휘두르는 타이밍 표시)
+        const prog = Math.max(0, Math.min(1, 1 - p.wind / w.windup));
+        fxLayer
+          .moveTo(v.x, v.y)
+          .arc(v.x, v.y, w.reach * (0.4 + 0.6 * prog), p.aim - w.arc, p.aim + w.arc)
+          .closePath()
+          .fill({ color: 0xffc27a, alpha: 0.12 + 0.3 * prog });
+      }
       if (!v || p.swing <= 0 || w.ranged) continue;
       fxLayer
         .moveTo(v.x, v.y)
@@ -1110,19 +1191,32 @@ async function main() {
       const mine = latest.mercs.filter((w) => w[5] === myId);
       const down = mine.filter((w) => w[8] > 0).length;
       const used = mine.reduce((sum, w) => sum + unitCost(w[4], w[15]), 0);
-      hudText.text =
-        `HP ${Math.ceil(meState.hp)}/${meState.maxHp}   금화 ${meState.gold}   처치 ${meState.kills}   ${m}:${s}\n` +
-        `통솔력 ${used}/${meState.leadership}   용병 ${mine.length}명` +
-        (meState.luck > 0 ? `   행운 +${Math.round(meState.luck * 100)}%` : "") +
-        (meState.shaken > 0 ? `   [사기 저하! 공격력 -20% ${Math.ceil(meState.shaken)}초]` : meState.swarm > 0 ? `   [군세 공격력 +${Math.round(meState.swarm * 100)}%]` : "") +
-        (down > 0 ? `  (쓰러짐 ${down}명, 부활 대기)` : "") +
-        `\nLv ${meState.level}`;
-      xpBar
+      hudLv.text = `Lv ${meState.level}`;
+      hudTime.text = `${m}:${s}`;
+      hudHp.text = `HP ${Math.ceil(meState.hp)} / ${meState.maxHp}`;
+      hudGold.text = `금화 ${meState.gold}`;
+      hudKills.text = `처치 ${meState.kills}`;
+      hudLead.text = `통솔력 ${used}/${meState.leadership}`;
+      hudMercs.text = `용병 ${mine.length}명`;
+      const extra: string[] = [];
+      if (meState.shaken > 0) extra.push(`사기 저하! 공격력 -20% (${Math.ceil(meState.shaken)}초)`);
+      else if (meState.swarm > 0) extra.push(`군세: 공격력 +${Math.round(meState.swarm * 100)}%`);
+      if (meState.luck > 0) extra.push(`행운 +${Math.round(meState.luck * 100)}%`);
+      if (down > 0) extra.push(`용병 ${down}명 쓰러짐 (부활 대기)`);
+      hudExtra.text = extra.join("\n");
+      hudExtra.style.fill = meState.shaken > 0 ? 0xff9b8f : 0xffe08a;
+      drawHudBg(hudExtra.text ? 148 + hudExtra.height + 10 : 148);
+      const hpFrac = Math.max(0, Math.min(1, meState.hp / meState.maxHp));
+      hudBars
         .clear()
-        .roundRect(52, 91, 160, 7, 3)
+        .roundRect(14, 42, HUD_W - 28, 9, 4) // 경험치
         .fill(0x2a2d36)
-        .roundRect(52, 91, 160 * Math.min(1, meState.xp / meState.xpNeed), 7, 3)
-        .fill(0xffe08a);
+        .roundRect(14, 42, (HUD_W - 28) * Math.min(1, meState.xp / meState.xpNeed), 9, 4)
+        .fill(0xffe08a)
+        .roundRect(14, 53, HUD_W - 28, 20, 6) // 체력
+        .fill(0x3a1a1a)
+        .roundRect(14, 53, (HUD_W - 28) * hpFrac, 20, 6)
+        .fill(hpFrac > 0.5 ? 0x4caf50 : hpFrac > 0.25 ? 0xe0a43a : 0xd9453b);
       mercPanel.update(latest.mercs, myId, meState.gold, meState.leadership - used);
       const hv = mercs.views.get(mercPanel.hovered());
       if (hv) fxLayer.circle(hv.x, hv.y, 26).stroke({ width: 3, color: 0xffe08a, alpha: 0.9 });
@@ -1179,24 +1273,41 @@ async function main() {
         if (snd.near < 0) audio.play("camp_open"); // 방금 범위에 들어왔다
         nearCampId = best[0];
         const owned = mine.length;
-        const lines = ["캠프 - 고용 (숫자 키)"];
+        campHint.text = `보유 금화 ${meState.gold}G · 통솔력 ${used}/${meState.leadership}`;
         [best[4], best[5], best[6]].forEach((code, i) => {
           const { type: t, tier } = decodeOffer(code);
           const price = Math.round(mercPrice(t, owned) * TIER_BUY_MULT[tier]! * meState.priceMult);
           const need = unitCost(t, tier);
           const noLeader = used + need > meState.leadership;
-          lines.push(
-            `[${i + 1}] ${tierName(t, tier)}${tier > 0 ? " " + "★".repeat(tier) : ""}  ${price}G  통솔 ${need}` +
-              (noLeader ? "  (통솔력 부족)" : meState.gold < price ? "  (금화 부족)" : ""),
-          );
+          const noGold = meState.gold < price;
+          const ok = !noLeader && !noGold;
+          const row = campRows[i]!;
+          row.icon.texture = allyTex[t]!;
+          row.icon.scale.set(44 / row.icon.texture.height);
+          row.icon.alpha = ok ? 1 : 0.45;
+          row.name.text = `${tierName(t, tier)}${tier > 0 ? " " + "★".repeat(tier) : ""}`;
+          row.name.style.fill = ok ? 0xffffff : 0x8d96a8;
+          row.sub.text = noLeader ? "통솔력이 부족합니다" : noGold ? `금화가 ${price - meState.gold}G 부족합니다` : `${UNIT_NAMES[t]} · 숫자 ${i + 1} 키로 고용`;
+          row.sub.style.fill = ok ? 0xb8bdc9 : 0xff9b8f;
+          row.price.text = `${price}G`;
+          row.price.style.fill = noGold ? 0xff9b8f : 0xffd45d;
+          row.lead.text = `통솔 ${need}`;
+          row.lead.style.fill = noLeader ? 0xff9b8f : 0x9fd0ff;
+          row.bg
+            .clear()
+            .roundRect(0, 0, CAMP_W - 28, CAMP_ROW_H, 10)
+            .fill({ color: ok ? 0x2a2517 : 0x1a1d26, alpha: 0.95 })
+            .stroke({ width: ok ? 2 : 1, color: ok ? 0xe0c05d : 0x3a4052 });
         });
         const counts = UNIT_TYPES.map((t) => mine.filter((w) => w[4] === t).length);
-        if (counts.some((c) => c > 0)) {
-          lines.push("해고 (Shift+숫자, 절반 환급)");
-          UNIT_TYPES.forEach((t) => counts[t]! > 0 && lines.push(`[Shift+${t + 1}] ${UNIT_NAMES[t]} x${counts[t]}`));
-        }
-        campPanelText.text = lines.join("\n");
-        campPanelBg.clear().roundRect(0, 0, campPanelText.width + 28, campPanelText.height + 20, 8).fill({ color: 0x000000, alpha: 0.6 }).stroke({ width: 1, color: 0xe0c05d });
+        const dismiss = counts.some((c) => c > 0)
+          ? ["해고 (Shift+숫자, 낸 금화의 절반 환급)", ...UNIT_TYPES.filter((t) => counts[t]! > 0).map((t) => `[Shift+${t + 1}] ${UNIT_NAMES[t]} x${counts[t]}`)]
+          : [];
+        campDismiss.text = dismiss.join("   ").replace("   [", "\n[");
+        const rowsEnd = 52 + 3 * (CAMP_ROW_H + 8);
+        campDismiss.position.set(20, rowsEnd + 2);
+        const campH = rowsEnd + (dismiss.length > 0 ? campDismiss.height + 16 : 8);
+        campPanelBg.clear().roundRect(0, 0, CAMP_W, campH, 14).fill({ color: 0x0b0d12, alpha: 0.88 }).stroke({ width: 2, color: 0xe0c05d });
         campPanel.visible = true;
       } else {
         campPanel.visible = false;
@@ -1236,11 +1347,11 @@ async function main() {
     levelToast.visible = levelToastLeft > 0;
     levelToast.position.set(app.screen.width / 2, 100);
     weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 100);
-    cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(110, app.screen.height / 2 - 150));
+    cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(90, app.screen.height / 2 - 230));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 120);
-    campPanel.position.set(app.screen.width / 2 - campPanel.width / 2, app.screen.height - campPanel.height - 112);
+    campPanel.position.set(app.screen.width / 2 - CAMP_W / 2, app.screen.height - campPanel.height - 100);
     toast.position.set(app.screen.width / 2, 74);
     legend.position.set(0, app.screen.height - LEGEND_H);
   });

@@ -138,6 +138,9 @@ export class RoomManager {
       case "input":
         room.game.setInput(id, msg);
         return;
+      case "record":
+        conn.send({ t: "result", ...room.game.result(), partial: true });
+        return;
       case "buy": {
         const r = room.game.buy(id, Number(msg.camp), Number(msg.slot));
         if (!r.ok) conn.send({ t: "notice", text: r.reason });

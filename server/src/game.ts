@@ -261,6 +261,7 @@ interface Slot {
   zones: number[]; // 진형: 병종별 구역
   spacing: number; // 진형 간격 배율
   revives: number; // 동료를 일으켜 세운 횟수
+  stats: { dealt: number; taken: number; downs: number; mercDeaths: number; gold: number }; // 기록용 누적
   facing: number; // 진형이 바라보는 방향. 조준 방향을 천천히 따라간다
 }
 
@@ -494,6 +495,7 @@ export class Game {
       zones: [...DEFAULT_PRESETS[0]!.zones],
       spacing: DEFAULT_PRESETS[0]!.spacing,
       revives: 0,
+      stats: { dealt: 0, taken: 0, downs: 0, mercDeaths: 0, gold: 0 },
       facing: 0,
     };
   }
@@ -772,7 +774,18 @@ export class Game {
       status: this.status,
       stage: this.stage,
       time: Math.round(this.time),
-      players: [...this.slots.values()].map((s) => ({ name: s.state.name, level: s.state.level, kills: s.state.kills, revives: s.revives })),
+      players: [...this.slots.values()].map((s) => ({
+        name: s.state.name,
+        level: s.state.level,
+        kills: s.state.kills,
+        revives: s.revives,
+        dealt: Math.round(s.stats.dealt),
+        taken: Math.round(s.stats.taken),
+        downs: s.stats.downs,
+        mercDeaths: s.stats.mercDeaths,
+        mercs: this.countMercs(s.state.id),
+        gold: Math.round(s.stats.gold),
+      })),
     };
   }
 
@@ -969,7 +982,11 @@ export class Game {
     if (sq.left > 0) return;
     this.squads.delete(id);
     // 소대를 전멸시키면 모두에게 보상
-    for (const sl of this.slots.values()) sl.state.gold += Math.round(SQUAD_CLEAR_GOLD * sq.size * sl.mods.bounty);
+    for (const sl of this.slots.values()) {
+      const bonus = Math.round(SQUAD_CLEAR_GOLD * sq.size * sl.mods.bounty);
+      sl.state.gold += bonus;
+      sl.stats.gold += bonus;
+    }
   }
 
   /** 장군이 쓰러지면 스테이지 클리어: 남은 병사는 흩어져 일반 적이 되고, 보상과 쓰러진 동료의 부활이 주어진다 */
@@ -980,7 +997,9 @@ export class Game {
     }
     this.army = null;
     for (const s of this.slots.values()) {
-      s.state.gold += Math.round(STAGE_CLEAR_GOLD * this.stage * s.mods.bounty);
+      const bonus = Math.round(STAGE_CLEAR_GOLD * this.stage * s.mods.bounty);
+      s.state.gold += bonus;
+      s.stats.gold += bonus;
       this.giveXp(s.state.id, STAGE_CLEAR_XP + 15 * this.stage);
       if (s.state.down) this.standUp(s);
     }
@@ -1308,11 +1327,13 @@ export class Game {
           );
           const taken = r.body * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense));
           p.hp -= taken;
+          s.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
           this.thorns(s, h, taken);
           if (p.hp <= 0) {
             p.hp = 0;
             p.down = true;
+            s.stats.downs++;
             p.revive = 0;
             p.chargeLeft = 0;
           }
@@ -1335,6 +1356,7 @@ export class Game {
           this.applyShield(m, r.shield, r.shieldBroke);
           const taken = r.body * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
           this.hurtMerc(m, taken);
+          if (mods) this.slots.get(m.owner)!.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner);
           this.thorns(this.slots.get(m.owner), h, taken, m);
           return r.reflected;
@@ -1380,7 +1402,10 @@ export class Game {
     }
     m.hp = 0;
     m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * (owner ? mstat(owner.mods, m.type, "respawn") : 1);
-    if (owner) this.noteDeath(owner);
+    if (owner) {
+      owner.stats.mercDeaths++;
+      this.noteDeath(owner);
+    }
     m.atkT = 0;
   }
 
@@ -1704,6 +1729,7 @@ export class Game {
     this.applyShield(e, r.shield, r.shieldBroke);
     const dealt = Math.min(r.body, Math.max(0, e.hp));
     e.hp -= r.body;
+    if (owner) owner.stats.dealt += dealt + r.shield;
     if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
     if (has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
@@ -1760,7 +1786,9 @@ export class Game {
     }
     if (owner) {
       owner.state.kills++;
-      owner.state.gold += Math.round((ENEMY_GOLD[e.type] ?? 0) * owner.mods.goldMult * (e.boss ? 5 : 1));
+      const loot = Math.round((ENEMY_GOLD[e.type] ?? 0) * owner.mods.goldMult * (e.boss ? 5 : 1));
+      owner.state.gold += loot;
+      owner.stats.gold += loot;
     }
     // 경험치: 일부는 처치한 사람에게, 나머지는 모든 플레이어에게 똑같이 나눈다
     const xp = (ENEMY_XP[e.type] ?? 0) * (e.boss ? 5 : 1);

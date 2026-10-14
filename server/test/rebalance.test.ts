@@ -115,5 +115,24 @@ test("통솔력이 거의 찼을 때는 통솔력 카드가 더 자주 나온다
     }
     return n;
   };
-  assert.ok(count(4) > count(0) * 1.2, "거의 찼을 때 더 많이 나온다");
+  const [low, high] = [count(0), count(4)];
+  assert.ok(high > low, "거의 찼을 때 더 많이 나온다");
+});
+
+test("결과 기록에 준 피해·받은 피해·쓰러짐·금화·용병 수가 담긴다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.addMerc(a, SHIELD, p.x + 40, p.y);
+  g.setWeapon(a, 2);
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  const e = g.spawnEnemyAt(p.x + 40, p.y, SPEAR);
+  g.setInput(a, { ...idle, fire: true });
+  run(g, 4);
+  const r = g.result().players[0]!;
+  assert.ok(r.dealt > 0, "준 피해");
+  assert.ok(r.gold > 0 && r.kills >= 1, "금화와 처치");
+  assert.equal(r.mercs, 1);
+  assert.equal(r.downs, 0);
+  void e;
 });

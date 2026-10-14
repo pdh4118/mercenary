@@ -1,8 +1,20 @@
-import { STAGE_COUNT, type ClientMsg, type RoomInfo, type RoomMember, type RoomPhase, type ServerMsg } from "@mercenary/shared";
+import { STAGE_COUNT, type ClientMsg, type ResultPlayer, type RoomInfo, type RoomMember, type RoomPhase, type ServerMsg } from "@mercenary/shared";
 
 type ResultMsg = Extract<ServerMsg, { t: "result" }>;
 
 const NAME_KEY = "mercenary.name";
+const RECORDS_KEY = "mercenary.records";
+const RECORDS_MAX = 20;
+
+interface SavedRecord {
+  at: number;
+  status: "victory" | "defeat" | "quit";
+  stage: number;
+  time: number;
+  players: ResultPlayer[];
+  me: string;
+  room: string;
+}
 export const TOKEN_KEY = "mercenary.token";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -66,7 +78,13 @@ export function createLobby(opts: Options): Lobby {
   const waitEl = $("waitRoom");
   const waitErrorEl = $("waitError");
   const resultEl = $("resultPanel");
+  const recordEl = $("recordPanel");
   let lastResult: ResultMsg | null = null;
+  /** 결과 화면을 어떤 용도로 열었나: 끝난 게임 / 진행 중 중간 기록(나가기 전 확인) / 저장된 기록 보기 */
+  type ResultMode = "final" | "partial" | "view";
+  let resultMode: ResultMode = "final";
+  let leaveAfterRecord = false; // 나가기를 눌러 중간 기록을 기다리는 중
+  let viewing: SavedRecord | null = null;
 
   let code = "";
   let myId = -1;
@@ -186,37 +204,119 @@ export function createLobby(opts: Options): Lobby {
       : "방장이 시작하면 게임이 열립니다. 준비를 눌러 주세요.";
   }
 
-  /** 게임이 끝났을 때의 결과 화면. 방장만 다시 시작할 수 있다. */
-  function renderResult(): void {
-    const r = lastResult;
+  // --- 기록: 끝난 판·중도 종료한 판을 브라우저에 최근 20개까지 저장한다 ---
+  const mmss = (t: number) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+  const statusText = (r: { status: string; stage: number }, quit: boolean) =>
+    quit ? `중도 종료 (스테이지 ${r.stage}/${STAGE_COUNT})` : r.status === "victory" ? `승리 (${STAGE_COUNT}스테이지 돌파)` : `전멸 (스테이지 ${r.stage}/${STAGE_COUNT})`;
+  const loadRecords = (): SavedRecord[] => {
+    try {
+      const v = JSON.parse(safe.get(RECORDS_KEY) ?? "[]") as unknown;
+      return Array.isArray(v) ? (v as SavedRecord[]) : [];
+    } catch {
+      return [];
+    }
+  };
+  const saveRecord = (r: ResultMsg, quit: boolean): void => {
+    const rec: SavedRecord = { at: Date.now(), status: quit || r.status === "playing" ? "quit" : r.status, stage: r.stage, time: r.time, players: r.players, me: nameInput.value.trim(), room: code };
+    const list = loadRecords();
+    const prev = list[0];
+    // 같은 판의 결과가 재접속 등으로 다시 오면 중복해서 저장하지 않는다
+    if (prev && prev.status === rec.status && prev.stage === rec.stage && prev.time === rec.time && prev.room === rec.room && rec.at - prev.at < 3_600_000) return;
+    safe.set(RECORDS_KEY, JSON.stringify([rec, ...list].slice(0, RECORDS_MAX)));
+  };
+
+  /** 한 사람의 활약 줄: 이름과 레벨·처치, 그 아래 피해·쓰러짐·금화 */
+  function playerRow(p: ResultPlayer, mine: boolean): HTMLElement {
+    const item = document.createElement("div");
+    item.className = "item wrap";
+    const nm = document.createElement("div");
+    nm.className = "grow";
+    nm.textContent = p.name + (mine ? " (나)" : "");
+    if (mine) nm.style.color = "#ffe08a";
+    const st = document.createElement("div");
+    st.className = "stat";
+    st.textContent = `Lv ${p.level} · 처치 ${p.kills}`;
+    const more = document.createElement("div");
+    more.className = "pstats";
+    more.textContent =
+      `준 피해 ${(p.dealt ?? 0).toLocaleString()} · 받은 피해 ${(p.taken ?? 0).toLocaleString()} · 쓰러짐 ${p.downs ?? 0}회 · 부활시킴 ${p.revives}회\n` +
+      `번 금화 ${(p.gold ?? 0).toLocaleString()} · 용병 ${p.mercs ?? 0}명 (쓰러진 횟수 ${p.mercDeaths ?? 0})`;
+    more.style.whiteSpace = "pre-line";
+    item.append(nm, st, more);
+    return item;
+  }
+
+  /** 결과 화면. 끝난 게임이면 방장만 다시 시작할 수 있고, 진행 중 기록이면 계속하거나 나갈 수 있고, 저장된 기록은 보기만 한다. */
+  function renderResult(r: ResultMsg | null = lastResult, mode: ResultMode = resultMode, quit = false, me = nameInput.value.trim()): void {
     if (!r) return;
-    const win = r.status === "victory";
+    resultMode = mode;
+    const win = r.status === "victory" && !quit && !r.partial;
     const title = $("resultTitle");
-    title.textContent = win ? "승리!" : "전멸...";
-    title.className = win ? "victory" : "defeat";
-    const mm = Math.floor(r.time / 60);
-    const ss = String(r.time % 60).padStart(2, "0");
-    $("resultSub").textContent = win
-      ? `스테이지 ${STAGE_COUNT}개를 모두 돌파했습니다 · ${mm}:${ss}`
-      : `스테이지 ${r.stage}/${STAGE_COUNT}에서 모든 주인공이 쓰러졌습니다 · ${mm}:${ss}`;
+    title.textContent = quit || r.partial ? "진행 기록" : win ? "승리!" : "전멸...";
+    title.className = win ? "victory" : r.partial || quit ? "" : "defeat";
+    $("resultSub").textContent = `${r.partial || quit ? `스테이지 ${r.stage}/${STAGE_COUNT} 진행 중` : statusText(r, false)} · ${mmss(r.time)}`;
     const list = $("resultList");
     list.replaceChildren();
-    for (const p of r.players) {
-      const item = document.createElement("div");
-      item.className = "item";
-      const nm = document.createElement("div");
-      nm.className = "grow";
-      nm.textContent = p.name;
-      const st = document.createElement("div");
-      st.className = "stat";
-      st.textContent = `Lv ${p.level} · 처치 ${p.kills} · 부활시킴 ${p.revives}`;
-      item.append(nm, st);
-      list.append(item);
-    }
+    for (const p of r.players) list.append(playerRow(p, p.name === me));
     const iAmHost = hostId === myId;
-    $("resultRematch").style.display = iAmHost ? "" : "none";
-    $("resultHint").textContent = iAmHost ? "다시 하기를 누르면 대기실로 돌아갑니다." : "방장이 다시 시작하기를 기다리는 중입니다.";
+    $("resultClose").style.display = mode === "final" ? "none" : "";
+    $("resultClose").textContent = mode === "view" ? "닫기" : "계속하기";
+    $("resultLeave").style.display = mode === "view" ? "none" : "";
+    $("resultRematch").style.display = mode === "final" && iAmHost ? "" : "none";
+    $("resultHint").textContent =
+      mode === "partial"
+        ? "나가면 이 기록이 최근 기록에 저장됩니다."
+        : mode === "view"
+          ? ""
+          : iAmHost
+            ? "다시 하기를 누르면 대기실로 돌아갑니다."
+            : "방장이 다시 시작하기를 기다리는 중입니다.";
   }
+
+  function renderRecords(): void {
+    const box = $("recordList");
+    box.replaceChildren();
+    const list = loadRecords();
+    if (list.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "아직 기록이 없습니다. 게임이 끝나거나 중간에 나가면 저장됩니다";
+      box.append(empty);
+      return;
+    }
+    for (const rec of list) {
+      const item = document.createElement("div");
+      item.className = "item click";
+      const info = document.createElement("div");
+      info.className = "grow";
+      const d = new Date(rec.at);
+      const when = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      const top = document.createElement("div");
+      const tag = document.createElement("span");
+      tag.className = rec.status === "victory" ? "tag win" : rec.status === "defeat" ? "tag lose" : "tag quit";
+      tag.textContent = rec.status === "victory" ? "승리" : rec.status === "defeat" ? "전멸" : "중도 종료";
+      top.append(tag, ` 스테이지 ${rec.stage}/${STAGE_COUNT} · ${mmss(rec.time)}`);
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const mine = rec.players.find((p) => p.name === rec.me) ?? rec.players[0];
+      meta.textContent = `${when} · ${rec.players.length}명${mine ? ` · Lv ${mine.level} · 처치 ${mine.kills}` : ""}`;
+      info.append(top, meta);
+      item.append(info);
+      item.onclick = () => {
+        viewing = rec;
+        renderResult({ t: "result", status: rec.status === "victory" ? "victory" : "defeat", stage: rec.stage, time: rec.time, players: rec.players, partial: rec.status === "quit" }, "view", rec.status === "quit", rec.me);
+        $("resultTitle").textContent = rec.status === "victory" ? "승리!" : rec.status === "defeat" ? "전멸..." : "중도 종료";
+        $("resultTitle").className = rec.status === "victory" ? "victory" : rec.status === "defeat" ? "defeat" : "";
+        $("resultSub").textContent = `${statusText(rec, rec.status === "quit")} · ${mmss(rec.time)}`;
+        resultEl.classList.add("open");
+      };
+      box.append(item);
+    }
+  }
+  const openRecords = () => {
+    renderRecords();
+    recordEl.classList.add("open");
+  };
 
   const showLobby = (error = "") => {
     resultEl.classList.remove("open");
@@ -236,9 +336,37 @@ export function createLobby(opts: Options): Lobby {
   };
   $("lobbyJoin").onclick = joinByCode;
   codeInput.onkeydown = (e) => e.key === "Enter" && joinByCode();
-  $("roomLeave").onclick = () => opts.send({ t: "leave" });
+  // 진행 중에 나가려면 먼저 지금까지의 기록을 보여 주고 확인을 받는다
+  $("roomLeave").onclick = () => {
+    if (phase === "playing" && inRoom) {
+      leaveAfterRecord = true;
+      opts.send({ t: "record" });
+    } else opts.send({ t: "leave" });
+  };
+  $("roomRecords").onclick = () => {
+    leaveAfterRecord = false;
+    if (phase === "playing" && inRoom) opts.send({ t: "record" });
+    else openRecords();
+  };
+  $("lobbyRecords").onclick = openRecords;
+  $("recordClose").onclick = () => recordEl.classList.remove("open");
+  $("recordClear").onclick = () => {
+    if (confirm("저장된 기록을 모두 지울까요?")) {
+      safe.del(RECORDS_KEY);
+      renderRecords();
+    }
+  };
+  $("resultClose").onclick = () => {
+    resultEl.classList.remove("open");
+    leaveAfterRecord = false;
+    viewing = null;
+  };
   $("waitLeave").onclick = () => opts.send({ t: "leave" });
-  $("resultLeave").onclick = () => opts.send({ t: "leave" });
+  $("resultLeave").onclick = () => {
+    if (resultMode === "partial" && lastResult) saveRecord(lastResult, true); // 중도 종료도 기록으로 남긴다
+    resultEl.classList.remove("open");
+    opts.send({ t: "leave" });
+  };
   $("resultRematch").onclick = () => opts.send({ t: "rematch" });
   $("waitReady").onclick = () => opts.send({ t: "ready", ready: !members.find((m) => m.id === myId)?.ready });
   $("waitStart").onclick = () => {
@@ -297,7 +425,17 @@ export function createLobby(opts: Options): Lobby {
           return true;
         case "result":
           lastResult = msg;
-          renderResult();
+          if (msg.partial) {
+            // 진행 중 요청한 중간 기록: 나가려던 중이면 확인 화면, 아니면 기록만 보여 준다
+            renderResult(msg, "partial", true);
+            $("resultTitle").textContent = "진행 기록";
+            $("resultLeave").style.display = leaveAfterRecord ? "" : "none";
+            $("resultHint").textContent = leaveAfterRecord ? "나가면 이 기록이 최근 기록에 저장됩니다." : "";
+            resultEl.classList.add("open");
+            return true;
+          }
+          saveRecord(msg, false);
+          renderResult(msg, "final");
           resultEl.classList.add("open");
           return true;
         case "left":

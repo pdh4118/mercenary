@@ -173,6 +173,12 @@ export interface ResultPlayer {
   level: number;
   kills: number;
   revives: number; // 동료를 일으켜 세운 횟수
+  dealt: number; // 주인공·용병이 적에게 준 피해 합
+  taken: number; // 주인공·용병이 입은 피해 합
+  downs: number; // 주인공이 쓰러진 횟수
+  mercDeaths: number; // 용병이 쓰러진 횟수
+  mercs: number; // 끝났을 때 거느린 용병 수
+  gold: number; // 번 금화 합(보상 포함)
 }
 
 export type BulletWire = [id: number, x: number, y: number, team: 0 | 1]; // team 1 = 적 투사체
@@ -224,7 +230,8 @@ export type ClientMsg =
   | { t: "reroll" } // 지금 제시된 카드를 새로 뽑는다(새로고침 1회 소모)
   | { t: "upgrade"; merc: number } // 용병 한 명을 다음 단계로 강화
   | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
-  | { t: "charge"; x: number; y: number }; // 기병 돌격 지시(월드 좌표)
+  | { t: "charge"; x: number; y: number } // 기병 돌격 지시(월드 좌표)
+  | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)
 
 export type ServerMsg =
   | { t: "rooms"; rooms: RoomInfo[] } // 로비에 있는 동안 방 목록이 바뀔 때마다 온다
@@ -233,7 +240,7 @@ export type ServerMsg =
   | { t: "left"; reason: string } // 방에서 나왔다(스스로, 내보내짐, 방 종료)
   | { t: "error"; text: string }
   | { t: "notice"; text: string }
-  | { t: "result"; status: GameStatus; stage: number; time: number; players: ResultPlayer[] } // 게임이 끝났다
+  | { t: "result"; status: GameStatus; stage: number; time: number; players: ResultPlayer[]; partial?: boolean } // 게임이 끝났다. partial이면 진행 중에 요청한 중간 기록
   | {
       t: "state";
       tick: number;

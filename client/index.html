@@ -43,6 +43,13 @@
       .check input { width: 16px; height: 16px; accent-color: #d7a24d; align-self: center; }
       .tag.ready { background: #1f3a26; color: #7be08f; }
       .stat { color: #9aa1b0; font-size: 12px; white-space: nowrap; }
+      .item.click { cursor: pointer; }
+      .item.click:hover { background: #262b3a; }
+      .item .pstats { flex-basis: 100%; color: #9aa1b0; font-size: 12px; line-height: 1.5; }
+      .item.wrap { flex-wrap: wrap; row-gap: 2px; }
+      .tag.win { background: #3a3320; color: #ffe08a; }
+      .tag.lose { background: #3a2a2a; color: #ff9b8f; }
+      .tag.quit { background: #2a3040; color: #9fb4d8; }
       .victory { color: #ffe08a; }
       .defeat { color: #ff9b8f; }
       #formBar { position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); display: flex; gap: 6px; z-index: 5; }
@@ -58,7 +65,7 @@
       #formEditor .unit .nm { width: 52px; }
       #formEditor canvas { background: #14161c; border: 1px solid #343949; border-radius: 8px; width: 100%; max-width: 260px; }
       @media (max-width: 560px) { #formEditor .grid { grid-template-columns: 1fr; } }
-      #mercPanel { position: fixed; left: 8px; top: 112px; width: 300px; max-height: calc(100vh - 260px); display: none; flex-direction: column; background: rgba(15,16,21,.88); border: 1px solid #343949; border-radius: 10px; z-index: 6; color: #e6e9f0; }
+      #mercPanel { position: fixed; left: 10px; top: 270px; width: 320px; max-height: calc(100vh - 380px); display: none; flex-direction: column; background: rgba(15,16,21,.88); border: 1px solid #343949; border-radius: 10px; z-index: 6; color: #e6e9f0; }
       #mercPanel.open { display: flex; }
       #mercPanel header { padding: 8px 12px; font-size: 13px; color: #ffe08a; border-bottom: 1px solid #262a37; display: flex; justify-content: space-between; }
       #mercList { overflow: auto; }
@@ -109,6 +116,7 @@
 
         <h2>열려 있는 방</h2>
         <div id="lobbyList" class="list"></div>
+        <div class="row" style="margin-top: 14px"><button id="lobbyRecords">최근 기록 보기</button></div>
         <div id="lobbyError" class="error"></div>
       </div>
     </div>
@@ -135,11 +143,24 @@
         <h1 id="resultTitle"></h1>
         <p id="resultSub" class="sub"></p>
         <h2>활약</h2>
-        <div id="resultList" class="list"></div>
+        <div id="resultList" class="list" style="max-height: 340px"></div>
         <div id="resultHint" class="hint" style="min-height: 18px"></div>
         <div class="row" style="justify-content: flex-end; margin-top: 8px">
+          <button id="resultClose">계속하기</button>
           <button id="resultLeave" class="danger">방 나가기</button>
           <button id="resultRematch" class="primary">다시 하기</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="recordPanel" class="overlay">
+      <div class="panel">
+        <h1>최근 기록</h1>
+        <p class="sub">이 브라우저에 저장된 최근 20판입니다. 누르면 자세히 볼 수 있습니다.</p>
+        <div id="recordList" class="list" style="max-height: 420px"></div>
+        <div class="row" style="justify-content: space-between; margin-top: 12px">
+          <button id="recordClear" class="danger">기록 지우기</button>
+          <button id="recordClose" class="primary">닫기</button>
         </div>
       </div>
     </div>
@@ -176,6 +197,7 @@
         <h2>참가자</h2>
         <div id="roomMembers" class="list"></div>
         <div class="row" style="justify-content: flex-end; margin-top: 16px">
+          <button id="roomRecords">지금까지 기록</button>
           <button id="roomLeave" class="danger">방 나가기</button>
           <button id="roomClose">닫기 (Esc)</button>
         </div>
