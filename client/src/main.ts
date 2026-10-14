@@ -211,6 +211,9 @@ async function main() {
     x0: number; // 이전 프레임 위치(방향 계산용)
     y0: number;
   }
+  // 같은 순간에 나간 화살이 많으면 하나씩 소리 내는 대신 '화살 연사' 소리 하나로 낸다
+  const shotBuf: { x: number; y: number; hostile: boolean }[] = [];
+  let shotWindowStart = 0;
   const hitFx: { node: Sprite; age: number }[] = [];
   const HIT_FX_SEC = 0.22;
   const ARROW_SCALE = 0.5;
@@ -222,7 +225,13 @@ async function main() {
       sprite.scale.set(ARROW_SCALE);
       sprite.visible = false; // 첫 프레임에는 방향을 모른다
       bulletLayer.addChild(sprite);
-      audio.play("bow_shot", { x: w[1], y: w[2], vol: hostile ? 0.6 : 1 });
+      // 첫 발은 바로 소리 내(반응이 늦지 않게), 같은 순간에 이어서 나간 화살만 모아서 처리한다
+      if (shotWindowStart === 0) {
+        shotWindowStart = performance.now();
+        audio.play("bow_shot", { x: w[1], y: w[2], vol: hostile ? 0.6 : 1 });
+      } else {
+        shotBuf.push({ x: w[1], y: w[2], hostile });
+      }
       return { node: sprite, x: 0, y: 0, hostile, angle: 0, ready: false, x0: w[1], y0: w[2] };
     },
     (w) => [w[0], w[1], w[2]],
@@ -848,6 +857,19 @@ async function main() {
       v.x0 = w[1];
       v.y0 = w[2];
     });
+    if (shotWindowStart !== 0 && performance.now() - shotWindowStart >= 120) {
+      const n = shotBuf.length + 1; // 첫 발 포함
+      if (shotBuf.length > 0) {
+        const hostileShare = shotBuf.filter((q) => q.hostile).length / shotBuf.length;
+        if (n >= 4) {
+          audio.play("arrow_volley", { x: shotBuf.reduce((a, q) => a + q.x, 0) / shotBuf.length, y: shotBuf.reduce((a, q) => a + q.y, 0) / shotBuf.length, vol: hostileShare > 0.5 ? 0.7 : 1 });
+        } else {
+          for (const q of shotBuf) audio.play("bow_shot", { x: q.x, y: q.y, vol: q.hostile ? 0.6 : 1 });
+        }
+      }
+      shotBuf.length = 0;
+      shotWindowStart = 0;
+    }
     // 피해 숫자: 위로 떠오르며 사라진다(치명타는 처음에 크게 튀어 오른다)
     for (let i = floats.length - 1; i >= 0; i--) {
       const f = floats[i]!;

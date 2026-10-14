@@ -25,6 +25,7 @@ const d = (variants: number, volume: number, cooldownMs: number, maxVoices: numb
 export const SOUNDS = {
   // 1순위
   bow_shot: d(3, 0.5, 70, 4),
+  arrow_volley: d(1, 0.6, 350, 2, 0.04), // 여러 명이 한꺼번에 쏠 때(화살 연사)
   arrow_hit: d(4, 0.45, 60, 5),
   melee_hit: d(4, 0.55, 60, 5),
   shield_block: d(3, 0.55, 70, 4),
