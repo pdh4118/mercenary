@@ -42,8 +42,7 @@
 | `melee_hit_8` | marb7e (#620355) | 미확인 | 미정 |
 | `shield_block_4` | dermotte (#263008) | 미확인 | 미정 |
 | `ally_hurt_1` | micahlg (#413186) | 미확인 | 미정(1종뿐이라 변형 추가 권장) |
-| `level_up_1` | jivatma07 (#76234) | 미확인 | 미정(임시 후보) |
-| `level_up_2` | soneproject (#346425) | 미확인 | 미정(임시 후보) |
+| `level_up_1` | jivatma07 (#76234) | 미확인 | 미정 |
 
 Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~2`와 직접 받은 `impact`, 활·방패 소리 파일(`bow_shot_1`, `arrow_volley_1`, `shield_block_*`, `crit_hit_*`)도 생성·출처 약관을 확인해야 합니다(Suno는 요금제에 따라 상업 이용 조건이 다릅니다).
 
@@ -66,4 +65,4 @@ Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~
 | `shield_block_4` | `263008__dermotte__metallic_hit.wav` | 원본 1.57초 중 앞 0.45초, 금속이 부딪히며 울리는 소리(중심 약 4kHz). 타격 후 쇳소리 여운이 남음. 방패 막힘으로 사용. 제작자 dermotte, **라이선스 확인 필요** |
 | `ally_hurt_1` | `413186__micahlg__male_hurt9.ogg` | 원본 0.38초 중 앞 0.27초, 짧게 "윽" 하는 남자 신음(중심 약 3.2kHz). 원본이 작아 6dB 키움. 1종뿐이라 높낮이를 ±8% 바꿔 재생. 제작자 micahlg, **라이선스 확인 필요** |
 | `level_up_1` | `76234__jivatma07__level_up_3note2.wav` | 0.61초, 3음 상승 레벨업 효과음(중심 약 3.2kHz). 원본이 0dB를 넘어 5dB 낮춤. 임시 후보. 제작자 jivatma07, **라이선스 확인 필요** |
-| `level_up_2` | `346425__soneproject__ecofuture3.wav` | 원본 3.85초 중 앞 1.6초(뒤는 점점 줄어드는 여운), 밝은 신시사이저 소리(중심 약 4.2kHz). level_up_1과 번갈아 나옴. 제작자 soneproject, **라이선스 확인 필요** |
+| (미사용) `level_up_2_ecofuture3.ogg` | `346425__soneproject__ecofuture3.wav` | 레벨업 후보였으나 탈락(미래적인 신스 소리라 분위기에 안 맞고 여운이 길어 자주 나기엔 부담). 게임 폴더에서 빼고 이 폴더에 보관. 제작자 soneproject |
