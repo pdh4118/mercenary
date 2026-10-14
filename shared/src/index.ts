@@ -2,6 +2,7 @@
 
 export * from "./rules.js";
 export * from "./cards.js";
+export * from "./formation.js";
 import { ARCHER, BLUNT, SHIELD, SPEAR } from "./rules.js";
 
 export const TICK_RATE = 20; // 서버가 초당 계산·전송하는 횟수
@@ -195,6 +196,7 @@ export type ClientMsg =
   | { t: "input"; dx: number; dy: number; aim: number; fire: boolean; revive?: boolean }
   | { t: "buy"; camp: number; slot: number }
   | { t: "weapon"; index: number } // 무기 변경(WEAPONS 인덱스)
+  | { t: "formation"; zones: number[]; spacing: number } // 진형 변경(병종별 구역 + 간격)
   | { t: "pick"; index: number } // 레벨업 카드 선택(0..2)
   | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number }; // 기병 돌격 지시(월드 좌표)

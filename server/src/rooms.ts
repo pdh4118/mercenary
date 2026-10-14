@@ -157,6 +157,9 @@ export class RoomManager {
       case "weapon":
         room.game.setWeapon(id, msg.index);
         return;
+      case "formation":
+        room.game.setFormation(id, msg);
+        return;
     }
   }
 

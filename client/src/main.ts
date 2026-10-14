@@ -1,5 +1,6 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture } from "pixi.js";
 import { createLobby } from "./lobby.js";
+import { createFormationUi } from "./formation.js";
 import {
   CARDS,
   CARD_CATEGORY_NAMES,
@@ -325,7 +326,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고",
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 진형 편성",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -439,13 +440,25 @@ async function main() {
   // --- 접속: 로비(방 목록·만들기·참가)를 거쳐 방에 들어가고, 끊기면 같은 캐릭터로 이어서 접속한다 ---
   let ws!: WebSocket;
   const send = (m: ClientMsg) => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m));
+  const formations = createFormationUi({
+    send,
+    colors: TYPE_COLORS,
+    notify: (text) => {
+      toast.text = text;
+      toastLeft = 2;
+    },
+  });
   const lobby = createLobby({
     send,
     onEnter: (id) => {
       myId = id;
+      formations.show(true);
+      formations.resend();
     },
     onLeave: () => {
       myId = -1;
+      formations.show(false);
+      formations.close();
       latest = null;
       levelOf.clear();
       lastLevel = 0;
@@ -538,11 +551,24 @@ async function main() {
   };
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      lobby.toggleRoomPanel();
+      if (formations.isOpen()) formations.close();
+      else lobby.toggleRoomPanel();
       return;
     }
     if (lobby.blocksGameInput()) return;
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    if (tag === "INPUT" || tag === "SELECT") return; // 이름·간격 입력 중에는 게임 키로 쓰지 않는다
     const k = e.key.toLowerCase();
+    if (/^F[1-4]$/.test(e.key) && !e.repeat) {
+      e.preventDefault();
+      formations.apply(Number(e.key[1]) - 1);
+      return;
+    }
+    if (k === "b" && !e.repeat) {
+      formations.toggle();
+      return;
+    }
+    if (formations.isOpen()) return; // 편성 화면에서는 게임 조작을 받지 않는다
     if (!e.repeat && k === "q") cycleWeapon(1);
     if (!e.repeat && (k === "z" || k === "x" || k === "c")) send({ t: "pick", index: "zxc".indexOf(k) });
     if (!e.repeat && nearCampId >= 0) {

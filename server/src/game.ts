@@ -78,12 +78,6 @@ import {
   ENEMY_SPAWN_WEIGHTS,
   ENEMY_STATS,
   FIRE_COOLDOWN_SEC,
-  FORMATION_LATERAL_SPACING,
-  FORMATION_ROW_OF_TYPE,
-  FORMATION_ROW_OFFSET,
-  FORMATION_ROW_WRAP,
-  FORMATION_WING_FORWARD,
-  FORMATION_WING_LATERAL,
   FORMATION_TURN_RATE,
   MAX_MERCS_PER_PLAYER,
   MAX_PLAYERS,
@@ -107,6 +101,9 @@ import {
   clampToWorld,
   mercPrice,
   sanitizeInput,
+  DEFAULT_PRESETS,
+  layoutFormation,
+  sanitizeFormation,
   type BulletWire,
   type CampWire,
   type EnemyWire,
@@ -161,6 +158,8 @@ interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
+  zones: number[]; // 진형: 병종별 구역
+  spacing: number; // 진형 간격 배율
   revives: number; // 동료를 일으켜 세운 횟수
   facing: number; // 진형이 바라보는 방향. 조준 방향을 천천히 따라간다
 }
@@ -307,6 +306,8 @@ export class Game {
     for (const o of old) {
       const slot = this.newSlot(o.state.id, o.state.name);
       slot.away = o.away;
+      slot.zones = o.zones; // 고른 진형은 다시 시작해도 유지한다
+      slot.spacing = o.spacing;
       this.placeAtSpawn(slot.state, o.state.id);
       this.slots.set(o.state.id, slot);
     }
@@ -345,6 +346,8 @@ export class Game {
       switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
+      zones: [...DEFAULT_PRESETS[0]!.zones],
+      spacing: DEFAULT_PRESETS[0]!.spacing,
       revives: 0,
       facing: 0,
     };
@@ -776,42 +779,27 @@ export class Game {
     return this.slots.get(id)?.state;
   }
 
-  /** 용병 진형 자리(테스트용). 주인공 기준 앞/옆/뒤 줄에 병종별로 배치된다. */
+  /** 용병 진형 자리(테스트용). 주인공 기준으로 플레이어가 고른 진형(병종별 구역·간격)대로 배치된다. */
   formationSlots(owner: number): Map<number, [number, number]> {
     const s = this.slots.get(owner);
     const out = new Map<number, [number, number]>();
     if (!s) return out;
-    const rows: Merc[][] = [[], [], []];
-    const wing: Merc[] = [];
-    for (const m of this.mercs.values()) {
-      if (m.owner !== owner || m.respawn > 0) continue;
-      const row = FORMATION_ROW_OF_TYPE[m.type]!;
-      if (row < 0) wing.push(m);
-      else rows[row]!.push(m);
-    }
+    const alive = [...this.mercs.values()].filter((m) => m.owner === owner && m.respawn <= 0);
+    const rel = layoutFormation(alive, s.zones, s.spacing);
     const fx = Math.cos(s.facing);
     const fy = Math.sin(s.facing);
-    const lx = -fy;
-    const ly = fx;
-    // 기병은 양옆 바깥 날개에 번갈아 선다
-    wing.sort((a, b) => a.id - b.id);
-    wing.forEach((m, i) => {
-      const side = i % 2 === 0 ? 1 : -1;
-      const lateral = side * (FORMATION_WING_LATERAL + Math.floor(i / 2) * FORMATION_LATERAL_SPACING);
-      out.set(m.id, [s.state.x + fx * FORMATION_WING_FORWARD + lx * lateral, s.state.y + fy * FORMATION_WING_FORWARD + ly * lateral]);
-    });
-    rows.forEach((row, r) => {
-      row.sort((a, b) => a.id - b.id);
-      row.forEach((m, i) => {
-        const col = i % FORMATION_ROW_WRAP;
-        const wrap = Math.floor(i / FORMATION_ROW_WRAP);
-        const inThisLine = Math.min(FORMATION_ROW_WRAP, row.length - wrap * FORMATION_ROW_WRAP);
-        const lateral = (col - (inThisLine - 1) / 2) * FORMATION_LATERAL_SPACING;
-        const forward = FORMATION_ROW_OFFSET[r]! - wrap * 30;
-        out.set(m.id, [s.state.x + fx * forward + lx * lateral, s.state.y + fy * forward + ly * lateral]);
-      });
-    });
+    for (const [id, [fwd, lat]] of rel) out.set(id, [s.state.x + fx * fwd - fy * lat, s.state.y + fy * fwd + fx * lat]);
     return out;
+  }
+
+  /** 진형을 바꾼다(병종별 구역과 간격). 잘못된 값은 무시한다. */
+  setFormation(playerId: number, raw: unknown): boolean {
+    const s = this.slots.get(playerId);
+    const f = sanitizeFormation(raw);
+    if (!s || !f) return false;
+    s.zones = f.zones;
+    s.spacing = f.spacing;
+    return true;
   }
 
   // --- 내부 ------------------------------------------------------------
