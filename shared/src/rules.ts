@@ -2,6 +2,7 @@
 
 /** 서버 실행 중에도 수치 조정 도구로 바꿀 수 있는 숫자들(shared/src/tuning.ts가 이름·범위·설명을 관리한다) */
 export const TUNE = {
+  ENEMY_SPEED_MULT: 1.15, // 적 이동 속도 배율(빠를수록 포위가 위협적이고 주인공 이동 속도의 가치가 커진다)
   XP_BASE: 12, // 1레벨에서 필요한 경험치
   XP_PER_LEVEL: 9, // 레벨이 오를 때마다 늘어나는 필요 경험치
   START_LEADERSHIP: 5,
@@ -218,6 +219,8 @@ export const SPEAR_WATCH_RANGE = 520; // 창병이 적 기병을 주시하는 �
 export const CAV_TARGET_WEIGHT = [1, 1, 2.2, 0.5, 1.8] as const;
 /** 둔기병이 방패 있는 검방병을 노리는 가중치 */
 export const BLUNT_SHIELD_PREF = 2.6;
+
+export const ENEMY_SURROUND_RANGE = 360; // 적이 대상에서 이 거리보다 멀수록 크게 돌아(포위) 접근한다
 
 // 캠프(용병을 고용할 수 있는 곳)
 export const CAMP_OFFERS = 3;

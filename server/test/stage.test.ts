@@ -106,6 +106,7 @@ test("성장 시간이 흐르면 저절로 보스가 등장한다", () => {
   g.autoSpawn = true;
   for (let i = 0; i < TUNE.STAGE_GROW_SEC * TICK_RATE + 5 && g.info().phase === "grow"; i++) {
     g.getPlayer(1)!.hp = TUNE.PLAYER_MAX_HP; // 일반 적에게 죽지 않게
+    g.getPlayer(1)!.invuln = 5;
     g.step();
   }
   assert.equal(g.info().phase, "boss");
@@ -146,7 +147,10 @@ test("장군을 쓰러뜨리면 스테이지가 클리어되고 보상·휴식�
   assert.ok(me(g, a).gold >= gold0 + TUNE.STAGE_CLEAR_GOLD);
   assert.ok(g.snapshotEnemies().every((en) => en[11] === 0), "남은 병사는 더 이상 보스군이 아니다");
   assert.equal(g.status, "playing");
-  run(g, TUNE.STAGE_BREAK_SEC + 0.5);
+  for (let i = 0; i < Math.round((TUNE.STAGE_BREAK_SEC + 0.5) * TICK_RATE); i++) {
+    g.getPlayer(a)!.invuln = 5; // 흩어진 병사들에게 쓰러지지 않게
+    g.step();
+  }
   assert.equal(g.info().stage, 2);
   assert.equal(g.info().phase, "grow");
 });

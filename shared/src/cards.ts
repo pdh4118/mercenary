@@ -172,7 +172,7 @@ const statCards = (): CardDef[] => {
 /** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용) */
 const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" }[] = [
   { k: "heroMaxHp", label: "최대 체력", base: 25, weight: 8, fmt: "flat" },
-  { k: "heroSpeed", label: "이동 속도", base: 0.08, weight: 6, fmt: "pct" },
+  { k: "heroSpeed", label: "이동 속도", base: 0.12, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.25, weight: 8, fmt: "pct" },
   { k: "heroFireRate", label: "공격 속도", base: 0.15, weight: 6, fmt: "pct" },
   { k: "heroRange", label: "사거리", base: 0.12, weight: 6, fmt: "pct" },

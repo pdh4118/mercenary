@@ -114,6 +114,7 @@ import {
   ARCHER_STRAFE_SEC,
   ASSAULT_LEASH_MULT_CAVALRY,
   BLUNT_SHIELD_PREF,
+  ENEMY_SURROUND_RANGE,
   CAV_TARGET_WEIGHT,
   GUARD_THREAT_RADIUS,
   HERO_WARD_WEIGHT,
@@ -272,7 +273,23 @@ interface Fighter {
   chargeSnap: number; // 공격 예비 동작을 시작할 때 정해진 돌격 추가 피해
 }
 
+/** 적 AI가 보는 아군(주인공·용병) */
+interface Foe {
+  x: number;
+  y: number;
+  r: number;
+  type: number; // 병종(주인공은 NO_TYPE)
+  face: number;
+  shield: number;
+  ranged: boolean;
+  vx: number; // 이동 속도(px/s). 움직이는 대상을 앞질러 가는 데 쓴다
+  vy: number;
+  f: Friendly;
+}
+
 interface Enemy extends Fighter {
+  flankT: number; // 기병이 우회 접근에 쓴 시간
+  evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   maxHp: number;
   shieldMax: number;
   dmgMult: number;
@@ -416,6 +433,7 @@ export class Game {
   private mercs = new Map<number, Merc>();
   private camps = new Map<number, Camp>();
   private chests = new Map<number, Chest>();
+  private foePos = new Map<string, [number, number]>(); // 적 AI가 아군의 이동 속도를 구하려고 기억하는 지난 위치
   private tour: Tournament | null = null;
   private tourPending = false; // 보스를 잡은 직후, 다음 틱에 토너먼트를 연다
   private bossT = 0; // 보스 단계가 시작된 뒤 흐른 시간
@@ -831,6 +849,7 @@ export class Game {
       shield: st.shield * hpMult,
       shieldMax: st.shield * hpMult,
       dmgMult: (1 + TUNE.STAGE_ENEMY_DMG_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_DMG_GROWTH * minutes + TUNE.ENEMY_LEVEL_DMG_GROWTH * lv) * (extra.boss ? TUNE.BOSS_DMG_MULT : 1),
+      flankT: 0, evadeT: 0,
       atkT: 0, atkAng: 0, face: Math.atan2(-y, -x), cd: 0, regenT: 0, momentum: 0, chargeSnap: 0, // 처음에는 중앙(플레이어가 있는 쪽)을 본다
       boss: false, army: false, squad: 0, slotF: 0, slotL: 0,
       ...extra,
@@ -2784,7 +2803,54 @@ export class Game {
     return { ok: true };
   }
 
+  /** 적 AI가 보는 아군(주인공·용병): 병종·방향·방패와 이동 속도(예측에 쓴다) */
+  private buildFoes(friendlies: Friendly[], dt: number): Foe[] {
+    const out: Foe[] = [];
+    const seen = new Set<string>();
+    for (const f of friendlies) {
+      const key = f.merc ? `m${f.merc.id}` : `h${f.ownerId}`;
+      seen.add(key);
+      const prev = this.foePos.get(key);
+      let vx = prev ? (f.x - prev[0]) / dt : 0;
+      let vy = prev ? (f.y - prev[1]) / dt : 0;
+      const sp = Math.hypot(vx, vy);
+      if (sp > 320) {
+        vx = (vx / sp) * 320; // 순간이동(부활·경기 시작) 같은 큰 변화는 속도로 보지 않는다
+        vy = (vy / sp) * 320;
+      }
+      this.foePos.set(key, [f.x, f.y]);
+      if (f.merc) {
+        out.push({ x: f.x, y: f.y, r: f.radius, type: f.merc.type, face: f.merc.face, shield: f.merc.shield, ranged: MERC_STATS[f.merc.type]!.ranged, vx, vy, f });
+      } else {
+        const sl = this.slots.get(f.ownerId)!;
+        out.push({ x: f.x, y: f.y, r: f.radius, type: NO_TYPE, face: sl.state.aim, shield: 0, ranged: WEAPONS[sl.state.weapon]!.ranged, vx, vy, f });
+      }
+    }
+    for (const k of [...this.foePos.keys()]) if (!seen.has(k)) this.foePos.delete(k);
+    return out;
+  }
+
+  /** 적이 노릴 가치(병종별 성향). 값이 클수록 먼저 노린다 */
+  private enemyTargetWeight(e: Enemy, t: Foe, d: number): number {
+    switch (e.type) {
+      case CAVALRY:
+        if (t.type === SPEAR && d > CAV_SELF_DEFENSE) return 0.05; // 창병은 돌격이 반사되므로 피한다
+        return t.type === NO_TYPE ? 1.2 : (CAV_TARGET_WEIGHT[t.type] ?? 1);
+      case SPEAR:
+        return t.type === CAVALRY ? 2.2 : 1; // 기병을 주시한다
+      case BLUNT:
+        return t.type === SHIELD && t.shield > 0 ? BLUNT_SHIELD_PREF : 1; // 방패를 부순다
+      case ARCHER:
+        return this.frontalShield({ x: t.x, y: t.y, r: t.r, type: t.type, shield: t.shield, face: t.face } as Target, e) ? 0.33 : t.ranged ? 1.15 : 1; // 방패 정면은 피한다
+      default:
+        return 1;
+    }
+  }
+
   private stepEnemies(dt: number, friendlies: Friendly[]): void {
+    const foes = this.buildFoes(friendlies, dt);
+    const archers: Enemy[] = [];
+    for (const o of this.enemies.values()) if (o.type === ARCHER) archers.push(o);
     for (const e of this.enemies.values()) {
       const st = ENEMY_STATS[e.type]!;
       this.regenShield(e, e.shieldMax, dt);
@@ -2804,12 +2870,17 @@ export class Game {
       const home = group ? this.armySlotPos(e.slotF, e.slotL, group) : null;
       const leashed = home !== null && Math.hypot(home[0] - e.x, home[1] - e.y) > ARMY_LEASH;
       const aggro = Math.max(ARMY_AGGRO, st.reach + 20);
-      let target: Friendly | null = null;
+      // 대상: 병종별 성향(기병은 궁병·둔기병, 둔기병은 방패 든 검방병, 창병은 기병, 궁병은 방패 정면이 아닌 쪽)을 거리에 반영해 고른다
+      let target: Foe | null = null;
       let targetDist = Infinity;
+      let best = Infinity;
       if (!leashed) {
-        for (const f of friendlies) {
+        for (const f of foes) {
           const d = Math.hypot(f.x - e.x, f.y - e.y);
-          if (d < targetDist && (home === null || d <= aggro)) {
+          if (home !== null && d > aggro) continue;
+          const sc = d / this.enemyTargetWeight(e, f, d);
+          if (sc < best) {
+            best = sc;
             targetDist = d;
             target = f;
           }
@@ -2823,28 +2894,216 @@ export class Game {
         }
         continue;
       }
-      const speed = st.speed * (e.boss ? BOSS_SPEED_MULT : 1);
+      // 이동 속도가 곧 위협이다: 적은 조금 더 빠르고, 움직이는 대상을 앞질러 막아선다
+      const speed = st.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT;
 
-      const attackRange = st.ranged ? st.reach : st.reach + target.radius * 0.5;
+      const attackRange = st.ranged ? st.reach : st.reach + target.r * 0.5;
       if (targetDist <= attackRange) {
-        if (e.cd <= 0) {
+        if (e.cd <= 0 && !(e.type === CAVALRY && e.evadeT > 0)) {
           e.atkT = st.windup;
           e.atkAng = Math.atan2(target.y - e.y, target.x - e.x);
           e.face = e.atkAng;
           e.chargeSnap = e.type === CAVALRY ? chargeBonus(speed, e.momentum) : 0;
           continue;
         }
-        // 근접은 쿨다운 중에도 붙어서 압박하고, 원거리는 거리를 유지한다
-        if (st.ranged) continue;
+        // 근접은 쿨다운 중에도 붙어서 압박하고(기병은 빠졌다 돌아온다), 원거리는 거리를 유지한다
+        if (st.ranged) {
+          this.enemyArcherMove(e, st, dt, foes, target, targetDist, speed);
+          continue;
+        }
       }
-      const stop = st.ranged ? st.reach * 0.8 : st.reach * 0.5 + target.radius;
-      e.face = Math.atan2(target.y - e.y, target.x - e.x);
-      if (e.type === CAVALRY) {
-        this.updateMomentum(e, this.moveToward(e, target.x, target.y, cavSpeed(speed, e.momentum), dt, stop), dt);
-      } else {
-        this.moveToward(e, target.x, target.y, speed, dt, stop);
+      this.enemyMove(e, st, dt, foes, archers, target, targetDist, speed);
+    }
+  }
+
+  /** 대상 둘레를 돌아 들어가는 접근: 처음에는 옆으로 크게 돌고(포위), 가까워질수록 곧장 붙는다. 대상의 움직임을 예측해 앞질러 간다. */
+  private enemySurround(e: Enemy, dt: number, target: Foe, td: number, speed: number, stopR: number, spread: number): void {
+    const lead = Math.min(1, td / Math.max(60, speed)) * 0.7;
+    const px = target.x + target.vx * lead;
+    const py = target.y + target.vy * lead;
+    const dd = Math.hypot(px - e.x, py - e.y);
+    const a0 = Math.atan2(e.y - py, e.x - px); // 대상에서 나를 본 방향
+    // 개체마다 정해진 쪽(±약 110도)으로 비껴서 접근한다. 가까워질수록 비김이 줄어 곧장 붙는다.
+    const side = ((e.id * 0.6180339887) % 1 - 0.5) * 2 * (Math.PI * 0.62) * spread;
+    const k = Math.max(0, Math.min(1, (dd - stopR) / ENEMY_SURROUND_RANGE));
+    const rr = Math.max(stopR, dd * 0.85);
+    const ang = a0 + side * k;
+    const gx = px + Math.cos(ang) * rr;
+    const gy = py + Math.sin(ang) * rr;
+    this.moveToward(e, gx, gy, speed, dt, 3);
+    e.face = Math.atan2(target.y - e.y, target.x - e.x);
+  }
+
+  private enemyMove(e: Enemy, st: UnitStats, dt: number, foes: Foe[], archers: Enemy[], target: Foe, td: number, speed: number): void {
+    const stopR = st.reach * 0.5 + target.r;
+    e.face = Math.atan2(target.y - e.y, target.x - e.x);
+    switch (e.type) {
+      case CAVALRY:
+        this.enemyCavalryMove(e, st, dt, foes, target, td, speed);
+        return;
+      case ARCHER:
+        this.enemyArcherMove(e, st, dt, foes, target, td, speed);
+        return;
+      case SHIELD: {
+        // 검방병: 가까운 궁병(취약한 아군)에 붙어, 그 궁병과 위협 사이에 서서 방패로 막는다. 지킬 아군이 없으면 앞장서 밀고 들어간다.
+        const ward = this.nearestEnemy(archers, e, 520);
+        if (ward) {
+          let threat: Foe | null = null;
+          let tdw = GUARD_THREAT_RADIUS;
+          for (const f of foes) {
+            const d = Math.hypot(f.x - ward.x, f.y - ward.y);
+            if (d < tdw) {
+              tdw = d;
+              threat = f;
+            }
+          }
+          if (threat) {
+            const ux = (threat.x - ward.x) / (tdw || 1);
+            const uy = (threat.y - ward.y) / (tdw || 1);
+            this.moveToward(e, ward.x + ux * TUNE.GUARD_DIST, ward.y + uy * TUNE.GUARD_DIST, speed, dt, 6);
+            e.face = Math.atan2(threat.y - e.y, threat.x - e.x); // 방패 정면을 위협 쪽으로
+            return;
+          }
+        }
+        this.enemySurround(e, dt, target, td, speed, stopR, 0.25);
+        return;
+      }
+      case SPEAR: {
+        // 창병: 아군 기병을 주시한다. 기병이 오면 지킬 궁병 앞에 서서 창끝을 기병 쪽으로 겨눈다.
+        let cav: Foe | null = null;
+        let cd = SPEAR_WATCH_RANGE;
+        for (const f of foes) {
+          if (f.type !== CAVALRY) continue;
+          const d = Math.hypot(f.x - e.x, f.y - e.y);
+          if (d < cd) {
+            cd = d;
+            cav = f;
+          }
+        }
+        if (cav) {
+          const ward = this.nearestEnemy(archers, e, 520);
+          if (ward) {
+            const dc = Math.hypot(cav.x - ward.x, cav.y - ward.y) || 1;
+            this.moveToward(e, ward.x + ((cav.x - ward.x) / dc) * TUNE.SPEAR_COVER_DIST, ward.y + ((cav.y - ward.y) / dc) * TUNE.SPEAR_COVER_DIST, speed, dt, 8);
+          }
+          e.face = Math.atan2(cav.y - e.y, cav.x - e.x);
+          if (ward) return;
+        }
+        this.enemySurround(e, dt, target, td, speed, stopR, 0.5);
+        return;
+      }
+      default:
+        // 둔기병: 느리지만 크게 돌아 포위에 가담한다
+        this.enemySurround(e, dt, target, td, speed, stopR, 1);
+    }
+  }
+
+  private nearestEnemy(list: Enemy[], from: Enemy, limit: number): Enemy | null {
+    let best: Enemy | null = null;
+    let bd = limit;
+    for (const o of list) {
+      if (o === from) continue;
+      const d = Math.hypot(o.x - from.x, o.y - from.y);
+      if (d < bd) {
+        bd = d;
+        best = o;
       }
     }
+    return best;
+  }
+
+  /** 궁병: 사거리 끝 근처에서 둘레를 돌아 에워싸며 쏘고, 근접한 상대가 오면 물러난다. 방패 정면이면 옆으로 돈다. */
+  private enemyArcherMove(e: Enemy, st: UnitStats, dt: number, foes: Foe[], target: Foe, td: number, speed: number): void {
+    const desired = st.reach * TUNE.ARCHER_REACH_FRAC;
+    let threat: Foe | null = null;
+    let gapBest = Infinity;
+    for (const f of foes) {
+      if (f.ranged) continue;
+      const d = Math.hypot(f.x - e.x, f.y - e.y);
+      const danger = (f.type === NO_TYPE ? 50 : MERC_STATS[f.type]!.reach) + f.r + st.radius + TUNE.ARCHER_KITE_MARGIN;
+      if (d < danger && d - danger < gapBest) {
+        threat = f;
+        gapBest = d - danger;
+      }
+    }
+    if (threat) {
+      const away = Math.atan2(e.y - threat.y, e.x - threat.x);
+      e.x += Math.cos(away) * speed * 1.1 * dt;
+      e.y += Math.sin(away) * speed * 1.1 * dt;
+      e.face = Math.atan2(threat.y - e.y, threat.x - e.x);
+      return;
+    }
+    e.face = Math.atan2(target.y - e.y, target.x - e.x);
+    if (td > st.reach) {
+      this.enemySurround(e, dt, target, td, speed, desired, 0.8);
+      return;
+    }
+    if (this.frontalShield({ x: target.x, y: target.y, r: target.r, type: target.type, shield: target.shield, face: target.face } as Target, e)) {
+      // 방패 정면: 대상 둘레를 돌며 사거리 끝 거리를 유지해 옆으로 빠진다
+      const away = Math.atan2(e.y - target.y, e.x - target.x);
+      const side = (e.id & 1 ? 1 : -1) * (angleDiff(away, target.face) >= 0 ? 1 : -1);
+      const tan = away + side * (Math.PI / 2);
+      const radial = Math.max(-1, Math.min(1, (desired - td) / 80));
+      let vx = Math.cos(tan) + Math.cos(away) * radial * 0.8;
+      let vy = Math.sin(tan) + Math.sin(away) * radial * 0.8;
+      const vl = Math.hypot(vx, vy) || 1;
+      vx /= vl;
+      vy /= vl;
+      e.x += vx * speed * 0.9 * dt;
+      e.y += vy * speed * 0.9 * dt;
+    } else if (td < desired * 0.7) {
+      const away = Math.atan2(e.y - target.y, e.x - target.x);
+      e.x += Math.cos(away) * speed * 0.8 * dt;
+      e.y += Math.sin(away) * speed * 0.8 * dt;
+    }
+  }
+
+  /** 기병: 대상의 옆·뒤로 돌아 배후를 치고, 공격 뒤에는 빠졌다가 다시 달려든다. 창병은 피해 돈다. */
+  private enemyCavalryMove(e: Enemy, st: UnitStats, dt: number, foes: Foe[], target: Foe, td: number, speed: number): void {
+    const spears: { x: number; y: number }[] = [];
+    for (const f of foes) if (f.type === SPEAR) spears.push(f);
+    if (e.evadeT > 0) {
+      e.evadeT = Math.max(0, e.evadeT - dt);
+      const back = Math.atan2(e.y - target.y, e.x - target.x);
+      e.x += Math.cos(back) * speed * CAV_EVADE_SPEED_FRAC * dt;
+      e.y += Math.sin(back) * speed * CAV_EVADE_SPEED_FRAC * dt;
+      this.updateMomentum(e, false, dt);
+      return;
+    }
+    const lead = Math.min(0.8, td / Math.max(80, speed));
+    let gx = target.x + target.vx * lead;
+    let gy = target.y + target.vy * lead;
+    const reachNow = st.reach + target.r;
+    const theta = angleDiff(Math.atan2(e.y - target.y, e.x - target.x), target.face);
+    if (td > 70 && Math.abs(theta) < (Math.PI * 100) / 180 && e.flankT < CAV_FLANK_MAX_SEC) {
+      // 정면에서는 곧장 들어가지 않고 둘레를 돌아 옆·뒤로 접근한다
+      e.flankT += dt;
+      const phi = target.face + (theta >= 0 ? 1 : -1) * Math.min(Math.PI, Math.abs(theta) + 1.1);
+      const radius = Math.min(260, Math.max(reachNow + 40, td * 0.9));
+      gx = target.x + Math.cos(phi) * radius;
+      gy = target.y + Math.sin(phi) * radius;
+    } else if (td <= 70) e.flankT = 0;
+    const cavSpd = cavSpeed(speed, e.momentum);
+    // 창병 가까이로는 들어가지 않고 비껴 돌아간다
+    let dx = gx - e.x;
+    let dy = gy - e.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= 4) return;
+    dx /= dist;
+    dy /= dist;
+    for (const sp of spears) {
+      if (Math.hypot(sp.x - target.x, sp.y - target.y) < 1) continue; // 노리는 대상이 창병이면(근접 방어) 그대로 들어간다
+      const sd = Math.hypot(e.x - sp.x, e.y - sp.y);
+      if (sd >= SPEAR_AVOID_RADIUS || sd < 0.001) continue;
+      const w = (1 - sd / SPEAR_AVOID_RADIUS) * 1.5;
+      dx += ((e.x - sp.x) / sd) * w;
+      dy += ((e.y - sp.y) / sd) * w;
+    }
+    const len = Math.hypot(dx, dy) || 1;
+    const step = Math.min(cavSpd * dt, dist);
+    e.x += (dx / len) * step;
+    e.y += (dy / len) * step;
+    this.updateMomentum(e, true, dt);
   }
 
   private resolveEnemyAttack(e: Enemy, st: UnitStats, friendlies: Friendly[]): void {
@@ -2868,7 +3127,10 @@ export class Game {
       return;
     }
     const charge = e.type === CAVALRY ? e.chargeSnap : 0;
-    if (e.type === CAVALRY) e.momentum *= CAV_MOMENTUM_AFTER_HIT;
+    if (e.type === CAVALRY) {
+      e.momentum *= CAV_MOMENTUM_AFTER_HIT;
+      e.evadeT = CAV_EVADE_SEC; // 치고 빠지기
+    }
     e.chargeSnap = 0;
     // 예비 동작이 끝난 시점에 부채꼴 안에 있는 아군만 맞는다. 그 사이 피하면 맞지 않는다.
     const struck: Friendly[] = [];

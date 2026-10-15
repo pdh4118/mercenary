@@ -224,7 +224,7 @@ test("적 기병의 돌격: 창병 용병은 돌격 피해를 받지 않고 되�
     run(g, 0.5);
     return { lost: MERC_STATS[mercType]!.hp - g.getMerc(merc)!.hp, enemyHp: g.getEnemy(e)?.hp ?? 0 };
   };
-  const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed, 1);
+  const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed * TUNE.ENEMY_SPEED_MULT, 1); // 적은 이동 속도 배율이 붙는다
   const base = ENEMY_STATS[CAVALRY]!.damage;
   const blunt = run1(BLUNT); // 궁병은 근접 적이 오면 물러나 맞지 않으므로 제자리에서 맞는 병종으로 본다
   assert.ok(Math.abs(blunt.lost - (base + bonus)) < 1e-6, `둔기병은 기본+돌격: ${blunt.lost}`);
@@ -419,10 +419,10 @@ test("용병이 처치하면 주인이 금화를 얻는다", () => {
   const a = g.addPlayer("a")!;
   const p = me(g, a);
   g.addMerc(a, BLUNT, p.x + 60, p.y);
-  g.spawnEnemyAt(p.x + 60 + 30, p.y, ARCHER); // 둔기병은 궁병에게 배율 1, 피해 18 ≥ 체력 18
+  g.spawnEnemyAt(p.x + 60 + 30, p.y, SPEAR); // 둔기병 피해 36 ≥ 창병 체력 28(적 궁병은 물러나며 쏘므로 다른 병종으로)
   run(g, 1.5);
   assert.equal(g.enemyCount, 0);
-  assert.equal(me(g, a).gold, TUNE.START_GOLD + ENEMY_GOLD[ARCHER]!);
+  assert.equal(me(g, a).gold, TUNE.START_GOLD + ENEMY_GOLD[SPEAR]!);
   assert.equal(me(g, a).kills, 1);
 });
 
@@ -571,6 +571,7 @@ test("돌격 중인 기병은 지점 근처의 적을 공격한다", () => {
   const p = { ...me(g, a) };
   g.addMerc(a, CAVALRY, p.x, p.y);
   const e = g.spawnEnemyAt(p.x + 600, p.y, ARCHER);
+  (g.getEnemy(e) as { atkT: number }).atkT = 999; // 제자리에 서 있게(적 궁병은 원래 물러나며 쏜다)
   g.charge(a, p.x + 600, p.y);
   run(g, 6);
   assert.equal(g.getEnemy(e), undefined, "궁병이 처치되어야 한다");
@@ -614,7 +615,7 @@ test("경험치: 용병이 처치해도 주인에게 개인 몫이 간다", () =
   const b = g.addPlayer("b")!;
   const p = me(g, a);
   g.addMerc(a, BLUNT, p.x + 60, p.y);
-  g.spawnEnemyAt(p.x + 90, p.y, ARCHER);
+  g.spawnEnemyAt(p.x + 90, p.y, SPEAR);
   run(g, 1.5);
   assert.equal(g.enemyCount, 0);
   assert.ok(g.getPlayer(a)!.xp > g.getPlayer(b)!.xp);
@@ -735,7 +736,7 @@ test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
   const x0 = me(g, a).x;
   g.setInput(a, { ...idle, dx: 1 });
   run(g, 1);
-  assert.ok(Math.abs(me(g, a).x - x0 - TUNE.PLAYER_SPEED * 1.08) < 1e-6);
+  assert.ok(Math.abs(me(g, a).x - x0 - TUNE.PLAYER_SPEED * 1.12) < 1e-6);
   g.setInput(a, idle);
   forceCard(g, a, "heroRegen");
   g.getPlayer(a)!.hp = 50;
@@ -917,7 +918,7 @@ test("검을 들면 정면 피해가 절반이고, 창을 들면 기병의 돌�
   assert.equal(bow, ENEMY_STATS[SPEAR]!.damage);
   assert.ok(Math.abs(sword - bow * HERO_SWORD_FRONT_BLOCK) < 1e-6);
   // 기병의 돌격
-  const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed, 1);
+  const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed * TUNE.ENEMY_SPEED_MULT, 1); // 적은 이동 속도 배율이 붙는다
   const vsBow = hpLost(0, CAVALRY, 1);
   assert.ok(Math.abs(vsBow.lost - (ENEMY_STATS[CAVALRY]!.damage + bonus)) < 1e-6);
   const vsSpear = hpLost(1, CAVALRY, 1);

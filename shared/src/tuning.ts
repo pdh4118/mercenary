@@ -37,6 +37,7 @@ const G = {
 
 /** 숫자 하나의 설명: [이름, 묶음, 최솟값, 최댓값, 단계]. 최솟값 등을 생략하면 기본값 크기로 알맞게 잡는다. */
 const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
+  ENEMY_SPEED_MULT: ["적 이동 속도 배율", G.stage, 0.5, 3, 0.05],
   STAGE_GROW_SEC: ["한 라운드 성장 시간(초)", G.stage, 10, 600, 5],
   STAGE_BREAK_SEC: ["클리어 뒤 쉬는 시간(초)", G.stage, 1, 120, 1],
   STAGE_ENEMY_HP_GROWTH: ["스테이지당 적 체력 증가", G.stage, 0, 2, 0.01],

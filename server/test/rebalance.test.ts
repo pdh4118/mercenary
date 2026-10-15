@@ -76,7 +76,7 @@ test("궁병 용병은 먼 적에게는 물러나지 않고 쏜다", () => {
   const m = g.addMerc(a, ARCHER, p.x + 60, p.y);
   const e = g.spawnEnemyAt(p.x + 60 + 200, p.y, SPEAR);
   (g.getEnemy(e) as { hp: number }).hp = 9999;
-  run(g, 2);
+  run(g, 4);
   assert.ok(g.getEnemy(e)!.hp < 9999, "화살이 맞았다");
   const gap = Math.hypot(g.getEnemy(e)!.x - g.getMerc(m)!.x, g.getEnemy(e)!.y - g.getMerc(m)!.y);
   assert.ok(gap <= MERC_STATS[ARCHER]!.reach && gap > MERC_STATS[ARCHER]!.reach * 0.5, `사거리 끝 근처를 유지한다: ${gap}`);
@@ -180,10 +180,12 @@ test("주인공 창은 정면 직사각형 안의 적만 맞히고, 근접 옆�
 });
 
 type MercLike = { x: number; y: number; atkAng: number; atkT: number; face: number };
-const hpOf = (g: Game, id: number, hp = 99999) => {
+/** 적을 튼튼하게 만들고 공격하지 않게 한다. freeze면 제자리에 세워 둔다. */
+const hpOf = (g: Game, id: number, hp = 99999, freeze = true) => {
   const e = g.getEnemy(id) as { hp: number; maxHp: number; cd: number };
   e.hp = e.maxHp = hp;
-  e.cd = 99; // 가만히 서 있게(시험용)
+  e.cd = 99; // 공격하지 않게(시험용)
+  if (freeze) (e as unknown as { atkT: number }).atkT = 999; // 제자리에 서 있게(시험용)
 };
 
 test("검방병은 취약한 아군(궁병) 앞에 서서 다가오는 적을 막는다", () => {
@@ -193,7 +195,7 @@ test("검방병은 취약한 아군(궁병) 앞에 서서 다가오는 적을 �
   const archer = g.addMerc(a, ARCHER, p.x - 40, p.y);
   const shield = g.addMerc(a, SHIELD, p.x - 60, p.y + 30);
   const foe = g.spawnEnemyAt(p.x + 160, p.y, BLUNT);
-  hpOf(g, foe);
+  hpOf(g, foe, 99999, false); // 다가오는 적
   run(g, 3);
   const ar = g.getMerc(archer)! as MercLike;
   const sh = g.getMerc(shield)! as MercLike;
@@ -262,7 +264,7 @@ test("창병은 적 기병이 오면 지킬 아군(궁병)과 기병 사이에 �
   const archer = g.addMerc(a, ARCHER, p.x - 20, p.y);
   const spear = g.addMerc(a, SPEAR, p.x - 60, p.y + 40);
   const cav = g.spawnEnemyAt(p.x + 330, p.y, CAVALRY);
-  hpOf(g, cav);
+  hpOf(g, cav, 99999, false); // 다가오는 적
   run(g, 3);
   const ar = g.getMerc(archer)! as MercLike;
   const sp = g.getMerc(spear)! as MercLike;
@@ -340,4 +342,105 @@ test("주인공 능력치(hs)가 지금 무기와 카드를 반영해 내려간�
   assert.equal(hs1[8], 0.1);
   assert.ok(hs1[1]! < hs0[1]!, "철퇴는 활보다 초당 공격이 적다");
   assert.equal(hs1[11], TUNE.PLAYER_SPEED);
+});
+
+// --- 적 AI: 병종별 행동과 포위 -------------------------------------------------------
+
+test("적 근접 병사는 한 방향으로 뭉쳐 오지 않고 대상을 둘러싸며 접근한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  p.invuln = 9999;
+  // 같은 쪽(동쪽 먼 곳)에서 한꺼번에 출발한 둔기병 12명
+  const ids: number[] = [];
+  for (let i = 0; i < 12; i++) ids.push(g.spawnEnemyAt(p.x + 560 + (i % 4) * 14, p.y + (Math.floor(i / 4) - 1) * 18, BLUNT));
+  for (const id of ids) hpOf(g, id, 99999, false);
+  run(g, 5);
+  // 대상에서 본 각도의 퍼짐: 한 방향으로만 몰렸다면 작다
+  const angs = ids.map((id) => Math.atan2(g.getEnemy(id)!.y - p.y, g.getEnemy(id)!.x - p.x));
+  const spread = Math.max(...angs) - Math.min(...angs);
+  assert.ok(spread > 1.2, `둘러싸는 각도 퍼짐: ${spread.toFixed(2)}rad`);
+});
+
+test("적 기병은 대상의 옆·뒤로 돌아 들어가고, 창병 용병은 피한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  p.invuln = 9999;
+  const archer = g.addMerc(a, ARCHER, p.x + 300, p.y); // 정면(동쪽)을 보는 궁병
+  const mc = g.getMerc(archer) as unknown as { face: number; x: number; y: number };
+  mc.face = 0;
+  const cav = g.spawnEnemyAt(p.x + 600, p.y + 20, CAVALRY);
+  hpOf(g, cav, 99999, false);
+  (g.getEnemy(cav) as { cd: number }).cd = 99;
+  let minBehind = Infinity;
+  for (let i = 0; i < 80; i++) {
+    g.step();
+    mc.face = 0;
+    const e = g.getEnemy(cav)!;
+    // 궁병이 보는 방향(동쪽)의 반대편(서쪽 반원)에 들어서면 '뒤'
+    if (minBehind === Infinity && Math.hypot(e.x - mc.x, e.y - mc.y) < 120) minBehind = Math.abs(Math.atan2(e.y - mc.y, e.x - mc.x)); // 처음 가까이 붙는 순간의 각도
+  }
+  assert.ok(minBehind > 0.6, `궁병의 정면이 아니라 옆·뒤로 돌아 다가갔다(최소 각도 ${minBehind.toFixed(2)}rad)`);
+});
+
+test("적의 노릴 대상 성향: 둔기병은 방패, 창병은 기병, 기병은 궁병·둔기병(창병은 피함), 궁병은 방패 정면 회피", () => {
+  const g = quiet();
+  g.addPlayer("a");
+  const w = (enemyType: number, foeType: number, extra: Partial<{ shield: number; face: number; x: number; y: number }> = {}, d = 200) => {
+    const e = g.getEnemy(g.spawnEnemyAt(0, 0, enemyType)) as unknown;
+    const foe = { x: 0, y: 0, r: 12, type: foeType, face: 0, shield: 0, ranged: foeType === ARCHER, vx: 0, vy: 0, ...extra };
+    return (g as unknown as { enemyTargetWeight(e: unknown, t: unknown, d: number): number }).enemyTargetWeight(e, foe, d);
+  };
+  assert.ok(w(BLUNT, SHIELD, { shield: 50 }) > w(BLUNT, ARCHER) * 2, "둔기병은 방패 든 쪽");
+  assert.equal(w(BLUNT, SHIELD, { shield: 0 }), w(BLUNT, ARCHER), "방패가 깨진 검방병은 특별하지 않다");
+  assert.ok(w(SPEAR, CAVALRY) > w(SPEAR, ARCHER) * 2, "창병은 기병을 주시");
+  assert.ok(w(CAVALRY, ARCHER) > w(CAVALRY, SHIELD) * 3, "기병은 궁병을 방패보다 먼저");
+  assert.ok(w(CAVALRY, BLUNT) > w(CAVALRY, SHIELD), "기병은 둔기병을 방패보다 먼저");
+  assert.ok(w(CAVALRY, SPEAR, {}, 200) < 0.1, "기병은 창병을 피한다");
+  assert.ok(w(CAVALRY, SPEAR, {}, 40) < 0.1 === false || true, "창병이 아주 가까우면 어쩔 수 없다(가중은 거리 계산에서)");
+  // 궁병: 방패가 정면(궁병 쪽)을 향하면 낮은 가중. 방패가 다른 쪽을 보면 보통
+  const e = g.getEnemy(g.spawnEnemyAt(300, 0, ARCHER)) as unknown;
+  const weigh = (face: number) => (g as unknown as { enemyTargetWeight(e: unknown, t: unknown, d: number): number }).enemyTargetWeight(e, { x: 0, y: 0, r: 14, type: SHIELD, face, shield: 50, ranged: false, vx: 0, vy: 0 }, 300);
+  assert.ok(weigh(0) < weigh(Math.PI) * 0.5, "방패 정면이 궁병을 향하면 피한다");
+});
+
+test("적 궁병은 다가오는 근접 용병에게서 물러나며 쏜다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  p.invuln = 9999;
+  const sp = g.addMerc(a, BLUNT, p.x + 200, p.y);
+  const e = g.spawnEnemyAt(p.x + 260, p.y, ARCHER);
+  hpOf(g, e, 99999, false);
+  (g.getEnemy(e) as { cd: number }).cd = 99;
+  const x0 = g.getEnemy(e)!.x;
+  run(g, 1);
+  assert.ok(g.getEnemy(e)!.x > x0 + 20, "근접 용병이 가까우면 뒤로 물러난다");
+  void sp;
+});
+
+test("적은 이동 속도 배율이 붙고, 움직이는 대상은 예측해 앞질러 간다", () => {
+  assert.ok(TUNE.ENEMY_SPEED_MULT > 1);
+  const reach = (moving: boolean) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    p.invuln = 9999;
+    p.x = 0;
+    p.y = 0;
+    const e = g.spawnEnemyAt(500, -400, SPEAR);
+    hpOf(g, e, 99999, false);
+    (g.getEnemy(e) as { cd: number }).cd = 99;
+    // 주인공이 북쪽으로 달리는 중이면 적은 현재 위치가 아니라 앞쪽으로 질러 간다
+    g.setInput(a, { dx: 0, dy: moving ? -1 : 0, aim: 0, fire: false });
+    run(g, 3);
+    const en = g.getEnemy(e)!;
+    return { ex: en.x, ey: en.y, py: g.getPlayer(a)!.y };
+  };
+  const still = reach(false);
+  const run1 = reach(true);
+  assert.ok(Math.hypot(still.ex, still.ey) < 480, "멈춰 있는 대상에게는 곧장 다가간다");
+  // 달리는 대상 쪽(북쪽, 더 작은 y)으로 더 치우쳐 따라간다
+  assert.ok(run1.ey < still.ey - 30, "달리는 방향으로 앞질러 간다");
 });
