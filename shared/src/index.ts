@@ -229,6 +229,10 @@ export interface PlayerInput {
   dist?: number; // 마우스까지의 거리(px). 마법사 지팡이가 운석을 떨어뜨릴 위치를 정한다
 }
 
+/** 난이도: 플레이어(주인공·용병)가 적에게 받는 피해를 줄이는 비율. 인덱스로 고른다. */
+export const DIFFICULTY_REDUCTION = [0.75, 0.5, 0.25, 0] as const;
+export const DIFFICULTY_NAMES = ["매우 쉬움", "쉬움", "보통", "어려움"] as const;
+export const DEFAULT_DIFFICULTY = 3;
 export type RoomPhase = "waiting" | "playing" | "ended";
 
 export interface RoomInfo {
@@ -257,6 +261,7 @@ export type ClientMsg =
   | { t: "kick"; id: number } // 방장만
   | { t: "ready"; ready: boolean } // 대기실에서 준비/준비 취소
   | { t: "start" } // 방장만. 모두 준비되면 게임 시작
+  | { t: "difficulty"; v: number } // 방장만, 대기실에서. DIFFICULTY_REDUCTION 인덱스
   | { t: "rematch" } // 방장만. 게임이 끝난 뒤 대기실로 돌아가 다시 시작
   // 게임 중
   | { t: "input"; dx: number; dy: number; aim: number; fire: boolean; revive?: boolean; dist?: number }
@@ -276,7 +281,7 @@ export type ServerMsg =
   | { t: "rooms"; rooms: RoomInfo[] } // 로비에 있는 동안 방 목록이 바뀔 때마다 온다
   | { t: "tuning"; values: Record<string, number> } // 수치 조정 값(기본값과 다른 것만). 받으면 기본값으로 되돌린 뒤 적용한다
   | { t: "welcome"; id: number; tick: number; code: string; token: string } // token은 재접속에 쓴다
-  | { t: "room"; code: string; name: string; hostId: number; phase: RoomPhase; private: boolean; players: RoomMember[] } // 방 구성이 바뀔 때마다
+  | { t: "room"; code: string; name: string; hostId: number; phase: RoomPhase; private: boolean; difficulty: number; players: RoomMember[] } // 방 구성이 바뀔 때마다
   | { t: "left"; reason: string } // 방에서 나왔다(스스로, 내보내짐, 방 종료)
   | { t: "error"; text: string }
   | { t: "notice"; text: string }

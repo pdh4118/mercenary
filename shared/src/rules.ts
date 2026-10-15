@@ -29,7 +29,7 @@ export const TUNE = {
   BOSS_DMG_MULT: 1.6,
   BOSS_TIMEOUT_SEC: 60, // 보스군이 등장한 뒤 이 시간 안에 장군을 못 잡으면 보스군이 격노해 점점 강해진다
   BOSS_HARD_TIMEOUT_SEC: 240, // 그래도 못 잡고 이 시간이 지나면 보스군이 물러나고 다음 스테이지로 넘어간다(마지막 스테이지 제외, 0이면 없음)
-  BOSS_RAGE_INTERVAL_SEC: 12, // 격노 단계가 올라가는 간격
+  BOSS_RAGE_INTERVAL_SEC: 20, // 격노 단계가 올라가는 간격
   BOSS_RAGE_REINFORCE: 0.1, // 단계마다 늘어나는 병력(처음 병력 대비 비율, 최소 3명)
   BOSS_RAGE_POWER: 0.08, // 단계마다 보스군의 체력·방패·공격력이 곱해지는 비율
   BOSS_RAGE_SPEED: 0.02, // 단계마다 늘어나는 이동 속도 비율
@@ -62,6 +62,8 @@ export const TUNE = {
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
   DEFEND_LEASH_MULT: 1.8, // 주인공 호위(기본)에서 용병이 진형 자리를 벗어나 적을 쫓을 수 있는 거리 배율(기병 제외)
+  MERC_SPACING: 1.9, // 용병끼리 유지하려는 거리 = 두 용병 반지름 합 x 이 값(뭉치지 않게)
+  MERC_SEPARATION_SPEED: 160, // 겹친 용병이 서로 밀려나는 최대 속도(px/초)
   GUARD_HERO_RADIUS: 260, // 주인공 호위에서 주인공 둘레 이 거리 안의 적은 진형 자리에서 멀어도 막으러 나선다
   CATCHUP_MAX: 3.2, // 진형 자리에서 멀어졌을 때 따라붙는 최대 속도 배율(멀수록 빨라진다)
   MOVE_ORDER_SEC: 12, // 기병 이동 지시(땅을 우클릭)가 이어지는 시간

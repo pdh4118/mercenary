@@ -1,4 +1,4 @@
-import { STAGE_COUNT, type ClientMsg, type ResultPlayer, type RoomInfo, type RoomMember, type RoomPhase, type ServerMsg } from "@mercenary/shared";
+import { DIFFICULTY_NAMES, DIFFICULTY_REDUCTION, STAGE_COUNT, type ClientMsg, type ResultPlayer, type RoomInfo, type RoomMember, type RoomPhase, type ServerMsg } from "@mercenary/shared";
 
 type ResultMsg = Extract<ServerMsg, { t: "result" }>;
 
@@ -90,6 +90,7 @@ export function createLobby(opts: Options): Lobby {
   let myId = -1;
   let inRoom = false;
   let hostId = -1;
+  let difficulty = 3;
   let phase: RoomPhase = "playing";
   let rooms: RoomInfo[] = [];
   let members: RoomMember[] = [];
@@ -185,6 +186,16 @@ export function createLobby(opts: Options): Lobby {
     $("waitCode").textContent = code;
     $("waitCount").textContent = `(${members.length}명)`;
     renderMembers($("waitMembers"), members, true);
+    const diffBox = $("waitDiff");
+    diffBox.replaceChildren();
+    DIFFICULTY_REDUCTION.forEach((r, i) => {
+      const b = document.createElement("button");
+      b.textContent = `${DIFFICULTY_NAMES[i]} ${Math.round(r * 100)}%`;
+      b.className = i === difficulty ? "primary" : "";
+      b.disabled = hostId !== myId;
+      b.onclick = () => opts.send({ t: "difficulty", v: i });
+      diffBox.append(b);
+    });
     const iAmHost = hostId === myId;
     const me = members.find((m) => m.id === myId);
     const waiting = members.filter((m) => m.id !== hostId && m.online && !m.ready);
@@ -407,6 +418,7 @@ export function createLobby(opts: Options): Lobby {
           code = msg.code;
           hostId = msg.hostId;
           phase = msg.phase;
+          difficulty = msg.difficulty;
           members = msg.players;
           $("roomTitle").textContent = msg.name;
           $("roomCode").textContent = msg.code;

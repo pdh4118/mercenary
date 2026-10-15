@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import {
+  DIFFICULTY_REDUCTION,
   JOIN_FAIL_BLOCK_SEC,
   JOIN_FAIL_LIMIT,
   MAX_PLAYERS,
@@ -120,6 +121,9 @@ export class RoomManager {
         return;
       case "start":
         this.start(conn);
+        return;
+      case "difficulty":
+        this.setDifficulty(conn, msg.v);
         return;
       case "rematch":
         this.rematch(conn);
@@ -285,6 +289,17 @@ export class RoomManager {
     this.broadcastLobby();
   }
 
+  private setDifficulty(conn: Conn, v: number): void {
+    const at = this.where.get(conn);
+    if (!at) return;
+    const { room } = at;
+    if (room.hostId !== at.id) return this.fail(conn, "방장만 난이도를 바꿀 수 있습니다");
+    if (room.phase !== "waiting") return this.fail(conn, "게임 중에는 난이도를 바꿀 수 없습니다");
+    if (!Number.isInteger(v) || v < 0 || v >= DIFFICULTY_REDUCTION.length) return;
+    room.game.difficulty = v;
+    this.broadcastRoom(room);
+  }
+
   /** 방장이 끝난 게임을 대기실로 되돌린다. 같은 참가자들로 처음부터 다시 시작할 수 있다. */
   private rematch(conn: Conn): void {
     const at = this.where.get(conn);
@@ -376,6 +391,7 @@ export class RoomManager {
       hostId: room.hostId,
       phase: room.phase,
       private: room.isPrivate,
+      difficulty: room.game.difficulty,
       players: [...room.members.values()].map((m) => ({ id: m.id, name: m.name, online: !!m.conn, ready: m.ready })),
     };
     for (const m of room.members.values()) m.conn?.send(msg);

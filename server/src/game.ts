@@ -16,6 +16,8 @@ import {
   KNOCK_BOSS_FACTOR,
   KNOCK_STUN_SEC,
   DEFENSE_MAX,
+  DEFAULT_DIFFICULTY,
+  DIFFICULTY_REDUCTION,
   DODGE_MAX,
   EVT_DODGE,
   CRIT_MAX_CHANCE,
@@ -530,6 +532,14 @@ export class Game {
   }
 
   /** 같은 참가자들로 판을 처음부터 다시 시작한다(다시 하기) */
+  /** 난이도(DIFFICULTY_REDUCTION 인덱스). 방 설정이라 reset()해도 유지한다. */
+  difficulty: number = DEFAULT_DIFFICULTY;
+
+  /** 적에게 받는 피해에 곱한다. 토너먼트(플레이어끼리)에는 적용하지 않는다. */
+  private damageTakenMult(): number {
+    return this.phase === "tournament" ? 1 : 1 - (DIFFICULTY_REDUCTION[this.difficulty] ?? 0);
+  }
+
   reset(): void {
     const old = [...this.slots.values()];
     this.slots.clear();
@@ -767,6 +777,7 @@ export class Game {
     if (duel) this.tickDuelPoison(dt, friendlies);
     else if (this.duelPoison.size > 0) this.duelPoison.clear();
     this.stepMercs(dt);
+    this.separateMercs(dt);
     if (!duel) {
       this.stepEnemies(dt, friendlies);
       this.separateEnemies();
@@ -2061,7 +2072,7 @@ export class Game {
                 h,
               );
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(-p.id, h.poison); // 토너먼트: 몸에 맞은 독 화살
-          const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)); // 고정 감소가 먼저, 방어력(%)은 그다음
+          const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)) * this.damageTakenMult(); // 고정 감소가 먼저, 방어력(%)은 그다음
           p.hp -= taken;
           s.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
@@ -2092,7 +2103,7 @@ export class Game {
           const r = h.dot || h.pierceGuard ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
-          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
+          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)) * this.damageTakenMult();
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner);
@@ -3749,6 +3760,71 @@ export class Game {
   }
 
   /** 적끼리 한 점에 뭉치지 않도록 겹친 쌍을 서로 밀어낸다(격자로 이웃만 검사). */
+  /**
+   * 아군 용병이 한곳에 뭉치지 않도록 서로 조금씩 밀어낸다. 진형 자리·추격이 같은 곳을 가리켜도 겹쳐서 쌓이지 않는다.
+   * 준비 동작 중(마법사 시전 등)인 용병은 제자리를 지키고, 대신 상대가 더 많이 밀려난다. 속도 제한이 있어 갑자기 튀지 않는다.
+   */
+  private separateMercs(dt: number): void {
+    const CELL = 96;
+    const grid = new Map<number, Merc[]>();
+    const key = (cx: number, cy: number) => cx * 100003 + cy;
+    const list: Merc[] = [];
+    for (const m of this.mercs.values()) {
+      if (m.respawn > 0) continue;
+      list.push(m);
+      const k = key(Math.floor(m.x / CELL), Math.floor(m.y / CELL));
+      const cell = grid.get(k);
+      if (cell) cell.push(m);
+      else grid.set(k, [m]);
+    }
+    const dx = new Map<Merc, number>();
+    const dy = new Map<Merc, number>();
+    const add = (m: Merc, x: number, y: number) => {
+      dx.set(m, (dx.get(m) ?? 0) + x);
+      dy.set(m, (dy.get(m) ?? 0) + y);
+    };
+    const maxStep = TUNE.MERC_SEPARATION_SPEED * dt;
+    for (const m of list) {
+      const cx = Math.floor(m.x / CELL);
+      const cy = Math.floor(m.y / CELL);
+      const rm = MERC_STATS[m.type]!.radius;
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          for (const o of grid.get(key(cx + ox, cy + oy)) ?? []) {
+            if (o.id <= m.id) continue;
+            const min = (rm + MERC_STATS[o.type]!.radius) * TUNE.MERC_SPACING;
+            const ex = o.x - m.x;
+            const ey = o.y - m.y;
+            const d = Math.hypot(ex, ey);
+            if (d >= min) continue;
+            const push = Math.min(maxStep, (min - d) * 0.5);
+            const nx = d > 0.001 ? ex / d : Math.cos(m.id * 2.4);
+            const ny = d > 0.001 ? ey / d : Math.sin(m.id * 2.4);
+            const mFixed = m.atkT > 0;
+            const oFixed = o.atkT > 0;
+            const wm = mFixed ? 0 : oFixed ? 2 : 1;
+            const wo = oFixed ? 0 : mFixed ? 2 : 1;
+            // 마주 보고 서로 지나가려는 둘이 막혀 서 있지 않도록, 밀어내는 힘에 옆으로 비껴 가는 성분을 조금 섞는다(둘이 서로 반대쪽으로 돈다)
+            const tx = -ny * 0.8;
+            const ty = nx * 0.8;
+            add(m, (-nx + tx) * push * wm, (-ny + ty) * push * wm);
+            add(o, (nx - tx) * push * wo, (ny - ty) * push * wo);
+          }
+        }
+      }
+    }
+    for (const m of list) {
+      const x = dx.get(m);
+      if (x === undefined) continue;
+      const y = dy.get(m)!;
+      const l = Math.hypot(x, y);
+      const k = l > maxStep ? maxStep / l : 1; // 여럿에게 둘러싸여도 한 틱에 maxStep 이상은 밀리지 않는다
+      const r = MERC_STATS[m.type]!.radius;
+      m.x = clampToWorld(m.x + x * k, r);
+      m.y = clampToWorld(m.y + y * k, r);
+    }
+  }
+
   private separateEnemies(): void {
     const grid = new Map<number, Enemy[]>();
     const key = (cx: number, cy: number) => cx * 100003 + cy;

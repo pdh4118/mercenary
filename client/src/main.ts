@@ -962,6 +962,8 @@ async function main() {
         toastLeft = 4;
       }),
   );
+  let spectating = false; // 쓰러진 동안 동료를 따라가며 구경한다
+  let specIndex = 0;
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (pickingHold) endPickHold();
@@ -982,6 +984,16 @@ async function main() {
         if (me) send({ t: "hold", x: me.x, y: me.y });
       } else if (e.key === "F3") setStance(1);
       return;
+    }
+    // 쓰러져 있을 때 스페이스: 관전 시작/끝, 관전 중 Tab(또는 ←/→): 다음 동료 보기
+    if (!e.repeat && latest?.players.find((p) => p.id === myId)?.down) {
+      if (e.key === " ") {
+        spectating = !spectating;
+        e.preventDefault();
+      } else if (spectating && (e.key === "Tab" || e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+        specIndex += e.key === "ArrowLeft" ? -1 : 1;
+        e.preventDefault();
+      }
     }
     if (k === "n" && !e.repeat) {
       showNames = !showNames;
@@ -1717,7 +1729,20 @@ async function main() {
       chargeMark.position.set(meState.chargeX, meState.chargeY);
       chargeLabel.position.set(meState.chargeX, meState.chargeY - 32);
     }
-    if (me) world.position.set(app.screen.width / 2 - me.x, app.screen.height / 2 - me.y);
+    if (!meState?.down) spectating = false; // 일어나면 관전 끝
+    let camTarget = me;
+    let specName = "";
+    if (spectating) {
+      const alive = latest.players.filter((q) => q.id !== myId && !q.down);
+      if (alive.length === 0) spectating = false;
+      else {
+        specIndex = ((specIndex % alive.length) + alive.length) % alive.length;
+        const t = alive[specIndex]!;
+        camTarget = players.views.get(t.id) ?? me;
+        specName = t.name;
+      }
+    }
+    if (camTarget) world.position.set(app.screen.width / 2 - camTarget.x, app.screen.height / 2 - camTarget.y);
     nearCampId = -1;
     if (meState) {
       const m = Math.floor(latest.time / 60);
@@ -1799,7 +1824,9 @@ async function main() {
         : meState.down
         ? meState.revive > 0
           ? `동료가 일으켜 세우는 중... ${Math.round(meState.revive * 100)}%`
-          : "쓰러졌습니다 - 동료가 일으켜 주기를 기다리는 중"
+          : spectating
+            ? `${specName} 관전 중 · Tab/←→ 다음 동료 · 스페이스 끝내기`
+            : "쓰러졌습니다 - 동료가 일으켜 주기를 기다리는 중 (스페이스: 관전)"
         : fallen
           ? `${fallen.name} 부활: E 누르고 있기${fallen.revive > 0 ? ` (${Math.round(fallen.revive * 100)}%)` : ""}`
           : (latest.chests ?? []).some((c) => c[3] === myId)

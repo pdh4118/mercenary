@@ -85,6 +85,8 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   CAV_RAMP_SEC: ["기병이 최고 속도까지 걸리는 시간(초)", G.combat, 0.2, 10, 0.1],
   KNOCK_MAX: ["넉백 최대 거리(px)", G.combat, 0, 600, 5],
   DEFEND_LEASH_MULT: ["주인공 호위에서 용병이 자리를 벗어나 쫓는 거리 배율", G.ai, 1, 5, 0.1],
+  MERC_SPACING: ["용병끼리 유지하는 거리 배율(반지름 합 x 이 값)", G.ai, 1, 4, 0.1],
+  MERC_SEPARATION_SPEED: ["겹친 용병이 밀려나는 속도(px/초)", G.ai, 0, 600, 10],
   GUARD_HERO_RADIUS: ["주인공 호위: 주인공 둘레 이 거리 안의 적은 막으러 나선다(px)", G.ai, 0, 800, 10],
   CATCHUP_MAX: ["용병이 진형으로 따라붙는 최대 속도 배율", G.ai, 1, 6, 0.1],
   BOSS_HARD_TIMEOUT_SEC: ["보스를 못 잡았을 때 강제로 다음 스테이지로 넘어가는 시간(초, 0이면 없음)", G.boss, 0, 1200, 10],
