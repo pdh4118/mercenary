@@ -54,7 +54,7 @@ export const WEAPONS: readonly WeaponDef[] = [
   { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 14, cooldown: 0.55, windup: 0, splash: 0, note: "기병 돌격 무효·반사 · 아주 긴 사거리, 좁은 폭" },
   { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 9, cooldown: 0.35, windup: 0, splash: 0, note: "정면 피해 절반 방어 · 빠른 공격" },
   { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 42, cooldown: 1.2, windup: 0.5, splash: 46, note: "방패 파괴(250%) · 범위 공격 · 휘두르기 전 준비 동작이 길다" },
-  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 150, cooldown: 1.5, windup: 5, splash: 140, note: "마우스 위치에 운석 · 5초 주문 · 매우 넓은 범위 · 방패 무시" },
+  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 150, cooldown: 1.5, windup: 3, splash: 140, note: "마우스 위치에 운석 · 3초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
 export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간

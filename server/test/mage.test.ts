@@ -8,6 +8,7 @@ import {
   SHIELD,
   TICK_RATE,
   TUNE,
+  CAV_TARGET_WEIGHT,
   UNIT_NAMES,
   UNIT_TYPES,
   WEAPONS,
@@ -37,22 +38,23 @@ const dummy = (g: Game, x: number, y: number, type = 1): E => {
   return e;
 };
 
-test("마법사: 병종 목록에 있고 느리고 약하지만 준비 5초·한 방이 크고 범위가 넓다", () => {
+test("마법사: 병종 목록에 있고 느리고 약하지만 준비 3초·한 방이 크고 범위가 넓다", () => {
   assert.equal(UNIT_TYPES.length, 6);
   assert.equal(UNIT_NAMES[MAGE], "마법사");
   const m = MERC_STATS[MAGE]!;
   const others = MERC_STATS.filter((_, i) => i !== MAGE);
-  assert.equal(m.windup, 5);
+  assert.equal(m.windup, 3);
   assert.ok(m.hp < Math.min(...others.map((s) => s.hp)), "체력이 가장 낮다");
   assert.ok(m.speed < Math.min(...others.map((s) => s.speed)), "가장 느리다");
   assert.ok(m.damage > Math.max(...others.map((s) => s.damage)) * 3, "한 방이 훨씬 세다");
   assert.ok(m.splash > MERC_STATS[BLUNT]!.splash * 2.5, "범위가 굉장히 넓다");
   assert.equal(m.reach, MERC_STATS[ARCHER]!.reach, "사정거리는 궁수 정도");
   assert.equal(WEAPONS[4]!.type, MAGE);
-  assert.equal(WEAPONS[4]!.windup, 5);
+  assert.equal(WEAPONS[4]!.windup, 3);
+  assert.ok(CAV_TARGET_WEIGHT[MAGE]! > CAV_TARGET_WEIGHT[ARCHER]!, "기병은 마법사를 궁병보다 먼저 노린다");
 });
 
-test("용병 마법사: 5초 주문을 외운 뒤 낙하 지점 주변의 적에게 방패를 무시한 피해를 주고, 가장자리는 약하다", () => {
+test("용병 마법사: 3초 주문을 외운 뒤 낙하 지점 주변의 적에게 방패를 무시한 피해를 주고, 가장자리는 약하다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
@@ -63,10 +65,10 @@ test("용병 마법사: 5초 주문을 외운 뒤 낙하 지점 주변의 적에
   const far = dummy(g, p.x + 200 + 400, p.y);
   const shielded = dummy(g, p.x + 200, p.y + 20, SHIELD);
   shielded.shield = shielded.shieldMax = 500; // 방패가 정면을 막고 있다
-  run(g, 4.6);
+  run(g, 2.5);
   assert.equal(center.hp, 5000, "주문을 외우는 동안은 피해가 없다");
   assert.equal(g.snapshotMeteors().length, 1, "낙하 예고가 보인다");
-  run(g, 1.2);
+  run(g, 1);
   const hitCenter = 5000 - center.hp;
   const hitEdge = 5000 - edge.hp;
   assert.ok(hitCenter > MERC_STATS[MAGE]!.damage * 0.8, `중심 ${hitCenter}`);
@@ -92,7 +94,7 @@ test("용병 마법사가 주문 도중 쓰러지면 운석은 떨어지지 않�
   assert.equal(e.hp, 5000, "쓰러졌으니 폭발이 없다");
 });
 
-test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 5초 뒤에 폭발한다", () => {
+test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 3초 뒤에 폭발하며, 그동안 움직일 수 없다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
@@ -107,9 +109,12 @@ test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 5초 �
   assert.equal(m.length, 1);
   assert.equal(m[0]![0], -a);
   assert.ok(Math.abs(m[0]![1] - (p.x + 180)) < 3, `x ${m[0]![1]}`);
-  run(g, 4.2);
+  g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false, dist: 180 });
+  const x0 = p.x;
+  run(g, 2.4);
+  assert.equal(p.x, x0, "주문을 외우는 동안은 움직일 수 없다");
   assert.equal(near.hp, 5000, "아직 폭발 전");
-  run(g, 1);
+  run(g, 0.6);
   assert.ok(5000 - near.hp > WEAPONS[4]!.damage * 0.8);
   assert.equal(other.hp, 5000);
 });
@@ -152,4 +157,21 @@ test("캠프에 마법사가 나오고 고용하면 통솔력 2를 쓴다", () =
   assert.equal(g.getPlayer(a)!.leadership, 5);
   assert.equal([...(g as unknown as { mercs: Map<number, { type: number }> }).mercs.values()].filter((m) => m.type === MAGE).length, 1);
   void TUNE;
+});
+
+test("마법사는 궁병처럼 가까이 온 근접 적에게서 물러나고, 그동안은 주문을 시작하지 않는다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  (p as { invuln: number }).invuln = 1e9;
+  const mid = g.addMerc(a, MAGE, p.x - 60, p.y);
+  const mage = () => (g as unknown as { mercs: Map<number, { x: number; atkT: number }> }).mercs.get(mid)!;
+  dummy(g, p.x + 200, p.y, 1); // 사거리 안의 먼 적
+  const near = dummy(g, mage().x + 60, p.y, 1); // 바로 곁의 근접 적
+  near.atkT = 999;
+  const x0 = mage().x;
+  run(g, 0.5);
+  assert.ok(mage().x < x0 - 5, "멀어지는 쪽으로 움직인다");
+  assert.equal(mage().atkT, 0, "위협이 있으면 주문을 시작하지 않는다");
+  assert.equal(g.snapshotMeteors().length, 0);
 });

@@ -469,7 +469,7 @@ async function main() {
     lx += 32 + label.width + 12;
   }
   const legendText = new Text({
-    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창병은 반사 · 마법사: 5초 주문 후 운석(방패 무시)",
+    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창병은 반사 · 마법사: 3초 주문 후 운석(방패 무시)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   legendText.position.set(12, 26);
@@ -1476,12 +1476,23 @@ async function main() {
       const p = prog / 100;
       const pulse = 0.5 + 0.5 * Math.sin(now / 130);
       const mine = owner === myId;
+      // 낙하 예고: 원 안의 음영이 시계처럼(위에서 시계 방향) 차올라, 한 바퀴를 다 돌면 운석이 떨어진다
+      const a0 = -Math.PI / 2;
+      const a1 = a0 + Math.PI * 2 * p;
       fxLayer
         .circle(mx, my, radius)
-        .fill({ color: 0xff3a1a, alpha: 0.05 + 0.13 * p })
-        .stroke({ width: 2 + 2 * p, color: mine ? 0xffc04a : 0xff6a3a, alpha: 0.3 + 0.4 * p + 0.15 * pulse })
-        .circle(mx, my, Math.max(6, radius * (1 - p)))
-        .stroke({ width: 2, color: 0xffe0a0, alpha: 0.45 + 0.3 * pulse });
+        .fill({ color: 0xff3a1a, alpha: 0.06 })
+        .stroke({ width: 2 + 2 * p, color: mine ? 0xffc04a : 0xff6a3a, alpha: 0.4 + 0.3 * p + 0.15 * pulse });
+      if (p > 0.005) {
+        fxLayer
+          .moveTo(mx, my)
+          .arc(mx, my, radius, a0, a1)
+          .closePath()
+          .fill({ color: 0xff2a10, alpha: 0.28 + 0.1 * pulse * p })
+          .moveTo(mx, my)
+          .lineTo(mx + Math.cos(a1) * radius, my + Math.sin(a1) * radius)
+          .stroke({ width: 3, color: 0xffe0a0, alpha: 0.8 });
+      }
       if (p >= METEOR_FALL_FROM) {
         liveKeys.add(key);
         let sp = falling.get(key);

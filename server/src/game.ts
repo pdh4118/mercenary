@@ -1644,7 +1644,8 @@ export class Game {
       const fighter = duel && this.isFighter(p.id);
       // 토너먼트: 선수는 경기 시작 전·후에는 움직일 수 없고, 경기장 밖으로 나갈 수 없다. 선수가 아니면 싸울 수 없다.
       const frozen = fighter && this.tour?.step !== "fight";
-      if (!frozen) {
+      const casting = s.windT > 0 && WEAPONS[p.weapon]!.type === MAGE; // 주문을 외우는 동안은 움직일 수 없다
+      if (!frozen && !casting) {
         p.x = clampToWorld(p.x + s.input.dx * speed * dt, PLAYER_RADIUS);
         p.y = clampToWorld(p.y + s.input.dy * speed * dt, PLAYER_RADIUS);
       }
@@ -2811,9 +2812,36 @@ export class Game {
     }
   }
 
-  /** 마법사: 느리고 약해서 진형 뒤에 머물다가, 사거리 안에 적이 모여 있으면 서서 주문을 외운다(5초). 외우는 동안은 움직이지 못한다. */
+  /** 마법사: 궁병처럼 근접한 적에게서 거리를 벌리고, 사거리 안에서 적이 가장 많이 모인 곳에 운석을 떨어뜨린다. 주문을 외우는(3초) 동안은 움직이지 못한다. */
   private aiMage(c: AiCtx): void {
-    const { m, st } = c;
+    const { m, st, dt } = c;
+    // 가까이 온 근접 위협에서 물러난다(주문을 시작하지 않는다)
+    let threat: Target | null = null;
+    let gapBest = Infinity;
+    for (const t of c.targets) {
+      if (t.ranged) continue;
+      const d = Math.hypot(t.x - m.x, t.y - m.y);
+      const danger = (t.hero ? 50 : ENEMY_STATS[t.type]?.reach ?? MERC_STATS[t.type]?.reach ?? 40) + t.r + st.radius + TUNE.ARCHER_KITE_MARGIN + 30;
+      if (d >= danger || d - danger >= gapBest) continue;
+      threat = t;
+      gapBest = d - danger;
+    }
+    if (threat) {
+      m.face = Math.atan2(threat.y - m.y, threat.x - m.x);
+      let ax = m.x - threat.x;
+      let ay = m.y - threat.y;
+      const al = Math.hypot(ax, ay) || 1;
+      ax /= al;
+      ay /= al;
+      const hl = c.homeDist || 1;
+      ax += ((c.home[0] - m.x) / hl) * ARCHER_KITE_HOME_PULL;
+      ay += ((c.home[1] - m.y) / hl) * ARCHER_KITE_HOME_PULL;
+      const ll = Math.hypot(ax, ay) || 1;
+      const step = st.speed * ARCHER_KITE_SPEED_MULT * dt;
+      m.x += (ax / ll) * step;
+      m.y += (ay / ll) * step;
+      return;
+    }
     if (m.cd <= 0 && c.targets.length > 0) {
       const spot = this.meteorSpot(m, st.reach, st.splash, c.targets.map((t) => ({ x: t.x, y: t.y, w: t.hero ? 3 : 1 })));
       if (spot) {
@@ -2824,11 +2852,11 @@ export class Game {
         return;
       }
     }
-    // 사거리 밖에 적이 있으면 진형에서 조금(마법사의 활동 범위) 앞으로 나가 사거리에 들어간다
+    // 사거리 밖에 적이 있으면 진형에서 조금(마법사의 활동 범위) 앞으로 나가 사거리 끝 근처에 선다
     const near = m.cd <= 0 ? this.nearestTarget(c, m, st.reach + 170) : null;
     if (near && c.homeDist < 200) {
       m.face = Math.atan2(near.t.y - m.y, near.t.x - m.x);
-      this.moveToward(m, near.t.x, near.t.y, st.speed, c.dt, st.reach * 0.85);
+      this.moveToward(m, near.t.x, near.t.y, st.speed, dt, st.reach * TUNE.ARCHER_REACH_FRAC);
       return;
     }
     this.aiGoHome(c);

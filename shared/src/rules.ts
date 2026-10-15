@@ -169,8 +169,8 @@ export const MERC_STATS: readonly UnitStats[] = [
   { hp: 160, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 120, splash: 0 },
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 180, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
-  // 마법사: 느리고 약하지만 5초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
-  { hp: 70, speed: 60, reach: 280, damage: 150, windup: 5, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
+  // 마법사: 느리고 약하지만 3초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
+  { hp: 70, speed: 60, reach: 280, damage: 150, windup: 3, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
@@ -234,7 +234,7 @@ export const GUARD_THREAT_RADIUS = 320; // 지키는 아군 둘레에서 위협�
 export const ARCHER_STRAFE_SEC = 2.5; // 방패 정면을 피해 돌아가려고 시도하는 최대 시간
 export const SPEAR_WATCH_RANGE = 520; // 창병이 적 기병을 주시하는 거리
 /** 기병이 노릴 가치(적 병종별: 기병, 창병, 궁병, 검방병, 둔기병). 궁병과 둔기병을 먼저, 정면의 방패는 나중에 */
-export const CAV_TARGET_WEIGHT = [1, 1, 2.2, 0.5, 1.8, 2.4] as const;
+export const CAV_TARGET_WEIGHT = [1, 1, 2.2, 0.5, 1.8, 3.2] as const;
 /** 둔기병이 방패 있는 검방병을 노리는 가중치 */
 export const BLUNT_SHIELD_PREF = 2.6;
 
