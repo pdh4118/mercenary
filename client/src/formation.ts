@@ -42,7 +42,7 @@ export interface FormationUi {
   isOpen(): boolean;
   toggle(): void;
   close(): void;
-  /** F4와 아래 버튼: 저장된 진형을 적용한다(F1~F3은 용병 명령에 쓴다) */
+  /** 아래 버튼과 편성 화면에서 저장된 진형을 적용한다(F1~F3은 용병 명령에 쓰고 F4는 비워 두었다) */
   apply(slot: number): void;
   /** 방에 들어갔을 때 지금 고른 진형을 서버에 알린다 */
   resend(): void;
@@ -74,11 +74,6 @@ export function createFormationUi(opts: { send(m: ClientMsg): void; colors: read
     saved.presets.forEach((p, i) => {
       const b = document.createElement("button");
       b.className = i === saved.active ? "active" : "";
-      if (i === 3) {
-        const key = document.createElement("b");
-        key.textContent = "F4"; // F1~F3은 용병 명령(주인공 호위·위치 고수·돌격)에 쓴다
-        b.append(key);
-      }
       b.append(p.name);
       b.onclick = () => apply(i);
       bar.append(b);
