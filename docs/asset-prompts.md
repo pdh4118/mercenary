@@ -283,13 +283,14 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 | `level_up` | 레벨업 | `short uplifting level-up chime, warm bells, about one second` | 0.6초, 1종 |
 | `boss_warning` | 보스군이 나타날 때 | `distant war horn blast, deep and ominous, two long notes, with faint marching drums` | 3초, 1종 |
 
-### 10-2. 2순위: 게임의 맛을 살립니다 (16종)
+### 10-2. 2순위: 게임의 맛을 살립니다 (17종)
 
 | 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
 | --- | --- | --- | --- |
 | `spear_thrust` | 창을 찌를 때 | `quick spear thrust, short airy whoosh with a light tip impact` | 0.25초, 2종 |
 | `sword_swing` | 검을 휘두를 때 | `light sword swing whoosh, short, slightly metallic` | 0.25초, 2종 |
 | `mace_smash` | 철퇴 타격·범위 공격 | `heavy mace smash, deep low thud with a little crunch, short tail` | 0.4초, 2종 |
+| `meteor_fall` | 마법사 운석이 떨어지기 시작할 때(약 0.6초 뒤 폭발) | `meteor falling from the sky, rising whoosh into a heavy explosion with a rumbling tail` | 1.7초, 1종 |
 | `backstab` | 배후 공격 | `sneaky backstab slash, quick low whoosh with a sharper cut` | 0.25초, 2종 |
 | `knockback` | 넉백으로 적이 밀려날 때 | `short heavy shove impact, muffled whomp` | 0.2초, 2종 |
 | `dodge` | 회피 | `quick evasive whoosh, soft cloth swish` | 0.15초, 2종 |

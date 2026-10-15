@@ -37,6 +37,7 @@
 | `bgm_grow` | code_box (#559485) | 미확인 | 미정(임시 음악) |
 | `enemy_die_1` | starkvind (#559975) | 미확인 | 미정 |
 | `enemy_die_2` | artmasterrich (#345456) | 미확인 | 미정 |
+| `meteor_fall_1` | univ_lyon3 (#367093, 원본 `chatel_florian_2016_2017_meteorite.wav` 5.8초 중 4.15~5.83초) | 미확인 | 미정 |
 | `armor_fall_1~4` | artninja / halleck (#704881) | 미확인 | 미정 |
 | `armor_fall_5` | sgossner (#209405) | 미확인 | 미정 |
 | `melee_hit_8` | marb7e (#620355) | 미확인 | 미정 |
@@ -84,3 +85,7 @@ Suno로 만든 곡에서 자른 `melee_hit_1~4`, `arrow_hit_*`, `shield_break_1~
 
 추가: 화살 맞는 소리 `arrow_hit_1`에서 기타 튕기는 소리가 난다는 확인이 있어, 이 번호의 파일을 완전히 비웠습니다(옛 Suno 조각은 `removed/`에 있음). 지금 `arrow_hit`은 2종(`arrow_hit_1` = `melee_hit_4`를 높인 소리, `arrow_hit_2` = Suno 조각)입니다.
 | `arrow_hit_3` | `574044__thecrow_br__arrow.mp3` | 원본 1.32초(화살이 날아와 꽂히는 소리) 중 꽂히는 순간 0.57~0.84초만 사용. 소음이 섞인 타격음이라 음높이가 또렷하지 않음. 제작자 thecrow_br, **라이선스 확인 필요** |
+
+## 마법사 운석
+
+`meteor_fall_univ_lyon3.ogg`: 받은 `367093__univ_lyon3__chatel_florian_2016_2017_meteorite.wav`(5.8초)의 **뒷부분 4.15~5.83초**(상승하는 낙하음 → 0.6초 뒤 충돌음 → 여운)를 잘라 `meteor_fall_1.ogg`로 쓴다. 게임은 운석이 하늘에서 떨어지기 시작하는 순간(폭발 0.6초 전)에 이 소리를 한 번 내서 충돌음이 폭발과 맞물리게 했다. 낙하 시간은 주문 시간의 마지막 20%라 주문 시간(`MERC_STATS`/지팡이 `windup`)을 바꾸면 어긋날 수 있다. 직접 들어 보지 못하고 파형으로 맞췄으니 어긋나면 알려 주세요.

@@ -40,6 +40,7 @@ export const SOUNDS = {
   spear_thrust: d(2, 0.5, 120, 3),
   sword_swing: d(2, 0.5, 100, 3),
   mace_smash: d(2, 0.6, 200, 2),
+  meteor_fall: d(1, 0.8, 350, 3, 0.03), // 운석이 떨어지기 시작할 때(폭발까지 약 0.6초를 포함한 한 덩어리)
   backstab: d(2, 0.6, 100, 3),
   knockback: d(2, 0.45, 100, 3),
   dodge: d(2, 0.4, 100, 2),

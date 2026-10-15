@@ -855,7 +855,6 @@ async function main() {
           else if (kind === EVT_BACKSTAB) audio.play("backstab", { x, y });
           else if (kind === EVT_KNOCK) audio.play("knockback", { x, y });
           else if (kind === EVT_METEOR) {
-            audio.play("mace_smash", { x, y, vol: 1 });
             blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
           }
           else if (kind === EVT_DODGE) audio.play("dodge", { x, y });
@@ -1499,6 +1498,7 @@ async function main() {
         let sp = falling.get(key);
         if (!sp) {
           sp = new Sprite(meteorTex[0]!);
+          audio.play("meteor_fall", { x: mx, y: my }); // 떨어지기 시작할 때 한 덩어리(낙하음 → 폭발음)로 낸다
           sp.anchor.set(0.2, 0.8);
           skyLayer.addChild(sp);
           falling.set(key, sp);
