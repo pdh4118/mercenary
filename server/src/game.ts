@@ -202,7 +202,7 @@ type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn", "xp"];
 const newMercMods = (): MercMods => ({
   hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1,
-  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, xp: 1,
+  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, xp: 1,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
 const mstat = (mods: Mods, type: number, stat: MercStat): number =>
@@ -231,6 +231,7 @@ interface Mods {
   heroKnock: number;
   heroFireRate: number;
   heroRegen: number;
+  heroLifesteal: number;
 }
 
 const newMods = (): Mods => ({
@@ -255,6 +256,7 @@ const newMods = (): Mods => ({
   heroKnock: 0,
   heroFireRate: 1,
   heroRegen: 0,
+  heroLifesteal: 0,
 });
 
 interface Slot {
@@ -409,6 +411,7 @@ interface AiCtx {
   owner: Slot | undefined;
   leash: number;
   assault: boolean;
+  guard: boolean; // 주인공 호위(기본) 명령 중
   widthMult: number; // 창병 범위 증가 배율
 }
 
@@ -763,6 +766,7 @@ export class Game {
       this.separateEnemies();
     }
     this.stepBullets(dt, friendlies);
+    this.clampUnits();
     this.pruneCasts();
     // 모든 주인공이 쓰러져 있으면 게임오버(동료가 일으켜 세울 사람이 없다). 토너먼트 중에는 지는 것이 정상이라 제외한다.
     if (!duel && [...this.slots.values()].every((s) => s.state.down)) this.status = "defeat";
@@ -795,6 +799,7 @@ export class Game {
       r2(m.heroRegen),
       Math.round(TUNE.PLAYER_SPEED * m.heroSpeed * (WEAPONS[s.state.weapon]!.type === CAVALRY ? TUNE.MOUNT_SPEED_MAX : 1)),
       1 + m.heroMulti,
+      r2(m.heroLifesteal),
     ];
   }
 
@@ -1533,7 +1538,7 @@ export class Game {
       const remaining = key < 0 ? this.slots.get(-key)?.windT ?? 0 : this.mercs.get(key)?.atkT ?? this.enemies.get(key)?.atkT ?? 0;
       if (remaining <= 0) continue;
       const owner = key < 0 ? -key : this.mercs.get(key)?.owner ?? 0; // 0이면 적의 운석
-      out.push([key, round(c.x), round(c.y), Math.round(100 * Math.max(0, Math.min(1, 1 - remaining / c.total))), Math.round(c.radius), owner]);
+      out.push([key, round(c.x), round(c.y), Math.round(100 * Math.max(0, Math.min(1, 1 - remaining / c.total))), Math.round(c.radius), owner, Math.round(c.total * 10)]);
     }
     return out;
   }
@@ -1603,7 +1608,7 @@ export class Game {
     const fx = Math.cos(face);
     const fy = Math.sin(face);
     const adv = s.state.stance === STANCE_ASSAULT ? TUNE.ASSAULT_ADVANCE : 0; // 돌격 진형은 대열이 앞으로 나간다
-    for (const [id, [fwd, lat]] of rel) out.set(id, [ox + fx * (fwd + adv) - fy * lat, oy + fy * (fwd + adv) + fx * lat]);
+    for (const [id, [fwd, lat]] of rel) out.set(id, [clampToWorld(ox + fx * (fwd + adv) - fy * lat, 24), clampToWorld(oy + fy * (fwd + adv) + fx * lat, 24)]); // 진형 자리가 맵 밖이면 가장자리로
     return out;
   }
 
@@ -2125,7 +2130,7 @@ export class Game {
   /** 진형 자리에서 벗어나 적을 쫓을 수 있는 거리: 돌격 진형이면 훨씬 멀리까지 쫓는다 */
   private leashOf(st: UnitStats, type: number, owner: Slot | undefined): number {
     const assault = owner?.state.stance === STANCE_ASSAULT;
-    return st.leash * (assault ? (type === CAVALRY ? ASSAULT_LEASH_MULT_CAVALRY : TUNE.ASSAULT_LEASH_MULT) : 1);
+    return st.leash * (assault ? (type === CAVALRY ? ASSAULT_LEASH_MULT_CAVALRY : TUNE.ASSAULT_LEASH_MULT) : type === CAVALRY ? 1 : TUNE.DEFEND_LEASH_MULT);
   }
 
   private stepMercs(dt: number): void {
@@ -2212,6 +2217,7 @@ export class Game {
         owner: ownerSlot,
         leash: this.leashOf(st, m.type, ownerSlot),
         assault: ownerSlot?.state.stance === STANCE_ASSAULT,
+        guard: ownerSlot?.state.stance === STANCE_DEFEND,
         widthMult: st.arc / MERC_STATS[SPEAR]!.arc,
       };
       switch (m.type) {
@@ -2273,9 +2279,15 @@ export class Game {
 
   /** 진형 자리로 돌아간다. 멀리 떨어졌다면 따라붙도록 더 빨리 움직인다. 대열은 주인공이 바라보는 쪽을 향한다. */
   private aiGoHome(c: AiCtx): void {
-    const speed = c.homeDist > 150 ? c.st.speed * 1.5 : c.st.speed;
+    // 멀어질수록 빨리 따라붙는다(주인공이 달려도 대열이 뒤처지지 않게)
+    const speed = c.homeDist > 120 ? c.st.speed * Math.min(TUNE.CATCHUP_MAX, 1 + c.homeDist / 160) : c.st.speed;
     this.moveToward(c.m, c.home[0], c.home[1], speed, c.dt, 4);
     if (c.owner) c.m.face = c.owner.facing;
+  }
+
+  /** 주인공 호위 중에 주인공 둘레의 위협인가(진형 자리에서 멀어도 막으러 나선다) */
+  private threatensHero(c: AiCtx, t: { x: number; y: number }): boolean {
+    return c.guard && !!c.owner && !c.owner.state.down && Math.hypot(t.x - c.owner.state.x, t.y - c.owner.state.y) <= TUNE.GUARD_HERO_RADIUS;
   }
 
   /** 지킬 만한 아군: 취약도(병종별 가중치) / (1 + 거리). exclude에 든 병종은 뺀다 */
@@ -2437,8 +2449,9 @@ export class Game {
     let target: Target | null = null;
     let score = Infinity;
     for (const t of c.targets) {
-      if (Math.hypot(t.x - c.home[0], t.y - c.home[1]) > c.leash + st.reach + 30) continue;
       const d = Math.hypot(t.x - m.x, t.y - m.y);
+      // 진형 자리에서 멀리 뒤처져 있어도 바로 곁(사거리 안)의 적은 가만히 맞고 있지 않고 맞서 싸운다
+      if (d > st.reach + t.r + 14 && Math.hypot(t.x - c.home[0], t.y - c.home[1]) > c.leash + st.reach + 30 && !this.threatensHero(c, t)) continue;
       const sc = d / (t.type === SHIELD && t.shield > 0 ? BLUNT_SHIELD_PREF : 1);
       if (sc < score) {
         score = sc;
@@ -2452,7 +2465,7 @@ export class Game {
         if (m.cd <= 0) this.startAttack(m, st, m.face);
         return;
       }
-      if (c.homeDist <= c.leash) {
+      if (c.homeDist <= c.leash || this.threatensHero(c, target)) {
         this.moveToward(m, target.x, target.y, st.speed, c.dt, st.reach * 0.6);
         return;
       }
@@ -2521,8 +2534,9 @@ export class Game {
     let target: Target | null = null;
     let score = Infinity;
     for (const t of c.targets) {
-      if (Math.hypot(t.x - c.home[0], t.y - c.home[1]) > c.leash + st.reach + 30) continue;
-      const sc = Math.hypot(t.x - m.x, t.y - m.y) / (t.type === CAVALRY ? 2 : 1);
+      const dm = Math.hypot(t.x - m.x, t.y - m.y);
+      if (dm > st.reach + t.r + 14 && Math.hypot(t.x - c.home[0], t.y - c.home[1]) > c.leash + st.reach + 30 && !this.threatensHero(c, t)) continue; // 곁의 적과는 뒤처져 있어도 싸운다
+      const sc = dm / (t.type === CAVALRY ? 2 : 1);
       if (sc < score) {
         score = sc;
         target = t;
@@ -2535,7 +2549,7 @@ export class Game {
         if (m.cd <= 0) this.startAttack(m, st, ang);
         return;
       }
-      if (c.homeDist <= c.leash) {
+      if (c.homeDist <= c.leash || this.threatensHero(c, target)) {
         this.moveToward(m, target.x, target.y, st.speed, c.dt, st.reach * 0.8);
         return;
       }
@@ -2784,7 +2798,9 @@ export class Game {
     if (owner) owner.stats.dealt += dealt + r.shield;
     if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
     if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
-    if (has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
+    // 흡혈: 카드로 쌓은 비율 + 전설 피의 갈증(치명타는 2배). 때린 쪽(주인공 또는 그 병종)만 회복한다.
+    const steal = (owner ? (src ? mstat(owner.mods, src.type, "lifesteal") : owner.mods.heroLifesteal) : 0) + (has("bloodthirst") ? LEGEND_CONST.bloodthirstFrac : 0);
+    if (steal > 0 && dealt > 0) this.lifesteal(owner!, src, dealt * steal * (hit.crit && has("bloodthirst") ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
     this.pushDamage(hit.crit ? EVT_DMG_ENEMY_CRIT : EVT_DMG_ENEMY, e.id, e.x, e.y, r.body, ownerId);
     this.pushDamage(EVT_DMG_SHIELD, e.id, e.x, e.y, r.shield, ownerId);
@@ -2812,6 +2828,24 @@ export class Game {
   // --- 마법사: 운석 -------------------------------------------------------------
   /** 주문을 외우는 중인 운석. 키는 시전자(용병 번호, 주인공은 -번호). 진행도는 시전자의 준비 시간에서 구한다. */
   private casts = new Map<number, { x: number; y: number; total: number; radius: number; scanT?: number }>();
+
+  /** 맵 바깥으로 나간 유닛(밀려남·도망·추격·진형 자리가 맵 밖일 때 등)을 안으로 되돌린다 */
+  private clampUnits(): void {
+    for (const m of this.mercs.values()) {
+      const r = MERC_STATS[m.type]!.radius;
+      m.x = clampToWorld(m.x, r);
+      m.y = clampToWorld(m.y, r);
+    }
+    for (const e of this.enemies.values()) {
+      const r = radiusOf(e);
+      e.x = clampToWorld(e.x, r);
+      e.y = clampToWorld(e.y, r);
+    }
+    for (const s of this.slots.values()) {
+      s.state.x = clampToWorld(s.state.x, PLAYER_RADIUS);
+      s.state.y = clampToWorld(s.state.y, PLAYER_RADIUS);
+    }
+  }
 
   /** 시전이 끊긴 운석(시전자가 쓰러졌거나 무기를 바꿨거나 부활한 경우)을 치운다 */
   private pruneCasts(): void {
@@ -3205,6 +3239,7 @@ export class Game {
       case "heroArea": m.heroArea += e.v; break;
       case "heroFireRate": m.heroFireRate += e.v; break;
       case "heroRegen": m.heroRegen += e.v; break;
+      case "heroLifesteal": m.heroLifesteal += e.v; break;
     }
     for (const merc of this.mercs.values()) {
       const old = before.get(merc.id);

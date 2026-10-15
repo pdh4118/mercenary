@@ -55,6 +55,9 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  DEFEND_LEASH_MULT: 1.8, // 주인공 호위(기본)에서 용병이 진형 자리를 벗어나 적을 쫓을 수 있는 거리 배율(기병 제외)
+  GUARD_HERO_RADIUS: 260, // 주인공 호위에서 주인공 둘레 이 거리 안의 적은 진형 자리에서 멀어도 막으러 나선다
+  CATCHUP_MAX: 3.2, // 진형 자리에서 멀어졌을 때 따라붙는 최대 속도 배율(멀수록 빨라진다)
   MOVE_ORDER_SEC: 12, // 기병 이동 지시(땅을 우클릭)가 이어지는 시간
   MOVE_ENGAGE_RADIUS: 150, // 이동 지시 지점에 도착한 기병이 맞서 싸우는 반경
   ORDER_ATTACK_PICK: 90, // 우클릭한 곳 이 거리 안에 적이 있으면 공격 지시, 없으면 이동 지시
@@ -176,8 +179,8 @@ export const MERC_STATS: readonly UnitStats[] = [
   { hp: 160, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 120, splash: 0 },
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 180, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
-  // 마법사: 느리고 약하지만 3초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
-  { hp: 70, speed: 60, reach: 280, damage: 150, windup: 3, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
+  // 마법사: 느리고 약하지만 2초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
+  { hp: 70, speed: 60, reach: 280, damage: 150, windup: 2, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [

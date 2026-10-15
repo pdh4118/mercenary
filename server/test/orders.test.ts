@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CAVALRY, MAGE, SHIELD, SPEAR, STANCE_DEFEND, STANCE_HOLD, TICK_RATE, TUNE, WEAPONS, CAV_MOMENTUM_AFTER_HIT } from "@mercenary/shared";
+import { WORLD_SIZE, CAVALRY, MAGE, SHIELD, SPEAR, STANCE_DEFEND, STANCE_HOLD, TICK_RATE, TUNE, WEAPONS, CAV_MOMENTUM_AFTER_HIT } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -200,4 +200,31 @@ test("우클릭 지시: 빈 땅을 찍으면 기병이 그곳으로 가서 자�
   assert.equal(p2.chargeLeft, 6);
   run(g2, 5);
   assert.ok(foe.hp < foe.maxHp, "적 주변을 찍으면 그 일대의 적을 공격한다");
+});
+
+test("맵 바깥으로 나가지 않는다: 용병·적·주인공이 밀리거나 쫓겨도 경계 안에 있다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const cav = g.addMerc(a, CAVALRY, p.x, p.y);
+  dummy(g, p.x + 100, p.y, 1);
+  const priv = g as unknown as { mercs: Map<number, { x: number; y: number }>; enemies: Map<number, { x: number; y: number }> };
+  const merc = priv.mercs.get(cav)!;
+  const enemy = priv.enemies.get([...priv.enemies.keys()][0]!)!;
+  merc.x = 99999;
+  merc.y = -99999;
+  enemy.x = -88888;
+  enemy.y = 88888;
+  p.x = 77777;
+  g.step();
+  for (const u of [merc, enemy, g.getPlayer(a)!]) {
+    assert.ok(Math.abs(u.x) <= WORLD_SIZE / 2 && Math.abs(u.y) <= WORLD_SIZE / 2, `경계 안: ${u.x}, ${u.y}`);
+  }
+  // 경계에서 도망치는 용병도 밖으로 나가지 않는다
+  merc.x = WORLD_SIZE / 2 - 20;
+  merc.y = 0;
+  p.x = merc.x - 40;
+  p.y = 0;
+  for (let i = 0; i < 40; i++) g.step();
+  assert.ok(Math.abs(merc.x) <= WORLD_SIZE / 2 && Math.abs(merc.y) <= WORLD_SIZE / 2);
 });

@@ -236,7 +236,7 @@ test("레벨업이 잦다: 첫 레벨은 적 몇 마리로 오른다", () => {
 test("전설 카드: 드물고 한 번만 나오며 다섯 이상의 레벨에서부터 등장한다", () => {
   const legends = CARDS.filter((c) => c.category === 3);
   assert.equal(legends.length, Object.values(LEGENDS).reduce((n, l) => n + l.scopes.length, 0));
-  assert.ok(legends.every((c) => c.unique && (c.minLevel ?? 1) >= 5 && c.weight <= 1));
+  assert.ok(legends.every((c) => c.unique && (c.minLevel ?? 1) >= 5 && c.weight <= 2));
   assert.ok(legends.every((c) => c.effect.k === "legend" && (c.effect.scope === "hero") === (c.unitType === undefined)), "주인공 전용이 아니면 병종 전용");
   const g = new Game(() => 0.999);
   g.autoSpawn = false;

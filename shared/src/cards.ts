@@ -22,7 +22,7 @@ export type LegendId = "stormfire" | "bloodthirst" | "pierceRamp" | "execute" | 
 export type LegendScope = "hero" | number; // number = 병종
 export const legendKey = (id: LegendId, scope: LegendScope): string => `${id}@${scope}`;
 export const LEGEND_CONST = {
-  bloodthirstFrac: 0.04, // 준 피해의 이만큼 회복(치명타는 2배)
+  bloodthirstFrac: 0.025, // 준 피해의 이만큼 회복(치명타는 2배)
   pierceRamp: 1.35, // 관통할 때마다 피해 배율
   executeBelow: 0.3, // 이 체력 비율 아래의 적에게
   executeMult: 2, // 피해 배율
@@ -36,7 +36,7 @@ export const LEGEND_CONST = {
 } as const;
 export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: readonly LegendScope[] }> = {
   stormfire: { name: "폭풍 연사", desc: "치명타가 터지면 다음 공격 대기시간이 사라진다 (치명타·공격 속도와 시너지)", scopes: ["hero", CAVALRY, ARCHER] },
-  bloodthirst: { name: "피의 갈증", desc: "준 피해의 4%를 회복, 치명타는 2배 (치명타 피해와 시너지)", scopes: ["hero", CAVALRY, SPEAR, BLUNT] },
+  bloodthirst: { name: "피의 갈증", desc: "준 피해의 2.5%를 회복, 치명타는 2배 (치명타 피해와 시너지)", scopes: ["hero", CAVALRY, SPEAR, BLUNT] },
   pierceRamp: { name: "관통 증폭", desc: "화살이 적을 뚫을 때마다 피해 +35% (관통 수와 시너지)", scopes: ["hero", ARCHER] },
   execute: { name: "처형", desc: "체력 30% 이하 적에게 피해 x2 (공격력·치명타와 시너지)", scopes: ["hero", SPEAR, BLUNT] },
   thorns: { name: "가시 갑옷", desc: "받은 피해의 50%를 공격자에게 되돌린다 (체력·방어력과 시너지)", scopes: ["hero", SPEAR, SHIELD] },
@@ -48,7 +48,7 @@ export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: rea
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
 /** 용병 능력치 종류. 배율 계열(hp~area, respawn)은 곱해지고, 나머지는 더해진다. */
-export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "pierce" | "multi" | "poison" | "armor" | "respawn" | "knock" | "xp";
+export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "lifesteal" | "pierce" | "multi" | "poison" | "armor" | "respawn" | "knock" | "xp";
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
@@ -74,6 +74,7 @@ export type CardEffect =
   | { k: "heroSpeed"; v: number }
   | { k: "heroDmg"; v: number }
   | { k: "heroFireRate"; v: number }
+  | { k: "heroLifesteal"; v: number } // 준 피해의 v(비율)만큼 회복
   | { k: "heroRegen"; v: number }; // 초당 체력 회복
 
 export interface CardDef {
@@ -101,6 +102,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
   defense: "방어력",
   dodge: "회피율",
   regen: "체력 재생",
+  lifesteal: "흡혈",
   pierce: "관통",
   multi: "발사 수",
   poison: "독 화살",
@@ -111,16 +113,16 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 };
 /** 병종 전용 일반 카드 한 장의 효과량. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.004, pierce: 1, multi: 1, poison: 0.5, armor: 2, respawn: -0.25, knock: 30, xp: 0.3,
+  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.0025, lifesteal: 0.012, pierce: 1, multi: 1, poison: 0.5, armor: 2, respawn: -0.25, knock: 30, xp: 0.3,
 };
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
-  ["hp", "dmg", "speed", "crit", "dodge", "armor", "atkSpeed", "area", "knock", "xp"], // 기병
-  ["hp", "dmg", "range", "defense", "armor", "atkSpeed", "area", "knock", "xp"], // 창병
+  ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "area", "knock", "xp"], // 기병
+  ["hp", "dmg", "range", "defense", "armor", "lifesteal", "atkSpeed", "area", "knock", "xp"], // 창병
   ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "armor", "xp"], // 궁병(화살이라 범위는 없다)
-  ["hp", "defense", "armor", "regen", "dmg", "respawn", "atkSpeed", "area", "knock", "xp"], // 검방병
-  ["dmg", "area", "hp", "armor", "critMult", "atkSpeed", "knock", "xp"], // 둔기병
+  ["hp", "defense", "armor", "regen", "lifesteal", "dmg", "respawn", "atkSpeed", "area", "knock", "xp"], // 검방병
+  ["dmg", "area", "hp", "armor", "lifesteal", "critMult", "atkSpeed", "knock", "xp"], // 둔기병
   ["dmg", "area", "range", "atkSpeed", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
 ];
 
@@ -148,6 +150,9 @@ const statDesc = (t: number, stat: MercStat, v: number): string =>
       ? `${UNIT_NAMES[t]}만: 맞을 때마다 받는 피해 ${describeStat(stat, v)} (방어력과 별개의 고정 감소)`
       : `${UNIT_NAMES[t]}만: ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`;
 
+/** 잘 나오게 하고 싶은 능력치의 뽑힐 확률 가중치(일반 5). 체력 재생·흡혈은 한 장의 효과를 낮추는 대신 자주 나온다. */
+const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 };
+
 const statCards = (): CardDef[] => {
   const out: CardDef[] = [];
   for (const t of UNIT_TYPES) {
@@ -160,7 +165,7 @@ const statCards = (): CardDef[] => {
           desc: statDesc(t, stat, v),
           category: 1,
           rarity: r as 0 | 1 | 2,
-          weight: (stat === "armor" ? 3 : special ? 4 : 5) * RARITY[r]!.weight,
+          weight: (STAT_WEIGHT[stat] ?? (stat === "armor" ? 3 : special ? 4 : 5)) * RARITY[r]!.weight,
           stars: r + 1,
           minLevel: Math.max(RARITY[r]!.minLevel, stat === "armor" ? 4 : special ? 3 : 1),
           unitType: t,
@@ -170,7 +175,7 @@ const statCards = (): CardDef[] => {
     }
   }
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
-    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor") continue; // 관통·발사 수는 화살을 쏘는 궁병만
+    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "lifesteal") continue; // 관통·발사 수는 화살을 쏘는 궁병만
     for (let r = 0; r < 3; r++) {
       const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR);
       out.push({
@@ -205,7 +210,8 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroKnock", label: "넉백", base: 30, weight: 5, fmt: "flat" },
   { k: "heroDefense", label: "방어력", base: 0.08, weight: 7, fmt: "pct" },
   { k: "heroDodge", label: "회피율", base: 0.06, weight: 5, fmt: "pct" },
-  { k: "heroRegen", label: "체력 재생", base: 0.2, weight: 5, fmt: "regen" },
+  { k: "heroRegen", label: "체력 재생", base: 0.12, weight: 9, fmt: "regen" },
+  { k: "heroLifesteal", label: "흡혈", base: 0.012, weight: 9, fmt: "pct" },
 ];
 const heroCards = (): CardDef[] =>
   HERO_STATS.flatMap((h) =>
@@ -244,6 +250,8 @@ const scaleCards = (): CardDef[] =>
   });
 
 /** 전설: 드물게 나오고 같은 (능력, 대상) 조합은 한 번만 고를 수 있다 */
+/** 전설 카드 가중치(기본 0.6). 피의 갈증은 흡혈 카드와 함께 자주 나오게 한다. */
+const LEGEND_WEIGHT: Partial<Record<LegendId, number>> = { bloodthirst: 1.6 };
 const legendCards = (): CardDef[] =>
   (Object.keys(LEGENDS) as LegendId[]).flatMap((id) =>
     LEGENDS[id].scopes.map(
@@ -252,7 +260,7 @@ const legendCards = (): CardDef[] =>
         desc: LEGENDS[id].desc, // 대상은 이름에 이미 들어 있다
         category: 3,
         rarity: 3,
-        weight: 0.6,
+        weight: LEGEND_WEIGHT[id] ?? 0.6,
         stars: 3,
         minLevel: 6,
         unique: true,

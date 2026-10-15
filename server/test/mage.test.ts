@@ -38,23 +38,23 @@ const dummy = (g: Game, x: number, y: number, type = 1): E => {
   return e;
 };
 
-test("마법사: 병종 목록에 있고 느리고 약하지만 준비 3초·한 방이 크고 범위가 넓다", () => {
+test("마법사: 병종 목록에 있고 느리고 약하지만 준비 2초·한 방이 크고 범위가 넓다", () => {
   assert.equal(UNIT_TYPES.length, 6);
   assert.equal(UNIT_NAMES[MAGE], "마법사");
   const m = MERC_STATS[MAGE]!;
   const others = MERC_STATS.filter((_, i) => i !== MAGE);
-  assert.equal(m.windup, 3);
+  assert.equal(m.windup, 2);
   assert.ok(m.hp < Math.min(...others.map((s) => s.hp)), "체력이 가장 낮다");
   assert.ok(m.speed < Math.min(...others.map((s) => s.speed)), "가장 느리다");
   assert.ok(m.damage > Math.max(...others.map((s) => s.damage)) * 3, "한 방이 훨씬 세다");
   assert.ok(m.splash > MERC_STATS[BLUNT]!.splash * 2.5, "범위가 굉장히 넓다");
   assert.equal(m.reach, MERC_STATS[ARCHER]!.reach, "사정거리는 궁수 정도");
   assert.equal(WEAPONS[4]!.type, MAGE);
-  assert.equal(WEAPONS[4]!.windup, 3);
+  assert.equal(WEAPONS[4]!.windup, 2);
   assert.ok(CAV_TARGET_WEIGHT[MAGE]! > CAV_TARGET_WEIGHT[ARCHER]!, "기병은 마법사를 궁병보다 먼저 노린다");
 });
 
-test("용병 마법사: 3초 주문을 외운 뒤 낙하 지점 주변의 적에게 방패를 무시한 피해를 주고, 가장자리는 약하다", () => {
+test("용병 마법사: 2초 주문을 외운 뒤 낙하 지점 주변의 적에게 방패를 무시한 피해를 주고, 가장자리는 약하다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
@@ -65,10 +65,10 @@ test("용병 마법사: 3초 주문을 외운 뒤 낙하 지점 주변의 적에
   const far = dummy(g, p.x + 200 + 400, p.y);
   const shielded = dummy(g, p.x + 200, p.y + 20, SHIELD);
   shielded.shield = shielded.shieldMax = 500; // 방패가 정면을 막고 있다
-  run(g, 2.5);
+  run(g, 1.6);
   assert.equal(center.hp, 5000, "주문을 외우는 동안은 피해가 없다");
   assert.equal(g.snapshotMeteors().length, 1, "낙하 예고가 보인다");
-  run(g, 1);
+  run(g, 0.8);
   const hitCenter = 5000 - center.hp;
   const hitEdge = 5000 - edge.hp;
   assert.ok(hitCenter > MERC_STATS[MAGE]!.damage * 0.8, `중심 ${hitCenter}`);
@@ -94,7 +94,7 @@ test("용병 마법사가 주문 도중 쓰러지면 운석은 떨어지지 않�
   assert.equal(e.hp, 5000, "쓰러졌으니 폭발이 없다");
 });
 
-test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 3초 뒤에 폭발하며, 그동안 움직일 수 없다", () => {
+test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 2초 뒤에 폭발하며, 그동안 움직일 수 없다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
@@ -111,10 +111,10 @@ test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 3초 �
   assert.ok(Math.abs(m[0]![1] - (p.x + 180)) < 3, `x ${m[0]![1]}`);
   g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false, dist: 180 });
   const x0 = p.x;
-  run(g, 2.4);
+  run(g, 1.5);
   assert.equal(p.x, x0, "주문을 외우는 동안은 움직일 수 없다");
   assert.equal(near.hp, 5000, "아직 폭발 전");
-  run(g, 0.6);
+  run(g, 0.7);
   assert.ok(5000 - near.hp > WEAPONS[4]!.damage * 0.8);
   assert.equal(other.hp, 5000);
 });

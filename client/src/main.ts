@@ -245,7 +245,6 @@ async function main() {
   const falling = new Map<number, Sprite>();
   const BOOM_SEC = 0.6;
   const SCORCH_SEC = 2.8;
-  const METEOR_FALL_FROM = 0.8; // 주문 진행도가 이만큼 되면 운석이 하늘에서 떨어지기 시작한다
   const METEOR_DIR = { x: 0.5, y: -0.87 }; // 꼬리 쪽(오른쪽 위)에서 날아온다
   const HIT_FX_SEC = 0.22;
   const ARROW_SCALE = 0.5;
@@ -469,7 +468,7 @@ async function main() {
     lx += 32 + label.width + 12;
   }
   const legendText = new Text({
-    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창병은 반사 · 마법사: 3초 주문 후 운석(방패 무시)",
+    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창병은 반사 · 마법사: 2초 주문 후 운석(방패 무시)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   legendText.position.set(12, 26);
@@ -1127,7 +1126,7 @@ async function main() {
       ["이동 속도", String(h[11])],
       ["넉백", String(h[7])],
       ["행운", `+${pct(p.luck)}`],
-      ["", ""],
+      ["흡혈", pct(h[13] ?? 0)],
     ];
     items.forEach(([label, value], i) => {
       statLabels[i]!.text = label;
@@ -1545,7 +1544,8 @@ async function main() {
     // 마법사 운석: 낙하 지점 예고(진해지는 원과 줄어드는 고리), 마지막에 하늘에서 떨어지는 운석, 폭발과 그을음
     const now = performance.now();
     const liveKeys = new Set<number>();
-    for (const [key, mx, my, prog, radius, owner] of latest.meteors ?? []) {
+    for (const [key, mx, my, prog, radius, owner, total] of latest.meteors ?? []) {
+      const fallFrom = Math.max(0.3, Math.min(0.95, 1 - 0.6 / Math.max(0.6, (total ?? 30) / 10))); // 폭발 약 0.6초 전부터 낙하(소리의 충돌 시점과 맞춘다)
       const p = prog / 100;
       const pulse = 0.5 + 0.5 * Math.sin(now / 130);
       const mine = owner === myId;
@@ -1567,7 +1567,7 @@ async function main() {
           .lineTo(mx + Math.cos(a1) * radius, my + Math.sin(a1) * radius)
           .stroke({ width: 3, color: 0xffe0a0, alpha: 0.8 });
       }
-      if (p >= METEOR_FALL_FROM) {
+      if (p >= fallFrom) {
         liveKeys.add(key);
         let sp = falling.get(key);
         if (!sp) {
@@ -1577,7 +1577,7 @@ async function main() {
           skyLayer.addChild(sp);
           falling.set(key, sp);
         }
-        const t = Math.min(1, (p - METEOR_FALL_FROM) / (1 - METEOR_FALL_FROM));
+        const t = Math.min(1, (p - fallFrom) / (1 - fallFrom));
         const dist = 680 * (1 - t) ** 1.5;
         sp.texture = meteorTex[Math.min(5, Math.floor(t * 6))]!;
         sp.scale.set(radius / 130);
@@ -1854,11 +1854,13 @@ async function main() {
     levelToast.visible = levelToastLeft > 0;
     levelToast.position.set(app.screen.width / 2, 100);
     weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 100);
-    cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(90, app.screen.height / 2 - 230));
+    // 캠프 고용창은 오른쪽 위에 뜨고, 레벨업 카드가 함께 떠 있으면 카드를 그 아래로 내린다
+    const campBottom = campPanel.visible ? 52 + campPanel.height + 10 : 0;
+    cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(90, campBottom, app.screen.height / 2 - 230));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 120);
-    campPanel.position.set(app.screen.width / 2 - CAMP_W / 2, app.screen.height - campPanel.height - 100);
+    campPanel.position.set(app.screen.width - CAMP_W - 12, 52); // 오른쪽 위(소리 버튼 아래)
     toast.position.set(app.screen.width / 2, 74);
     legend.position.set(0, app.screen.height - LEGEND_H);
   });

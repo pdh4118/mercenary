@@ -102,7 +102,7 @@ test("용병 경험치 요구량이 크게 늘었고, 통솔력 카드가 가장
   const lead = CARDS.filter((c) => c.effect.k === "leadership" && c.rarity === 0)[0]!;
   const others = CARDS.filter((c) => c.rarity === 0 && c.category !== 3 && c.effect.k !== "leadership");
   assert.ok(lead.weight > Math.max(...others.map((c) => c.weight)) * 1.5, "일반 등급에서 통솔력이 가장 자주 나온다");
-  assert.ok(LEGENDS.bloodthirst.desc.includes("4%"));
+  assert.ok(LEGENDS.bloodthirst.desc.includes("2.5%"));
 });
 
 test("통솔력이 거의 찼을 때는 통솔력 카드가 더 자주 나온다", () => {
@@ -329,7 +329,7 @@ test("주인공 능력치(hs)가 지금 무기와 카드를 반영해 내려간�
   const g = quiet();
   const a = g.addPlayer("a")!;
   const hs0 = g.snapshotPlayers()[0]!.hs;
-  assert.equal(hs0.length, 13);
+  assert.equal(hs0.length, 14);
   assert.equal(hs0[0], WEAPONS[0]!.damage, "활 공격력");
   assert.equal(hs0[2], WEAPONS[0]!.reach, "활 사거리");
   g.applyCardForTest(a, { k: "heroDmg", v: 0.5 });

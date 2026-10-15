@@ -54,7 +54,7 @@ export const WEAPONS: readonly WeaponDef[] = [
   { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 14, cooldown: 0.55, windup: 0, splash: 0, note: "기병 돌격 무효·반사 · 아주 긴 사거리, 좁은 폭" },
   { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 9, cooldown: 0.35, windup: 0, splash: 0, note: "정면 피해 절반 방어 · 빠른 공격" },
   { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 42, cooldown: 1.2, windup: 0.5, splash: 46, note: "방패 파괴(250%) · 범위 공격 · 휘두르기 전 준비 동작이 길다" },
-  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 150, cooldown: 1.5, windup: 3, splash: 140, note: "마우스 위치에 운석 · 3초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
+  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 150, cooldown: 1.5, windup: 2, splash: 140, note: "마우스 위치에 운석 · 2초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
   { name: "기마", type: CAVALRY, ranged: false, reach: 54, arc: rad(80), damage: 14, cooldown: 0.65, windup: 0.12, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창병에게는 반사" },
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
@@ -81,7 +81,7 @@ export interface PlayerState {
   xp: number; // 현재 레벨에서 모은 경험치
   xpNeed: number; // 다음 레벨까지 필요한 경험치
   pending: number; // 아직 고르지 않은 카드 선택 횟수(레벨업 + 보상 상자)
-  hs: number[]; // 주인공 능력치(지금 무기 기준): [공격력, 초당 공격 횟수, 사거리, 치명타 확률, 치명타 배율, 관통, 범위 배율, 넉백, 방어력, 회피율, 재생(초당), 이동 속도, 발사 수]
+  hs: number[]; // 주인공 능력치(지금 무기 기준): [공격력, 초당 공격 횟수, 사거리, 치명타 확률, 치명타 배율, 관통, 범위 배율, 넉백, 방어력, 회피율, 재생(초당), 이동 속도, 발사 수, 흡혈]
   stance: number; // 용병 진형 모드(STANCE_DEFEND / STANCE_ASSAULT / STANCE_HOLD)
   holdX: number; // 지점 방어 모드에서 지키는 지점(stance가 STANCE_HOLD일 때만 의미가 있다)
   holdY: number;
@@ -214,8 +214,8 @@ export interface ResultPlayer {
 
 export type BulletWire = [id: number, x: number, y: number, team: 0 | 1]; // team 1 = 적 투사체
 /** 보스 보상 상자: id, x, y, 주인 번호, 남은 초 */
-/** 마법사가 주문을 외우는 중인 운석: 시전자 키(용병 번호, 주인공은 -번호), x, y, 진행도(0~100), 반경, 주인 번호 */
-export type MeteorWire = [key: number, x: number, y: number, progress: number, radius: number, owner: number];
+/** 마법사가 주문을 외우는 중인 운석: 시전자 키(용병 번호, 주인공은 -번호), x, y, 진행도(0~100), 반경, 주인 번호(0이면 적), 전체 주문 시간(0.1초 단위) */
+export type MeteorWire = [key: number, x: number, y: number, progress: number, radius: number, owner: number, total: number];
 export type ChestWire = [id: number, x: number, y: number, owner: number, left: number];
 export type CampWire = [id: number, x: number, y: number, left: number, offer0: number, offer1: number, offer2: number];
 
