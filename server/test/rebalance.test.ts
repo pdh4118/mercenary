@@ -322,3 +322,22 @@ test("창 반사: 돌격하는 기병 용병은 창을 든 상대 선수에게 �
   run(g, 1);
   assert.ok(c.hp < hp0, `기병이 반사 피해를 입었다: ${hp0} → ${c.hp}`);
 });
+
+test("주인공 능력치(hs)가 지금 무기와 카드를 반영해 내려간다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const hs0 = g.snapshotPlayers()[0]!.hs;
+  assert.equal(hs0.length, 12);
+  assert.equal(hs0[0], WEAPONS[0]!.damage, "활 공격력");
+  assert.equal(hs0[2], WEAPONS[0]!.reach, "활 사거리");
+  g.applyCardForTest(a, { k: "heroDmg", v: 0.5 });
+  g.applyCardForTest(a, { k: "heroCrit", v: 0.2 });
+  g.applyCardForTest(a, { k: "heroDefense", v: 0.1 });
+  g.setWeapon(a, 3); // 철퇴: 준비 동작이 있어 초당 공격 횟수가 낮다
+  const hs1 = g.snapshotPlayers()[0]!.hs;
+  assert.ok(Math.abs(hs1[0]! - WEAPONS[3]!.damage * 1.5) < 0.01, "공격력 +50%");
+  assert.equal(hs1[3], 0.2);
+  assert.equal(hs1[8], 0.1);
+  assert.ok(hs1[1]! < hs0[1]!, "철퇴는 활보다 초당 공격이 적다");
+  assert.equal(hs1[11], TUNE.PLAYER_SPEED);
+});

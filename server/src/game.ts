@@ -520,6 +520,7 @@ export class Game {
         xp: 0,
         xpNeed: xpNeeded(1),
         pending: 0,
+        hs: [],
         stance: STANCE_DEFEND,
         box: 0,
         rerolls: REROLL_START,
@@ -707,7 +708,29 @@ export class Game {
   // --- 스냅샷 -----------------------------------------------------------
 
   snapshotPlayers(): PlayerState[] {
-    return [...this.slots.values()].map((s) => ({ ...s.state }));
+    return [...this.slots.values()].map((s) => ({ ...s.state, hs: this.heroStats(s) }));
+  }
+
+  /** 화면에 보여 줄 주인공 능력치(지금 든 무기와 카드가 반영된 값) */
+  private heroStats(s: Slot): number[] {
+    const w = WEAPONS[s.state.weapon]!;
+    const m = s.mods;
+    const rate = m.heroFireRate;
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    return [
+      r2(w.damage * m.heroDmg),
+      r2(rate / (w.cooldown + w.windup)),
+      Math.round(w.reach * m.heroRange),
+      r2(Math.min(CRIT_MAX_CHANCE, m.heroCrit)),
+      r2(m.heroCritMult),
+      m.heroPierce,
+      r2(m.heroArea),
+      Math.round(m.heroKnock),
+      r2(Math.min(DEFENSE_MAX, m.heroDefense)),
+      r2(Math.min(DODGE_MAX, m.heroDodge)),
+      r2(m.heroRegen),
+      Math.round(TUNE.PLAYER_SPEED * m.heroSpeed),
+    ];
   }
 
   snapshotEnemies(): EnemyWire[] {

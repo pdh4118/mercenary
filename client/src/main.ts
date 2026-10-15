@@ -465,7 +465,8 @@ async function main() {
   const LEGEND_H = 64;
   legendBg.rect(0, 0, Math.max(lx, legendText.width + 24, helpText.width + 24), LEGEND_H).fill({ color: 0x000000, alpha: 0.35 });
   // 미니맵: 월드 전체를 작게 보여 준다. 아군(주인공·용병)은 주인 색 점, 쓰러진 아군은 X(부활 대기), 방금 쓰러진 곳은 잠깐 붉은 고리로 깜빡인다.
-  const MINI = 200;
+  const MINI_W = 320; // 왼쪽 위 상태 상자와 같은 폭
+  const STATS_H = 152; // 왼쪽 아래 주인공 능력치 상자 높이
   const mini = new Container();
   const miniG = new Graphics();
   const miniLabel = new Text({ text: "미니맵 (G)", style: { fill: 0x9aa1b0, fontSize: 11 } });
@@ -488,6 +489,36 @@ async function main() {
   const deathFlashes: { x: number; y: number; age: number; hero: boolean }[] = [];
   const wasDown = new Map<string, boolean>();
   const MINI_FLASH_SEC = 5;
+  // 주인공 능력치 상자(왼쪽 아래): 지금 든 무기와 카드가 반영된 실제 값
+  const statsPanel = new Container();
+  const statsBg = new Graphics()
+    .roundRect(0, 0, MINI_W, STATS_H, 12)
+    .fill({ color: 0x0b0d12, alpha: 0.78 })
+    .stroke({ width: 2, color: 0x59627a })
+    .roundRect(3, 3, MINI_W - 6, STATS_H - 6, 10)
+    .stroke({ width: 1, color: 0xe0c05d, alpha: 0.35 });
+  const statsTitle = new Text({ text: "주인공 능력치", style: { fill: 0xffe08a, fontSize: 15, fontWeight: "bold" } });
+  statsTitle.position.set(14, 7);
+  const statsWeapon = new Text({ text: "", style: { fill: 0x9aa1b0, fontSize: 13 } });
+  statsWeapon.anchor.set(1, 0);
+  statsWeapon.position.set(MINI_W - 14, 9);
+  statsPanel.addChild(statsBg, statsTitle, statsWeapon);
+  const statLabels: Text[] = [];
+  const statValues: Text[] = [];
+  for (let i = 0; i < 12; i++) {
+    const col = Math.floor(i / 6);
+    const row = i % 6;
+    const lx = 14 + col * (MINI_W / 2);
+    const y = 32 + row * 20;
+    const label = new Text({ text: "", style: { fill: 0xb8bdc9, fontSize: 13 } });
+    label.position.set(lx, y + 1);
+    const value = new Text({ text: "", style: { fill: 0xffffff, fontSize: 15, fontWeight: "bold" } });
+    value.anchor.set(1, 0);
+    value.position.set(lx + MINI_W / 2 - 24, y - 1);
+    statLabels.push(label);
+    statValues.push(value);
+    statsPanel.addChild(label, value);
+  }
   const stageText = new Text({ text: "", style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
   stageText.anchor.set(0.5, 0);
   const bossBar = new Graphics();
@@ -668,7 +699,7 @@ async function main() {
     weaponHint.text = WEAPONS[active]!.note;
   };
   weaponBar.visible = false;
-  hud.addChild(hudPanel, mini, stageText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
+  hud.addChild(hudPanel, mini, statsPanel, stageText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
@@ -1018,16 +1049,46 @@ async function main() {
     tourBigEl.style.display = big ? "block" : "none";
   };
 
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const updateStats = (p: { hs?: number[]; weapon: number; luck: number }) => {
+    const h = p.hs ?? [];
+    if (h.length < 12) return;
+    statsWeapon.text = `${WEAPONS[p.weapon]?.name ?? ""} 기준`;
+    const items: [string, string][] = [
+      ["공격력", String(h[0])],
+      ["공격 속도", `${h[1]}/초`],
+      ["사거리", String(h[2])],
+      ["치명타", `${pct(h[3]!)} ×${h[4]}`],
+      ["관통", String(h[5])],
+      ["범위", `+${pct((h[6] ?? 1) - 1)}`],
+      ["방어력", pct(h[8]!)],
+      ["회피", pct(h[9]!)],
+      ["재생", `${h[10]}/초`],
+      ["이동 속도", String(h[11])],
+      ["넉백", String(h[7])],
+      ["행운", `+${pct(p.luck)}`],
+    ];
+    items.forEach(([label, value], i) => {
+      statLabels[i]!.text = label;
+      statValues[i]!.text = value;
+    });
+  };
   const miniColor = (owner: number) => PLAYER_COLORS[(owner - 1) % PLAYER_COLORS.length]!;
   const drawMinimap = (dt: number) => {
     const st = latest;
     mini.visible = miniOn && !!st;
     if (!st) return;
     const ox = 10;
-    const oy = 30 + hudH + 8; // 왼쪽 위 상태 상자 바로 아래
+    const oy = 30 + hudH + 8; // 왼쪽 위 상태 상자 바로 아래, 폭은 같게
+    // 아래쪽 능력치 상자와 조작 막대를 뺀 남은 높이만큼(최대 폭과 같은 정사각형)
+    const avail = app.screen.height - oy - 8 - STATS_H - 112;
+    const S = Math.min(MINI_W, avail);
+    mini.visible = miniOn && !!st && S >= 110;
+    if (!mini.visible) return;
+    const offX = (MINI_W - S) / 2;
     mini.position.set(ox, oy);
-    const sx = (x: number) => ((x + WORLD_SIZE / 2) / WORLD_SIZE) * MINI;
-    const sy = (y: number) => ((y + WORLD_SIZE / 2) / WORLD_SIZE) * MINI;
+    const sx = (x: number) => offX + ((x + WORLD_SIZE / 2) / WORLD_SIZE) * S;
+    const sy = (y: number) => ((y + WORLD_SIZE / 2) / WORLD_SIZE) * S;
     // 방금 쓰러진 아군을 찾아 깜빡임을 만든다(토너먼트에서는 쓰러지는 것이 정상이라 제외)
     const duel = st.g?.phase === "tournament";
     const seen = new Set<string>();
@@ -1052,13 +1113,14 @@ async function main() {
 
     const g = miniG;
     g.clear();
-    g.roundRect(0, 0, MINI, MINI, 8).fill({ color: 0x0b0d12, alpha: 0.78 }).stroke({ width: 2, color: 0x59627a });
+    g.roundRect(0, 0, MINI_W, S, 12).fill({ color: 0x0b0d12, alpha: 0.78 }).stroke({ width: 2, color: 0x59627a });
+    g.rect(offX, 1, S, S - 2).stroke({ width: 1, color: 0xffffff, alpha: 0.1 });
     // 격자(위치 감각용)
     for (let i = 1; i < 4; i++) {
-      g.moveTo((MINI * i) / 4, 2).lineTo((MINI * i) / 4, MINI - 2).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
-      g.moveTo(2, (MINI * i) / 4).lineTo(MINI - 2, (MINI * i) / 4).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
+      g.moveTo(offX + (S * i) / 4, 2).lineTo(offX + (S * i) / 4, S - 2).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
+      g.moveTo(offX + 2, (S * i) / 4).lineTo(offX + S - 2, (S * i) / 4).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
     }
-    if (duel) g.circle(sx(0), sy(0), (TOURNAMENT_ARENA_RADIUS / WORLD_SIZE) * MINI).stroke({ width: 1.5, color: 0xe0c05d, alpha: 0.8 });
+    if (duel) g.circle(sx(0), sy(0), (TOURNAMENT_ARENA_RADIUS / WORLD_SIZE) * S).stroke({ width: 1.5, color: 0xe0c05d, alpha: 0.8 });
     // 캠프와 상자
     for (const c of st.camps) g.rect(sx(c[1]) - 3, sy(c[2]) - 3, 6, 6).fill(0xe0c05d);
     for (const c of st.chests ?? []) {
@@ -1089,8 +1151,8 @@ async function main() {
     // 시야(카메라가 보는 범위)
     const me = st.players.find((p) => p.id === myId);
     if (me) {
-      const vw = (app.screen.width / WORLD_SIZE) * MINI;
-      const vh = (app.screen.height / WORLD_SIZE) * MINI;
+      const vw = (app.screen.width / WORLD_SIZE) * S;
+      const vh = (app.screen.height / WORLD_SIZE) * S;
       g.rect(sx(me.x) - vw / 2, sy(me.y) - vh / 2, vw, vh).stroke({ width: 1, color: 0xffffff, alpha: 0.4 });
     }
     // 주인공들: 큰 점(나는 흰 테두리 삼각형). 쓰러진 주인공은 큰 X와 이름, 부활 진행률
@@ -1108,7 +1170,7 @@ async function main() {
         if (t) {
           t.visible = true;
           t.text = p.name;
-          t.position.set(Math.max(24, Math.min(MINI - 24, x)), Math.max(14, y - 8));
+          t.position.set(Math.max(offX + 24, Math.min(offX + S - 24, x)), Math.max(14, y - 8));
         }
       } else if (p.id === myId) {
         const a = p.aim;
@@ -1440,6 +1502,7 @@ async function main() {
       const down = mine.filter((w) => w[8] > 0).length;
       const used = mine.reduce((sum, w) => sum + unitCost(w[4], w[15]), 0);
       stanceBtns.forEach((b, i) => b.classList.toggle("active", (meState.stance ?? 0) === i));
+      updateStats(meState);
       hudLv.text = `Lv ${meState.level}`;
       hudTime.text = `${m}:${s}`;
       hudHp.text = `HP ${Math.ceil(meState.hp)} / ${meState.maxHp}`;
@@ -1596,6 +1659,8 @@ async function main() {
         bossBar.roundRect(bx, 36, bw, 10, 4).fill({ color: 0x000000, alpha: 0.6 }).roundRect(bx, 36, (bw * gi.bossHp) / 100, 10, 4).fill(0xe8883a);
       }
     }
+    statsPanel.position.set(10, app.screen.height - 112 - STATS_H);
+    statsPanel.visible = !!meState;
     drawMinimap(ticker.deltaMS / 1000);
     renderTournament(gi, myId);
     snd.near = nearCampId;
