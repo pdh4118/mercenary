@@ -88,3 +88,29 @@ test("검을 든 주인공은 방패 체력이 정면 피해를 받아 내고, �
   run(g, 20);
   assert.equal(p.shield, max);
 });
+
+test("방패 카드: 방패 체력 최대치가 늘고, 재생 카드는 더 빨리 차오르게 한다", () => {
+  const regenAfter = (card: boolean) => {
+    const g = new Game(() => 0.99);
+    g.autoSpawn = false;
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    if (card) g.applyCardForTest(a, { k: "heroShieldRegen", v: 0.5 });
+    p.shield = 0;
+    run(g, 5);
+    return p.shield;
+  };
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const before = p.shieldMax;
+  g.applyCardForTest(a, { k: "heroShield", v: 100 });
+  assert.equal(p.shieldMax, before + 100);
+  assert.equal(p.shield, before + 100);
+  run(g, 0.2);
+  assert.equal(p.shieldMax, before + 100, "최대치가 유지된다");
+  const base = regenAfter(false);
+  const fast = regenAfter(true);
+  assert.ok(base > 0 && Math.abs(fast / base - 1.5) < 0.05, `${base} -> ${fast}`);
+});

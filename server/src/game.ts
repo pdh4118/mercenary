@@ -236,6 +236,8 @@ interface Mods {
   heroFireRate: number;
   heroRegen: number;
   heroLifesteal: number;
+  heroShield: number; // 방패 체력 최대치 추가
+  heroShieldRegen: number; // 방패 재생 속도 추가 비율
 }
 
 const newMods = (): Mods => ({
@@ -261,6 +263,8 @@ const newMods = (): Mods => ({
   heroFireRate: 1,
   heroRegen: 0,
   heroLifesteal: 0,
+  heroShield: 0,
+  heroShieldRegen: 0,
 });
 
 interface Slot {
@@ -1379,7 +1383,7 @@ export class Game {
     const p = s.state;
     p.down = false;
     p.hp = p.maxHp;
-    p.shield = p.shieldMax = TUNE.HERO_SHIELD_MAX;
+    p.shield = p.shieldMax = TUNE.HERO_SHIELD_MAX + s.mods.heroShield;
     s.shieldIdle = 99;
     p.revive = 0;
     p.invuln = 0;
@@ -1768,9 +1772,9 @@ export class Game {
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
       p.hp = Math.min(p.maxHp, p.hp + s.mods.heroRegen * dt);
-      p.shieldMax = TUNE.HERO_SHIELD_MAX;
+      p.shieldMax = TUNE.HERO_SHIELD_MAX + s.mods.heroShield;
       s.shieldIdle += dt;
-      if (s.shieldIdle >= s.shieldDelay) p.shield = Math.min(p.shieldMax, p.shield + p.shieldMax * TUNE.HERO_SHIELD_REGEN_PCT * dt);
+      if (s.shieldIdle >= s.shieldDelay) p.shield = Math.min(p.shieldMax, p.shield + p.shieldMax * TUNE.HERO_SHIELD_REGEN_PCT * (1 + s.mods.heroShieldRegen) * dt);
       const duel = this.phase === "tournament";
       const fighter = duel && this.isFighter(p.id);
       // 토너먼트: 선수는 경기 시작 전·후에는 움직일 수 없고, 경기장 밖으로 나갈 수 없다. 선수가 아니면 싸울 수 없다.
@@ -1860,7 +1864,7 @@ export class Game {
     p.revive = 0;
     p.hp = Math.max(1, Math.round(p.maxHp * REVIVE_HP_FRAC));
     p.invuln = REVIVE_INVULN_SEC;
-    p.shield = p.shieldMax = TUNE.HERO_SHIELD_MAX;
+    p.shield = p.shieldMax = TUNE.HERO_SHIELD_MAX + s.mods.heroShield;
     s.shieldIdle = 99;
     this.pushEvent(EVT_REVIVE, p.x, p.y, 0);
   }
@@ -3342,6 +3346,8 @@ export class Game {
       case "heroArea": m.heroArea += e.v; break;
       case "heroFireRate": m.heroFireRate += e.v; break;
       case "heroRegen": m.heroRegen += e.v; break;
+      case "heroShield": m.heroShield += e.v; p.shield += e.v; p.shieldMax += e.v; break;
+      case "heroShieldRegen": m.heroShieldRegen += e.v; break;
       case "heroLifesteal": m.heroLifesteal += e.v; break;
     }
     for (const merc of this.mercs.values()) {

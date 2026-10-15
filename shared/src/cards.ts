@@ -75,7 +75,9 @@ export type CardEffect =
   | { k: "heroDmg"; v: number }
   | { k: "heroFireRate"; v: number }
   | { k: "heroLifesteal"; v: number } // 준 피해의 v(비율)만큼 회복
-  | { k: "heroRegen"; v: number }; // 초당 체력 회복
+  | { k: "heroRegen"; v: number } // 초당 체력 회복
+  | { k: "heroShield"; v: number } // 검 방패 체력 최대치 +v
+  | { k: "heroShieldRegen"; v: number }; // 검 방패 재생 속도 +v(비율)
 
 export interface CardDef {
   name: string;
@@ -194,7 +196,7 @@ const statCards = (): CardDef[] => {
 };
 
 /** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용) */
-const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" }[] = [
+const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" }[] = [
   { k: "heroMaxHp", label: "최대 체력", base: 25, weight: 8, fmt: "flat" },
   { k: "heroSpeed", label: "이동 속도", base: 0.12, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.25, weight: 8, fmt: "pct" },
@@ -212,6 +214,8 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroDodge", label: "회피율", base: 0.06, weight: 5, fmt: "pct" },
   { k: "heroRegen", label: "체력 재생", base: 0.06, weight: 9, fmt: "regen" },
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
+  { k: "heroShield", label: "방패 체력", base: 80, weight: 5, fmt: "flat" },
+  { k: "heroShieldRegen", label: "방패 재생 속도", base: 0.4, weight: 5, fmt: "pct" },
 ];
 const heroCards = (): CardDef[] =>
   HERO_STATS.flatMap((h) =>
@@ -220,7 +224,7 @@ const heroCards = (): CardDef[] =>
       const text = h.k === "heroArmor" ? `-${v}` : h.k === "heroPoison" ? `화살 피해의 ${Math.round(v * 100)}%` : h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 +${Math.round(v * 10) / 10}` : `+${v}`;
       return {
         name: `${h.label} ${text}`,
-        desc: h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : `주인공만: ${h.label} ${text}`,
+        desc: h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : h.k === "heroShield" ? `주인공이 검을 들었을 때: 방패 체력 ${text}` : h.k === "heroShieldRegen" ? `주인공이 검을 들었을 때: 방패가 차오르는 속도 ${text} (맞지 않고 기다리는 시간은 그대로)` : `주인공만: ${h.label} ${text}`,
         category: 2,
         rarity: r as 0 | 1 | 2,
         weight: h.weight * RARITY[r]!.weight,

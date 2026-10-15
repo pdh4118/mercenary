@@ -601,6 +601,8 @@ async function main() {
     if (e.k === "legend") return e.scope === "hero" ? -1 : e.scope;
     switch (e.k) {
       case "heroDefense":
+      case "heroShield":
+      case "heroShieldRegen":
       case "heroArmor": return SHIELD;
       case "heroDodge": return 0;
       case "heroArea":
