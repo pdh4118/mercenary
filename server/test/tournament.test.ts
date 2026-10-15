@@ -193,3 +193,35 @@ test("선수가 아닌 사람은 공격할 수 없고, 3명이면 준결승 뒤 
   tour = g.info().tour!;
   assert.equal(tour.title, "결승");
 });
+
+test("토너먼트에서도 독 화살이 상대 주인공에게 걸려 시간에 걸쳐 피해를 준다", () => {
+  const g = quiet();
+  g.addPlayer("a");
+  g.addPlayer("b");
+  g.jumpToStage(3);
+  bossDown(g);
+  g.step();
+  const tour = g.info().tour!;
+  run(g, TUNE.TOURNAMENT_INTRO_SEC + 0.5);
+  assert.equal(g.info().tour!.step, "fight");
+  const pa = g.getPlayer(tour.a)!;
+  const pb = g.getPlayer(tour.b)!;
+  pa.x = -150;
+  pa.y = 0;
+  pb.x = 50;
+  pb.y = 0;
+  g.setWeapon(tour.a, 0);
+  g.applyCardForTest(tour.a, { k: "heroPoison", v: 3 });
+  g.setInput(tour.b, idle);
+  g.setInput(tour.a, { dx: 0, dy: 0, aim: 0, fire: true });
+  g.step();
+  g.setInput(tour.a, idle);
+  run(g, 0.7);
+  const afterHit = pb.hp;
+  assert.ok(afterHit < pb.maxHp, "화살이 맞았다");
+  run(g, 1.5);
+  assert.ok(pb.hp < afterHit - 3, "독으로 계속 줄어든다");
+  const done = (() => { run(g, 4); return pb.hp; })();
+  run(g, 1);
+  assert.equal(pb.hp, done, "독이 끝나면 멈춘다");
+});

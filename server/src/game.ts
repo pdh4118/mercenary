@@ -179,7 +179,7 @@ import {
   type UnitStats,
   TUNE,
 } from "@mercenary/shared";
-import { resolveHit, type Hit } from "./combat.js";
+import { resolveHit, type Hit, type HitResult } from "./combat.js";
 import { SQUAD_KINDS, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
@@ -189,6 +189,9 @@ const fanOffset = (i: number, n: number): number => {
   const k = Math.ceil(i / 2);
   return (i % 2 === 1 ? 1 : -1) * k * TUNE.MULTISHOT_SPREAD;
 };
+
+const POISON_PULSE_SEC = 0.5;
+const DOT_RESULT = (damage: number): HitResult => ({ body: damage, shield: 0, reflected: 0, shieldBroke: false, backstab: false });
 
 const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mods.legends.has(legendKey(id, scope));
 
@@ -733,6 +736,8 @@ export class Game {
       this.stepSquads(dt);
     }
     const friendlies = this.collectFriendlies();
+    if (duel) this.tickDuelPoison(dt, friendlies);
+    else if (this.duelPoison.size > 0) this.duelPoison.clear();
     this.stepMercs(dt);
     if (!duel) {
       this.stepEnemies(dt, friendlies);
@@ -1870,13 +1875,16 @@ export class Game {
         ownerId: p.id,
         hit: (h) => {
           if (p.invuln > 0) return 0; // 부활 직후 잠깐 무적
-          if (this.dodged(s.mods.heroDodge, p.x, p.y, p.id)) return 0;
+          if (!h.dot && this.dodged(s.mods.heroDodge, p.x, p.y, p.id)) return 0;
           // 창을 들면 창병처럼 돌격을 반사하고, 검을 들면 정면 피해를 절반으로 막는다
           const w = WEAPONS[p.weapon]!;
-          const r = resolveHit(
-            { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
-            h,
-          );
+          const r = h.dot
+            ? DOT_RESULT(h.damage)
+            : resolveHit(
+                { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
+                h,
+              );
+          if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(-p.id, h.poison); // 토너먼트: 몸에 맞은 독 화살
           const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)); // 고정 감소가 먼저, 방어력(%)은 그다음
           p.hp -= taken;
           s.stats.taken += taken;
@@ -1904,9 +1912,10 @@ export class Game {
         hit: (h) => {
           if (m.respawn > 0 || m.hp <= 0) return 0; // 이미 쓰러졌다
           const mods = this.slots.get(m.owner)?.mods;
-          if (this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
-          const r = resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
+          if (!h.dot && this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
+          const r = h.dot ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
+          if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
           const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
@@ -2632,6 +2641,32 @@ export class Game {
     e.poisonSrc = src;
   }
 
+  /** 토너먼트: 독에 걸린 선수(주인공은 -번호, 용병은 용병 번호) */
+  private duelPoison = new Map<number, { t: number; dps: number; pulse: number }>();
+
+  private poisonFriendly(key: number, total: number): void {
+    const dps = total / POISON_SEC;
+    const cur = this.duelPoison.get(key);
+    this.duelPoison.set(key, { t: POISON_SEC, dps: Math.max(dps, cur && cur.t > 0 ? cur.dps : 0), pulse: cur?.pulse ?? POISON_PULSE_SEC });
+  }
+
+  /** 토너먼트 독: 0.5초마다 한 번씩 지속 피해로 들어간다(피해 감소 카드가 매번 적용되어 잔 피해에 강하다) */
+  private tickDuelPoison(dt: number, friendlies: Friendly[]): void {
+    for (const [key, p] of [...this.duelPoison]) {
+      const f = friendlies.find((x) => (x.merc ? x.merc.id : -x.ownerId) === key);
+      p.t -= dt;
+      if (!f || p.t <= 0) {
+        this.duelPoison.delete(key);
+        continue;
+      }
+      p.pulse -= dt;
+      if (p.pulse <= 0) {
+        p.pulse += POISON_PULSE_SEC;
+        f.hit({ damage: p.dps * POISON_PULSE_SEC, charge: 0, srcType: -1, fromAngle: 0, dot: true });
+      }
+    }
+  }
+
   /** 독 피해를 한 틱 입힌다. 숫자는 0.5초마다 모아서 띄운다. 죽으면 true */
   private tickPoison(e: Enemy, dt: number): boolean {
     if (!e.poisonT || e.poisonT <= 0) return false;
@@ -3331,7 +3366,7 @@ export class Game {
             const key = f.merc ? f.merc.id : -f.ownerId;
             if (b.hitIds.has(key) || Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
             b.hitIds.add(key);
-            f.hit({ damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit });
+            f.hit({ damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit, poison: b.poison ? b.damage * b.poison : 0 });
             this.pushEvent(EVT_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             if (b.pierce > 0) {
               b.pierce--;

@@ -1100,7 +1100,7 @@ test("둔기병 경직: 맞은 적이 잠깐 멈추고, 단계가 오를수록 �
   const hit = () => (g as any).damageEnemy(e, { damage: 5, charge: 0, srcType: 4, fromAngle: Math.PI }, a, m);
   hit();
   const t0 = e.stunT;
-  assert.ok(Math.abs(t0 - 0.5) < 1e-9, `${t0}`);
+  assert.ok(Math.abs(t0 - 0.3) < 1e-9, `${t0}`);
   e.stunT = 0;
   m.tier = 2;
   hit();

@@ -55,7 +55,7 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
-  BLUNT_STAGGER_SEC: 0.5, // 둔기병이 때린 적이 경직되는 시간(0단계)
+  BLUNT_STAGGER_SEC: 0.3, // 둔기병이 때린 적이 경직되는 시간(0단계)
   BLUNT_STAGGER_PER_TIER: 0.15, // 강화 단계마다 늘어나는 경직 시간
   BLUNT_STAGGER_BOSS_FRAC: 0.3, // 보스는 이 비율만큼만 경직된다
   ARMOR_MAX_FRAC: 0.7, // 피해 감소(고정치)로 한 번의 피해를 줄일 수 있는 최대 비율
