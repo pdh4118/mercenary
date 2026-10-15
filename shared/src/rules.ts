@@ -62,6 +62,10 @@ export const TUNE = {
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
   DEFEND_LEASH_MULT: 1.8, // 주인공 호위(기본)에서 용병이 진형 자리를 벗어나 적을 쫓을 수 있는 거리 배율(기병 제외)
+  HERO_SHIELD_MAX: 240, // 주인공이 검을 들었을 때 방패 체력(정면 공격을 먼저 받아 낸다)
+  HERO_SHIELD_REGEN_DELAY: 3, // 맞지 않고 이만큼(초) 지나면 방패가 차오르기 시작한다
+  HERO_SHIELD_BROKEN_DELAY: 6, // 방패가 깨졌을 때는 이만큼(초) 뒤부터 차오른다
+  HERO_SHIELD_REGEN_PCT: 0.06, // 차오르는 속도(초당 최대치 비율)
   MERC_SPACING: 1.9, // 용병끼리 유지하려는 거리 = 두 용병 반지름 합 x 이 값(뭉치지 않게)
   MERC_SEPARATION_SPEED: 160, // 겹친 용병이 서로 밀려나는 최대 속도(px/초)
   GUARD_HERO_RADIUS: 260, // 주인공 호위에서 주인공 둘레 이 거리 안의 적은 진형 자리에서 멀어도 막으러 나선다
@@ -332,8 +336,8 @@ export const CHEST_OPEN_RADIUS = 60;
 export const TOURNAMENT_STAGES = [3, 6, 9, 10] as const;
 export const TOURNAMENT_OUTRO_SEC = 4; // 경기 뒤 결과 표시
 export const TOURNAMENT_END_SEC = 7; // 우승자 발표
-export const TOURNAMENT_ARENA_RADIUS = 450; // 경기장 반지름(px). 월드 중앙
-export const TOURNAMENT_START_DIST = 300; // 두 선수가 중앙에서 떨어져 서는 거리
+export const TOURNAMENT_ARENA_RADIUS = 800; // 경기장 반지름(px). 월드 중앙
+export const TOURNAMENT_START_DIST = 520; // 두 선수가 중앙에서 떨어져 서는 거리
 export const isTournamentStage = (stage: number): boolean => (TOURNAMENT_STAGES as readonly number[]).includes(stage);
 /** n명이 겨루는 토너먼트의 라운드 이름: 결승, 준결승, 8강... (roundsLeft는 이 라운드를 포함해 남은 라운드 수) */
 export const tournamentRoundName = (roundsLeft: number): string => (roundsLeft <= 1 ? "결승" : roundsLeft === 2 ? "준결승" : `${2 ** roundsLeft}강`);

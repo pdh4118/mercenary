@@ -903,11 +903,22 @@ test("철퇴는 맞힌 대상 주변의 다른 적에게 절반 피해(범위 �
 });
 
 test("검을 들면 정면 피해가 절반이고, 창을 들면 기병의 돌격이 반사된다", () => {
+  const regen = TUNE.HERO_SHIELD_REGEN_PCT;
+  TUNE.HERO_SHIELD_REGEN_PCT = 0; // 방패가 다시 차오르지 않게
+  try {
+    swordAndSpearCase();
+  } finally {
+    TUNE.HERO_SHIELD_REGEN_PCT = regen;
+  }
+});
+
+function swordAndSpearCase(): void {
   const hpLost = (weapon: number, enemyType: number, momentum = 0) => {
     const g = quiet();
     const a = g.addPlayer("a")!;
     const p = me(g, a);
     g.setWeapon(a, weapon);
+    g.getPlayer(a)!.shield = 0; // 방패 체력은 따로 시험한다(여기서는 방패가 깨진 뒤의 정면 반감만 본다)
     g.setInput(a, { ...idle, aim: 0 }); // 동쪽을 본다
     const e = g.spawnEnemyAt(p.x + 25, p.y, enemyType); // 정면
     if (momentum) (g.getEnemy(e) as { momentum: number }).momentum = momentum;
@@ -925,7 +936,7 @@ test("검을 들면 정면 피해가 절반이고, 창을 들면 기병의 돌�
   const vsSpear = hpLost(1, CAVALRY, 1);
   assert.ok(Math.abs(vsSpear.lost - ENEMY_STATS[CAVALRY]!.damage) < 1e-6, "창을 들면 돌격 피해가 없다");
   assert.ok(vsSpear.enemyHp <= ENEMY_STATS[CAVALRY]!.hp - bonus + 1e-6, "그 피해가 기병에게 돌아간다");
-});
+}
 
 test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며, 돌격 피해는 속도에 비례한다", () => {
   const g = quiet();
@@ -1234,7 +1245,8 @@ test("피해 숫자: 내가 적에게 준 피해와 적이 방패로 막은 피�
   assert.ok(Math.abs(ev[0]![4] - WEAPONS[2]!.damage) < 0.11, `${ev[0]![4]}`);
   // 적이 때리면 입은 피해(받은 사람 번호)
   g.setInput(a, idle);
-  run(g, 2);
+  g.setWeapon(a, 0); // 검 방패가 막지 않도록 활로 바꾼다
+  run(g, WEAPON_SWITCH_DELAY_SEC + 2);
   const taken = g.takeEvents().filter((x) => x[0] === EVT_DMG_ALLY);
   assert.ok(taken.length > 0 && taken.every((x) => x[5] === a));
 });

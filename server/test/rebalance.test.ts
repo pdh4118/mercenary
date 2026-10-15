@@ -312,6 +312,8 @@ test("창 반사: 돌격하는 기병 용병은 창을 든 상대 선수에게 �
   const cav = g.addMerc(fa, CAVALRY, 0, 0);
   const spear = g.addMerc(fb, SPEAR, 0, 0);
   run(g, 5.1); // 소개가 끝나 경기가 시작된다(용병은 선수 곁으로 옮겨진다)
+  g.getPlayer(fa)!.x = -40; // 주인공 곁에서 싸우게 한다(경기장이 넓어져 선수 사이가 멀다)
+  g.getPlayer(fb)!.x = 40;
   const c = g.getMerc(cav)! as unknown as { x: number; y: number; hp: number };
   const sp = g.getMerc(spear)! as unknown as { x: number; y: number };
   c.x = 0;

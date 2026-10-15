@@ -283,6 +283,8 @@ interface Slot {
   revives: number; // 동료를 일으켜 세운 횟수
   stats: { dealt: number; taken: number; downs: number; mercDeaths: number; gold: number; wins: number; champion: number }; // 기록용 누적
   facing: number; // 진형이 바라보는 방향. 조준 방향을 천천히 따라간다
+  shieldIdle: number; // 마지막으로 방패 체력이 깎인 뒤 지난 시간(초). 차오르기 시작할 때를 잰다
+  shieldDelay: number; // 차오르기 시작하기까지 필요한 시간(깨졌으면 더 길다)
 }
 
 interface Fighter {
@@ -609,6 +611,8 @@ export class Game {
         down: false,
         revive: 0,
         invuln: 0,
+        shield: TUNE.HERO_SHIELD_MAX,
+        shieldMax: TUNE.HERO_SHIELD_MAX,
       },
       mods: newMods(),
       away: false,
@@ -628,6 +632,8 @@ export class Game {
       revives: 0,
       stats: { dealt: 0, taken: 0, downs: 0, mercDeaths: 0, gold: 0, wins: 0, champion: 0 },
       facing: 0,
+      shieldIdle: 99,
+      shieldDelay: 0,
     };
   }
 
@@ -1373,6 +1379,8 @@ export class Game {
     const p = s.state;
     p.down = false;
     p.hp = p.maxHp;
+    p.shield = p.shieldMax = TUNE.HERO_SHIELD_MAX;
+    s.shieldIdle = 99;
     p.revive = 0;
     p.invuln = 0;
     p.swing = 0;
@@ -1760,6 +1768,9 @@ export class Game {
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
       p.hp = Math.min(p.maxHp, p.hp + s.mods.heroRegen * dt);
+      p.shieldMax = TUNE.HERO_SHIELD_MAX;
+      s.shieldIdle += dt;
+      if (s.shieldIdle >= s.shieldDelay) p.shield = Math.min(p.shieldMax, p.shield + p.shieldMax * TUNE.HERO_SHIELD_REGEN_PCT * dt);
       const duel = this.phase === "tournament";
       const fighter = duel && this.isFighter(p.id);
       // 토너먼트: 선수는 경기 시작 전·후에는 움직일 수 없고, 경기장 밖으로 나갈 수 없다. 선수가 아니면 싸울 수 없다.
@@ -1849,6 +1860,8 @@ export class Game {
     p.revive = 0;
     p.hp = Math.max(1, Math.round(p.maxHp * REVIVE_HP_FRAC));
     p.invuln = REVIVE_INVULN_SEC;
+    p.shield = p.shieldMax = TUNE.HERO_SHIELD_MAX;
+    s.shieldIdle = 99;
     this.pushEvent(EVT_REVIVE, p.x, p.y, 0);
   }
 
@@ -2068,9 +2081,19 @@ export class Game {
           const r = h.dot || h.pierceGuard
             ? DOT_RESULT(h.damage)
             : resolveHit(
-                { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
+                { type: NO_TYPE, spearStance: w.type === SPEAR, shield: w.type === SHIELD ? p.shield : 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
                 h,
               );
+          if (w.type === SHIELD && r.shield > 0) {
+            // 방패가 받아 낸 만큼 깎인다
+            p.shield = r.shieldBroke ? 0 : Math.max(0, p.shield - r.shield);
+            this.pushEvent(r.shieldBroke ? EVT_SHIELD_BREAK : EVT_SHIELD_BLOCK, p.x, p.y, p.aim);
+          }
+          if (r.body > 0 || r.shield > 0) {
+            // 맞으면(몸이든 방패든) 한동안 방패가 차오르지 않는다. 깨졌으면 더 오래 걸린다.
+            s.shieldIdle = 0;
+            s.shieldDelay = p.shield <= 0 ? TUNE.HERO_SHIELD_BROKEN_DELAY : TUNE.HERO_SHIELD_REGEN_DELAY;
+          }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(-p.id, h.poison); // 토너먼트: 몸에 맞은 독 화살
           const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)) * this.damageTakenMult(); // 고정 감소가 먼저, 방어력(%)은 그다음
           p.hp -= taken;

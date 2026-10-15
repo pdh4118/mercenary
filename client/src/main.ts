@@ -1755,6 +1755,7 @@ async function main() {
       hudLv.text = `Lv ${meState.level}`;
       hudTime.text = `${m}:${s}`;
       hudHp.text = `HP ${Math.ceil(meState.hp)} / ${meState.maxHp}`;
+      hudHp.text += (WEAPONS[meState.weapon]?.type ?? -1) === SHIELD && meState.shieldMax > 0 ? `  ·  방패 ${Math.ceil(meState.shield)}` : "";
       hudGold.text = `금화 ${meState.gold}`;
       hudKills.text = `처치 ${meState.kills}`;
       hudLead.text = `통솔력 ${used}/${meState.leadership}`;
@@ -1778,6 +1779,15 @@ async function main() {
         .fill(0x3a1a1a)
         .roundRect(14, 53, (HUD_W - 28) * hpFrac, 20, 6)
         .fill(hpFrac > 0.5 ? 0x4caf50 : hpFrac > 0.25 ? 0xe0a43a : 0xd9453b);
+      // 검을 들면 체력 막대 아래에 방패 체력(파랑)을 보여 준다
+      if ((WEAPONS[meState.weapon]?.type ?? -1) === SHIELD && meState.shieldMax > 0) {
+        const sf = Math.max(0, Math.min(1, meState.shield / meState.shieldMax));
+        hudBars
+          .roundRect(14, 75, HUD_W - 28, 7, 3)
+          .fill(0x1b2433)
+          .roundRect(14, 75, (HUD_W - 28) * sf, 7, 3)
+          .fill(sf > 0 ? 0x5aa9ff : 0x1b2433);
+      }
       mercPanel.update(latest.mercs, myId, meState.gold, meState.leadership - used);
       const hv = mercs.views.get(mercPanel.hovered());
       if (hv) fxLayer.circle(hv.x, hv.y, 26).stroke({ width: 3, color: 0xffe08a, alpha: 0.9 });

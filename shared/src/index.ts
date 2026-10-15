@@ -101,6 +101,8 @@ export interface PlayerState {
   down: boolean; // 쓰러짐(스스로 일어나지 못하고, 동료가 부활시켜야 한다)
   revive: number; // 부활 진행도 0..1
   invuln: number; // 부활 직후 무적 남은 시간(초)
+  shield: number; // 검을 들었을 때의 방패 체력(무기를 바꿔도 값은 유지, 검일 때만 막는다)
+  shieldMax: number;
 }
 
 /**

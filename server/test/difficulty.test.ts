@@ -65,3 +65,26 @@ test("용병은 한 자리에 뭉쳐 쌓이지 않는다", () => {
     }
   assert.ok(minD > 18, `가장 가까운 두 용병 간격 ${minD.toFixed(1)}`);
 });
+
+test("검을 든 주인공은 방패 체력이 정면 피해를 받아 내고, 맞지 않으면 차오른다", () => {
+  const g = new Game(() => 0.99);
+  g.autoSpawn = false;
+  g.difficulty = 3;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.setWeapon(a, 2); // 검
+  p.aim = 0;
+  const max = p.shieldMax;
+  assert.ok(max >= 200, "방패가 튼튼해야 한다");
+  g.spawnEnemyAt(p.x + 30, p.y, 1); // 정면
+  run(g, 2.5);
+  assert.ok(p.shield < max, "정면 공격에 방패가 깎인다");
+  assert.ok(p.hp === p.maxHp, "방패가 막는 동안 몸은 안 다친다");
+  // 적을 치우고 가만히 두면 차오른다
+  const low = p.shield;
+  (g as unknown as { enemies: Map<number, unknown> }).enemies.clear();
+  run(g, 3 + 3);
+  assert.ok(p.shield > low, `차오름 ${low} -> ${p.shield}`);
+  run(g, 20);
+  assert.equal(p.shield, max);
+});
