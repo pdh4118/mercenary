@@ -1,4 +1,4 @@
-import { ARCHER, BLUNT, CAVALRY, MERC_BASE_PRICE, SHIELD, SPEAR, TUNE, UNIT_COST } from "./rules.js";
+import { ARCHER, BLUNT, CAVALRY, MAGE, MERC_BASE_PRICE, SHIELD, SPEAR, TUNE, UNIT_COST } from "./rules.js";
 
 /** 용병 단계(0~4). 한 명씩 금화를 내고 다음 단계로 강화한다. */
 export const MAX_TIER = 4;
@@ -8,14 +8,15 @@ export const TIER_NAMES: readonly (readonly string[])[] = [
   ["궁병", "장궁병", "정예 궁병", "신궁", "명사수"],
   ["검방병", "중갑 검방병", "근위 검방병", "철벽 방패병", "성채 수호자"],
   ["둔기병", "중갑 둔기병", "철퇴 전사", "파쇄병", "분쇄자"],
+  ["마법사", "견습 마도사", "마도사", "대마도사", "현자"],
 ];
 export const TIER_HP = [1, 1.3, 1.65, 2.05, 2.5] as const;
 export const TIER_DMG = [1, 1.2, 1.45, 1.75, 2.1] as const;
 /** 병종별 단계 보너스(단계마다): 기병 이동 속도, 창병·궁병 사거리, 검방병 방패, 둔기병 범위 */
-export const TIER_SPEED = [0.05, 0, 0, 0, 0] as const;
-export const TIER_REACH = [0, 0.08, 0.07, 0, 0] as const;
-export const TIER_SHIELD = [0, 0, 0, 0.15, 0] as const;
-export const TIER_AREA = [0, 0, 0, 0, 0.08] as const;
+export const TIER_SPEED = [0.05, 0, 0, 0, 0, 0] as const;
+export const TIER_REACH = [0, 0.08, 0.07, 0, 0, 0.05] as const;
+export const TIER_SHIELD = [0, 0, 0, 0.15, 0, 0] as const;
+export const TIER_AREA = [0, 0, 0, 0, 0.08, 0.1] as const;
 /** 강화 비용 = 고용 기본 가격 x 이 배율(현재 단계 → 다음 단계) */
 export const UPGRADE_COST_MULT = [1.2, 2.2, 3.6, 5.5] as const;
 
@@ -74,6 +75,10 @@ export function nextTierBonus(type: number, tier: number): string[] {
   if (type === CAVALRY) out.push(`이동 속도 ${step(TIER_SPEED)}`);
   if (type === SPEAR || type === ARCHER) out.push(`사거리 ${step(TIER_REACH)}`);
   if (type === SHIELD) out.push(`방패 ${step(TIER_SHIELD)}`);
+  if (type === MAGE) {
+    out.push(`사거리 ${step(TIER_REACH)}`);
+    out.push(`폭발 범위 ${step(TIER_AREA)}`);
+  }
   if (type === BLUNT) {
     out.push(`범위 ${step(TIER_AREA)}`);
     out.push(`경직 ${bluntStagger(tier).toFixed(2)}→${bluntStagger(tier + 1).toFixed(2)}초`);

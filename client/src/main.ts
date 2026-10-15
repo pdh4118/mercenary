@@ -11,6 +11,8 @@ import {
   SHIELD,
   SHIELD_FRONT_ARC,
   ARCHER as ARCHER_TYPE,
+  MAGE as MAGE_TYPE,
+  EVT_METEOR,
   BLUNT as BLUNT_TYPE,
   SPEAR as SPEAR_TYPE,
   LEVELUP_PUSH_RADIUS,
@@ -70,16 +72,16 @@ const tourBigEl = document.getElementById("tourBig")!;
 const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 const PLAYER_COLORS = [0xe05d5d, 0x5da6e0, 0x6fd16f, 0xe0c05d, 0xb07be0, 0x5de0d0, 0xe08f5d, 0xd96fb0];
-/** 병종 색: 기병 주황, 창병 초록, 궁병 노랑, 검방병 파랑, 둔기병 보라 */
-const TYPE_COLORS = [0xe8883a, 0x6fc46f, 0xe6d45d, 0x5da6e0, 0xb07be0];
+/** 병종 색: 기병 주황, 창병 초록, 궁병 노랑, 검방병 파랑, 둔기병 보라, 마법사 청록 */
+const TYPE_COLORS = [0xe8883a, 0x6fc46f, 0xe6d45d, 0x5da6e0, 0xb07be0, 0x4fd1d9];
 /** 스프라이트 파일 이름(병종 번호 순서) */
-const UNIT_FILES = ["cavalry", "spear", "archer", "sword", "mace"] as const;
+const UNIT_FILES = ["cavalry", "spear", "archer", "sword", "mace", "mage"] as const;
 /** 이미지는 화면 표시 크기의 약 2배로 만들어 두었다 */
 const SPRITE_SCALE = 0.5;
 /** 스프라이트 기준점: 가로 중앙, 세로는 몸통 쪽(발은 그 아래). 서버의 유닛 좌표가 몸통 중심이 된다. */
 const SPRITE_ANCHOR_Y = 0.65;
-/** 주인공 스프라이트 파일 이름(무기 순서: 활, 창, 검, 철퇴) */
-const HERO_FILES = ["archer", "spear", "sword", "mace"] as const;
+/** 주인공 스프라이트 파일 이름(무기 순서: 활, 창, 검, 철퇴, 지팡이) */
+const HERO_FILES = ["archer", "spear", "sword", "mace", "mage"] as const;
 /** 주인공은 일반 병사보다 한눈에 띄게 조금 크게 그린다 */
 const HERO_SCALE = 0.62;
 const SMOOTH_MS = 60; // 서버 스냅샷(20Hz)을 따라가는 보간 시간 상수
@@ -169,6 +171,13 @@ async function main() {
     Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/arrow_enemy_${i}.png`))),
   ]);
 
+  // 운석 이펙트: 낙하(작은 것부터 큰 것 6컷), 폭발 5컷, 바닥에 남는 그을음 5컷
+  const [meteorTex, boomTex, scorchTex] = await Promise.all([
+    Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/meteor_${i}.png`))),
+    Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/boom_${i}.png`))),
+    Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/scorch_${i}.png`))),
+  ]);
+
   // 바닥은 타일을 반복해서 깔고, 월드 경계를 선으로 표시한다
   const ground = new TilingSprite({ texture: groundTex, width: WORLD_SIZE, height: WORLD_SIZE });
   ground.position.set(-half, -half);
@@ -182,6 +191,8 @@ async function main() {
   const bulletLayer = new Container();
   const mercLayer = new Container();
   const playerLayer = new Container();
+  const groundFx = new Container(); // 바닥에 남는 그을음(유닛 아래)
+  const skyLayer = new Container(); // 떨어지는 운석과 폭발(유닛 위)
   enemyLayer.sortableChildren = true; // 아래쪽에 있는 유닛이 위에 그려지게(깊이 정렬)
   mercLayer.sortableChildren = true;
   const chargeMark = new Graphics();
@@ -189,7 +200,7 @@ async function main() {
   chargeLabel.anchor.set(0.5, 1);
   chargeMark.visible = chargeLabel.visible = false;
   const dmgLayer = new Container(); // 피해 숫자는 모든 그림 위에
-  world.addChild(campLayer, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, chargeMark, chargeLabel, dmgLayer);
+  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, skyLayer, chargeMark, chargeLabel, dmgLayer);
 
   /** 스프라이트는 오른쪽을 보고 그려져 있어, 왼쪽으로 움직이거나 공격할 때는 좌우 반전한다 */
   interface Facing {
@@ -229,6 +240,13 @@ async function main() {
   const shotBuf: { x: number; y: number; hostile: boolean }[] = [];
   let shotWindowStart = 0;
   const hitFx: { node: Sprite; age: number }[] = [];
+  // 운석 폭발(폭발 컷 → 바닥 그을음 컷)과 떨어지는 운석 스프라이트
+  const blasts: { x: number; y: number; r: number; age: number; boom: Sprite | null; scorch: Sprite | null }[] = [];
+  const falling = new Map<number, Sprite>();
+  const BOOM_SEC = 0.6;
+  const SCORCH_SEC = 2.8;
+  const METEOR_FALL_FROM = 0.8; // 주문 진행도가 이만큼 되면 운석이 하늘에서 떨어지기 시작한다
+  const METEOR_DIR = { x: 0.5, y: -0.87 }; // 꼬리 쪽(오른쪽 위)에서 날아온다
   const HIT_FX_SEC = 0.22;
   const ARROW_SCALE = 0.5;
   const bullets = new Pool<BulletView, BulletWire>(
@@ -451,13 +469,13 @@ async function main() {
     lx += 32 + label.width + 12;
   }
   const legendText = new Text({
-    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창병은 반사",
+    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창병은 반사 · 마법사: 5초 주문 후 운석(방패 무시)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · V 용병 진형(기본/돌격) · G 미니맵 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~6 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · V 용병 진형(기본/돌격) · G 미니맵 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -836,6 +854,10 @@ async function main() {
           else if (kind === EVT_CRIT) audio.play("crit_hit", { x, y });
           else if (kind === EVT_BACKSTAB) audio.play("backstab", { x, y });
           else if (kind === EVT_KNOCK) audio.play("knockback", { x, y });
+          else if (kind === EVT_METEOR) {
+            audio.play("mace_smash", { x, y, vol: 1 });
+            blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
+          }
           else if (kind === EVT_DODGE) audio.play("dodge", { x, y });
           else if (kind === EVT_REVIVE) audio.play("revive_done", { x, y });
           else if ((kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) && !arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14)) audio.play("melee_hit", { x, y }); // 화살이 아닌 근접 타격
@@ -882,10 +904,11 @@ async function main() {
     const fire = firing || keys.has(" ");
     const aim = Math.round(readAim() * 100) / 100;
     const revive = keys.has("e");
-    const key = `${dx},${dy},${aim},${fire},${revive}`;
+    const dist = Math.round(Math.hypot(mouseX - app.screen.width / 2, mouseY - app.screen.height / 2) / 8) * 8; // 마법사 지팡이가 운석을 떨어뜨릴 거리
+    const key = `${dx},${dy},${aim},${fire},${revive},${dist}`;
     if (force || key !== last) {
       last = key;
-      send({ t: "input", dx, dy, aim, fire, revive });
+      send({ t: "input", dx, dy, aim, fire, revive, dist });
     }
   };
   // 용병 진형 모드: 기본 진형(주인공 주변을 지킨다) / 돌격 진형(대열이 앞으로 나가 더 멀리 쫓는다). V 키로 바꾼다.
@@ -950,7 +973,7 @@ async function main() {
     if (k === "m" && !e.repeat) audio.toggleMute();
     if (!e.repeat && nearCampId >= 0) {
       if (!e.shiftKey && (k === "1" || k === "2" || k === "3")) send({ t: "buy", camp: nearCampId, slot: Number(k) - 1 });
-      const digit = /^Digit([1-5])$/.exec(e.code);
+      const digit = /^Digit([1-6])$/.exec(e.code);
       if (e.shiftKey && digit) send({ t: "dismiss", type: Number(digit[1]) - 1 });
     }
     keys.add(k);
@@ -1363,7 +1386,7 @@ async function main() {
       if (w[5] === undefined || w[6] <= 0) continue;
       const v = mercs.views.get(w[0]);
       const st = MERC_STATS[w[4]]!;
-      if (v) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!, w[4] === SPEAR_TYPE);
+      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!, w[4] === SPEAR_TYPE); // 마법사의 예고는 낙하 지점 표시가 대신한다
     }
 
     // 방패(검방병): 정면을 막는 호. 깨지면 회색으로 비고, 재생되면 다시 파랗게 돌아온다.
@@ -1446,11 +1469,79 @@ async function main() {
       if (v) streak(v.x, v.y, v.face, w[13]);
     }
 
+    // 마법사 운석: 낙하 지점 예고(진해지는 원과 줄어드는 고리), 마지막에 하늘에서 떨어지는 운석, 폭발과 그을음
+    const now = performance.now();
+    const liveKeys = new Set<number>();
+    for (const [key, mx, my, prog, radius, owner] of latest.meteors ?? []) {
+      const p = prog / 100;
+      const pulse = 0.5 + 0.5 * Math.sin(now / 130);
+      const mine = owner === myId;
+      fxLayer
+        .circle(mx, my, radius)
+        .fill({ color: 0xff3a1a, alpha: 0.05 + 0.13 * p })
+        .stroke({ width: 2 + 2 * p, color: mine ? 0xffc04a : 0xff6a3a, alpha: 0.3 + 0.4 * p + 0.15 * pulse })
+        .circle(mx, my, Math.max(6, radius * (1 - p)))
+        .stroke({ width: 2, color: 0xffe0a0, alpha: 0.45 + 0.3 * pulse });
+      if (p >= METEOR_FALL_FROM) {
+        liveKeys.add(key);
+        let sp = falling.get(key);
+        if (!sp) {
+          sp = new Sprite(meteorTex[0]!);
+          sp.anchor.set(0.2, 0.8);
+          skyLayer.addChild(sp);
+          falling.set(key, sp);
+        }
+        const t = Math.min(1, (p - METEOR_FALL_FROM) / (1 - METEOR_FALL_FROM));
+        const dist = 680 * (1 - t) ** 1.5;
+        sp.texture = meteorTex[Math.min(5, Math.floor(t * 6))]!;
+        sp.scale.set(radius / 130);
+        sp.position.set(mx + METEOR_DIR.x * dist, my + METEOR_DIR.y * dist);
+      }
+    }
+    for (const [key, sp] of falling) {
+      if (liveKeys.has(key)) continue;
+      sp.destroy();
+      falling.delete(key);
+    }
+    for (let i = blasts.length - 1; i >= 0; i--) {
+      const b = blasts[i]!;
+      b.age += ticker.deltaMS / 1000;
+      if (b.age >= SCORCH_SEC) {
+        b.boom?.destroy();
+        b.scorch?.destroy();
+        blasts.splice(i, 1);
+        continue;
+      }
+      if (!b.scorch) {
+        b.scorch = new Sprite(scorchTex[0]!);
+        b.scorch.anchor.set(0.5, 0.5);
+        b.scorch.position.set(b.x, b.y);
+        b.scorch.scale.set(b.r / 62);
+        groundFx.addChild(b.scorch);
+      }
+      if (!b.boom) {
+        b.boom = new Sprite(boomTex[0]!);
+        b.boom.anchor.set(0.5, 0.82);
+        b.boom.position.set(b.x, b.y);
+        b.boom.scale.set(b.r / 70);
+        skyLayer.addChild(b.boom);
+      }
+      const st = b.age / SCORCH_SEC;
+      b.scorch.texture = scorchTex[Math.min(4, Math.floor(st * 5))]!;
+      b.scorch.alpha = st < 0.7 ? 0.95 : 0.95 * (1 - (st - 0.7) / 0.3);
+      if (b.age < BOOM_SEC) {
+        const bt = b.age / BOOM_SEC;
+        b.boom.visible = true;
+        b.boom.texture = boomTex[Math.min(4, Math.floor(bt * 5))]!;
+        b.boom.alpha = bt < 0.8 ? 1 : 1 - (bt - 0.8) / 0.2;
+      } else b.boom.visible = false;
+    }
+
     // 근접 무기 휘두르기 이펙트와 레벨업 밀어내기 고리
     for (const p of latest.players) {
       const w = WEAPONS[p.weapon]!;
       const v = players.views.get(p.id);
-      if (v && p.wind > 0 && !w.ranged) {
+      if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
         // 철퇴 준비 동작: 범위가 점점 진하게 차오른다(맞기 직전까지 피하라는 신호가 아니라 휘두르는 타이밍 표시)
         const prog = Math.max(0, Math.min(1, 1 - p.wind / w.windup));
         fxLayer
@@ -1459,7 +1550,7 @@ async function main() {
           .closePath()
           .fill({ color: 0xffc27a, alpha: 0.12 + 0.3 * prog });
       }
-      if (!v || p.swing <= 0 || w.ranged) continue;
+      if (!v || p.swing <= 0 || w.ranged || w.type === MAGE_TYPE) continue;
       if (w.type === SPEAR_TYPE) {
         drawSpearBox(v.x, v.y, p.aim, w.reach, 1, TYPE_COLORS[w.type]!, 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC));
         continue;

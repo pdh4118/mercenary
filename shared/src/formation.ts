@@ -29,12 +29,12 @@ export interface FormationPreset {
   spacing: number; // 간격 배율
 }
 
-/** 기본으로 들어 있는 진형 4개(기병, 창병, 궁병, 검방병, 둔기병 순서) */
+/** 기본으로 들어 있는 진형 4개(기병, 창병, 궁병, 검방병, 둔기병, 마법사 순서) */
 export const DEFAULT_PRESETS: readonly FormationPreset[] = [
-  { name: "기본", zones: [ZONE_BOTH, ZONE_MID, ZONE_BACK, ZONE_FRONT, ZONE_FRONT], spacing: 1 },
-  { name: "방진", zones: [ZONE_GUARD, ZONE_FRONT, ZONE_BACK, ZONE_FRONT, ZONE_MID], spacing: 0.8 },
-  { name: "양익 포위", zones: [ZONE_BOTH, ZONE_MID, ZONE_BACK, ZONE_MID, ZONE_FRONT], spacing: 1.4 },
-  { name: "측면 압박", zones: [ZONE_LEFT, ZONE_FRONT, ZONE_BACK, ZONE_FRONT, ZONE_RIGHT], spacing: 1.5 },
+  { name: "기본", zones: [ZONE_BOTH, ZONE_MID, ZONE_BACK, ZONE_FRONT, ZONE_FRONT, ZONE_GUARD], spacing: 1 },
+  { name: "방진", zones: [ZONE_GUARD, ZONE_FRONT, ZONE_BACK, ZONE_FRONT, ZONE_MID, ZONE_GUARD], spacing: 0.8 },
+  { name: "양익 포위", zones: [ZONE_BOTH, ZONE_MID, ZONE_BACK, ZONE_MID, ZONE_FRONT, ZONE_GUARD], spacing: 1.4 },
+  { name: "측면 압박", zones: [ZONE_LEFT, ZONE_FRONT, ZONE_BACK, ZONE_FRONT, ZONE_RIGHT, ZONE_GUARD], spacing: 1.5 },
 ];
 
 export const defaultPresets = (): FormationPreset[] => DEFAULT_PRESETS.map((p) => ({ ...p, zones: [...p.zones] }));
@@ -43,13 +43,14 @@ export const defaultPresets = (): FormationPreset[] => DEFAULT_PRESETS.map((p) =
 export function sanitizeFormation(raw: unknown): { zones: number[]; spacing: number } | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as { zones?: unknown; spacing?: unknown };
-  if (!Array.isArray(r.zones) || r.zones.length !== UNIT_TYPES.length) return null;
+  if (!Array.isArray(r.zones) || r.zones.length < 5 || r.zones.length > UNIT_TYPES.length) return null; // 병종이 늘기 전에 저장된 진형(5개)도 받는다
   const zones: number[] = [];
   for (const z of r.zones) {
     if (typeof z !== "number" || !Number.isInteger(z) || z < 0 || z >= ZONE_NAMES.length) return null;
     zones.push(z);
   }
   const sp = typeof r.spacing === "number" && Number.isFinite(r.spacing) ? r.spacing : 1;
+  while (zones.length < UNIT_TYPES.length) zones.push(ZONE_GUARD); // 새 병종(마법사)은 가장 뒤에서 호위
   return { zones, spacing: Math.max(FORMATION_SPACING_MIN, Math.min(FORMATION_SPACING_MAX, sp)) };
 }
 

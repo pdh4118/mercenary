@@ -1,7 +1,7 @@
 // 레벨업 선택지. 효과 종류는 서버가 적용하고, 이름·설명은 클라이언트가 그대로 표시한다.
 // 수치 카드는 같은 능력치라도 일반 / 희귀 / 영웅 세 등급이 있고, 등급이 높을수록 효과가 크고 드물게 나온다.
 
-import { ARCHER, BLUNT, CAVALRY, SHIELD, SPEAR, UNIT_NAMES, UNIT_TYPES } from "./rules.js";
+import { ARCHER, BLUNT, CAVALRY, MAGE, SHIELD, SPEAR, UNIT_NAMES, UNIT_TYPES } from "./rules.js";
 
 /** 0=규모(수 늘리기), 1=용병 강화, 2=주인공 강화, 3=전설(드물고 강력한 시너지) */
 export const CARD_CATEGORY_NAMES = ["규모", "용병 강화", "주인공 강화", "전설"] as const;
@@ -42,8 +42,8 @@ export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: rea
   thorns: { name: "가시 갑옷", desc: "받은 피해의 50%를 공격자에게 되돌린다 (체력·방어력과 시너지)", scopes: ["hero", SPEAR, SHIELD] },
   chargeBoost: { name: "돌격 가속", desc: "돌격 피해 x2 (이동 속도와 시너지)", scopes: [CAVALRY] },
   undying: { name: "불사", desc: "쓰러질 때 35% 확률로 체력 절반으로 즉시 되살아난다", scopes: [SPEAR, SHIELD, BLUNT] },
-  splashBoost: { name: "광역 증폭", desc: "범위 공격 피해 x2 (범위·공격력과 시너지)", scopes: ["hero", BLUNT] },
-  warcry: { name: "전장의 함성", desc: "적을 처치할 때마다 6초간 공격 속도 +8% (최대 5중첩)", scopes: ["hero", CAVALRY, ARCHER, BLUNT] },
+  splashBoost: { name: "광역 증폭", desc: "범위 공격 피해 x2 (범위·공격력과 시너지)", scopes: ["hero", BLUNT, MAGE] },
+  warcry: { name: "전장의 함성", desc: "적을 처치할 때마다 6초간 공격 속도 +8% (최대 5중첩)", scopes: ["hero", CAVALRY, ARCHER, BLUNT, MAGE] },
 };
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
@@ -121,6 +121,7 @@ export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
   ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "armor", "xp"], // 궁병(화살이라 범위는 없다)
   ["hp", "defense", "armor", "regen", "dmg", "respawn", "atkSpeed", "area", "knock", "xp"], // 검방병
   ["dmg", "area", "hp", "armor", "critMult", "atkSpeed", "knock", "xp"], // 둔기병
+  ["dmg", "area", "range", "atkSpeed", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
 ];
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;

@@ -22,6 +22,7 @@ export interface Hit {
   charge: number; // 기병 돌격 추가 피해(속도 비례). 창병에게는 무효이고 되돌려준다
   srcType: number; // 공격자 병종(방패 피해 배율에 쓴다). 병종 없음은 -1
   fromAngle: number; // 방어자 위치에서 공격자(또는 날아온 쪽)를 바라본 방향
+  pierceGuard?: boolean; // 방패·돌격 반사·배후 배율을 무시하고 몸에 들어간다(하늘에서 떨어지는 마법)
   dot?: boolean; // 지속 피해(독): 방패·회피·배후 배율을 무시하고 몸에 들어간다
   poison?: number; // 독 총 피해(몸에 맞았을 때만 걸린다)
   crit?: boolean; // 치명타(이미 피해에 반영됨. 표시용)
@@ -44,6 +45,7 @@ export interface HitResult {
  *   검방병의 약점은 방패가 사라진 상태에서 드러나는 짧은 사거리와 낮은 공격력이다.
  */
 export function resolveHit(g: Guard, h: Hit): HitResult {
+  if (h.pierceGuard) return { body: h.damage, shield: 0, reflected: 0, shieldBroke: false, backstab: false };
   const spear = g.type === SPEAR || g.spearStance === true;
   const reflected = spear ? h.charge : 0;
   // 등 뒤에서 오는 공격은 피해가 늘어난다(돌격 피해도 포함). 방패는 정면만 막으므로 등 뒤에서는 어차피 소용없다.

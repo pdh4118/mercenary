@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   ARCHER,
   BLUNT,
+  MAGE,
   CAMP_FIRST_SPAWN_SEC,
   CAMP_USE_RADIUS,
   LEVELUP_PUSH_DISTANCE,
@@ -324,8 +325,8 @@ test("고용 검증: 금화 부족·거리·잘못된 선택·보유 한도", ()
   assert.equal(g.buy(a, near, 1).ok, false);
 });
 
-test("통솔력 비용: 기병만 2, 나머지는 1", () => {
-  assert.deepEqual([...UNIT_COST], [2, 1, 1, 1, 1]);
+test("통솔력 비용: 기병과 마법사만 2, 나머지는 1", () => {
+  assert.deepEqual([...UNIT_COST], [2, 1, 1, 1, 1, 2]);
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
@@ -768,9 +769,9 @@ const swingUntilHit = (g: Game, id: number, enemy: number) => {
   return g.getEnemy(enemy)?.hp;
 };
 
-test("무기 목록: 활·창·검·철퇴가 각각 궁병·창병·검방병·둔기병 속성이다", () => {
-  assert.deepEqual(WEAPONS.map((w) => w.name), ["활", "창", "검", "철퇴"]);
-  assert.deepEqual(WEAPONS.map((w) => w.type), [ARCHER, SPEAR, SHIELD, BLUNT]);
+test("무기 목록: 활·창·검·철퇴·지팡이가 각각 궁병·창병·검방병·둔기병·마법사 속성이다", () => {
+  assert.deepEqual(WEAPONS.map((w) => w.name), ["활", "창", "검", "철퇴", "지팡이"]);
+  assert.deepEqual(WEAPONS.map((w) => w.type), [ARCHER, SPEAR, SHIELD, BLUNT, MAGE]);
   assert.equal(WEAPONS[0]!.ranged, true);
 });
 

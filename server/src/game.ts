@@ -1,6 +1,9 @@
 import {
   ARCHER,
   BLUNT,
+  MAGE,
+  EVT_METEOR,
+  type MeteorWire,
   CARDS,
   ENEMY_XP,
   ARMY_AGGRO,
@@ -747,6 +750,7 @@ export class Game {
       this.separateEnemies();
     }
     this.stepBullets(dt, friendlies);
+    this.pruneCasts();
     // 모든 주인공이 쓰러져 있으면 게임오버(동료가 일으켜 세울 사람이 없다). 토너먼트 중에는 지는 것이 정상이라 제외한다.
     if (!duel && [...this.slots.values()].every((s) => s.state.down)) this.status = "defeat";
     this.tick++;
@@ -1509,6 +1513,17 @@ export class Game {
     }
   }
 
+  /** 주문을 외우는 중인 운석(낙하 예고 표시용) */
+  snapshotMeteors(): MeteorWire[] {
+    const out: MeteorWire[] = [];
+    for (const [key, c] of this.casts) {
+      const remaining = key < 0 ? this.slots.get(-key)?.windT ?? 0 : this.mercs.get(key)?.atkT ?? 0;
+      if (remaining <= 0) continue;
+      out.push([key, round(c.x), round(c.y), Math.round(100 * Math.max(0, Math.min(1, 1 - remaining / c.total))), Math.round(c.radius), key < 0 ? -key : this.mercs.get(key)!.owner]);
+    }
+    return out;
+  }
+
   snapshotChests(): ChestWire[] {
     return [...this.chests.values()].map((c) => [c.id, round(c.x), round(c.y), c.owner, Math.ceil(c.left)]);
   }
@@ -1646,6 +1661,19 @@ export class Game {
       s.switchCd = Math.max(0, s.switchCd - dt);
       p.swing = Math.max(0, p.swing - dt);
       if (s.windT > 0) {
+        const wc = this.casts.get(-p.id);
+        if (wc && s.windT > TUNE.MAGE_LOCK_SEC) {
+          // 주문을 외우는 동안은 마우스를 따라 낙하 지점이 움직이고, 마지막 순간에 고정된다
+          const [tx, ty] = this.heroSpot(s, WEAPONS[p.weapon]!);
+          const dx = tx - wc.x;
+          const dy = ty - wc.y;
+          const dl = Math.hypot(dx, dy);
+          const stepLen = Math.min(dl, 900 * dt);
+          if (dl > 0.001) {
+            wc.x += (dx / dl) * stepLen;
+            wc.y += (dy / dl) * stepLen;
+          }
+        }
         s.windT -= dt;
         p.wind = Math.max(0, s.windT);
         if (s.windT <= 0) {
@@ -1697,6 +1725,10 @@ export class Game {
       s.windT = w.windup / rate;
       p.wind = s.windT;
       s.fireCd = s.windT + w.cooldown / rate;
+      if (w.type === MAGE) {
+        const [x, y] = this.heroSpot(s, w);
+        this.casts.set(-p.id, { x, y, total: s.windT, radius: w.splash * s.mods.heroArea });
+      }
       return;
     }
     this.strikeHero(s);
@@ -1711,6 +1743,12 @@ export class Game {
     const reach = w.reach * s.mods.heroRange;
     if (w.windup <= 0 || w.ranged) s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
     if (crit && hasLegend(s.mods, "stormfire", "hero")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
+    if (w.type === MAGE) {
+      const cast = this.casts.get(-p.id);
+      this.casts.delete(-p.id);
+      if (cast) this.landMeteor(cast.x, cast.y, cast.radius, damage, p.id, crit);
+      return;
+    }
     if (w.ranged) {
       const n = 1 + Math.round(s.mods.heroMulti);
       for (let i = 0; i < n; i++) {
@@ -1849,7 +1887,7 @@ export class Game {
     const perPlayer = (TUNE.ENEMY_SPAWN_BASE_PER_SEC + TUNE.ENEMY_SPAWN_GROWTH_PER_SEC * this.stageTime) * stageMult;
     // 인원이 늘수록 적도 늘지만, 아군 전력도 함께 늘어나므로 인원 수에 정비례시키지는 않는다
     this.spawnBudget += perPlayer * Math.pow(alive.length, 0.75) * dt;
-    const totalWeight = ENEMY_SPAWN_WEIGHTS.reduce((a, b) => a + b, 0);
+    const totalWeight = (ENEMY_SPAWN_WEIGHTS as readonly number[]).reduce((a, b) => a + b, 0);
     while (this.spawnBudget >= 1) {
       this.spawnBudget -= 1;
       if (this.enemies.size >= ENEMY_MAX) continue;
@@ -1878,10 +1916,10 @@ export class Game {
         ownerId: p.id,
         hit: (h) => {
           if (p.invuln > 0) return 0; // 부활 직후 잠깐 무적
-          if (!h.dot && this.dodged(s.mods.heroDodge, p.x, p.y, p.id)) return 0;
+          if (!h.dot && !h.pierceGuard && this.dodged(s.mods.heroDodge, p.x, p.y, p.id)) return 0;
           // 창을 들면 창병처럼 돌격을 반사하고, 검을 들면 정면 피해를 절반으로 막는다
           const w = WEAPONS[p.weapon]!;
-          const r = h.dot
+          const r = h.dot || h.pierceGuard
             ? DOT_RESULT(h.damage)
             : resolveHit(
                 { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
@@ -1915,8 +1953,8 @@ export class Game {
         hit: (h) => {
           if (m.respawn > 0 || m.hp <= 0) return 0; // 이미 쓰러졌다
           const mods = this.slots.get(m.owner)?.mods;
-          if (!h.dot && this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
-          const r = h.dot ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
+          if (!h.dot && !h.pierceGuard && this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
+          const r = h.dot || h.pierceGuard ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
           const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
@@ -2072,6 +2110,7 @@ export class Game {
       m.cd = Math.max(0, m.cd - dt);
 
       if (m.atkT > 0) {
+        if (m.type === MAGE && !duel) this.steerMeteor(m, st, dt); // 주문을 외우는 동안 가장 빽빽한 곳으로 낙하 지점을 옮긴다
         m.atkT -= dt;
         if (m.atkT <= 0) {
           m.atkT = 0;
@@ -2110,6 +2149,7 @@ export class Game {
         case SHIELD: this.aiShield(c); break;
         case ARCHER: this.aiArcher(c); break;
         case BLUNT: this.aiBlunt(c); break;
+        case MAGE: this.aiMage(c); break;
         default: this.aiSpear(c);
       }
       if (duel) {
@@ -2548,6 +2588,12 @@ export class Game {
     const critMult = TUNE.CRIT_BASE_MULT + mstat(mods, m.type, "critMult");
     const dmg = st.damage * (crit ? critMult : 1);
     if (crit && hasLegend(mods, "stormfire", m.type)) m.cd = 0;
+    if (m.type === MAGE) {
+      const cast = this.casts.get(m.id);
+      this.casts.delete(m.id);
+      if (cast) this.landMeteor(cast.x, cast.y, cast.radius, dmg, m.owner, crit, m);
+      return;
+    }
     if (st.ranged) {
       const n = 1 + Math.round(mstat(mods, m.type, "multi"));
       for (let i = 0; i < n; i++) {
@@ -2668,6 +2714,124 @@ export class Game {
     e.poisonT = POISON_SEC;
     e.poisonOwner = ownerId;
     e.poisonSrc = src;
+  }
+
+  // --- 마법사: 운석 -------------------------------------------------------------
+  /** 주문을 외우는 중인 운석. 키는 시전자(용병 번호, 주인공은 -번호). 진행도는 시전자의 준비 시간에서 구한다. */
+  private casts = new Map<number, { x: number; y: number; total: number; radius: number; scanT?: number }>();
+
+  /** 시전이 끊긴 운석(시전자가 쓰러졌거나 무기를 바꿨거나 부활한 경우)을 치운다 */
+  private pruneCasts(): void {
+    for (const key of [...this.casts.keys()]) {
+      const active = key < 0 ? (this.slots.get(-key)?.windT ?? 0) > 0 && !this.slots.get(-key)!.state.down : (() => {
+        const m = this.mercs.get(key);
+        return !!m && m.respawn <= 0 && m.atkT > 0;
+      })();
+      if (!active) this.casts.delete(key);
+    }
+  }
+
+  /** 주인공이 마우스로 가리킨 낙하 지점(사거리 안으로 제한) */
+  private heroSpot(s: Slot, w: { reach: number }): [number, number] {
+    const p = s.state;
+    const maxD = w.reach * s.mods.heroRange;
+    const d = Math.max(40, Math.min(maxD, s.input.dist && s.input.dist > 0 ? s.input.dist : maxD * 0.7));
+    return [clampToWorld(p.x + Math.cos(p.aim) * d, 10), clampToWorld(p.y + Math.sin(p.aim) * d, 10)];
+  }
+
+  /** 점들 가운데 반경 안에 가장 많이(가중치 합) 모이는 곳을 찾는다. 모인 점들의 무게중심을 돌려준다. */
+  private meteorSpot(from: { x: number; y: number }, reach: number, radius: number, pts: { x: number; y: number; w: number }[]): [number, number] | null {
+    const cand = pts.filter((t) => Math.hypot(t.x - from.x, t.y - from.y) <= reach).sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y)).slice(0, 60);
+    let best = -1;
+    let bx = 0;
+    let by = 0;
+    for (const c of cand) {
+      let sum = 0;
+      let cx = 0;
+      let cy = 0;
+      for (const t of pts) {
+        if (Math.hypot(t.x - c.x, t.y - c.y) > radius * 0.85) continue;
+        sum += t.w;
+        cx += t.x * t.w;
+        cy += t.y * t.w;
+      }
+      if (sum > best) {
+        best = sum;
+        bx = cx / sum;
+        by = cy / sum;
+      }
+    }
+    if (best <= 0) return null;
+    // 사거리 끝을 넘지 않게
+    const d = Math.hypot(bx - from.x, by - from.y);
+    if (d > reach) {
+      bx = from.x + ((bx - from.x) / d) * reach;
+      by = from.y + ((by - from.y) / d) * reach;
+    }
+    return [bx, by];
+  }
+
+  private enemyPoints(): { x: number; y: number; w: number }[] {
+    return [...this.enemies.values()].map((e) => ({ x: e.x, y: e.y, w: e.boss ? 6 : e.type === ARCHER ? 1.4 : 1 }));
+  }
+
+  /** 용병 마법사가 주문을 외우는 동안(낙하 직전까지) 가장 빽빽한 곳으로 낙하 지점을 천천히 옮긴다 */
+  private steerMeteor(m: Merc, st: UnitStats, dt: number): void {
+    const cast = this.casts.get(m.id);
+    if (!cast || m.atkT <= TUNE.MAGE_LOCK_SEC) return;
+    cast.scanT = (cast.scanT ?? 0) - dt;
+    if (cast.scanT > 0) return;
+    cast.scanT = 0.3;
+    const spot = this.meteorSpot(m, st.reach, cast.radius, this.enemyPoints());
+    if (!spot) return;
+    const dx = spot[0] - cast.x;
+    const dy = spot[1] - cast.y;
+    const dl = Math.hypot(dx, dy);
+    const k = dl > 150 ? 150 / dl : 1; // 한 번에 너무 멀리 튀지 않게
+    cast.x += dx * k;
+    cast.y += dy * k;
+  }
+
+  /** 운석이 떨어져 폭발한다: 반경 안의 적(토너먼트에서는 상대 선수)에게 방패를 무시한 큰 피해. 중심이 가장 세고 가장자리는 약하다. */
+  private landMeteor(x: number, y: number, radius: number, damage: number, ownerId: number, crit: boolean, src?: Merc): void {
+    this.pushEvent(EVT_METEOR, x, y, 0, radius);
+    const scale = (d: number) => 1 - TUNE.MAGE_FALLOFF * Math.min(1, d / radius);
+    if (this.phase === "tournament") {
+      for (const f of this.duelFoes(ownerId)) {
+        const d = Math.hypot(f.x - x, f.y - y);
+        if (d > radius + f.radius) continue;
+        f.hit({ damage: damage * scale(d), charge: 0, srcType: MAGE, fromAngle: Math.atan2(y - f.y, x - f.x), crit, pierceGuard: true });
+      }
+      return;
+    }
+    for (const e of [...this.enemies.values()]) {
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d > radius + radiusOf(e)) continue;
+      this.damageEnemy(e, { damage: damage * scale(d), charge: 0, srcType: MAGE, fromAngle: Math.atan2(y - e.y, x - e.x), crit, pierceGuard: true }, ownerId, src);
+    }
+  }
+
+  /** 마법사: 느리고 약해서 진형 뒤에 머물다가, 사거리 안에 적이 모여 있으면 서서 주문을 외운다(5초). 외우는 동안은 움직이지 못한다. */
+  private aiMage(c: AiCtx): void {
+    const { m, st } = c;
+    if (m.cd <= 0 && c.targets.length > 0) {
+      const spot = this.meteorSpot(m, st.reach, st.splash, c.targets.map((t) => ({ x: t.x, y: t.y, w: t.hero ? 3 : 1 })));
+      if (spot) {
+        m.atkT = st.windup;
+        m.atkAng = Math.atan2(spot[1] - m.y, spot[0] - m.x);
+        m.face = m.atkAng;
+        this.casts.set(m.id, { x: spot[0], y: spot[1], total: st.windup, radius: st.splash });
+        return;
+      }
+    }
+    // 사거리 밖에 적이 있으면 진형에서 조금(마법사의 활동 범위) 앞으로 나가 사거리에 들어간다
+    const near = m.cd <= 0 ? this.nearestTarget(c, m, st.reach + 170) : null;
+    if (near && c.homeDist < 200) {
+      m.face = Math.atan2(near.t.y - m.y, near.t.x - m.x);
+      this.moveToward(m, near.t.x, near.t.y, st.speed, c.dt, st.reach * 0.85);
+      return;
+    }
+    this.aiGoHome(c);
   }
 
   /** 토너먼트: 독에 걸린 선수(주인공은 -번호, 용병은 용병 번호) */

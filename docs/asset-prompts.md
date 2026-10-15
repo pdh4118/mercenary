@@ -8,6 +8,8 @@
 |---|---|
 | 병종 유닛 10종 (아군·적 각 5) | 완료, 게임에 적용됨 (`client/public/assets/units/`) |
 | 주인공 (무기별 포즈) | 완료, 적용됨 (`assets/hero/`). 기병 포즈는 아직 쓸 곳이 없어 보관 |
+| 마법사 (아군·적 유닛, 주인공 지팡이 포즈, 카드 일러스트) | 아군·주인공·카드는 적용됨(`units/ally_mage.png`, `hero/hero_mage.png`, `cards/art_mage.png`). 적 마법사 그림(`units/enemy_mage.png`)은 적이 아직 마법사를 쓰지 않아 보관 |
+| 운석 이펙트 (낙하 6컷·폭발 5컷·바닥 그을음 5컷) | 완료, 적용됨 (`assets/fx/meteor_*`, `boom_*`, `scorch_*`) |
 | 캠프 | 완료, 적용됨 (`assets/camp/camp.png`) |
 | 바닥 타일 | 완료, 적용됨 (`assets/tiles/ground_a.png`) |
 | 투사체 (화살, 아군·적 각 5컷) | 완료, 적용됨 (`assets/fx/`). 속도선 컷으로 날아가고 명중 컷을 잠깐 보여 줌 |

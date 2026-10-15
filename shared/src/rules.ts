@@ -55,6 +55,8 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  MAGE_LOCK_SEC: 1, // 운석이 떨어지기 이 시간 전부터 낙하 지점이 고정된다
+  MAGE_FALLOFF: 0.4, // 폭발 가장자리의 피해 감소 비율(중심은 100%)
   CAV_RUNUP_SEC: 2.6, // 기병이 한 대 치고 빠져 다시 속도를 붙이는 최대 시간
   CAV_RUNUP_DIST: 240, // 달리기 위해 대상에서 떨어지는 거리(px)
   CAV_RUNUP_READY: 0.85, // 이 속도(최고 속도 대비)가 붙고 옆·뒤를 잡으면 다시 돌격
@@ -78,11 +80,12 @@ export const SPEAR = 1;
 export const ARCHER = 2;
 export const SHIELD = 3;
 export const BLUNT = 4;
-export const UNIT_TYPES = [CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT] as const;
+export const MAGE = 5;
+export const UNIT_TYPES = [CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE] as const;
 /** 주인공의 기본 공격·피격처럼 병종이 없는 쪽은 상성 계산에서 제외한다 */
 export const NO_TYPE = -1;
 
-export const UNIT_NAMES = ["기병", "창병", "궁병", "검방병", "둔기병"] as const;
+export const UNIT_NAMES = ["기병", "창병", "궁병", "검방병", "둔기병", "마법사"] as const;
 
 /**
  * 병종 상성은 배율표가 아니라 구체적인 규칙으로 표현한다.
@@ -103,7 +106,7 @@ export const SHIELD_FRONT_ARC = rad(70); // 정면 반각. 이 안에서 오는 
  * 방패 체력이 깎이는 배율(공격자 병종별): [기병, 창병, 궁병, 검방병, 둔기병].
  * 화살은 거의 막혀 방패가 오래 버티고, 철퇴는 방패를 쉽게 부순다. 기병의 돌격도 정면에서는 일부 흡수된다.
  */
-export const SHIELD_DAMAGE_FACTOR = [0.5, 0.6, 0.25, 1.0, 2.5] as const;
+export const SHIELD_DAMAGE_FACTOR = [0.5, 0.6, 0.25, 1.0, 2.5, 1.0] as const;
 export const HERO_SWORD_FRONT_BLOCK = 0.5; // 주인공이 검을 들면 정면 피해가 이 배율로 줄어든다
 export function shieldFactor(srcType: number): number {
   return SHIELD_DAMAGE_FACTOR[srcType] ?? 1;
@@ -166,6 +169,8 @@ export const MERC_STATS: readonly UnitStats[] = [
   { hp: 160, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 120, splash: 0 },
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 180, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
+  // 마법사: 느리고 약하지만 5초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
+  { hp: 70, speed: 60, reach: 280, damage: 150, windup: 5, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
@@ -174,24 +179,26 @@ export const ENEMY_STATS: readonly UnitStats[] = [
   { hp: 18, speed: 75, reach: 260, damage: 4.5, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 0 },
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },
   { hp: 36, speed: 60, reach: 38, damage: 9.5, windup: 0.9, cooldown: 1.8, arc: deg(90), ranged: false, radius: 14, leash: 0, shield: 0, splash: 40 },
+  // 적 마법사(아직 등장하지 않는다. 시트와 표를 병종 수에 맞추기 위한 자리)
+  { hp: 22, speed: 55, reach: 280, damage: 60, windup: 5, cooldown: 3, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 110 },
 ];
 
 /** 적 생성 비율(기병, 창병, 궁병, 검방병, 둔기병) */
-export const ENEMY_SPAWN_WEIGHTS = [15, 25, 20, 25, 15] as const;
-export const ENEMY_GOLD = [5, 4, 4, 5, 7] as const;
+export const ENEMY_SPAWN_WEIGHTS = [15, 25, 20, 25, 15, 0] as const;
+export const ENEMY_GOLD = [5, 4, 4, 5, 7, 8] as const;
 
 // 투사체 속도(px/s)
 export const MERC_ARROW_SPEED = 420;
 export const ENEMY_ARROW_SPEED = 260;
 
 // 용병 고용
-export const MERC_BASE_PRICE = [70, 40, 45, 50, 60] as const;
+export const MERC_BASE_PRICE = [70, 40, 45, 50, 60, 90] as const;
 /** 통솔력 비용: 보유 용병의 비용 합이 통솔력(최대 병력 규모)을 넘을 수 없다. 기병만 2. */
-export const UNIT_COST = [2, 1, 1, 1, 1] as const;
+export const UNIT_COST = [2, 1, 1, 1, 1, 2] as const;
 /** 통솔력과 별개로 개체 수를 묶어 두는 안전 한도 */
 export const MAX_MERCS_PER_PLAYER = 16;
 /** 쓰러진 뒤 부활까지(초). 기병은 유지 부담으로 더 오래 걸린다. */
-export const MERC_RESPAWN_SEC = [40, 30, 30, 30, 30] as const;
+export const MERC_RESPAWN_SEC = [40, 30, 30, 30, 30, 40] as const;
 
 export function mercPrice(type: number, owned: number): number {
   const base = MERC_BASE_PRICE[type] ?? 0;
@@ -221,13 +228,13 @@ export const ASSAULT_LEASH_MULT_CAVALRY = 1.6;
 
 // 병종별 역할 AI
 /** 검방병이 지키려는 아군의 취약도(병종별: 기병, 창병, 궁병, 검방병, 둔기병). 주인공은 HERO_WARD_WEIGHT */
-export const WARD_WEIGHT = [1.2, 1.6, 3, 0.9, 1.4] as const;
+export const WARD_WEIGHT = [1.2, 1.6, 3, 0.9, 1.4, 3.4] as const;
 export const HERO_WARD_WEIGHT = 2.6;
 export const GUARD_THREAT_RADIUS = 320; // 지키는 아군 둘레에서 위협으로 보는 거리
 export const ARCHER_STRAFE_SEC = 2.5; // 방패 정면을 피해 돌아가려고 시도하는 최대 시간
 export const SPEAR_WATCH_RANGE = 520; // 창병이 적 기병을 주시하는 거리
 /** 기병이 노릴 가치(적 병종별: 기병, 창병, 궁병, 검방병, 둔기병). 궁병과 둔기병을 먼저, 정면의 방패는 나중에 */
-export const CAV_TARGET_WEIGHT = [1, 1, 2.2, 0.5, 1.8] as const;
+export const CAV_TARGET_WEIGHT = [1, 1, 2.2, 0.5, 1.8, 2.4] as const;
 /** 둔기병이 방패 있는 검방병을 노리는 가중치 */
 export const BLUNT_SHIELD_PREF = 2.6;
 
@@ -240,7 +247,7 @@ export const CAMP_USE_RADIUS = 120;
 export const CAMP_MAX = 4;
 
 // 진형: 주인공이 바라보는 방향 기준의 줄. 0=앞, 1=중간, 2=뒤, -1=양옆 날개(기병)
-export const FORMATION_ROW_OF_TYPE = [-1, 1, 2, 0, 0] as const;
+export const FORMATION_ROW_OF_TYPE = [-1, 1, 2, 0, 0, 2] as const;
 export const FORMATION_ROW_OFFSET = [85, 15, -60] as const;
 export const FORMATION_WING_LATERAL = 150; // 기병은 주인공 양옆 이만큼 바깥에서 대기한다
 export const FORMATION_WING_FORWARD = 30;
@@ -257,7 +264,7 @@ export function angleDiff(a: number, b: number): number {
 }
 
 // 경험치와 레벨: 처치 경험치의 일부는 처치한 사람에게, 나머지는 모든 플레이어에게 똑같이 나뉜다(뒤처져도 따라갈 수 있게).
-export const ENEMY_XP = [3, 2.5, 2.5, 3, 4] as const; // 병종별 처치 경험치
+export const ENEMY_XP = [3, 2.5, 2.5, 3, 4, 5] as const; // 병종별 처치 경험치
 export function xpNeeded(level: number): number {
   return TUNE.XP_BASE + TUNE.XP_PER_LEVEL * (level - 1); // 레벨업이 잦도록 낮게 잡았다
 }
