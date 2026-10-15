@@ -7,11 +7,10 @@ import {
   MERC_STATS,
   SHAKEN_DEATHS,
   SHAKEN_MIN_ARMY,
-  SHAKEN_DMG,
-  SHAKEN_SEC,
   SPEAR,
   SWARM_MAX,
   SWARM_PER_MERC,
+  TUNE,
   TIER_BUY_MULT,
   TIER_RESPAWN_EXTRA,
   campMaxTier,
@@ -107,22 +106,33 @@ test("군세: 살아 있는 용병이 많을수록 공격력이 오르고 상한
   assert.equal(g.getPlayer(a)!.swarm, SWARM_MAX);
 });
 
-test("사기 저하: 짧은 시간에 여럿이 쓰러지면 한동안 공격력이 떨어지고, 시간이 지나면 풀린다", () => {
+test("사기 저하: 짧은 시간에 여럿이 쓰러지면 모든 용병이 공포에 질려 적에게서 도망치고, 시간이 지나면 돌아온다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
+  (g.getPlayer(a) as { invuln: number }).invuln = 1e9;
   const ids = Array.from({ length: 10 }, () => g.addMerc(a, SPEAR, 0, 0));
   g.step();
-  const before = g.mercStatsForTest(ids[SHAKEN_DEATHS]!).damage;
+  // 용병 곁에 가만히 서 있는 적(맞아도 죽지 않는다)
+  const foeId = g.spawnEnemyAt(60, 0, 4);
+  const foe = (g as unknown as { enemies: Map<number, { hp: number; maxHp: number; cd: number; atkT: number; x: number; y: number }> }).enemies.get(foeId)!;
+  foe.hp = foe.maxHp = 99999;
+  foe.cd = 99;
+  foe.atkT = 999;
+  const runner = ids[SHAKEN_DEATHS]!;
+  const d0 = Math.hypot(g.getMerc(runner)!.x - foe.x, g.getMerc(runner)!.y - foe.y);
   for (let i = 0; i < SHAKEN_DEATHS; i++) hurt(g, ids[i]!, 10_000);
-  assert.ok(g.getPlayer(a)!.shaken > 0);
-  g.step();
-  const during = g.mercStatsForTest(ids[SHAKEN_DEATHS]!).damage;
-  // 쓰러진 만큼 군세도 줄어 있다
-  const swarmNow = g.getPlayer(a)!.swarm;
-  assert.ok(Math.abs(during - MERC_STATS[SPEAR]!.damage * (1 + swarmNow) * SHAKEN_DMG) < 1e-9);
-  assert.ok(during < before * 0.85);
-  for (let i = 0; i < (SHAKEN_SEC + 1) * 20; i++) g.step();
+  assert.equal(g.getPlayer(a)!.shaken, TUNE.SHAKEN_SEC);
+  const hp = foe.hp;
+  for (let i = 0; i < 40; i++) g.step(); // 2초
+  const d1 = Math.hypot(g.getMerc(runner)!.x - foe.x, g.getMerc(runner)!.y - foe.y);
+  assert.ok(d1 > d0 + 40, `적에게서 멀어진다: ${d0.toFixed(0)} → ${d1.toFixed(0)}`);
+  assert.equal(foe.hp, hp, "도망치는 동안은 공격하지 않는다");
+  // 공격력은 줄지 않는다(군세만 반영)
+  assert.ok(Math.abs(g.mercStatsForTest(runner).damage - MERC_STATS[SPEAR]!.damage * (1 + g.getPlayer(a)!.swarm)) < 1e-9);
+  for (let i = 0; i < (TUNE.SHAKEN_SEC + 1) * 20; i++) g.step();
   assert.equal(g.getPlayer(a)!.shaken, 0);
+  for (let i = 0; i < 6 * 20; i++) g.step();
+  assert.ok(foe.hp < hp, "공포가 풀리면 다시 싸운다");
 });
 
 test("느리게 하나씩 쓰러지는 것은 사기 저하가 아니다", () => {
@@ -163,7 +173,7 @@ test("사기 저하 조건: 작은 부대에는 걸리지 않고, 큰 부대는 
   hurt(big, bids[3]!, 10_000);
   assert.ok(big.getPlayer(b)!.shaken > 0);
   // 풀린 직후 유예
-  for (let i = 0; i < (SHAKEN_SEC + 1) * 20; i++) big.step();
+  for (let i = 0; i < (TUNE.SHAKEN_SEC + 1) * 20; i++) big.step();
   assert.equal(big.getPlayer(b)!.shaken, 0);
   for (let i = 4; i < 9; i++) hurt(big, bids[i]!, 10_000);
   assert.equal(big.getPlayer(b)!.shaken, 0, "유예 시간에는 다시 걸리지 않는다");

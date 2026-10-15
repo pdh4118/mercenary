@@ -42,7 +42,7 @@ export const decodeOffer = (code: number): { type: number; tier: number } => ({ 
 /** 높은 단계 용병은 부활이 오래 걸린다 */
 export const TIER_RESPAWN_EXTRA = 0.15;
 
-// 군세: 살아 있는 용병 수에 비례해 공격력이 오른다(물량의 강점). 짧은 시간에 여럿이 쓰러지면 사기가 꺾여 약해진다(물량의 약점).
+// 군세: 살아 있는 용병 수에 비례해 공격력이 오른다(물량의 강점). 짧은 시간에 여럿이 쓰러지면 사기가 꺾여 모두 공포에 질려 잠깐 도망친다(물량의 약점).
 export const SWARM_PER_MERC = 0.025;
 export const SWARM_MAX = 0.4;
 export const SHAKEN_DEATHS = 3; // 이 시간 안에 최소 이만큼(그리고 용병 수의 SHAKEN_FRAC) 쓰러지면
@@ -50,8 +50,7 @@ export const SHAKEN_FRAC = 0.3;
 export const SHAKEN_MIN_ARMY = 6; // 이보다 작은 부대는 사기 저하가 걸리지 않는다(이미 약한데 더 얹지 않는다)
 export const SHAKEN_GRACE_SEC = 10; // 사기 저하가 풀린 뒤 이 시간 동안은 다시 걸리지 않는다
 export const SHAKEN_WINDOW_SEC = 6;
-export const SHAKEN_SEC = 8; // 사기 저하가 이어지는 시간
-export const SHAKEN_DMG = 0.8; // 그동안 용병 공격력 배율
+// 사기 저하의 지속 시간과 도망 속도는 TUNE.SHAKEN_SEC / TUNE.SHAKEN_FLEE_SPEED (수치 조정 도구)
 
 export const tierName = (type: number, tier: number): string => TIER_NAMES[type]?.[tier] ?? "";
 

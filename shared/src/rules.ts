@@ -55,6 +55,8 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  SHAKEN_SEC: 3, // 사기 저하(공포)로 용병이 도망치는 시간(초)
+  SHAKEN_FLEE_SPEED: 1.3, // 도망칠 때 이동 속도 배율
   MOUNT_SPEED_MAX: 1.7, // 기마 주인공이 달려서 붙는 최고 속도 배율(걸어갈 때 대비)
   ENEMY_MAGE_FROM_STAGE: 2, // 적 마법사가 나오기 시작하는 스테이지
   MAGE_LOCK_SEC: 1, // 운석이 떨어지기 이 시간 전부터 낙하 지점이 고정된다

@@ -144,8 +144,6 @@ import {
   SHAKEN_FRAC,
   SHAKEN_GRACE_SEC,
   SHAKEN_MIN_ARMY,
-  SHAKEN_DMG,
-  SHAKEN_SEC,
   SHAKEN_WINDOW_SEC,
   SWARM_MAX,
   SWARM_PER_MERC,
@@ -2069,14 +2067,15 @@ export class Game {
     m.atkT = 0;
   }
 
-  /** 짧은 시간에 여럿이 쓰러지면 사기가 꺾여 한동안 약해진다 */
+  /** 짧은 시간에 여럿이 쓰러지면 사기가 꺾여 모든 용병이 공포에 질려 잠깐 도망친다 */
   private noteDeath(owner: Slot): void {
+    if (this.phase === "tournament") return; // 토너먼트에서는 사기가 꺾이지 않는다
     owner.deaths.push(this.time);
     owner.deaths = owner.deaths.filter((t) => this.time - t <= SHAKEN_WINDOW_SEC);
     // 큰 부대가 짧은 시간에 크게 무너졌을 때만(작은 부대나 직후 재발 제외)
     const army = this.countMercs(owner.state.id);
     if (army >= SHAKEN_MIN_ARMY && owner.state.shaken <= 0 && owner.shakenGrace <= 0 && owner.deaths.length >= Math.max(SHAKEN_DEATHS, Math.ceil(army * SHAKEN_FRAC))) {
-      owner.state.shaken = SHAKEN_SEC;
+      owner.state.shaken = TUNE.SHAKEN_SEC;
       owner.deaths = [];
     }
   }
@@ -2166,6 +2165,14 @@ export class Game {
       if (regen > 0) m.hp = Math.min(st.hp, m.hp + st.hp * regen * dt);
       m.cd = Math.max(0, m.cd - dt);
 
+      // 공포: 사기가 꺾인 동안 모든 용병이 싸우지 않고 적에게서 멀어지는 쪽으로 도망친다(주문·공격 준비도 끊긴다)
+      if (!duel && ownerSlot && ownerSlot.state.shaken > 0) {
+        m.atkT = 0;
+        m.evadeT = 0;
+        this.mercFlee(m, st, dt);
+        continue;
+      }
+
       if (m.atkT > 0) {
         if (m.type === MAGE && !duel) this.steerMeteor(m, st, dt); // 주문을 외우는 동안 가장 빽빽한 곳으로 낙하 지점을 옮긴다
         m.atkT -= dt;
@@ -2229,6 +2236,27 @@ export class Game {
     const d = Math.hypot(tx - ward.x, ty - ward.y) || 1;
     const g = Math.min(d, Math.max(minDist, d * TUNE.GUARD_MID_FRAC));
     return [ward.x + ((tx - ward.x) / d) * g, ward.y + ((ty - ward.y) / d) * g];
+  }
+
+  /** 공포에 질린 용병: 가까운 적들(가까울수록 크게)에게서 멀어지는 방향으로 달아난다 */
+  private mercFlee(m: Merc, st: UnitStats, dt: number): void {
+    let vx = 0;
+    let vy = 0;
+    for (const e of this.enemies.values()) {
+      const dx = m.x - e.x;
+      const dy = m.y - e.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 500) continue;
+      const w = 1 / (d + 40);
+      vx += (dx / (d || 1)) * w;
+      vy += (dy / (d || 1)) * w;
+    }
+    const l = Math.hypot(vx, vy);
+    if (l < 1e-9) return; // 주위에 적이 없으면 그 자리에서 숨을 고른다
+    const sp = st.speed * TUNE.SHAKEN_FLEE_SPEED;
+    m.x = clampToWorld(m.x + (vx / l) * sp * dt, st.radius);
+    m.y = clampToWorld(m.y + (vy / l) * sp * dt, st.radius);
+    m.face = Math.atan2(vy, vx);
   }
 
   private startAttack(m: Merc, st: UnitStats, ang: number): void {
@@ -3191,7 +3219,7 @@ export class Game {
       ...base,
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
-      damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)) * ((slot?.state.shaken ?? 0) > 0 ? SHAKEN_DMG : 1),
+      damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)),
       cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
       reach: base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier),

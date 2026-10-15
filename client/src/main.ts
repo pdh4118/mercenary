@@ -1443,6 +1443,23 @@ async function main() {
       const v = mercs.views.get(w[0]);
       if (v) shieldArc(v.x, v.y, w[12], w[11] > 0 ? w[10] / w[11] : 0, w[14], MERC_STATS[SHIELD]!.radius + 12, 0x8fd0ff);
     }
+    // 공포에 질려 도망치는 용병: 머리 위에 느낌표
+    const scared = new Set(latest.players.filter((q) => q.shaken > 0).map((q) => q.id));
+    if (scared.size > 0) {
+      for (const w of latest.mercs) {
+        if (w[8] > 0 || !scared.has(w[5])) continue;
+        const v = mercs.views.get(w[0]);
+        if (!v) continue;
+        const ty = v.y - allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 22;
+        fxLayer
+          .roundRect(v.x - 3, ty, 6, 11, 2)
+          .fill(0xffd45d)
+          .stroke({ width: 1.2, color: 0x6a1a00 })
+          .circle(v.x, ty + 16, 3)
+          .fill(0xffd45d)
+          .stroke({ width: 1.2, color: 0x6a1a00 });
+      }
+    }
     // 장군: 발밑에 금빛 고리
     for (const w of latest.enemies) {
       if (w[11] !== 1) continue;
@@ -1671,7 +1688,7 @@ async function main() {
       hudLead.text = `통솔력 ${used}/${meState.leadership}`;
       hudMercs.text = `용병 ${mine.length}명`;
       const extra: string[] = [];
-      if (meState.shaken > 0) extra.push(`사기 저하! 공격력 -20% (${Math.ceil(meState.shaken)}초)`);
+      if (meState.shaken > 0) extra.push(`공포! 용병이 도망칩니다 (${Math.ceil(meState.shaken)}초)`);
       else if (meState.swarm > 0) extra.push(`군세: 공격력 +${Math.round(meState.swarm * 100)}%`);
       if (meState.luck > 0) extra.push(`행운 +${Math.round(meState.luck * 100)}%`);
       if (down > 0) extra.push(`용병 ${down}명 쓰러짐 (부활 대기)`);
