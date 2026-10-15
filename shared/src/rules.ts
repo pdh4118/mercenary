@@ -55,8 +55,8 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  MOUNT_SPEED_MAX: 1.7, // 기마 주인공이 달려서 붙는 최고 속도 배율(걸어갈 때 대비)
   ENEMY_MAGE_FROM_STAGE: 2, // 적 마법사가 나오기 시작하는 스테이지
-  ENEMY_MAGE_MAX: 3, // 적 마법사가 동시에 살아 있을 수 있는 수
   MAGE_LOCK_SEC: 1, // 운석이 떨어지기 이 시간 전부터 낙하 지점이 고정된다
   MAGE_FALLOFF: 0.4, // 폭발 가장자리의 피해 감소 비율(중심은 100%)
   CAV_RUNUP_SEC: 2.6, // 기병이 한 대 치고 빠져 다시 속도를 붙이는 최대 시간
@@ -225,7 +225,8 @@ export const ARCHER_KITE_HOME_PULL = 0.7; // 물러날 때 진형 자리 쪽으�
 // 진형 모드: 기본 진형은 주인공 주변을 지키며 싸우고, 돌격 진형은 대열이 앞으로 나가 더 멀리 적을 쫓는다
 export const STANCE_DEFEND = 0;
 export const STANCE_ASSAULT = 1;
-export const STANCE_NAMES = ["기본 진형", "돌격 진형"] as const;
+export const STANCE_HOLD = 2; // 지정한 지점에 진형을 펴고 지킨다(주인공이 떠나도 그 자리에 남는다)
+export const STANCE_NAMES = ["기본(주인공 수비)", "돌격", "지점 방어"] as const;
 export const ASSAULT_LEASH_MULT_CAVALRY = 1.6;
 
 // 병종별 역할 AI

@@ -7,7 +7,7 @@ export * from "./formation.js";
 export * from "./tiers.js";
 export * from "./names.js";
 export * from "./audio.js";
-import { ARCHER, BLUNT, MAGE, SHIELD, SPEAR } from "./rules.js";
+import { ARCHER, BLUNT, CAVALRY, MAGE, SHIELD, SPEAR } from "./rules.js";
 
 export const TICK_RATE = 20; // 서버가 초당 계산·전송하는 횟수
 export const MAX_PLAYERS = 8;
@@ -55,6 +55,7 @@ export const WEAPONS: readonly WeaponDef[] = [
   { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 9, cooldown: 0.35, windup: 0, splash: 0, note: "정면 피해 절반 방어 · 빠른 공격" },
   { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 42, cooldown: 1.2, windup: 0.5, splash: 46, note: "방패 파괴(250%) · 범위 공격 · 휘두르기 전 준비 동작이 길다" },
   { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 150, cooldown: 1.5, windup: 3, splash: 140, note: "마우스 위치에 운석 · 3초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
+  { name: "기마", type: CAVALRY, ranged: false, reach: 54, arc: rad(80), damage: 14, cooldown: 0.65, windup: 0.12, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창병에게는 반사" },
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
 export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간
@@ -81,7 +82,9 @@ export interface PlayerState {
   xpNeed: number; // 다음 레벨까지 필요한 경험치
   pending: number; // 아직 고르지 않은 카드 선택 횟수(레벨업 + 보상 상자)
   hs: number[]; // 주인공 능력치(지금 무기 기준): [공격력, 초당 공격 횟수, 사거리, 치명타 확률, 치명타 배율, 관통, 범위 배율, 넉백, 방어력, 회피율, 재생(초당), 이동 속도, 발사 수]
-  stance: number; // 용병 진형 모드(STANCE_DEFEND / STANCE_ASSAULT)
+  stance: number; // 용병 진형 모드(STANCE_DEFEND / STANCE_ASSAULT / STANCE_HOLD)
+  holdX: number; // 지점 방어 모드에서 지키는 지점(stance가 STANCE_HOLD일 때만 의미가 있다)
+  holdY: number;
   box: number; // 그중 보상 상자에서 나온 선택 횟수(상자가 먼저 나온다)
   rerolls: number; // 남은 카드 새로고침 횟수
   legends: string[]; // 고른 전설 능력(LegendId)
@@ -263,7 +266,8 @@ export type ClientMsg =
   | { t: "upgrade"; merc: number } // 용병 한 명을 다음 단계로 강화
   | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number } // 기병 돌격 지시(월드 좌표)
-  | { t: "stance"; v: number } // 용병 진형 모드(0 기본, 1 돌격)
+  | { t: "stance"; v: number } // 용병 진형 모드(0 기본, 1 돌격, 2 지점 방어)
+  | { t: "hold"; x: number; y: number } // 이 지점을 지키도록 지시(지점 방어 모드로 바꾼다)
   | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)
 
 export type ServerMsg =

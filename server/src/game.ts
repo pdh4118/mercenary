@@ -124,6 +124,7 @@ import {
   SPEAR_WATCH_RANGE,
   STANCE_ASSAULT,
   STANCE_DEFEND,
+  STANCE_HOLD,
   WARD_WEIGHT,
   CHEST_OPEN_RADIUS,
   TOURNAMENT_ARENA_RADIUS,
@@ -266,6 +267,9 @@ interface Slot {
   input: PlayerInput;
   fireCd: number;
   windT: number; // 공격 준비 동작이 남은 시간(철퇴). 0이면 준비 중이 아니다
+  mom: number; // 기마 주인공의 속도(0~1). 달리면 오르고 멈추면 줄어든다
+  holdSet: boolean; // 지점 방어 지점을 한 번이라도 지정했다
+  holdFacing: number; // 지점 방어 진형이 바라보는 방향
   deaths: number[]; // 최근 용병이 쓰러진 시각(사기 저하 판정)
   shakenGrace: number; // 사기 저하가 다시 걸리지 않는 남은 시간
   haste: Record<string, number>; // 전장의 함성 중첩(대상별: hero 또는 병종 번호)
@@ -570,6 +574,8 @@ export class Game {
         pending: 0,
         hs: [],
         stance: STANCE_DEFEND,
+        holdX: 0,
+        holdY: 0,
         box: 0,
         rerolls: REROLL_START,
         legends: [],
@@ -592,6 +598,9 @@ export class Game {
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
       windT: 0,
+      mom: 0,
+      holdSet: false,
+      holdFacing: 0,
       deaths: [],
       shakenGrace: 0,
       haste: {},
@@ -780,7 +789,7 @@ export class Game {
       r2(Math.min(DEFENSE_MAX, m.heroDefense)),
       r2(Math.min(DODGE_MAX, m.heroDodge)),
       r2(m.heroRegen),
-      Math.round(TUNE.PLAYER_SPEED * m.heroSpeed),
+      Math.round(TUNE.PLAYER_SPEED * m.heroSpeed * (WEAPONS[s.state.weapon]!.type === CAVALRY ? TUNE.MOUNT_SPEED_MAX : 1)),
       1 + m.heroMulti,
     ];
   }
@@ -1582,10 +1591,15 @@ export class Game {
     if (!s) return out;
     const alive = [...this.mercs.values()].filter((m) => m.owner === owner && m.respawn <= 0);
     const rel = layoutFormation(alive, s.zones, s.spacing);
-    const fx = Math.cos(s.facing);
-    const fy = Math.sin(s.facing);
+    // 지점 방어: 진형을 주인공이 아니라 지정한 지점에 편다(토너먼트에서는 쓰지 않는다)
+    const hold = s.state.stance === STANCE_HOLD && this.phase !== "tournament";
+    const face = hold ? s.holdFacing : s.facing;
+    const ox = hold ? s.state.holdX : s.state.x;
+    const oy = hold ? s.state.holdY : s.state.y;
+    const fx = Math.cos(face);
+    const fy = Math.sin(face);
     const adv = s.state.stance === STANCE_ASSAULT ? TUNE.ASSAULT_ADVANCE : 0; // 돌격 진형은 대열이 앞으로 나간다
-    for (const [id, [fwd, lat]] of rel) out.set(id, [s.state.x + fx * (fwd + adv) - fy * lat, s.state.y + fy * (fwd + adv) + fx * lat]);
+    for (const [id, [fwd, lat]] of rel) out.set(id, [ox + fx * (fwd + adv) - fy * lat, oy + fy * (fwd + adv) + fx * lat]);
     return out;
   }
 
@@ -1593,8 +1607,24 @@ export class Game {
   /** 용병 진형 모드(기본 / 돌격)를 바꾼다 */
   setStance(playerId: number, v: unknown): boolean {
     const sl = this.slots.get(playerId);
-    if (!sl || (v !== STANCE_DEFEND && v !== STANCE_ASSAULT)) return false;
+    if (!sl || (v !== STANCE_DEFEND && v !== STANCE_ASSAULT && v !== STANCE_HOLD)) return false;
+    if (v === STANCE_HOLD && !sl.holdSet) this.setHold(playerId, sl.state.x + Math.cos(sl.facing) * 120, sl.state.y + Math.sin(sl.facing) * 120); // 지점을 정한 적이 없으면 주인공 앞쪽
     sl.state.stance = v;
+    return true;
+  }
+
+  /** 지점 방어: 이 지점에 진형을 펴고 지키도록 지시한다 */
+  setHold(playerId: number, x: unknown, y: unknown): boolean {
+    const sl = this.slots.get(playerId);
+    if (!sl || typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+    const hx = clampToWorld(x, 60);
+    const hy = clampToWorld(y, 60);
+    const d = Math.hypot(hx - sl.state.x, hy - sl.state.y);
+    sl.state.holdX = Math.round(hx);
+    sl.state.holdY = Math.round(hy);
+    sl.holdFacing = d > 40 ? Math.atan2(hy - sl.state.y, hx - sl.state.x) : sl.facing; // 주인공에서 바깥쪽을 보고 선다
+    sl.holdSet = true;
+    sl.state.stance = STANCE_HOLD;
     return true;
   }
 
@@ -1639,13 +1669,16 @@ export class Game {
       p.invuln = Math.max(0, p.invuln - dt);
       s.fireCd = Math.max(0, s.fireCd - dt);
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
-      const speed = TUNE.PLAYER_SPEED * s.mods.heroSpeed;
+      const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
       p.hp = Math.min(p.maxHp, p.hp + s.mods.heroRegen * dt);
       const duel = this.phase === "tournament";
       const fighter = duel && this.isFighter(p.id);
       // 토너먼트: 선수는 경기 시작 전·후에는 움직일 수 없고, 경기장 밖으로 나갈 수 없다. 선수가 아니면 싸울 수 없다.
       const frozen = fighter && this.tour?.step !== "fight";
       const casting = s.windT > 0 && WEAPONS[p.weapon]!.type === MAGE; // 주문을 외우는 동안은 움직일 수 없다
+      const moving = !frozen && !casting && (s.input.dx !== 0 || s.input.dy !== 0);
+      s.mom = mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
+      const speed = this.heroSpeedNow(s);
       if (!frozen && !casting) {
         p.x = clampToWorld(p.x + s.input.dx * speed * dt, PLAYER_RADIUS);
         p.y = clampToWorld(p.y + s.input.dy * speed * dt, PLAYER_RADIUS);
@@ -1686,6 +1719,19 @@ export class Game {
       } else if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight"))) this.useWeapon(s);
     }
     if (this.phase !== "tournament") this.stepRevive(dt);
+  }
+
+  /** 지금 주인공의 이동 속도(기마면 달린 만큼 빨라진다) */
+  private heroSpeedNow(s: Slot): number {
+    const base = TUNE.PLAYER_SPEED * s.mods.heroSpeed;
+    return WEAPONS[s.state.weapon]!.type === CAVALRY ? base * (1 + (TUNE.MOUNT_SPEED_MAX - 1) * s.mom) : base;
+  }
+
+  /** 되돌려받은 피해(창병에게 돌격하면 자신에게 돌아온다)를 주인공이 입는다 */
+  private hurtHeroReflect(s: Slot, amount: number): void {
+    if (amount <= 0 || s.state.down) return;
+    const f = this.collectFriendlies().find((x) => x.ownerId === s.state.id && !x.merc);
+    f?.hit({ damage: amount, charge: 0, srcType: SPEAR, fromAngle: 0, dot: true });
   }
 
   /** 쓰러진 동료 곁에서 부활 키를 누르고 있으면 진행도가 차오르고, 떼면 서서히 줄어든다 */
@@ -1777,6 +1823,10 @@ export class Game {
     }
     p.swing = SWING_VISUAL_SEC;
     const arc = Math.min(AREA_ARC_MAX, w.arc * s.mods.heroArea);
+    // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
+    const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) : 0;
+    if (w.type === CAVALRY) s.mom *= CAV_MOMENTUM_AFTER_HIT;
+    let reflected = 0;
     if (this.phase === "tournament") {
       // 토너먼트: 상대 선수의 주인공과 용병이 대상이다
       const foes = this.duelFoes(p.id);
@@ -1790,7 +1840,7 @@ export class Game {
         }
         hitFoes.push(f);
       }
-      for (const f of hitFoes) f.hit({ damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit });
+      for (const f of hitFoes) reflected += f.hit({ damage, charge, srcType: w.type, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit });
       if (w.splash > 0) {
         const radius = w.splash * s.mods.heroArea;
         for (const f of foes) {
@@ -1798,6 +1848,7 @@ export class Game {
           f.hit({ damage: damage * this.splashFactor(s.mods, "hero"), charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit });
         }
       }
+      this.hurtHeroReflect(s, reflected);
       return;
     }
     const struck: Enemy[] = [];
@@ -1811,8 +1862,9 @@ export class Game {
       }
       struck.push(e);
     }
-    for (const e of struck) this.damageEnemy(e, { damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x), crit }, p.id);
+    for (const e of struck) reflected += this.damageEnemy(e, { damage, charge, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x), crit }, p.id);
     if (w.splash > 0) this.splashEnemies(struck, w.splash * s.mods.heroArea, damage * this.splashFactor(s.mods, "hero"), w.type, p.x, p.y, p.id);
+    this.hurtHeroReflect(s, reflected);
   }
 
   /** 회피 판정: 피했으면 true(효과 표시를 띄운다) */
@@ -1889,11 +1941,9 @@ export class Game {
     const perPlayer = (TUNE.ENEMY_SPAWN_BASE_PER_SEC + TUNE.ENEMY_SPAWN_GROWTH_PER_SEC * this.stageTime) * stageMult;
     // 인원이 늘수록 적도 늘지만, 아군 전력도 함께 늘어나므로 인원 수에 정비례시키지는 않는다
     this.spawnBudget += perPlayer * Math.pow(alive.length, 0.75) * dt;
-    // 적 마법사는 드물게, 일정 스테이지부터, 동시에 몇 명까지만 나온다
+    // 적 마법사는 일정 스테이지부터 낮은 생성 비율로만 나온다(수 제한은 없다)
     const weights = [...(ENEMY_SPAWN_WEIGHTS as readonly number[])];
-    let mages = 0;
-    for (const o of this.enemies.values()) if (o.type === MAGE) mages++;
-    if (this.stage < TUNE.ENEMY_MAGE_FROM_STAGE || mages >= TUNE.ENEMY_MAGE_MAX) weights[MAGE] = 0;
+    if (this.stage < TUNE.ENEMY_MAGE_FROM_STAGE) weights[MAGE] = 0;
     const totalWeight = weights.reduce((a, b) => a + b, 0);
     while (this.spawnBudget >= 1) {
       this.spawnBudget -= 1;
@@ -1903,10 +1953,6 @@ export class Game {
       let roll = this.rng() * totalWeight;
       let type = 0;
       while (type < weights.length - 1 && roll >= weights[type]!) roll -= weights[type++]!;
-      if (type === MAGE) {
-        if (mages >= TUNE.ENEMY_MAGE_MAX) type = 0;
-        else mages++;
-      }
       this.spawnEnemyAt(
         clampToWorld(target.x + Math.cos(angle) * ENEMY_SPAWN_DISTANCE, 14),
         clampToWorld(target.y + Math.sin(angle) * ENEMY_SPAWN_DISTANCE, 14),

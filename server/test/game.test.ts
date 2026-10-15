@@ -769,9 +769,9 @@ const swingUntilHit = (g: Game, id: number, enemy: number) => {
   return g.getEnemy(enemy)?.hp;
 };
 
-test("무기 목록: 활·창·검·철퇴·지팡이가 각각 궁병·창병·검방병·둔기병·마법사 속성이다", () => {
-  assert.deepEqual(WEAPONS.map((w) => w.name), ["활", "창", "검", "철퇴", "지팡이"]);
-  assert.deepEqual(WEAPONS.map((w) => w.type), [ARCHER, SPEAR, SHIELD, BLUNT, MAGE]);
+test("무기 목록: 활·창·검·철퇴·지팡이·기마가 각각 궁병·창병·검방병·둔기병·마법사·기병 속성이다", () => {
+  assert.deepEqual(WEAPONS.map((w) => w.name), ["활", "창", "검", "철퇴", "지팡이", "기마"]);
+  assert.deepEqual(WEAPONS.map((w) => w.type), [ARCHER, SPEAR, SHIELD, BLUNT, MAGE, CAVALRY]);
   assert.equal(WEAPONS[0]!.ranged, true);
 });
 

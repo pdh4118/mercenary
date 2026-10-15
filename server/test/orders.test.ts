@@ -1,0 +1,163 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { CAVALRY, MAGE, SHIELD, SPEAR, STANCE_DEFEND, STANCE_HOLD, TICK_RATE, TUNE, WEAPONS, CAV_MOMENTUM_AFTER_HIT } from "@mercenary/shared";
+import { Game } from "../src/game.js";
+
+const run = (g: Game, sec: number) => {
+  for (let i = 0; i < Math.round(sec * TICK_RATE); i++) g.step();
+};
+const quiet = () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  return g;
+};
+type E = { hp: number; maxHp: number; cd: number; atkT: number; x: number; y: number };
+const dummy = (g: Game, x: number, y: number, type = 1): E => {
+  const id = g.spawnEnemyAt(x, y, type);
+  const e = (g as unknown as { enemies: Map<number, E> }).enemies.get(id)!;
+  e.hp = e.maxHp = 5000;
+  e.cd = 99;
+  e.atkT = 999;
+  return e;
+};
+const mercPos = (g: Game, id: number) => {
+  const m = g.getMerc(id)!;
+  return { x: m.x, y: m.y };
+};
+
+test("지점 방어: 지정한 지점에 진형을 펴고, 주인공이 멀어져도 그 자리를 지킨다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const ids = [g.addMerc(a, SHIELD, p.x, p.y), g.addMerc(a, SPEAR, p.x, p.y), g.addMerc(a, SPEAR, p.x, p.y)];
+  assert.equal(p.stance, STANCE_DEFEND);
+  assert.equal(g.setHold(a, p.x + 400, p.y + 200), true);
+  assert.equal(p.stance, STANCE_HOLD);
+  assert.equal(p.holdX, Math.round(p.x + 400));
+  run(g, 8); // 진형이 지점에 자리 잡는 시간
+  g.setInput(a, { dx: -1, dy: 0, aim: 0, fire: false });
+  run(g, 2);
+  const hold = { x: p.holdX, y: p.holdY };
+  for (const id of ids) {
+    const m = mercPos(g, id);
+    assert.ok(Math.hypot(m.x - hold.x, m.y - hold.y) < 160, `지점 근처: ${Math.hypot(m.x - hold.x, m.y - hold.y)}`);
+    assert.ok(Math.hypot(m.x - p.x, m.y - p.y) > 300, "주인공을 따라가지 않는다");
+  }
+  // 기본으로 돌아오면 다시 주인공을 따라온다
+  assert.equal(g.setStance(a, STANCE_DEFEND), true);
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+  run(g, 14);
+  assert.ok(Math.hypot(mercPos(g, ids[0]!).x - p.x, mercPos(g, ids[0]!).y - p.y) < 160);
+});
+
+test("지점 방어: 지점 근처에 온 적과는 싸우고, 잘못된 입력은 무시한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.addMerc(a, SPEAR, p.x, p.y);
+  g.setHold(a, p.x + 300, p.y);
+  run(g, 4);
+  const foe = dummy(g, p.x + 300 + 70, p.y);
+  run(g, 4);
+  assert.ok(foe.hp < foe.maxHp, "지키는 지점에 온 적을 공격한다");
+  assert.equal(g.setHold(a, "x", 3), false);
+  assert.equal(g.setHold(a, NaN, 0), false);
+  assert.equal(g.setHold(999, 0, 0), false);
+  assert.equal(g.setStance(a, 3), false);
+});
+
+test("지점을 지정하지 않고 지점 방어로 바꾸면 주인공 앞쪽을 지킨다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  assert.equal(g.setStance(a, STANCE_HOLD), true);
+  assert.ok(Math.hypot(p.holdX - p.x, p.holdY - p.y) > 50);
+});
+
+test("기마 주인공: 달릴수록 빨라지고 멈추면 느려진다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const mount = WEAPONS.findIndex((w) => w.type === CAVALRY);
+  assert.ok(g.setWeapon(a, mount));
+  g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false });
+  const dist = (sec: number) => {
+    const x0 = p.x;
+    run(g, sec);
+    return (p.x - x0) / sec;
+  };
+  const v1 = dist(0.5);
+  run(g, 2);
+  const v2 = dist(0.5);
+  assert.ok(v1 > TUNE.PLAYER_SPEED * 0.95, `출발 속도 ${v1}`);
+  assert.ok(v2 > TUNE.PLAYER_SPEED * (TUNE.MOUNT_SPEED_MAX - 0.15), `달린 뒤 속도 ${v2}`);
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+  run(g, 1.5);
+  g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false });
+  assert.ok(dist(0.3) < v2 * 0.85, "멈추면 속도가 줄었다");
+  // 걸어 다니는 무기에서는 속도가 늘지 않는다
+  g.setWeapon(a, 0);
+  run(g, 0.4);
+  assert.ok(Math.abs(dist(1) - TUNE.PLAYER_SPEED) < 5);
+});
+
+test("기마 주인공: 속도가 붙을수록 한 방이 세고, 공격하면 속도를 잃으며, 창병에게는 반사된다", () => {
+  const strike = (run0: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    const mount = WEAPONS.findIndex((w) => w.type === CAVALRY);
+    g.setWeapon(a, mount);
+    run(g, 0.4);
+    const e = dummy(g, p.x + 2000, p.y, 4); // 먼 곳에 두었다가 달린 뒤 앞에 둔다
+    g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false });
+    run(g, run0);
+    g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+    e.x = p.x + 40;
+    e.y = p.y;
+    const before = e.hp;
+    const mom = (g as unknown as { slots: Map<number, { mom: number }> }).slots.get(a)!.mom;
+    g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+    run(g, 0.3);
+    const after = (g as unknown as { slots: Map<number, { mom: number }> }).slots.get(a)!.mom;
+    return { dealt: before - e.hp, mom, after };
+  };
+  const slow = strike(0.01);
+  const fast = strike(2.5);
+  assert.ok(fast.dealt > slow.dealt + 5, `느린 ${slow.dealt} / 빠른 ${fast.dealt}`);
+  assert.ok(fast.after < fast.mom * CAV_MOMENTUM_AFTER_HIT + 0.01 + 0.0, "공격하면 속도를 잃는다");
+
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.setWeapon(a, WEAPONS.findIndex((w) => w.type === CAVALRY));
+  run(g, 0.4);
+  const spear = dummy(g, p.x + 2000, p.y, SPEAR);
+  g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false });
+  run(g, 2.5);
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+  spear.x = p.x + 40;
+  spear.y = p.y;
+  const hp0 = p.hp;
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  run(g, 0.3);
+  assert.ok(p.hp < hp0, "창병에게 돌격하면 그 피해가 주인공에게 돌아온다");
+  void MAGE;
+});
+
+test("적 마법사는 수 제한 없이 낮은 비율로만 나온다", () => {
+  let seed = 12345;
+  const rng = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const g = new Game(rng);
+  g.addPlayer("a");
+  g.jumpToStage(3);
+  const priv = g as unknown as { spawnBudget: number; spawnEnemies(dt: number): void; enemies: Map<number, { type: number }> };
+  for (let i = 0; i < 4; i++) {
+    priv.spawnBudget = 100;
+    priv.spawnEnemies(0);
+  }
+  const all = [...priv.enemies.values()];
+  const mages = all.filter((e) => e.type === MAGE).length;
+  assert.ok(mages > 3, `이전의 동시 3명 제한을 넘어 나올 수 있다: ${mages}`);
+  assert.ok(mages / all.length < 0.08, "빈도는 낮다");
+});

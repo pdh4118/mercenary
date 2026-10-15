@@ -80,8 +80,8 @@ const UNIT_FILES = ["cavalry", "spear", "archer", "sword", "mace", "mage"] as co
 const SPRITE_SCALE = 0.5;
 /** 스프라이트 기준점: 가로 중앙, 세로는 몸통 쪽(발은 그 아래). 서버의 유닛 좌표가 몸통 중심이 된다. */
 const SPRITE_ANCHOR_Y = 0.65;
-/** 주인공 스프라이트 파일 이름(무기 순서: 활, 창, 검, 철퇴, 지팡이) */
-const HERO_FILES = ["archer", "spear", "sword", "mace", "mage"] as const;
+/** 주인공 스프라이트 파일 이름(무기 순서: 활, 창, 검, 철퇴, 지팡이, 기마) */
+const HERO_FILES = ["archer", "spear", "sword", "mace", "mage", "cavalry"] as const;
 /** 주인공은 일반 병사보다 한눈에 띄게 조금 크게 그린다 */
 const HERO_SCALE = 0.62;
 const SMOOTH_MS = 60; // 서버 스냅샷(20Hz)을 따라가는 보간 시간 상수
@@ -475,7 +475,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~6 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · V 용병 진형(기본/돌격) · G 미니맵 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~6 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · V 용병 명령(기본/돌격/지점 방어) · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -911,12 +911,32 @@ async function main() {
     }
   };
   // 용병 진형 모드: 기본 진형(주인공 주변을 지킨다) / 돌격 진형(대열이 앞으로 나가 더 멀리 쫓는다). V 키로 바꾼다.
-  const stanceBtns = [document.getElementById("stance0")!, document.getElementById("stance1")!];
+  const stanceBtns = [document.getElementById("stance0")!, document.getElementById("stance1")!, document.getElementById("stance2")!];
   const setStance = (v: number) => send({ t: "stance", v });
-  stanceBtns.forEach((b, i) => (b.onclick = () => setStance(i)));
+  // 지점 방어: 버튼을 누르면 지점 지정 모드(다음 클릭한 곳을 지킨다), T 키는 마우스 위치를 바로 지킨다
+  let pickingHold = false;
+  const endPickHold = () => {
+    pickingHold = false;
+    app.canvas.style.cursor = "";
+  };
+  const holdAtMouse = () => {
+    const me = latest?.players.find((p) => p.id === myId);
+    if (me) send({ t: "hold", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2 });
+  };
+  stanceBtns.forEach(
+    (b, i) =>
+      (b.onclick = () => {
+        if (i !== 2) return setStance(i);
+        pickingHold = true;
+        app.canvas.style.cursor = "crosshair";
+        toast.text = "지킬 지점을 클릭하세요 (Esc 취소)";
+        toastLeft = 4;
+      }),
+  );
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (formations.isOpen()) formations.close();
+      if (pickingHold) endPickHold();
+      else if (formations.isOpen()) formations.close();
       else lobby.toggleRoomPanel();
       return;
     }
@@ -948,7 +968,11 @@ async function main() {
     }
     if (k === "v" && !e.repeat) {
       const cur = latest?.players.find((p) => p.id === myId)?.stance ?? 0;
-      setStance(cur === 0 ? 1 : 0);
+      setStance((cur + 1) % 3); // 기본 → 돌격 → 지점 방어(마지막으로 정한 지점) → 기본
+      return;
+    }
+    if (k === "t" && !e.repeat) {
+      holdAtMouse(); // 마우스가 가리키는 지점을 지키게 한다
       return;
     }
     if (k === "r" && !e.repeat) {
@@ -989,6 +1013,11 @@ async function main() {
       const me = latest?.players.find((p) => p.id === myId);
       if (me) audio.play("cavalry_charge");
       if (me) send({ t: "charge", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2 });
+      return;
+    }
+    if (pickingHold) {
+      holdAtMouse();
+      endPickHold();
       return;
     }
     firing = true;
@@ -1148,6 +1177,13 @@ async function main() {
       g.moveTo(offX + 2, (S * i) / 4).lineTo(offX + S - 2, (S * i) / 4).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
     }
     if (duel) g.circle(sx(0), sy(0), (TOURNAMENT_ARENA_RADIUS / WORLD_SIZE) * S).stroke({ width: 1.5, color: 0xe0c05d, alpha: 0.8 });
+    // 지점 방어 깃발
+    for (const hp of st.players) {
+      if (hp.stance !== 2) continue;
+      const hx = sx(hp.holdX);
+      const hy = sy(hp.holdY);
+      g.moveTo(hx, hy + 3).lineTo(hx, hy - 6).stroke({ width: 1.2, color: 0xffffff }).poly([hx, hy - 6, hx + 6, hy - 4, hx, hy - 2]).fill(miniColor(hp.id));
+    }
     // 캠프와 상자
     for (const c of st.camps) g.rect(sx(c[1]) - 3, sy(c[2]) - 3, 6, 6).fill(0xe0c05d);
     for (const c of st.chests ?? []) {
@@ -1466,6 +1502,22 @@ async function main() {
       if (w[4] !== 0 || w[8] > 0) continue;
       const v = mercs.views.get(w[0]);
       if (v) streak(v.x, v.y, v.face, w[13]);
+    }
+
+    // 지점 방어: 지키는 지점에 깃발과 구역을 표시한다
+    for (const hp of latest.players) {
+      if (hp.stance !== 2) continue;
+      const hc = PLAYER_COLORS[(hp.id - 1) % PLAYER_COLORS.length]!;
+      const own = hp.id === myId;
+      fxLayer
+        .circle(hp.holdX, hp.holdY, 130)
+        .fill({ color: hc, alpha: own ? 0.06 : 0.03 })
+        .stroke({ width: own ? 2 : 1, color: hc, alpha: own ? 0.55 : 0.3 })
+        .moveTo(hp.holdX, hp.holdY + 8)
+        .lineTo(hp.holdX, hp.holdY - 36)
+        .stroke({ width: 3, color: 0xe8e8e8, alpha: own ? 0.95 : 0.6 })
+        .poly([hp.holdX, hp.holdY - 36, hp.holdX + 24, hp.holdY - 28, hp.holdX, hp.holdY - 20])
+        .fill({ color: hc, alpha: own ? 0.95 : 0.6 });
     }
 
     // 마법사 운석: 낙하 지점 예고(진해지는 원과 줄어드는 고리), 마지막에 하늘에서 떨어지는 운석, 폭발과 그을음

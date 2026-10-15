@@ -141,6 +141,9 @@ export class RoomManager {
       case "stance":
         room.game.setStance(id, msg.v);
         return;
+      case "hold":
+        room.game.setHold(id, msg.x, msg.y);
+        return;
       case "record":
         conn.send({ t: "result", ...room.game.result(), partial: true });
         return;

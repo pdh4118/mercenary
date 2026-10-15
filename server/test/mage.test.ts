@@ -176,7 +176,7 @@ test("마법사는 궁병처럼 가까이 온 근접 적에게서 물러나고, 
   assert.equal(g.snapshotMeteors().length, 0);
 });
 
-test("적 마법사: 1스테이지에는 나오지 않고, 2스테이지부터 드물게 나오며 동시에 최대 수를 넘지 않는다", () => {
+test("적 마법사: 1스테이지에는 나오지 않고, 2스테이지부터 드물게(수 제한 없이 낮은 비율로) 나온다", () => {
   const countMages = (stage: number) => {
     const g = new Game(() => Math.random());
     g.addPlayer("a");
@@ -191,8 +191,8 @@ test("적 마법사: 1스테이지에는 나오지 않고, 2스테이지부터 �
   };
   assert.equal(countMages(1).mages, 0);
   const s2 = countMages(2);
-  assert.ok(s2.mages >= 1 && s2.mages <= TUNE.ENEMY_MAGE_MAX, `mages=${s2.mages}`);
-  assert.ok(s2.mages / s2.total < 0.1, "빈도가 높지 않다");
+  assert.ok(s2.mages >= 1, `mages=${s2.mages}`);
+  assert.ok(s2.mages / s2.total < 0.08, "빈도가 높지 않다");
 });
 
 test("적 마법사: 모인 아군 위에 운석을 겨누고(낙하 지점이 보인다), 그 사이에 벗어나면 맞지 않는다", () => {
