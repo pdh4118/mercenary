@@ -1517,9 +1517,10 @@ export class Game {
   snapshotMeteors(): MeteorWire[] {
     const out: MeteorWire[] = [];
     for (const [key, c] of this.casts) {
-      const remaining = key < 0 ? this.slots.get(-key)?.windT ?? 0 : this.mercs.get(key)?.atkT ?? 0;
+      const remaining = key < 0 ? this.slots.get(-key)?.windT ?? 0 : this.mercs.get(key)?.atkT ?? this.enemies.get(key)?.atkT ?? 0;
       if (remaining <= 0) continue;
-      out.push([key, round(c.x), round(c.y), Math.round(100 * Math.max(0, Math.min(1, 1 - remaining / c.total))), Math.round(c.radius), key < 0 ? -key : this.mercs.get(key)!.owner]);
+      const owner = key < 0 ? -key : this.mercs.get(key)?.owner ?? 0; // 0이면 적의 운석
+      out.push([key, round(c.x), round(c.y), Math.round(100 * Math.max(0, Math.min(1, 1 - remaining / c.total))), Math.round(c.radius), owner]);
     }
     return out;
   }
@@ -1888,7 +1889,12 @@ export class Game {
     const perPlayer = (TUNE.ENEMY_SPAWN_BASE_PER_SEC + TUNE.ENEMY_SPAWN_GROWTH_PER_SEC * this.stageTime) * stageMult;
     // 인원이 늘수록 적도 늘지만, 아군 전력도 함께 늘어나므로 인원 수에 정비례시키지는 않는다
     this.spawnBudget += perPlayer * Math.pow(alive.length, 0.75) * dt;
-    const totalWeight = (ENEMY_SPAWN_WEIGHTS as readonly number[]).reduce((a, b) => a + b, 0);
+    // 적 마법사는 드물게, 일정 스테이지부터, 동시에 몇 명까지만 나온다
+    const weights = [...(ENEMY_SPAWN_WEIGHTS as readonly number[])];
+    let mages = 0;
+    for (const o of this.enemies.values()) if (o.type === MAGE) mages++;
+    if (this.stage < TUNE.ENEMY_MAGE_FROM_STAGE || mages >= TUNE.ENEMY_MAGE_MAX) weights[MAGE] = 0;
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
     while (this.spawnBudget >= 1) {
       this.spawnBudget -= 1;
       if (this.enemies.size >= ENEMY_MAX) continue;
@@ -1896,7 +1902,11 @@ export class Game {
       const angle = this.rng() * Math.PI * 2;
       let roll = this.rng() * totalWeight;
       let type = 0;
-      while (type < ENEMY_SPAWN_WEIGHTS.length - 1 && roll >= ENEMY_SPAWN_WEIGHTS[type]!) roll -= ENEMY_SPAWN_WEIGHTS[type++]!;
+      while (type < weights.length - 1 && roll >= weights[type]!) roll -= weights[type++]!;
+      if (type === MAGE) {
+        if (mages >= TUNE.ENEMY_MAGE_MAX) type = 0;
+        else mages++;
+      }
       this.spawnEnemyAt(
         clampToWorld(target.x + Math.cos(angle) * ENEMY_SPAWN_DISTANCE, 14),
         clampToWorld(target.y + Math.sin(angle) * ENEMY_SPAWN_DISTANCE, 14),
@@ -2726,7 +2736,9 @@ export class Game {
     for (const key of [...this.casts.keys()]) {
       const active = key < 0 ? (this.slots.get(-key)?.windT ?? 0) > 0 && !this.slots.get(-key)!.state.down : (() => {
         const m = this.mercs.get(key);
-        return !!m && m.respawn <= 0 && m.atkT > 0;
+        if (m) return m.respawn <= 0 && m.atkT > 0;
+        const en = this.enemies.get(key); // 적 마법사
+        return !!en && en.atkT > 0;
       })();
       if (!active) this.casts.delete(key);
     }
@@ -3266,6 +3278,21 @@ export class Game {
       // 이동 속도가 곧 위협이다: 적은 조금 더 빠르고, 움직이는 대상을 앞질러 막아선다
       const speed = st.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT;
 
+      if (e.type === MAGE) {
+        // 적 마법사: 쿨다운이 끝나면 사거리 안에서 아군이 가장 많이 모인 곳에 운석을 겨눈다(외우는 동안 멈춰 선다). 그 외에는 궁병처럼 거리를 유지한다.
+        if (e.cd <= 0) {
+          const spot = this.meteorSpot(e, st.reach, st.splash, foes.map((f) => ({ x: f.x, y: f.y, w: f.type === NO_TYPE ? 3 : 1 })));
+          if (spot) {
+            e.atkT = st.windup;
+            e.atkAng = Math.atan2(spot[1] - e.y, spot[0] - e.x);
+            e.face = e.atkAng;
+            this.casts.set(e.id, { x: spot[0], y: spot[1], total: st.windup, radius: st.splash });
+            continue;
+          }
+        }
+        this.enemyArcherMove(e, st, dt, foes, target, targetDist, speed);
+        continue;
+      }
       const attackRange = st.ranged ? st.reach : st.reach + target.r * 0.5;
       if (targetDist <= attackRange) {
         if (e.cd <= 0 && !(e.type === CAVALRY && e.evadeT > 0)) {
@@ -3477,6 +3504,19 @@ export class Game {
   }
 
   private resolveEnemyAttack(e: Enemy, st: UnitStats, friendlies: Friendly[]): void {
+    if (e.type === MAGE) {
+      const cast = this.casts.get(e.id);
+      this.casts.delete(e.id);
+      if (!cast) return;
+      this.pushEvent(EVT_METEOR, cast.x, cast.y, 0, cast.radius);
+      for (const f of friendlies) {
+        const d = Math.hypot(f.x - cast.x, f.y - cast.y);
+        if (d > cast.radius + f.radius) continue;
+        const dmg = st.damage * e.dmgMult * (1 - TUNE.MAGE_FALLOFF * Math.min(1, d / cast.radius));
+        f.hit({ damage: dmg, charge: 0, srcType: MAGE, fromAngle: Math.atan2(cast.y - f.y, cast.x - f.x), pierceGuard: true, src: e });
+      }
+      return;
+    }
     if (st.ranged) {
       this.bullets.push({
         id: this.nextEntityId++,

@@ -175,3 +175,46 @@ test("마법사는 궁병처럼 가까이 온 근접 적에게서 물러나고, 
   assert.equal(mage().atkT, 0, "위협이 있으면 주문을 시작하지 않는다");
   assert.equal(g.snapshotMeteors().length, 0);
 });
+
+test("적 마법사: 1스테이지에는 나오지 않고, 2스테이지부터 드물게 나오며 동시에 최대 수를 넘지 않는다", () => {
+  const countMages = (stage: number) => {
+    const g = new Game(() => Math.random());
+    g.addPlayer("a");
+    g.jumpToStage(stage);
+    const priv = g as unknown as { spawnBudget: number; spawnEnemies(dt: number): void; enemies: Map<number, { type: number }> };
+    for (let i = 0; i < 3; i++) {
+      priv.spawnBudget = 100;
+      priv.spawnEnemies(0);
+    }
+    const all = [...priv.enemies.values()];
+    return { mages: all.filter((e) => e.type === MAGE).length, total: all.length };
+  };
+  assert.equal(countMages(1).mages, 0);
+  const s2 = countMages(2);
+  assert.ok(s2.mages >= 1 && s2.mages <= TUNE.ENEMY_MAGE_MAX, `mages=${s2.mages}`);
+  assert.ok(s2.mages / s2.total < 0.1, "빈도가 높지 않다");
+});
+
+test("적 마법사: 모인 아군 위에 운석을 겨누고(낙하 지점이 보인다), 그 사이에 벗어나면 맞지 않는다", () => {
+  const run2 = (move: boolean) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    p.invuln = 0;
+    const id = g.spawnEnemyAt(p.x + 220, p.y, MAGE);
+    const mage = (g as unknown as { enemies: Map<number, { x: number; atkT: number }> }).enemies.get(id)!;
+    run(g, 0.4);
+    assert.ok(mage.atkT > 0, "주문을 외우기 시작한다");
+    const m = g.snapshotMeteors();
+    assert.equal(m.length, 1);
+    assert.equal(m[0]![5], 0, "적의 운석(주인 0)");
+    assert.ok(Math.hypot(m[0]![1] - p.x, m[0]![2] - p.y) < 60, "아군이 있는 곳을 겨눈다");
+    if (move) g.setInput(a, { dx: -1, dy: 0, aim: 0, fire: false });
+    run(g, 3.6);
+    return { hp: g.getPlayer(a)!.hp, max: g.getPlayer(a)!.maxHp };
+  };
+  const still = run2(false);
+  assert.ok(still.hp < still.max - 20, `서 있으면 맞는다: ${still.hp}`);
+  const dodged = run2(true);
+  assert.equal(dodged.hp, dodged.max, "벗어나면 맞지 않는다");
+});

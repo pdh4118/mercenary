@@ -55,6 +55,8 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  ENEMY_MAGE_FROM_STAGE: 2, // 적 마법사가 나오기 시작하는 스테이지
+  ENEMY_MAGE_MAX: 3, // 적 마법사가 동시에 살아 있을 수 있는 수
   MAGE_LOCK_SEC: 1, // 운석이 떨어지기 이 시간 전부터 낙하 지점이 고정된다
   MAGE_FALLOFF: 0.4, // 폭발 가장자리의 피해 감소 비율(중심은 100%)
   CAV_RUNUP_SEC: 2.6, // 기병이 한 대 치고 빠져 다시 속도를 붙이는 최대 시간
@@ -179,12 +181,12 @@ export const ENEMY_STATS: readonly UnitStats[] = [
   { hp: 18, speed: 75, reach: 260, damage: 4.5, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 0 },
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },
   { hp: 36, speed: 60, reach: 38, damage: 9.5, windup: 0.9, cooldown: 1.8, arc: deg(90), ranged: false, radius: 14, leash: 0, shield: 0, splash: 40 },
-  // 적 마법사(아직 등장하지 않는다. 시트와 표를 병종 수에 맞추기 위한 자리)
-  { hp: 22, speed: 55, reach: 280, damage: 60, windup: 5, cooldown: 3, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 110 },
+  // 적 마법사: 드물게 나온다. 3.5초 주문 뒤 모여 있는 아군에게 운석을 떨어뜨린다(낙하 지점이 미리 보이니 피할 수 있다). 넉백이나 둔기병의 타격으로 밀려나면 주문이 끊긴다.
+  { hp: 22, speed: 55, reach: 280, damage: 55, windup: 3.5, cooldown: 4, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 110 },
 ];
 
 /** 적 생성 비율(기병, 창병, 궁병, 검방병, 둔기병) */
-export const ENEMY_SPAWN_WEIGHTS = [15, 25, 20, 25, 15, 0] as const;
+export const ENEMY_SPAWN_WEIGHTS = [15, 25, 20, 25, 15, 3] as const;
 export const ENEMY_GOLD = [5, 4, 4, 5, 7, 8] as const;
 
 // 투사체 속도(px/s)

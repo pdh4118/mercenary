@@ -1380,7 +1380,7 @@ async function main() {
       if (w[5] <= 0) continue;
       const v = enemies.views.get(w[0]);
       const st = ENEMY_STATS[w[4]]!;
-      if (v) drawTelegraph(v.x, v.y, w[6], st.reach, st.arc, st.ranged, w[5], 0xff3b3b);
+      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[6], st.reach, st.arc, st.ranged, w[5], 0xff3b3b); // 적 마법사의 예고는 낙하 지점 표시가 대신한다
     }
     for (const w of latest.mercs) {
       if (w[5] === undefined || w[6] <= 0) continue;
@@ -1476,19 +1476,20 @@ async function main() {
       const p = prog / 100;
       const pulse = 0.5 + 0.5 * Math.sin(now / 130);
       const mine = owner === myId;
+      const hostile = owner === 0; // 적 마법사의 운석: 아군이 맞는다. 피하라고 붉고 진하게 표시한다
       // 낙하 예고: 원 안의 음영이 시계처럼(위에서 시계 방향) 차올라, 한 바퀴를 다 돌면 운석이 떨어진다
       const a0 = -Math.PI / 2;
       const a1 = a0 + Math.PI * 2 * p;
       fxLayer
         .circle(mx, my, radius)
-        .fill({ color: 0xff3a1a, alpha: 0.06 })
-        .stroke({ width: 2 + 2 * p, color: mine ? 0xffc04a : 0xff6a3a, alpha: 0.4 + 0.3 * p + 0.15 * pulse });
+        .fill({ color: hostile ? 0xff1a1a : 0xff9a2a, alpha: hostile ? 0.1 : 0.06 })
+        .stroke({ width: (hostile ? 3 : 2) + 2 * p, color: hostile ? 0xff3030 : mine ? 0xffc04a : 0xff8a3a, alpha: 0.4 + 0.3 * p + 0.15 * pulse });
       if (p > 0.005) {
         fxLayer
           .moveTo(mx, my)
           .arc(mx, my, radius, a0, a1)
           .closePath()
-          .fill({ color: 0xff2a10, alpha: 0.28 + 0.1 * pulse * p })
+          .fill({ color: hostile ? 0xd01010 : 0xff8a1a, alpha: (hostile ? 0.36 : 0.26) + 0.1 * pulse * p })
           .moveTo(mx, my)
           .lineTo(mx + Math.cos(a1) * radius, my + Math.sin(a1) * radius)
           .stroke({ width: 3, color: 0xffe0a0, alpha: 0.8 });
