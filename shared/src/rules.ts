@@ -55,7 +55,6 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
-  BLUNT_VS_BROKEN: 1.6, // 방패가 깨진 상대가 둔기에 맞을 때 피해 배율
   BLUNT_STAGGER_SEC: 0.3, // 둔기병이 때린 적이 경직되는 시간(0단계)
   BLUNT_STAGGER_PER_TIER: 0.15, // 강화 단계마다 늘어나는 경직 시간
   BLUNT_STAGGER_BOSS_FRAC: 0.3, // 보스는 이 비율만큼만 경직된다
@@ -100,7 +99,7 @@ export const SHIELD_FRONT_ARC = rad(70); // 정면 반각. 이 안에서 오는 
  * 방패 체력이 깎이는 배율(공격자 병종별): [기병, 창병, 궁병, 검방병, 둔기병].
  * 화살은 거의 막혀 방패가 오래 버티고, 철퇴는 방패를 쉽게 부순다. 기병의 돌격도 정면에서는 일부 흡수된다.
  */
-export const SHIELD_DAMAGE_FACTOR = [0.5, 0.6, 0.25, 1.0, 4.0] as const;
+export const SHIELD_DAMAGE_FACTOR = [0.5, 0.6, 0.25, 1.0, 2.5] as const;
 export const HERO_SWORD_FRONT_BLOCK = 0.5; // 주인공이 검을 들면 정면 피해가 이 배율로 줄어든다
 export function shieldFactor(srcType: number): number {
   return SHIELD_DAMAGE_FACTOR[srcType] ?? 1;
@@ -162,7 +161,7 @@ export const MERC_STATS: readonly UnitStats[] = [
   // 검방병: 몸 체력과 별개로 방패 체력이 있다
   { hp: 170, speed: 90, reach: 32, damage: 12, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 110, splash: 0 },
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
-  { hp: 180, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
+  { hp: 200, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [

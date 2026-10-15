@@ -84,7 +84,6 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   CAV_DAMAGE_PER_SPEED: ["기병 속도당 돌격 추가 피해", G.combat, 0, 1, 0.005],
   CAV_RAMP_SEC: ["기병이 최고 속도까지 걸리는 시간(초)", G.combat, 0.2, 10, 0.1],
   KNOCK_MAX: ["넉백 최대 거리(px)", G.combat, 0, 600, 5],
-  BLUNT_VS_BROKEN: ["방패가 깨진 상대에게 둔기 피해 배율", G.combat, 1, 5, 0.05],
   BLUNT_STAGGER_SEC: ["둔기병 경직 시간(초, 0단계)", G.combat, 0, 5, 0.05],
   BLUNT_STAGGER_PER_TIER: ["둔기병 경직 시간 단계당 증가(초)", G.combat, 0, 2, 0.05],
   BLUNT_STAGGER_BOSS_FRAC: ["보스에게 걸리는 경직 비율", G.combat, 0, 1, 0.05],

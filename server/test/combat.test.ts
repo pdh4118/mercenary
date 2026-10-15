@@ -5,7 +5,6 @@ import {
   BLUNT,
   CAVALRY,
   SHIELD,
-  TUNE,
   SHIELD_DAMAGE_FACTOR,
   SHIELD_FRONT_ARC,
   SPEAR,
@@ -65,11 +64,10 @@ test("옆이나 뒤에서 오는 공격은 방패를 무시하고 몸에 그대�
 });
 
 test("방패가 버티지 못하면 깨지고 남은 몫이 몸에 들어간다", () => {
-  const r = resolveHit(shield({ shield: 20 }), front(BLUNT, 26)); 
-  const f = SHIELD_DAMAGE_FACTOR[BLUNT]!;
+  const r = resolveHit(shield({ shield: 20 }), front(BLUNT, 26)); // 26 x 2.5 = 65
   assert.equal(r.shield, 20);
   assert.equal(r.shieldBroke, true);
-  close(r.body, (26 * f - 20) / f);
+  close(r.body, (65 - 20) / SHIELD_DAMAGE_FACTOR[BLUNT]!);
   // 정확히 맞춰 깨지는 경우도 깨진 것으로 본다
   assert.equal(resolveHit(shield({ shield: 5 }), front(SHIELD, 5)).shieldBroke, true);
 });
@@ -151,11 +149,4 @@ test("배후 공격: 등 뒤(반각 60도)에서 오면 피해와 돌격 피해�
   const sp = resolveHit({ type: SPEAR, shield: 0, face: 0 }, { damage: 10, charge: 8, srcType: CAVALRY, fromAngle: Math.PI });
   close(sp.body, 15);
   assert.equal(sp.reflected, 8);
-});
-
-test("방패가 깨진 상대는 둔기 피해를 더 받지만 다른 병종에게는 그대로다", () => {
-  const broken = (src: number) => resolveHit(shield({ shield: 0, broken: true }), front(src, 10)).body;
-  assert.equal(broken(BLUNT), 10 * TUNE.BLUNT_VS_BROKEN);
-  assert.equal(broken(ARCHER), 10);
-  assert.equal(resolveHit(shield({ shield: 0 }), front(BLUNT, 10)).body, 10, "방패가 원래 없는 경우는 해당 없음");
 });
