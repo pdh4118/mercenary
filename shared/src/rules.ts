@@ -360,9 +360,11 @@ export const KNOCK_BOSS_FACTOR = 0.25; // 보스는 넉백이 이만큼만 먹�
 export const KNOCK_STUN_SEC = 0.4; // 밀려난 적이 공격하지 못하는 시간
 export const CAST_TIME_MIN_MULT = 0.3; // 시전 시간 감소 카드를 아무리 모아도 원래 시간의 이 비율 밑으로는 줄지 않는다
 /**
- * 근접 공격이 범위 증가를 받았을 때의 부채꼴 반각. 철퇴(둔기)는 몸을 두르듯 퍼지는 대신 앞으로 길어지므로(깔때기) 각도는 그대로 둔다.
+ * 근접 공격이 범위 증가를 받았을 때의 부채꼴 반각. 철퇴(둔기)·검은 몸을 두르듯 퍼지는 대신 앞으로 길어지므로(깔때기) 각도는 그대로 둔다.
  * 같은 범위 배율이 철퇴에서는 meleeReach로 사거리에 곱해진다.
  */
-export const meleeArc = (type: number, baseArc: number, area: number): number => (type === BLUNT ? baseArc : Math.min(AREA_ARC_MAX, baseArc * area));
-export const meleeReach = (type: number, reach: number, area: number): number => (type === BLUNT ? reach * area : reach);
+/** 범위 증가가 각도 대신 사거리를 늘리는 병종: 철퇴(둔기)와 검방 */
+const lengthensOnArea = (type: number): boolean => type === BLUNT || type === SHIELD;
+export const meleeArc = (type: number, baseArc: number, area: number): number => (lengthensOnArea(type) ? baseArc : Math.min(AREA_ARC_MAX, baseArc * area));
+export const meleeReach = (type: number, reach: number, area: number): number => (lengthensOnArea(type) ? reach * area : reach);
 export const AREA_ARC_MAX = 2.4; // 범위 증가로 넓어지는 근접 부채꼴 반각 상한(라디안)

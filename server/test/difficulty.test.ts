@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BLUNT, CAST_TIME_MIN_MULT, DIFFICULTY_REDUCTION, MAGE, SHIELD, SPEAR, TICK_RATE, meleeArc, meleeReach } from "@mercenary/shared";
+import { BLUNT, CAVALRY, CAST_TIME_MIN_MULT, DIFFICULTY_REDUCTION, MAGE, SHIELD, SPEAR, TICK_RATE, meleeArc, meleeReach } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 import { RoomManager } from "../src/rooms.js";
 
@@ -115,11 +115,13 @@ test("방패 카드: 방패 체력 최대치가 늘고, 재생 카드는 더 빨
   assert.ok(base > 0 && Math.abs(fast / base - 1.5) < 0.05, `${base} -> ${fast}`);
 });
 
-test("철퇴 범위 증가는 부채꼴을 넓히지 않고 앞으로 길게 늘린다(다른 근접 무기는 각도가 넓어진다)", () => {
+test("철퇴·검 범위 증가는 부채꼴을 넓히지 않고 앞으로 길게 늘린다(기마는 각도가 넓어진다)", () => {
   assert.equal(meleeArc(BLUNT, 1.7, 2), 1.7);
   assert.equal(meleeReach(BLUNT, 50, 1.5), 75);
-  assert.ok(meleeArc(SHIELD, 1.2, 1.5) > 1.2);
-  assert.equal(meleeReach(SHIELD, 50, 1.5), 50);
+  assert.equal(meleeArc(SHIELD, 1.2, 1.5), 1.2);
+  assert.equal(meleeReach(SHIELD, 50, 1.5), 75);
+  assert.ok(meleeArc(CAVALRY, 1.2, 1.5) > 1.2);
+  assert.equal(meleeReach(CAVALRY, 50, 1.5), 50);
   const g = new Game();
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;
