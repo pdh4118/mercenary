@@ -590,3 +590,11 @@ test("행운이 높으면 제시되는 카드의 평균 등급이 실제로 올�
   };
   assert.ok(meanRarity(2) > meanRarity(0) + 0.1, `${meanRarity(0)} -> ${meanRarity(2)}`);
 });
+
+test("강화 시 늘어나는 능력치 문구: 병종 보너스와 둔기병 경직 시간이 들어 있고 최고 단계는 비어 있다", async () => {
+  const { nextTierBonus } = await import("@mercenary/shared");
+  assert.ok(nextTierBonus(4, 0).some((t) => t.includes("경직 0.30→0.45")));
+  assert.ok(nextTierBonus(0, 0).some((t) => t.startsWith("이동 속도")));
+  assert.ok(nextTierBonus(1, 1).some((t) => t.startsWith("사거리")));
+  assert.deepEqual(nextTierBonus(2, 4), []);
+});

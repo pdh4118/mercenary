@@ -1,4 +1,4 @@
-import { MERC_BASE_PRICE, UNIT_COST } from "./rules.js";
+import { ARCHER, BLUNT, CAVALRY, MERC_BASE_PRICE, SHIELD, SPEAR, TUNE, UNIT_COST } from "./rules.js";
 
 /** 용병 단계(0~4). 한 명씩 금화를 내고 다음 단계로 강화한다. */
 export const MAX_TIER = 4;
@@ -59,4 +59,24 @@ export function upgradeCost(type: number, tier: number): number | null {
   const mult = UPGRADE_COST_MULT[tier];
   if (mult === undefined) return null;
   return Math.round((MERC_BASE_PRICE[type] ?? 0) * mult);
+}
+
+/** 둔기병이 때린 적의 경직 시간(초). 단계마다 늘어난다. */
+export const bluntStagger = (tier: number): number => TUNE.BLUNT_STAGGER_SEC + TUNE.BLUNT_STAGGER_PER_TIER * tier;
+
+/** tier → tier+1 로 강화할 때 늘어나는 것들을 짧은 문구로(최고 단계면 빈 목록). 보이는 숫자는 기본 능력치 기준이다. */
+export function nextTierBonus(type: number, tier: number): string[] {
+  if (tier >= MAX_TIER) return [];
+  const pct = (v: number) => `+${Math.round(v)}%`;
+  const out = [`체력 ${pct((TIER_HP[tier + 1]! / TIER_HP[tier]! - 1) * 100)}`, `공격 ${pct((TIER_DMG[tier + 1]! / TIER_DMG[tier]! - 1) * 100)}`];
+  // 병종 보너스는 단계마다 기본 능력치의 일정 비율이 더해진다
+  const step = (x: readonly number[]) => (x[type] ?? 0) > 0 ? pct(((1 + x[type]! * (tier + 1)) / (1 + x[type]! * tier) - 1) * 100) : "";
+  if (type === CAVALRY) out.push(`이동 속도 ${step(TIER_SPEED)}`);
+  if (type === SPEAR || type === ARCHER) out.push(`사거리 ${step(TIER_REACH)}`);
+  if (type === SHIELD) out.push(`방패 ${step(TIER_SHIELD)}`);
+  if (type === BLUNT) {
+    out.push(`범위 ${step(TIER_AREA)}`);
+    out.push(`경직 ${bluntStagger(tier).toFixed(2)}→${bluntStagger(tier + 1).toFixed(2)}초`);
+  }
+  return out;
 }

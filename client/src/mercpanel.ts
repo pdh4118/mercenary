@@ -1,4 +1,4 @@
-import { unitCost, mercName, mercXpNeed, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
+import { nextTierBonus, unitCost, mercName, mercXpNeed, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -82,6 +82,13 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           bar.append(fill);
           name.append(bar);
         }
+        const bonus = nextTierBonus(type, tier);
+        if (bonus.length > 0) {
+          const b = document.createElement("div");
+          b.className = "bonus";
+          b.textContent = `강화 시: ${bonus.join(" · ")}`;
+          name.append(b);
+        }
         row.append(dot, name);
         const cost = upgradeCost(type, tier);
         if (cost === null) {
@@ -93,7 +100,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           const btn = document.createElement("button");
           const noLeader = freeLeadership < 1;
           btn.textContent = `${tierName(type, tier + 1)} ${cost}G`;
-          btn.title = noLeader ? "통솔력이 부족합니다 (강화하면 통솔력 +1)" : "강화하면 통솔력 +1";
+          btn.title = noLeader ? "통솔력이 부족합니다 (강화하면 통솔력 +1)" : `강화하면 통솔력 +1 · ${bonus.join(" · ")}`;
           btn.className = "primary";
           btn.disabled = gold < cost || respawn > 0 || noLeader;
           btn.onclick = () => opts.send({ t: "upgrade", merc: id });
