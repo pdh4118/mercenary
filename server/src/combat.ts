@@ -2,6 +2,7 @@ import {
   BACKSTAB_ARC,
   SHIELD_FRONT_ARC,
   SPEAR,
+  BLUNT,
   angleDiff,
   shieldFactor,
   TUNE,
@@ -13,6 +14,7 @@ export interface Guard {
   spearStance?: boolean; // 창을 든 주인공도 창병처럼 돌격을 반사한다
   shield: number; // 남은 방패 체력(0이면 방패 없음 또는 깨져서 재생 대기 중)
   face: number; // 바라보는 방향(라디안). 방패가 막는 방향
+  broken?: boolean; // 방패가 깨져 재생을 기다리는 중(둔기병에게 더 약하다)
   frontBlock?: number; // 정면 피해 배율(검을 든 주인공)
 }
 
@@ -48,7 +50,8 @@ export function resolveHit(g: Guard, h: Hit): HitResult {
   const reflected = spear ? h.charge : 0;
   // 등 뒤에서 오는 공격은 피해가 늘어난다(돌격 피해도 포함). 방패는 정면만 막으므로 등 뒤에서는 어차피 소용없다.
   const backstab = Math.abs(angleDiff(h.fromAngle, g.face + Math.PI)) <= BACKSTAB_ARC;
-  const mult = backstab ? TUNE.BACKSTAB_MULT : 1;
+  // 방패가 깨진 검방병은 둔기병에게 무방비다
+  const mult = (backstab ? TUNE.BACKSTAB_MULT : 1) * (g.broken && h.srcType === BLUNT ? TUNE.BLUNT_VS_BROKEN : 1);
   const base = (h.damage + (spear ? 0 : h.charge)) * mult;
   const frontal = Math.abs(angleDiff(h.fromAngle, g.face)) <= SHIELD_FRONT_ARC;
 

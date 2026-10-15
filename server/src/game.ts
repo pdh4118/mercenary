@@ -1913,7 +1913,7 @@ export class Game {
           if (m.respawn > 0 || m.hp <= 0) return 0; // 이미 쓰러졌다
           const mods = this.slots.get(m.owner)?.mods;
           if (!h.dot && this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
-          const r = h.dot ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
+          const r = h.dot ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face, broken: m.regenT > 0 }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
           const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
@@ -2609,7 +2609,7 @@ export class Game {
     const has = (id: LegendId) => !!owner && hasLegend(owner.mods, id, scope);
     // 처형: 체력이 얼마 안 남은 적에게는 피해가 몇 배로 들어간다
     if (has("execute") && e.hp < e.maxHp * LEGEND_CONST.executeBelow) hit = { ...hit, damage: hit.damage * LEGEND_CONST.executeMult };
-    const r = resolveHit({ type: e.type, shield: e.shield, face: e.face }, hit);
+    const r = resolveHit({ type: e.type, shield: e.shield, face: e.face, broken: e.regenT > 0 }, hit);
     this.applyShield(e, r.shield, r.shieldBroke);
     const dealt = Math.min(r.body, Math.max(0, e.hp));
     e.hp -= r.body;
