@@ -309,6 +309,7 @@ interface Enemy extends Fighter {
   poisonOwner?: number;
   poisonSrc?: Merc;
   poisonAcc?: number; // 아직 숫자로 띄우지 않은 독 피해
+  stunT?: number; // 경직(움직이지도 공격하지도 못하는) 남은 시간
   maxHp: number;
   shieldMax: number;
   dmgMult: number;
@@ -1876,7 +1877,7 @@ export class Game {
             { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
             h,
           );
-          const taken = this.armorCut(r.body * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)), s.mods.heroArmor);
+          const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)); // 고정 감소가 먼저, 방어력(%)은 그다음
           p.hp -= taken;
           s.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
@@ -1906,7 +1907,7 @@ export class Game {
           if (this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
           const r = resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
-          const taken = this.armorCut(r.body * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)), mods ? mstat(mods, m.type, "armor") : 0);
+          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner);
@@ -2611,6 +2612,12 @@ export class Game {
     this.pushDamage(hit.crit ? EVT_DMG_ENEMY_CRIT : EVT_DMG_ENEMY, e.id, e.x, e.y, r.body, ownerId);
     this.pushDamage(EVT_DMG_SHIELD, e.id, e.x, e.y, r.shield, ownerId);
     if (r.backstab && r.body + r.shield > 0) this.pushEvent(EVT_BACKSTAB, e.x, e.y, hit.fromAngle + Math.PI);
+    if (e.hp > 0 && src?.type === BLUNT && r.body + r.shield > 0) {
+      // 둔기병의 타격은 맞은 적을 잠깐 경직시킨다(단계가 오를수록 길다, 보스는 덜 걸린다)
+      const sec = (TUNE.BLUNT_STAGGER_SEC + TUNE.BLUNT_STAGGER_PER_TIER * src.tier) * (e.boss ? TUNE.BLUNT_STAGGER_BOSS_FRAC : 1);
+      if (sec > (e.stunT ?? 0)) e.stunT = sec;
+      e.atkT = 0;
+    }
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
     else if (owner && r.body + r.shield > 0) this.knockBack(e, hit.fromAngle, src ? mstat(owner.mods, src.type, "knock") : owner.mods.heroKnock);
     return r.reflected;
@@ -2954,6 +2961,10 @@ export class Game {
     for (const o of this.enemies.values()) if (o.type === ARCHER) archers.push(o);
     for (const e of [...this.enemies.values()]) {
       if (this.tickPoison(e, dt)) continue;
+      if (e.stunT && e.stunT > 0) {
+        e.stunT -= dt;
+        continue; // 경직: 움직이지도 공격하지도 못한다
+      }
       const st = ENEMY_STATS[e.type]!;
       this.regenShield(e, e.shieldMax, dt);
       e.cd = Math.max(0, e.cd - dt);

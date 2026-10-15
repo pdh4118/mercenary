@@ -1088,6 +1088,28 @@ test("독 화살: 몸에 맞으면 시간에 걸쳐 피해가 들어가고, 방�
   assert.ok(!s2.poisonT || s2.poisonT <= 0, "방패에 맞으면 독 없음");
 });
 
+test("둔기병 경직: 맞은 적이 잠깐 멈추고, 단계가 오를수록 길다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const mid = g.addMerc(a, 4, p.x + 60, p.y)!;
+  const m = (g as any).mercs.get(mid);
+  const id = g.spawnEnemyAt(p.x + 90, p.y, 4);
+  const e = (g as any).enemies.get(id);
+  e.hp = e.maxHp = 99999;
+  const hit = () => (g as any).damageEnemy(e, { damage: 5, charge: 0, srcType: 4, fromAngle: Math.PI }, a, m);
+  hit();
+  const t0 = e.stunT;
+  assert.ok(Math.abs(t0 - 0.5) < 1e-9, `${t0}`);
+  e.stunT = 0;
+  m.tier = 2;
+  hit();
+  assert.ok(e.stunT > t0 + 0.25, "단계가 높으면 경직이 길다");
+  const x = e.x;
+  run(g, 0.2);
+  assert.equal(e.x, x, "경직 중에는 움직이지 않는다");
+});
+
 test("피해 감소 카드: 고정 수치로 줄고 최소 30%는 들어온다", () => {
   const cards = CARDS.filter((c) => c.effect.k === "heroArmor");
   assert.deepEqual(cards.map((c) => c.rarity), [1, 2], "희귀 이상만");
