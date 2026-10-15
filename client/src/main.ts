@@ -553,7 +553,8 @@ async function main() {
     }
     if (e.k === "legend") return e.scope === "hero" ? -1 : e.scope;
     switch (e.k) {
-      case "heroDefense": return SHIELD;
+      case "heroDefense":
+      case "heroArmor": return SHIELD;
       case "heroDodge": return 0;
       case "heroArea":
       case "heroKnock": return BLUNT_TYPE;
@@ -561,7 +562,8 @@ async function main() {
       case "heroFireRate":
       case "heroRange":
       case "heroPierce":
-      case "heroMulti": return ARCHER_TYPE;
+      case "heroMulti":
+      case "heroPoison": return ARCHER_TYPE;
       default: return -1;
     }
   };
@@ -628,7 +630,7 @@ async function main() {
       v.glyph.style.fontSize = 26;
       const ef = card.effect;
       v.glyph.text =
-        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»", multi: "⇶", xp: "XP" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
+        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»", multi: "⇶", poison: "☠", armor: "▣", xp: "XP" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
       v.tag.text = CARD_CATEGORY_NAMES[card.category];
       v.tag.style.fill = color;
       v.rar.text = card.rarity < 3 ? `· ${RARITY_NAMES[card.rarity]}` : ""; // 전설은 분류 이름이 곧 등급

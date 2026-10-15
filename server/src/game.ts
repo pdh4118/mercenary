@@ -155,6 +155,7 @@ import {
   type LegendScope,
   legendKey,
   LEGEND_CONST,
+  POISON_SEC,
   MERC_NAME_COUNT,
   MERC_XP_KILL,
   MERC_XP_OVERFLOW,
@@ -196,7 +197,7 @@ type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn", "xp"];
 const newMercMods = (): MercMods => ({
   hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1,
-  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0, multi: 0, knock: 0, xp: 1,
+  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, xp: 1,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
 const mstat = (mods: Mods, type: number, stat: MercStat): number =>
@@ -217,6 +218,8 @@ interface Mods {
   heroRange: number;
   heroPierce: number;
   heroMulti: number;
+  heroPoison: number;
+  heroArmor: number;
   heroCrit: number;
   heroCritMult: number;
   heroArea: number;
@@ -239,6 +242,8 @@ const newMods = (): Mods => ({
   heroRange: 1,
   heroPierce: 0,
   heroMulti: 0,
+  heroPoison: 0,
+  heroArmor: 0,
   heroCrit: 0,
   heroCritMult: TUNE.CRIT_BASE_MULT,
   heroArea: 1,
@@ -299,6 +304,11 @@ interface Foe {
 interface Enemy extends Fighter {
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
+  poisonT?: number; // 독이 남은 시간
+  poisonDps?: number;
+  poisonOwner?: number;
+  poisonSrc?: Merc;
+  poisonAcc?: number; // 아직 숫자로 띄우지 않은 독 피해
   maxHp: number;
   shieldMax: number;
   dmgMult: number;
@@ -334,6 +344,7 @@ interface Bullet {
   pierce: number; // 더 뚫고 지나갈 수 있는 적 수
   crit: boolean;
   hitIds: Set<number>; // 이미 맞힌 적(관통 중 중복 피해 방지)
+  poison?: number; // 독 피해 비율(화살 피해 대비, 지속 POISON_SEC초)
   merc?: Merc; // 쏜 용병(경험치를 받는다)
 }
 
@@ -1709,6 +1720,7 @@ export class Game {
           radius: BULLET_RADIUS,
           pierce: s.mods.heroPierce,
           crit,
+          poison: s.mods.heroPoison,
           hitIds: new Set(),
         });
       }
@@ -1864,7 +1876,7 @@ export class Game {
             { type: NO_TYPE, spearStance: w.type === SPEAR, shield: 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
             h,
           );
-          const taken = r.body * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense));
+          const taken = this.armorCut(r.body * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)), s.mods.heroArmor);
           p.hp -= taken;
           s.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
@@ -1894,7 +1906,7 @@ export class Game {
           if (this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
           const r = resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
-          const taken = r.body * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0));
+          const taken = this.armorCut(r.body * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)), mods ? mstat(mods, m.type, "armor") : 0);
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner);
@@ -2515,6 +2527,7 @@ export class Game {
           radius: 4,
           pierce: Math.round(mstat(mods, m.type, "pierce")),
           crit,
+          poison: mstat(mods, m.type, "poison"),
           hitIds: new Set(),
           merc: m,
         });
@@ -2592,6 +2605,7 @@ export class Game {
     e.hp -= r.body;
     if (owner) owner.stats.dealt += dealt + r.shield;
     if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
+    if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
     if (has("bloodthirst") && dealt > 0) this.lifesteal(owner!, src, dealt * LEGEND_CONST.bloodthirstFrac * (hit.crit ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
     this.pushDamage(hit.crit ? EVT_DMG_ENEMY_CRIT : EVT_DMG_ENEMY, e.id, e.x, e.y, r.body, ownerId);
@@ -2600,6 +2614,44 @@ export class Game {
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
     else if (owner && r.body + r.shield > 0) this.knockBack(e, hit.fromAngle, src ? mstat(owner.mods, src.type, "knock") : owner.mods.heroKnock);
     return r.reflected;
+  }
+
+  /** 독: total만큼의 피해를 POISON_SEC초에 걸쳐 준다. 다시 맞으면 시간이 새로 시작하고 더 센 쪽을 따른다. */
+  private poisonEnemy(e: Enemy, total: number, ownerId: number, src?: Merc): void {
+    const dps = total / POISON_SEC;
+    e.poisonDps = Math.max(dps, e.poisonT && e.poisonT > 0 ? (e.poisonDps ?? 0) : 0);
+    e.poisonT = POISON_SEC;
+    e.poisonOwner = ownerId;
+    e.poisonSrc = src;
+  }
+
+  /** 독 피해를 한 틱 입힌다. 숫자는 0.5초마다 모아서 띄운다. 죽으면 true */
+  private tickPoison(e: Enemy, dt: number): boolean {
+    if (!e.poisonT || e.poisonT <= 0) return false;
+    const step = Math.min(dt, e.poisonT);
+    e.poisonT -= dt;
+    const dmg = (e.poisonDps ?? 0) * step;
+    const owner = this.slots.get(e.poisonOwner ?? 0);
+    const dealt = Math.min(dmg, Math.max(0, e.hp));
+    e.hp -= dmg;
+    e.poisonAcc = (e.poisonAcc ?? 0) + dmg;
+    if (owner) owner.stats.dealt += dealt;
+    if (e.poisonSrc) this.gainMercXp(e.poisonSrc, dealt * MERC_XP_PER_DAMAGE);
+    if (e.poisonAcc >= 1 || (e.poisonT <= 0 && e.poisonAcc > 0.05)) {
+      this.pushDamage(EVT_DMG_ENEMY, e.id, e.x, e.y, e.poisonAcc, e.poisonOwner ?? 0);
+      e.poisonAcc = 0;
+    }
+    if (e.hp <= 0) {
+      this.killEnemy(e, e.poisonOwner ?? 0, e.poisonSrc);
+      return true;
+    }
+    return false;
+  }
+
+  /** 고정 피해 감소: 한 번에 받는 피해에서 flat을 빼되, 최대 ARMOR_MAX_FRAC까지만 줄어든다 */
+  private armorCut(body: number, flat: number): number {
+    if (body <= 0 || flat <= 0) return body;
+    return Math.max(body * (1 - TUNE.ARMOR_MAX_FRAC), body - flat);
   }
 
   /** 넉백: 맞은 적이 공격해 온 쪽 반대로 밀려나고, 하던 공격 동작이 끊기며 잠깐 공격하지 못한다. 보스는 덜 밀린다. */
@@ -2789,6 +2841,8 @@ export class Game {
       case "heroRange": m.heroRange += e.v; break;
       case "heroPierce": m.heroPierce += e.v; break;
       case "heroMulti": m.heroMulti += e.v; break;
+      case "heroPoison": m.heroPoison += e.v; break;
+      case "heroArmor": m.heroArmor += e.v; break;
       case "heroCrit": m.heroCrit += e.v; break;
       case "heroCritMult": m.heroCritMult += e.v; break;
       case "heroArea": m.heroArea += e.v; break;
@@ -2898,7 +2952,8 @@ export class Game {
     const foes = this.buildFoes(friendlies, dt);
     const archers: Enemy[] = [];
     for (const o of this.enemies.values()) if (o.type === ARCHER) archers.push(o);
-    for (const e of this.enemies.values()) {
+    for (const e of [...this.enemies.values()]) {
+      if (this.tickPoison(e, dt)) continue;
       const st = ENEMY_STATS[e.type]!;
       this.regenShield(e, e.shieldMax, dt);
       e.cd = Math.max(0, e.cd - dt);
@@ -3278,7 +3333,7 @@ export class Game {
           for (const e of [...this.enemies.values()]) {
             if (b.hitIds.has(e.id) || Math.hypot(e.x - px, e.y - py) > b.radius + radiusOf(e)) continue;
             b.hitIds.add(e.id);
-            this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit }, b.owner, b.merc);
+            this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit, poison: b.poison ? b.damage * b.poison : 0 }, b.owner, b.merc);
             this.pushEvent(EVT_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             if (b.pierce > 0) {
               b.pierce--; // 뚫고 지나가 다음 적을 노린다

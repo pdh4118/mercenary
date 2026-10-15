@@ -22,6 +22,7 @@ export interface Hit {
   charge: number; // 기병 돌격 추가 피해(속도 비례). 창병에게는 무효이고 되돌려준다
   srcType: number; // 공격자 병종(방패 피해 배율에 쓴다). 병종 없음은 -1
   fromAngle: number; // 방어자 위치에서 공격자(또는 날아온 쪽)를 바라본 방향
+  poison?: number; // 독 총 피해(몸에 맞았을 때만 걸린다)
   crit?: boolean; // 치명타(이미 피해에 반영됨. 표시용)
   src?: unknown; // 공격자(가시 갑옷이 되돌릴 대상)
 }

@@ -44,7 +44,7 @@ test("전체 용병 카드는 병종 전용 카드의 20% 효과다", () => {
     assert.ok(Math.abs(c.effect.v - typed.effect.v * GLOBAL_CARD_FACTOR) < 1e-3, c.name);
   }
   // 병종마다 전용 능력치마다 일반/희귀/영웅 세 등급이 있고, 모두 그 병종을 가진 사람에게만 나온다
-  for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.length * 3);
+  for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.reduce((n, st) => n + (st === "armor" ? 2 : 3), 0));
 });
 
 test("카드를 고를 때마다 새로고침이 1회씩 쌓이고 상한이 있다", () => {

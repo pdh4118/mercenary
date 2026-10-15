@@ -1054,6 +1054,55 @@ test("발사 수 카드: 화살이 부채꼴로 더 나가고 늘어난 화살�
   assert.equal(p.id, a);
 });
 
+test("독 화살: 몸에 맞으면 시간에 걸쳐 피해가 들어가고, 방패에 막히면 걸리지 않는다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  g.applyCardForTest(a, { k: "heroPoison", v: 3 });
+  const id = g.spawnEnemyAt(p.x + 120, p.y, 4);
+  const e = (g as any).enemies.get(id);
+  e.hp = e.maxHp = 99999;
+  e.atkT = 999;
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  g.step();
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+  run(g, 0.6);
+  const afterHit = e.hp;
+  run(g, 1.5);
+  assert.ok(e.hp < afterHit - 3, "독으로 계속 줄어든다");
+  run(g, 4);
+  const done = e.hp;
+  run(g, 2);
+  assert.equal(e.hp, done, "독은 끝난다");
+  // 방패 정면에 맞으면 독이 없다
+  const sh = g.spawnEnemyAt(p.x + 200, p.y + 300, 4);
+  const s2 = (g as any).enemies.get(sh);
+  s2.hp = s2.maxHp = 99999;
+  s2.atkT = 999;
+  s2.shield = s2.shieldMax = 99999;
+  s2.face = Math.PI / 2 + Math.PI; // 위쪽을 보고 있음(화살이 정면에서 온다)
+  g.setInput(a, { dx: 0, dy: 0, aim: Math.atan2(300, 200), fire: true });
+  g.step();
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+  run(g, 1);
+  assert.ok(!s2.poisonT || s2.poisonT <= 0, "방패에 맞으면 독 없음");
+});
+
+test("피해 감소 카드: 고정 수치로 줄고 최소 30%는 들어온다", () => {
+  const cards = CARDS.filter((c) => c.effect.k === "heroArmor");
+  assert.deepEqual(cards.map((c) => c.rarity), [1, 2], "희귀 이상만");
+  const mercArmor = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.stat === "armor");
+  assert.ok(mercArmor.length > 0 && mercArmor.every((c) => c.rarity >= 1));
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const armorCut = (x: number, f: number) => (g as any).armorCut(x, f);
+  assert.equal(armorCut(10, 4), 6);
+  assert.ok(Math.abs(armorCut(10, 50) - 3) < 1e-9);
+  assert.equal(armorCut(10, 0), 10);
+  g.applyCardForTest(a, { k: "heroArmor", v: 4 });
+  assert.equal((g as any).slots.get(a).mods.heroArmor, 4);
+});
+
 test("사거리·범위 카드: 주인공 창의 사거리가 늘고 철퇴 범위 공격 반경이 커진다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
