@@ -159,7 +159,7 @@ export const MERC_STATS: readonly UnitStats[] = [
   { hp: 145, speed: 95, reach: 100, damage: 15, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
   { hp: 95, speed: 95, reach: 280, damage: 12, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
   // 검방병: 몸 체력과 별개로 방패 체력이 있다
-  { hp: 170, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 110, splash: 0 },
+  { hp: 160, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 110, splash: 0 },
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 180, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
 ];
