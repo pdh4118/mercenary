@@ -55,6 +55,8 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  MULTISHOT_DAMAGE: 0.7, // 발사 수 카드로 늘어난 화살의 피해 비율
+  MULTISHOT_SPREAD: 0.14, // 화살 사이 각도(라디안)
   SPEAR_HALF_WIDTH_NEAR: 18, // 몸 바로 앞의 반폭(px)
   SPEAR_HALF_WIDTH_FAR: 18, // 사거리 끝의 반폭(px)
   PLAYER_MAX_HP: 100,

@@ -466,7 +466,7 @@ async function main() {
   legendBg.rect(0, 0, Math.max(lx, legendText.width + 24, helpText.width + 24), LEGEND_H).fill({ color: 0x000000, alpha: 0.35 });
   // 미니맵: 월드 전체를 작게 보여 준다. 아군(주인공·용병)은 주인 색 점, 쓰러진 아군은 X(부활 대기), 방금 쓰러진 곳은 잠깐 붉은 고리로 깜빡인다.
   const MINI_W = 320; // 왼쪽 위 상태 상자와 같은 폭
-  const STATS_H = 152; // 왼쪽 아래 주인공 능력치 상자 높이
+  const STATS_H = 172; // 왼쪽 아래 주인공 능력치 상자 높이
   const mini = new Container();
   const miniG = new Graphics();
   const miniLabel = new Text({ text: "미니맵 (G)", style: { fill: 0x9aa1b0, fontSize: 11 } });
@@ -505,9 +505,9 @@ async function main() {
   statsPanel.addChild(statsBg, statsTitle, statsWeapon);
   const statLabels: Text[] = [];
   const statValues: Text[] = [];
-  for (let i = 0; i < 12; i++) {
-    const col = Math.floor(i / 6);
-    const row = i % 6;
+  for (let i = 0; i < 14; i++) {
+    const col = Math.floor(i / 7);
+    const row = i % 7;
     const lx = 14 + col * (MINI_W / 2);
     const y = 32 + row * 20;
     const label = new Text({ text: "", style: { fill: 0xb8bdc9, fontSize: 13 } });
@@ -560,7 +560,8 @@ async function main() {
       case "heroDmg":
       case "heroFireRate":
       case "heroRange":
-      case "heroPierce": return ARCHER_TYPE;
+      case "heroPierce":
+      case "heroMulti": return ARCHER_TYPE;
       default: return -1;
     }
   };
@@ -627,7 +628,7 @@ async function main() {
       v.glyph.style.fontSize = 26;
       const ef = card.effect;
       v.glyph.text =
-        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»", xp: "XP" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
+        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»", multi: "⇶", xp: "XP" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
       v.tag.text = CARD_CATEGORY_NAMES[card.category];
       v.tag.style.fill = color;
       v.rar.text = card.rarity < 3 ? `· ${RARITY_NAMES[card.rarity]}` : ""; // 전설은 분류 이름이 곧 등급
@@ -1060,6 +1061,7 @@ async function main() {
       ["사거리", String(h[2])],
       ["치명타", `${pct(h[3]!)} ×${h[4]}`],
       ["관통", String(h[5])],
+      ["발사 수", String(h[12] ?? 1)],
       ["범위", `+${pct((h[6] ?? 1) - 1)}`],
       ["방어력", pct(h[8]!)],
       ["회피", pct(h[9]!)],
@@ -1067,6 +1069,7 @@ async function main() {
       ["이동 속도", String(h[11])],
       ["넉백", String(h[7])],
       ["행운", `+${pct(p.luck)}`],
+      ["", ""],
     ];
     items.forEach(([label, value], i) => {
       statLabels[i]!.text = label;

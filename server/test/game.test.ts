@@ -1036,6 +1036,24 @@ test("관통: 화살이 지정한 수만큼 더 많은 적을 맞힌다", () => 
   assert.equal(hurt, 2, "관통 1이면 2명");
 });
 
+test("발사 수 카드: 화살이 부채꼴로 더 나가고 늘어난 화살은 약하다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  g.applyCardForTest(a, { k: "heroMulti", v: 2 });
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  g.step();
+  const snap = g.snapshotPlayers().find((x) => x.id === a)!;
+  assert.equal(snap.hs[12], 3, "발사 수 3");
+  const bullets = [...(g as any).bullets] as { vy: number; damage: number }[];
+  assert.equal(bullets.length, 3);
+  const ys = bullets.map((b) => Math.sign(b.vy)).sort();
+  assert.deepEqual(ys, [-1, 0, 1]);
+  const dmgs = bullets.map((b) => b.damage).sort((x, y) => x - y);
+  assert.ok(dmgs[0]! < dmgs[2]!, "늘어난 화살은 피해가 낮다");
+  assert.equal(p.id, a);
+});
+
 test("사거리·범위 카드: 주인공 창의 사거리가 늘고 철퇴 범위 공격 반경이 커진다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;

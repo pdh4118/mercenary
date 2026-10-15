@@ -182,6 +182,13 @@ import { resolveHit, type Hit } from "./combat.js";
 import { SQUAD_KINDS, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
+/** 한 번에 n발을 쏠 때 i번째 화살의 각도 오프셋: 0번은 정면, 나머지는 좌우로 번갈아 퍼진다 */
+const fanOffset = (i: number, n: number): number => {
+  if (i === 0 || n <= 1) return 0;
+  const k = Math.ceil(i / 2);
+  return (i % 2 === 1 ? 1 : -1) * k * TUNE.MULTISHOT_SPREAD;
+};
+
 const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mods.legends.has(legendKey(id, scope));
 
 /** 용병 능력치 강화 묶음(전체용 하나, 병종별 다섯). 배율 계열은 1에서, 가산 계열은 0에서 시작한다. */
@@ -189,7 +196,7 @@ type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn", "xp"];
 const newMercMods = (): MercMods => ({
   hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1,
-  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0, knock: 0, xp: 1,
+  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, pierce: 0, multi: 0, knock: 0, xp: 1,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
 const mstat = (mods: Mods, type: number, stat: MercStat): number =>
@@ -209,6 +216,7 @@ interface Mods {
   heroDodge: number;
   heroRange: number;
   heroPierce: number;
+  heroMulti: number;
   heroCrit: number;
   heroCritMult: number;
   heroArea: number;
@@ -230,6 +238,7 @@ const newMods = (): Mods => ({
   heroDodge: 0,
   heroRange: 1,
   heroPierce: 0,
+  heroMulti: 0,
   heroCrit: 0,
   heroCritMult: TUNE.CRIT_BASE_MULT,
   heroArea: 1,
@@ -748,6 +757,7 @@ export class Game {
       r2(Math.min(DODGE_MAX, m.heroDodge)),
       r2(m.heroRegen),
       Math.round(TUNE.PLAYER_SPEED * m.heroSpeed),
+      1 + m.heroMulti,
     ];
   }
 
@@ -1682,22 +1692,26 @@ export class Game {
     if (w.windup <= 0 || w.ranged) s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
     if (crit && hasLegend(s.mods, "stormfire", "hero")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
     if (w.ranged) {
-      this.bullets.push({
-        id: this.nextEntityId++,
-        x: p.x,
-        y: p.y,
-        vx: Math.cos(p.aim) * BULLET_SPEED,
-        vy: Math.sin(p.aim) * BULLET_SPEED,
-        left: reach,
-        hostile: false,
-        damage,
-        srcType: w.type,
-        owner: p.id,
-        radius: BULLET_RADIUS,
-        pierce: s.mods.heroPierce,
-        crit,
-        hitIds: new Set(),
-      });
+      const n = 1 + Math.round(s.mods.heroMulti);
+      for (let i = 0; i < n; i++) {
+        const ang = p.aim + fanOffset(i, n);
+        this.bullets.push({
+          id: this.nextEntityId++,
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(ang) * BULLET_SPEED,
+          vy: Math.sin(ang) * BULLET_SPEED,
+          left: reach,
+          hostile: false,
+          damage: i === 0 ? damage : damage * TUNE.MULTISHOT_DAMAGE,
+          srcType: w.type,
+          owner: p.id,
+          radius: BULLET_RADIUS,
+          pierce: s.mods.heroPierce,
+          crit,
+          hitIds: new Set(),
+        });
+      }
       return;
     }
     p.swing = SWING_VISUAL_SEC;
@@ -2484,23 +2498,27 @@ export class Game {
     const dmg = st.damage * (crit ? critMult : 1);
     if (crit && hasLegend(mods, "stormfire", m.type)) m.cd = 0;
     if (st.ranged) {
-      this.bullets.push({
-        id: this.nextEntityId++,
-        x: m.x,
-        y: m.y,
-        vx: Math.cos(m.atkAng) * MERC_ARROW_SPEED,
-        vy: Math.sin(m.atkAng) * MERC_ARROW_SPEED,
-        left: st.reach * MERC_ARROW_RANGE_FACTOR,
-        hostile: false,
-        damage: dmg,
-        srcType: m.type,
-        owner: m.owner,
-        radius: 4,
-        pierce: Math.round(mstat(mods, m.type, "pierce")),
-        crit,
-        hitIds: new Set(),
-        merc: m,
-      });
+      const n = 1 + Math.round(mstat(mods, m.type, "multi"));
+      for (let i = 0; i < n; i++) {
+        const ang = m.atkAng + fanOffset(i, n);
+        this.bullets.push({
+          id: this.nextEntityId++,
+          x: m.x,
+          y: m.y,
+          vx: Math.cos(ang) * MERC_ARROW_SPEED,
+          vy: Math.sin(ang) * MERC_ARROW_SPEED,
+          left: st.reach * MERC_ARROW_RANGE_FACTOR,
+          hostile: false,
+          damage: i === 0 ? dmg : dmg * TUNE.MULTISHOT_DAMAGE,
+          srcType: m.type,
+          owner: m.owner,
+          radius: 4,
+          pierce: Math.round(mstat(mods, m.type, "pierce")),
+          crit,
+          hitIds: new Set(),
+          merc: m,
+        });
+      }
       return;
     }
     const charge = m.type === CAVALRY ? m.chargeSnap * (hasLegend(mods, "chargeBoost", CAVALRY) ? LEGEND_CONST.chargeMult : 1) : 0;
@@ -2770,6 +2788,7 @@ export class Game {
       case "heroDodge": m.heroDodge += e.v; break;
       case "heroRange": m.heroRange += e.v; break;
       case "heroPierce": m.heroPierce += e.v; break;
+      case "heroMulti": m.heroMulti += e.v; break;
       case "heroCrit": m.heroCrit += e.v; break;
       case "heroCritMult": m.heroCritMult += e.v; break;
       case "heroArea": m.heroArea += e.v; break;

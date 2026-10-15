@@ -84,6 +84,8 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   CAV_DAMAGE_PER_SPEED: ["기병 속도당 돌격 추가 피해", G.combat, 0, 1, 0.005],
   CAV_RAMP_SEC: ["기병이 최고 속도까지 걸리는 시간(초)", G.combat, 0.2, 10, 0.1],
   KNOCK_MAX: ["넉백 최대 거리(px)", G.combat, 0, 600, 5],
+  MULTISHOT_DAMAGE: ["발사 수 카드로 늘어난 화살 피해 비율", G.combat, 0.1, 1.5, 0.05],
+  MULTISHOT_SPREAD: ["발사 수 카드 화살 사이 각도(라디안)", G.combat, 0, 0.6, 0.01],
   SPEAR_HALF_WIDTH_NEAR: ["창 찌르기 폭(몸 앞, 반폭 px)", G.combat, 2, 150, 1],
   SPEAR_HALF_WIDTH_FAR: ["창 찌르기 폭(끝, 반폭 px)", G.combat, 2, 150, 1],
   PLAYER_MAX_HP: ["주인공 기본 체력", G.hero, 10, 2000, 5],

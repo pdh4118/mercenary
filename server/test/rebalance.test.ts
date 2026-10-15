@@ -329,7 +329,7 @@ test("주인공 능력치(hs)가 지금 무기와 카드를 반영해 내려간�
   const g = quiet();
   const a = g.addPlayer("a")!;
   const hs0 = g.snapshotPlayers()[0]!.hs;
-  assert.equal(hs0.length, 12);
+  assert.equal(hs0.length, 13);
   assert.equal(hs0[0], WEAPONS[0]!.damage, "활 공격력");
   assert.equal(hs0[2], WEAPONS[0]!.reach, "활 사거리");
   g.applyCardForTest(a, { k: "heroDmg", v: 0.5 });

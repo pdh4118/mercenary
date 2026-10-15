@@ -45,7 +45,7 @@ export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: rea
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
 /** 용병 능력치 종류. 배율 계열(hp~area, respawn)은 곱해지고, 나머지는 더해진다. */
-export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "pierce" | "respawn" | "knock" | "xp";
+export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "pierce" | "multi" | "respawn" | "knock" | "xp";
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
@@ -58,6 +58,7 @@ export type CardEffect =
   | { k: "legend"; id: LegendId; scope: LegendScope }
   | { k: "heroRange"; v: number }
   | { k: "heroPierce"; v: number }
+  | { k: "heroMulti"; v: number }
   | { k: "heroCrit"; v: number }
   | { k: "heroCritMult"; v: number }
   | { k: "heroArea"; v: number }
@@ -96,32 +97,33 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
   dodge: "회피율",
   regen: "체력 재생",
   pierce: "관통",
+  multi: "발사 수",
   respawn: "부활 시간",
   knock: "넉백",
   xp: "경험치 획득",
 };
 /** 병종 전용 일반 카드 한 장의 효과량. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.004, pierce: 1, respawn: -0.25, knock: 30, xp: 0.3,
+  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.004, pierce: 1, multi: 1, respawn: -0.25, knock: 30, xp: 0.3,
 };
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
   ["hp", "dmg", "speed", "crit", "dodge", "atkSpeed", "area", "knock", "xp"], // 기병
   ["hp", "dmg", "range", "defense", "atkSpeed", "area", "knock", "xp"], // 창병
-  ["dmg", "range", "atkSpeed", "crit", "pierce", "xp"], // 궁병(화살이라 범위는 없다)
+  ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "xp"], // 궁병(화살이라 범위는 없다)
   ["hp", "defense", "regen", "dmg", "respawn", "atkSpeed", "area", "knock", "xp"], // 검방병
   ["dmg", "area", "hp", "critMult", "atkSpeed", "knock", "xp"], // 둔기병
 ];
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
 /** 등급을 반영한 효과량. 관통은 정수로 1/2/3, 나머지는 등급 배율. */
-export const scaledValue = (stat: MercStat | "heroPierce", base: number, rarity: number): number =>
-  stat === "pierce" || stat === "heroPierce" ? base * (rarity + 1) : round3(base * RARITY[rarity]!.mult);
+export const scaledValue = (stat: MercStat | "heroPierce" | "heroMulti", base: number, rarity: number): number =>
+  stat === "pierce" || stat === "multi" || stat === "heroPierce" || stat === "heroMulti" ? base * (rarity + 1) : round3(base * RARITY[rarity]!.mult);
 
 /** 능력치 변화량을 사람이 읽는 문구로 */
 export function describeStat(stat: MercStat, v: number): string {
-  if (stat === "pierce") return `+${v}`;
+  if (stat === "pierce" || stat === "multi") return `+${v}`;
   if (stat === "knock") return `+${Math.round(v)}`;
   const pct = Math.abs(v) * 100;
   const text = pct >= 10 ? String(Math.round(pct)) : String(Math.round(pct * 10) / 10);
@@ -133,7 +135,7 @@ const statCards = (): CardDef[] => {
   const out: CardDef[] = [];
   for (const t of UNIT_TYPES) {
     for (const stat of MERC_TYPE_FOCUS[t]!) {
-      const special = stat === "pierce" || stat === "critMult";
+      const special = stat === "pierce" || stat === "multi" || stat === "critMult";
       for (let r = 0; r < 3; r++) {
         const v = scaledValue(stat, MERC_STAT_BASE[stat], r);
         out.push({
@@ -151,7 +153,7 @@ const statCards = (): CardDef[] => {
     }
   }
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
-    if (stat === "pierce") continue; // 관통은 화살을 쏘는 궁병만
+    if (stat === "pierce" || stat === "multi") continue; // 관통·발사 수는 화살을 쏘는 궁병만
     for (let r = 0; r < 3; r++) {
       const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR);
       out.push({
@@ -177,6 +179,7 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroFireRate", label: "공격 속도", base: 0.15, weight: 6, fmt: "pct" },
   { k: "heroRange", label: "사거리", base: 0.12, weight: 6, fmt: "pct" },
   { k: "heroPierce", label: "관통", base: 1, weight: 4, minLevel: 3, fmt: "int" },
+  { k: "heroMulti", label: "발사 수", base: 1, weight: 3, minLevel: 3, fmt: "int" },
   { k: "heroCrit", label: "치명타 확률", base: 0.08, weight: 6, fmt: "pct" },
   { k: "heroCritMult", label: "치명타 피해", base: 0.3, weight: 4, minLevel: 3, fmt: "pct" },
   { k: "heroArea", label: "범위", base: 0.15, weight: 4, fmt: "pct" },
@@ -188,7 +191,7 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
 const heroCards = (): CardDef[] =>
   HERO_STATS.flatMap((h) =>
     [0, 1, 2].map((r): CardDef => {
-      const v = h.k === "heroPierce" ? h.base * (r + 1) : h.fmt === "flat" ? Math.round(h.base * RARITY[r]!.mult) : round3(h.base * RARITY[r]!.mult);
+      const v = h.k === "heroPierce" || h.k === "heroMulti" ? h.base * (r + 1) : h.fmt === "flat" ? Math.round(h.base * RARITY[r]!.mult) : round3(h.base * RARITY[r]!.mult);
       const text = h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 +${Math.round(v * 10) / 10}` : `+${v}`;
       return {
         name: `${h.label} ${text}`,
