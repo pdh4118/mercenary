@@ -2088,6 +2088,13 @@ export class Game {
   // 검방병은 취약한 아군을 지키고, 궁병은 최대 사거리 근처에서 방패 정면을 피해 쏘고, 기병은 측면·후면에서 궁병·둔기병을 노리고,
   // 둔기병은 검방병을 먼저 노리고, 창병은 적 기병을 주시하며 아군을 덮는다.
 
+  /** 지키는 아군(ward)과 위협(threat)을 잇는 선 위의 지점: 둘 사이의 중간쯤(GUARD_MID_FRAC)에 서되, 아군에 너무 붙지는 않는다. 위협이 다가올수록 그 지점도 앞으로 좁혀 온다. */
+  private guardPoint(ward: { x: number; y: number }, tx: number, ty: number, minDist: number): [number, number] {
+    const d = Math.hypot(tx - ward.x, ty - ward.y) || 1;
+    const g = Math.min(d, Math.max(minDist, d * TUNE.GUARD_MID_FRAC));
+    return [ward.x + ((tx - ward.x) / d) * g, ward.y + ((ty - ward.y) / d) * g];
+  }
+
   private startAttack(m: Merc, st: UnitStats, ang: number): void {
     m.atkT = st.windup;
     m.atkAng = ang;
@@ -2134,10 +2141,7 @@ export class Game {
     if (ward) {
       const threat = this.nearestTarget(c, ward, GUARD_THREAT_RADIUS);
       if (threat) {
-        const ux = (threat.t.x - ward.x) / (threat.d || 1);
-        const uy = (threat.t.y - ward.y) / (threat.d || 1);
-        const gx = ward.x + ux * TUNE.GUARD_DIST;
-        const gy = ward.y + uy * TUNE.GUARD_DIST;
+        const [gx, gy] = this.guardPoint(ward, threat.t.x, threat.t.y, TUNE.GUARD_DIST); // 궁병 옆이 아니라 궁병과 적 사이의 중간
         if (Math.hypot(gx - c.home[0], gy - c.home[1]) <= guardLimit) {
           m.face = Math.atan2(threat.t.y - m.y, threat.t.x - m.x); // 방패 정면을 위협 쪽으로
           if (near) {
@@ -2290,9 +2294,36 @@ export class Game {
   private aiSpear(c: AiCtx): void {
     const { m, st } = c;
     const canHit = (t: Target) => inSpearBox(m.x, m.y, Math.atan2(t.y - m.y, t.x - m.x), t.x, t.y, t.r, st.reach, c.widthMult);
+    // 지킬 아군(궁병·주인공)이 있으면 그 아군과 위협(기병을 먼저) 사이의 중간에서 막는다. 아군 옆으로 가지 않는다.
+    const wardFirst = this.pickWard(c, [SPEAR, CAVALRY]);
+    if (wardFirst && !c.assault) {
+      let threat: Target | null = null;
+      let ts = Infinity;
+      for (const t of c.targets) {
+        const d = Math.hypot(t.x - wardFirst.x, t.y - wardFirst.y);
+        if (d > GUARD_THREAT_RADIUS) continue;
+        const sc = d / (t.type === CAVALRY ? 2 : 1);
+        if (sc < ts) {
+          ts = sc;
+          threat = t;
+        }
+      }
+      if (threat) {
+        m.face = Math.atan2(threat.y - m.y, threat.x - m.x); // 창끝을 위협 쪽으로
+        if (m.cd <= 0) {
+          const hit = canHit(threat) ? threat : c.targets.find((t) => canHit(t));
+          if (hit) return this.startAttack(m, st, Math.atan2(hit.y - m.y, hit.x - m.x));
+        }
+        const [gx, gy] = this.guardPoint(wardFirst, threat.x, threat.y, TUNE.SPEAR_COVER_DIST);
+        if (Math.hypot(gx - c.home[0], gy - c.home[1]) <= c.leash * 1.6 + 160) {
+          this.moveToward(m, gx, gy, st.speed * (c.homeDist > 150 ? 1.4 : 1), c.dt, 8);
+          return;
+        }
+      }
+    }
     const cavs = c.targets.filter((t) => t.type === CAVALRY && Math.hypot(t.x - m.x, t.y - m.y) <= SPEAR_WATCH_RANGE);
     if (cavs.length > 0) {
-      const ward = this.pickWard(c, [SPEAR, CAVALRY]);
+      const ward = null as Ally | null;
       const ref = ward ?? { x: c.home[0], y: c.home[1] };
       let cav = cavs[0]!;
       let cd = Infinity;
@@ -2311,10 +2342,7 @@ export class Game {
         if (other) return this.startAttack(m, st, Math.atan2(other.y - m.y, other.x - m.x));
       }
       // 기병과 지킬 아군 사이에 서서 창끝을 기병 쪽으로 겨눈다
-      const ux = (cav.x - ref.x) / (cd || 1);
-      const uy = (cav.y - ref.y) / (cd || 1);
-      const gx = ref.x + ux * TUNE.SPEAR_COVER_DIST;
-      const gy = ref.y + uy * TUNE.SPEAR_COVER_DIST;
+      const [gx, gy] = this.guardPoint(ref, cav.x, cav.y, TUNE.SPEAR_COVER_DIST);
       if (Math.hypot(gx - c.home[0], gy - c.home[1]) <= c.leash * 1.6 + 160) {
         this.moveToward(m, gx, gy, st.speed * (c.homeDist > 150 ? 1.4 : 1), c.dt, 8);
         return;
@@ -2958,9 +2986,8 @@ export class Game {
             }
           }
           if (threat) {
-            const ux = (threat.x - ward.x) / (tdw || 1);
-            const uy = (threat.y - ward.y) / (tdw || 1);
-            this.moveToward(e, ward.x + ux * TUNE.GUARD_DIST, ward.y + uy * TUNE.GUARD_DIST, speed, dt, 6);
+            const [gx, gy] = this.guardPoint(ward, threat.x, threat.y, TUNE.GUARD_DIST); // 궁병과 위협 사이의 중간에서 포위망을 좁혀 온다
+            this.moveToward(e, gx, gy, speed, dt, 6);
             e.face = Math.atan2(threat.y - e.y, threat.x - e.x); // 방패 정면을 위협 쪽으로
             return;
           }
@@ -2970,24 +2997,26 @@ export class Game {
       }
       case SPEAR: {
         // 창병: 아군 기병을 주시한다. 기병이 오면 지킬 궁병 앞에 서서 창끝을 기병 쪽으로 겨눈다.
-        let cav: Foe | null = null;
-        let cd = SPEAR_WATCH_RANGE;
-        for (const f of foes) {
-          if (f.type !== CAVALRY) continue;
-          const d = Math.hypot(f.x - e.x, f.y - e.y);
-          if (d < cd) {
-            cd = d;
-            cav = f;
+        // 가까운 궁병이 있으면 그 궁병과 위협(내 기병을 먼저) 사이의 중간에서 막는다. 궁병 옆으로 가지 않는다.
+        const ward = this.nearestEnemy(archers, e, 520);
+        if (ward) {
+          let threat: Foe | null = null;
+          let ts = Infinity;
+          for (const f of foes) {
+            const d = Math.hypot(f.x - ward.x, f.y - ward.y);
+            if (d > GUARD_THREAT_RADIUS && !(f.type === CAVALRY && d <= SPEAR_WATCH_RANGE)) continue;
+            const sc = d / (f.type === CAVALRY ? 2 : 1);
+            if (sc < ts) {
+              ts = sc;
+              threat = f;
+            }
           }
-        }
-        if (cav) {
-          const ward = this.nearestEnemy(archers, e, 520);
-          if (ward) {
-            const dc = Math.hypot(cav.x - ward.x, cav.y - ward.y) || 1;
-            this.moveToward(e, ward.x + ((cav.x - ward.x) / dc) * TUNE.SPEAR_COVER_DIST, ward.y + ((cav.y - ward.y) / dc) * TUNE.SPEAR_COVER_DIST, speed, dt, 8);
+          if (threat) {
+            const [gx, gy] = this.guardPoint(ward, threat.x, threat.y, TUNE.SPEAR_COVER_DIST);
+            this.moveToward(e, gx, gy, speed, dt, 8);
+            e.face = Math.atan2(threat.y - e.y, threat.x - e.x);
+            return;
           }
-          e.face = Math.atan2(cav.y - e.y, cav.x - e.x);
-          if (ward) return;
         }
         this.enemySurround(e, dt, target, td, speed, stopR, 0.5);
         return;

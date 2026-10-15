@@ -444,3 +444,40 @@ test("적은 이동 속도 배율이 붙고, 움직이는 대상은 예측해 �
   // 달리는 대상 쪽(북쪽, 더 작은 y)으로 더 치우쳐 따라간다
   assert.ok(run1.ey < still.ey - 30, "달리는 방향으로 앞질러 간다");
 });
+
+test("검방병·창병은 궁병 옆이 아니라 궁병과 적을 잇는 선의 중간에 서서 좁혀 온다(아군·적 공통)", () => {
+  // 순수 계산: 중간 지점
+  const g = quiet();
+  g.addPlayer("a");
+  const guard = (g as unknown as { guardPoint(w: { x: number; y: number }, x: number, y: number, min: number): [number, number] }).guardPoint.bind(g);
+  const [mx, my] = guard({ x: 0, y: 0 }, 300, 0, 46);
+  assert.ok(Math.abs(mx - 150) < 1e-6 && Math.abs(my) < 1e-6, "300 떨어진 위협이면 150, 즉 중간");
+  const [nx] = guard({ x: 0, y: 0 }, 60, 0, 46);
+  assert.ok(nx >= 46 && nx <= 60, "위협이 가까우면 중간이 되 최소 거리는 지킨다");
+  assert.ok(guard({ x: 0, y: 0 }, 200, 0, 46)[0] < guard({ x: 0, y: 0 }, 300, 0, 46)[0], "위협이 다가올수록 지점도 좁혀 온다");
+
+  const check = (kind: number) => {
+    // 적 쪽: 적 궁병(동쪽 끝)과 내 용병(서쪽). 적 검방병/창병은 궁병과 내 용병을 잇는 선 위(중간)에 선다.
+    const h = quiet();
+    const id = h.addPlayer("a")!;
+    const pl = h.getPlayer(id)!;
+    pl.invuln = 9999;
+    pl.x = 0;
+    pl.y = 0;
+    h.addMerc(id, BLUNT, 0, 0);
+    const archer = h.spawnEnemyAt(300, 0, ARCHER); // 위협 반경(320) 안
+    hpOf(h, archer, 99999, true);
+    const e = h.spawnEnemyAt(260, 150, kind); // 궁병 옆(북쪽 150)에서 시작
+    hpOf(h, e, 99999, false);
+    (h.getEnemy(e) as { cd: number }).cd = 99;
+    run(h, 6);
+    const en = h.getEnemy(e)!;
+    const ar = h.getEnemy(archer)!;
+    return { x: en.x, y: en.y, ax: ar.x, ay: ar.y };
+  };
+  for (const kind of [SHIELD, SPEAR]) {
+    const r = check(kind);
+    assert.ok(Math.abs(r.y - r.ay) < 80, `궁병 옆(세로 150)이 아니라 궁병과 아군을 잇는 선 근처: 세로 차 ${Math.abs(r.y - r.ay).toFixed(0)}`);
+    assert.ok(r.x < r.ax - 60, "궁병보다 앞(아군 쪽)에 선다");
+  }
+});

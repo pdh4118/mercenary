@@ -748,14 +748,14 @@ test("카드 효과: 용병 부활 시간 단축", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
-  const m = g.addMerc(a, SPEAR, p.x + 300, p.y);
+  const m = g.addMerc(a, BLUNT, p.x + 300, p.y); // (창병·검방병은 주인공 곁을 지키러 물러나므로 제자리에서 싸우는 병종으로)
   forceCard(g, a, "mercStat", (e) => e.stat === "respawn" && e.type === undefined);
   for (let i = 0; i < 400 && g.getMerc(m)!.respawn === 0; i++) {
     if (i % 4 === 0) g.spawnEnemyAt(g.getMerc(m)!.x, g.getMerc(m)!.y, BLUNT);
     g.step();
   }
   assert.ok(g.getMerc(m)!.respawn > 0);
-  assert.ok(g.getMerc(m)!.respawn <= MERC_RESPAWN_SEC[SPEAR] * 0.95 + 1e-9);
+  assert.ok(g.getMerc(m)!.respawn <= MERC_RESPAWN_SEC[BLUNT] * 0.95 + 1e-9);
 });
 
 // --- 주인공 무기 ------------------------------------------------------------
