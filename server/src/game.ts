@@ -2481,7 +2481,7 @@ export class Game {
           m.chargeSnap = chargeBonus(st.speed, m.momentum); // 지금까지 붙은 속도가 돌격 피해가 된다
           m.flankT = 0;
           m.runId = target.id;
-          m.brawl = target.hpFrac <= TUNE.CAV_FINISH_HP; // 상대가 거의 죽었으면 빠지지 않고 끝까지 싸운다
+          m.brawl = target.hpFrac <= TUNE.CAV_FINISH_HP || target.ranged; // 상대가 거의 죽었거나 궁병이면 빠지지 않고 끝까지 쫓아 싸운다
         }
         return;
       }
@@ -2489,7 +2489,7 @@ export class Game {
       let gx = target.x;
       let gy = target.y;
       const theta = angleDiff(Math.atan2(m.y - target.y, m.x - target.x), target.face);
-      if (d > 70 && target.hpFrac > TUNE.CAV_FINISH_HP && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
+      if (d > 70 && target.hpFrac > TUNE.CAV_FINISH_HP && !target.ranged && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
         m.flankT += dt;
         const phi = target.face + (theta >= 0 ? 1 : -1) * Math.min(Math.PI, Math.abs(theta) + 0.7);
         const radius = Math.min(220, Math.max(reachNow + 40, d));

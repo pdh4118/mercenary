@@ -511,3 +511,28 @@ test("기병은 한 대 치고 빠져 속도를 붙여 다시 돌격하고, 상�
   assert.ok(brawlHit, "체력이 30% 이하가 되면 마무리 싸움으로 바뀐다");
   assert.ok(!retreatedAfterBrawl, "마무리 싸움 중에는 빠지지 않는다");
 });
+
+test("기병은 궁병을 상대할 때는 치고 빠지지 않고 계속 붙어 싸운다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  (p as { invuln: number }).invuln = 1e9;
+  g.setStance(a, 1);
+  const mid = g.addMerc(a, CAVALRY, p.x + 60, p.y);
+  const foe = g.spawnEnemyAt(p.x + 200, p.y, ARCHER);
+  hpOf(g, foe, 400);
+  const e = g.getEnemy(foe) as unknown as { hp: number };
+  const m = g.getMerc(mid) as unknown as { evadeT: number; brawl?: boolean };
+  let hits = 0;
+  let retreated = false;
+  for (let i = 0; i < TICK_RATE * 12 && e.hp > 0; i++) {
+    const before = e.hp;
+    g.step();
+    if (e.hp < before) {
+      hits++;
+      if (m.evadeT > 0) retreated = true;
+    }
+  }
+  assert.ok(m.brawl, "궁병이 상대면 끝까지 싸우는 모드");
+  assert.ok(hits >= 3 && !retreated, `hits=${hits}`);
+});

@@ -526,7 +526,7 @@ test("기병은 공격한 뒤 잠깐 물러난다(치고 빠지기)", () => {
   const p = me(g, a);
   const home = { x: p.x + 30, y: p.y + 150 };
   const c = g.addMerc(a, CAVALRY, home.x, home.y);
-  const e = g.spawnEnemyAt(home.x + 30, home.y, ARCHER);
+  const e = g.spawnEnemyAt(home.x + 30, home.y, BLUNT);
   (g.getEnemy(e) as { hp: number; maxHp: number }).hp = (g.getEnemy(e) as { maxHp: number }).maxHp = 500; // 한 방에 죽지 않게
   for (let i = 0; i < 20 && g.getEnemy(e)!.hp === 500; i++) g.step(); // 공격이 들어갈 때까지
   assert.ok(g.getEnemy(e)!.hp < 500);
@@ -931,7 +931,7 @@ test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며,
   const a = g.addPlayer("a")!;
   const p = me(g, a);
   const c = g.addMerc(a, CAVALRY, p.x, p.y + 150);
-  g.spawnEnemyAt(p.x + 400, p.y + 150, ARCHER); // 멀리 있는 궁병을 향해 달린다
+  g.spawnEnemyAt(p.x + 400, p.y + 150, BLUNT); // 멀리 있는 둔기병을 향해 달린다
   g.step();
   const m0 = g.getMerc(c)!.momentum;
   run(g, 1);
@@ -948,7 +948,7 @@ test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며,
     if (g.enemyCount === 0) break;
   }
   assert.ok(before > 0.5, "충분히 가속했다");
-  assert.equal(g.enemyCount, 0, "궁병이 처치되었다");
+  assert.equal(g.enemyCount, 0, "둔기병이 처치되었다");
   assert.ok(g.getMerc(c)!.momentum < before * 0.9, "공격하면 속도가 줄어든다");
 });
 
