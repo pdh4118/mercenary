@@ -457,13 +457,37 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · V 용병 진형(기본/돌격) · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~5 해고 · F1~F4 진형 · B 편성 · U 용병 강화 · V 용병 진형(기본/돌격) · G 미니맵 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
   legend.addChild(helpText);
   const LEGEND_H = 64;
   legendBg.rect(0, 0, Math.max(lx, legendText.width + 24, helpText.width + 24), LEGEND_H).fill({ color: 0x000000, alpha: 0.35 });
+  // 미니맵: 월드 전체를 작게 보여 준다. 아군(주인공·용병)은 주인 색 점, 쓰러진 아군은 X(부활 대기), 방금 쓰러진 곳은 잠깐 붉은 고리로 깜빡인다.
+  const MINI = 200;
+  const mini = new Container();
+  const miniG = new Graphics();
+  const miniLabel = new Text({ text: "미니맵 (G)", style: { fill: 0x9aa1b0, fontSize: 11 } });
+  miniLabel.position.set(8, 4);
+  const miniNames = Array.from({ length: 8 }, () => {
+    const t = new Text({ text: "", style: { fill: 0xffd0c8, fontSize: 11, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+    t.anchor.set(0.5, 1);
+    t.visible = false;
+    return t;
+  });
+  mini.addChild(miniG, miniLabel, ...miniNames);
+  let miniOn = (() => {
+    try {
+      return localStorage.getItem("mercenary.minimap") !== "0";
+    } catch {
+      return true;
+    }
+  })();
+  /** 쓰러진 곳 표시: 5초 동안 퍼지는 붉은 고리 */
+  const deathFlashes: { x: number; y: number; age: number; hero: boolean }[] = [];
+  const wasDown = new Map<string, boolean>();
+  const MINI_FLASH_SEC = 5;
   const stageText = new Text({ text: "", style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
   stageText.anchor.set(0.5, 0);
   const bossBar = new Graphics();
@@ -644,7 +668,7 @@ async function main() {
     weaponHint.text = WEAPONS[active]!.note;
   };
   weaponBar.visible = false;
-  hud.addChild(hudPanel, stageText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
+  hud.addChild(hudPanel, mini, stageText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
@@ -857,6 +881,15 @@ async function main() {
       mercPanel.toggle();
       return;
     }
+    if (k === "g" && !e.repeat) {
+      miniOn = !miniOn;
+      try {
+        localStorage.setItem("mercenary.minimap", miniOn ? "1" : "0");
+      } catch {
+        /* 저장소를 못 써도 켜고 끌 수는 있다 */
+      }
+      return;
+    }
     if (k === "v" && !e.repeat) {
       const cur = latest?.players.find((p) => p.id === myId)?.stance ?? 0;
       setStance(cur === 0 ? 1 : 0);
@@ -983,6 +1016,110 @@ async function main() {
     }
     tourBigEl.innerHTML = big;
     tourBigEl.style.display = big ? "block" : "none";
+  };
+
+  const miniColor = (owner: number) => PLAYER_COLORS[(owner - 1) % PLAYER_COLORS.length]!;
+  const drawMinimap = (dt: number) => {
+    const st = latest;
+    mini.visible = miniOn && !!st;
+    if (!st) return;
+    const ox = 10;
+    const oy = 30 + hudH + 8; // 왼쪽 위 상태 상자 바로 아래
+    mini.position.set(ox, oy);
+    const sx = (x: number) => ((x + WORLD_SIZE / 2) / WORLD_SIZE) * MINI;
+    const sy = (y: number) => ((y + WORLD_SIZE / 2) / WORLD_SIZE) * MINI;
+    // 방금 쓰러진 아군을 찾아 깜빡임을 만든다(토너먼트에서는 쓰러지는 것이 정상이라 제외)
+    const duel = st.g?.phase === "tournament";
+    const seen = new Set<string>();
+    for (const p of st.players) {
+      const key = `p${p.id}`;
+      seen.add(key);
+      if (p.down && wasDown.get(key) === false && !duel) deathFlashes.push({ x: p.x, y: p.y, age: 0, hero: true });
+      wasDown.set(key, p.down);
+    }
+    for (const w of st.mercs) {
+      const key = `m${w[0]}`;
+      seen.add(key);
+      const down = w[8] > 0;
+      if (down && wasDown.get(key) === false && !duel) deathFlashes.push({ x: w[1], y: w[2], age: 0, hero: false });
+      wasDown.set(key, down);
+    }
+    for (const k of [...wasDown.keys()]) if (!seen.has(k)) wasDown.delete(k);
+    for (let i = deathFlashes.length - 1; i >= 0; i--) {
+      deathFlashes[i]!.age += dt;
+      if (deathFlashes[i]!.age > MINI_FLASH_SEC) deathFlashes.splice(i, 1);
+    }
+
+    const g = miniG;
+    g.clear();
+    g.roundRect(0, 0, MINI, MINI, 8).fill({ color: 0x0b0d12, alpha: 0.78 }).stroke({ width: 2, color: 0x59627a });
+    // 격자(위치 감각용)
+    for (let i = 1; i < 4; i++) {
+      g.moveTo((MINI * i) / 4, 2).lineTo((MINI * i) / 4, MINI - 2).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
+      g.moveTo(2, (MINI * i) / 4).lineTo(MINI - 2, (MINI * i) / 4).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
+    }
+    if (duel) g.circle(sx(0), sy(0), (TOURNAMENT_ARENA_RADIUS / WORLD_SIZE) * MINI).stroke({ width: 1.5, color: 0xe0c05d, alpha: 0.8 });
+    // 캠프와 상자
+    for (const c of st.camps) g.rect(sx(c[1]) - 3, sy(c[2]) - 3, 6, 6).fill(0xe0c05d);
+    for (const c of st.chests ?? []) {
+      const mine = c[3] === myId;
+      g.rect(sx(c[1]) - 3, sy(c[2]) - 2.5, 6, 5).fill(mine ? 0xffd45d : 0x7a6a4a).stroke({ width: 1, color: 0x1a1208 });
+    }
+    // 적(작은 붉은 점, 보스는 크게)
+    for (const w of st.enemies) {
+      if (w[11] === 1) g.circle(sx(w[1]), sy(w[2]), 4.2).fill(0xff8a2a).stroke({ width: 1, color: 0xffffff });
+      else g.rect(sx(w[1]) - 0.9, sy(w[2]) - 0.9, 1.8, 1.8).fill({ color: 0xe0504a, alpha: 0.9 });
+    }
+    // 아군 용병: 주인 색 점. 쓰러진 용병은 X
+    for (const w of st.mercs) {
+      const color = miniColor(w[5]);
+      const x = sx(w[1]);
+      const y = sy(w[2]);
+      const mine = w[5] === myId;
+      if (w[8] > 0) {
+        const r = mine ? 3.8 : 3;
+        g.moveTo(x - r, y - r).lineTo(x + r, y + r).moveTo(x + r, y - r).lineTo(x - r, y + r).stroke({ width: 1.6, color: 0xff6a5a });
+      } else g.circle(x, y, mine ? 2.8 : 2.2).fill(color);
+    }
+    // 방금 쓰러진 곳
+    for (const f of deathFlashes) {
+      const k = f.age / MINI_FLASH_SEC;
+      g.circle(sx(f.x), sy(f.y), 3 + 11 * ((f.age * 1.6) % 1) + (f.hero ? 2 : 0)).stroke({ width: 1.5, color: 0xff4a3a, alpha: 0.9 * (1 - k) });
+    }
+    // 시야(카메라가 보는 범위)
+    const me = st.players.find((p) => p.id === myId);
+    if (me) {
+      const vw = (app.screen.width / WORLD_SIZE) * MINI;
+      const vh = (app.screen.height / WORLD_SIZE) * MINI;
+      g.rect(sx(me.x) - vw / 2, sy(me.y) - vh / 2, vw, vh).stroke({ width: 1, color: 0xffffff, alpha: 0.4 });
+    }
+    // 주인공들: 큰 점(나는 흰 테두리 삼각형). 쓰러진 주인공은 큰 X와 이름, 부활 진행률
+    let nameIdx = 0;
+    for (const p of st.players) {
+      const color = miniColor(p.id);
+      const x = sx(p.x);
+      const y = sy(p.y);
+      if (p.down) {
+        const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 180);
+        g.circle(x, y, 7).stroke({ width: 1.5, color: 0xff4a3a, alpha: pulse });
+        g.moveTo(x - 4.5, y - 4.5).lineTo(x + 4.5, y + 4.5).moveTo(x + 4.5, y - 4.5).lineTo(x - 4.5, y + 4.5).stroke({ width: 2.4, color: 0xff6a5a });
+        if (p.revive > 0) g.arc(x, y, 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.revive).stroke({ width: 2, color: 0x7be08f });
+        const t = miniNames[nameIdx++];
+        if (t) {
+          t.visible = true;
+          t.text = p.name;
+          t.position.set(Math.max(24, Math.min(MINI - 24, x)), Math.max(14, y - 8));
+        }
+      } else if (p.id === myId) {
+        const a = p.aim;
+        g.poly([x + Math.cos(a) * 6, y + Math.sin(a) * 6, x + Math.cos(a + 2.5) * 4.5, y + Math.sin(a + 2.5) * 4.5, x + Math.cos(a - 2.5) * 4.5, y + Math.sin(a - 2.5) * 4.5])
+          .fill(color)
+          .stroke({ width: 1.5, color: 0xffffff });
+      } else {
+        g.circle(x, y, 3.6).fill(color).stroke({ width: 1, color: 0xffffff, alpha: 0.8 });
+      }
+    }
+    for (let i = nameIdx; i < miniNames.length; i++) miniNames[i]!.visible = false;
   };
 
   app.ticker.add((ticker) => {
@@ -1459,6 +1596,7 @@ async function main() {
         bossBar.roundRect(bx, 36, bw, 10, 4).fill({ color: 0x000000, alpha: 0.6 }).roundRect(bx, 36, (bw * gi.bossHp) / 100, 10, 4).fill(0xe8883a);
       }
     }
+    drawMinimap(ticker.deltaMS / 1000);
     renderTournament(gi, myId);
     snd.near = nearCampId;
     levelToastLeft = Math.max(0, levelToastLeft - ticker.deltaMS / 1000);
