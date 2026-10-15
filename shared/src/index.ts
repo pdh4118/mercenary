@@ -94,7 +94,8 @@ export interface PlayerState {
   offer: number[]; // 지금 고를 수 있는 카드(CARDS 인덱스). 없으면 빈 배열
   priceMult: number; // 고용 가격 배율(할인 카드)
   leadership: number; // 통솔력(보유할 수 있는 용병 비용 합의 최대치)
-  chargeLeft: number; // 기병 돌격 지시가 남은 시간(초), 지시 중이 아니면 0
+  chargeLeft: number; // 기병 지시(공격·이동)가 남은 시간(초), 지시 중이 아니면 0
+  chargeKind: number; // 지시 종류: 0 공격(적 주변을 찍음), 1 이동(땅을 찍음)
   chargeX: number;
   chargeY: number;
   down: boolean; // 쓰러짐(스스로 일어나지 못하고, 동료가 부활시켜야 한다)

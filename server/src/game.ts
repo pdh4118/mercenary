@@ -584,6 +584,7 @@ export class Game {
         priceMult: 1,
         leadership: TUNE.START_LEADERSHIP,
         chargeLeft: 0,
+        chargeKind: 0,
         chargeX: 0,
         chargeY: 0,
         down: false,
@@ -687,7 +688,12 @@ export class Game {
     const k = d > CHARGE_MAX_DISTANCE ? CHARGE_MAX_DISTANCE / d : 1;
     s.state.chargeX = clampToWorld(s.state.x + dx * k, 20);
     s.state.chargeY = clampToWorld(s.state.y + dy * k, 20);
-    s.state.chargeLeft = CHARGE_DURATION_SEC;
+    // 적 주변을 찍으면 그 일대의 적을 공격하고, 빈 땅을 찍으면 그곳으로 이동해 자리를 지킨다
+    const foes: { x: number; y: number; r: number }[] =
+      this.phase === "tournament" ? this.duelFoes(playerId).map((f) => ({ x: f.x, y: f.y, r: f.radius })) : [...this.enemies.values()].map((e) => ({ x: e.x, y: e.y, r: radiusOf(e) }));
+    const attack = foes.some((f) => Math.hypot(f.x - s.state.chargeX, f.y - s.state.chargeY) <= TUNE.ORDER_ATTACK_PICK + f.r);
+    s.state.chargeKind = attack ? 0 : 1;
+    s.state.chargeLeft = attack ? CHARGE_DURATION_SEC : TUNE.MOVE_ORDER_SEC;
   }
 
   leadershipUsed(owner: number): number {
@@ -2579,10 +2585,12 @@ export class Game {
     const healthy = m.hp > st.hp * CAV_RETREAT_HP; // 체력이 낮으면 모험을 멈추고 복귀한다
     const charging = healthy && !!owner && owner.state.chargeLeft > 0;
     const anchor: [number, number] = charging ? [owner!.state.chargeX, owner!.state.chargeY] : c.home;
+    const moveOrder = charging && owner!.state.chargeKind === 1; // 이동 지시: 그곳까지 싸우지 않고 가서 자리를 지킨다
+    const arrived = moveOrder && Math.hypot(m.x - anchor[0], m.y - anchor[1]) <= TUNE.MOVE_ENGAGE_RADIUS + 60;
     let target: Target | null = null;
     let best = Infinity;
-    if (healthy) {
-      const radius = charging ? CHARGE_TARGET_RADIUS : c.leash;
+    if (healthy && (!moveOrder || arrived)) {
+      const radius = charging ? (moveOrder ? TUNE.MOVE_ENGAGE_RADIUS : CHARGE_TARGET_RADIUS) : c.leash;
       for (const t of c.targets) {
         if (Math.hypot(t.x - anchor[0], t.y - anchor[1]) > radius) continue;
         const d = Math.hypot(t.x - m.x, t.y - m.y);

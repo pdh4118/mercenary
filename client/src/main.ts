@@ -475,7 +475,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 돌격 지시 · 캠프에서 1~3 고용 / Shift+1~6 해고 · F1 주인공 호위 · F2 위치 고수 · F3 돌격 · B 편성 · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 이동/공격 지시 · 캠프에서 1~3 고용 / Shift+1~6 해고 · F1 주인공 호위 · F2 위치 고수 · F3 돌격 · B 편성 · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1666,12 +1666,16 @@ async function main() {
     chargeMark.visible = chargeLabel.visible = charging;
     if (charging && meState) {
       const pulse = 1 + 0.12 * Math.sin(performance.now() / 120);
+      const attack = (meState.chargeKind ?? 0) === 0;
+      const col = attack ? 0xffa043 : 0x6fc4ff; // 공격 지시는 주황, 이동 지시는 하늘색
+      chargeLabel.text = attack ? "공격" : "이동";
+      chargeLabel.style.fill = attack ? 0xffc27a : 0xa8dcff;
       chargeMark
         .clear()
         .circle(0, 0, 26 * pulse)
-        .stroke({ width: 3, color: 0xffa043, alpha: 0.4 + 0.5 * Math.min(1, meState.chargeLeft / 2) })
+        .stroke({ width: 3, color: col, alpha: 0.4 + 0.5 * Math.min(1, meState.chargeLeft / 2) })
         .circle(0, 0, 4)
-        .fill(0xffa043);
+        .fill(col);
       chargeMark.position.set(meState.chargeX, meState.chargeY);
       chargeLabel.position.set(meState.chargeX, meState.chargeY - 32);
     }

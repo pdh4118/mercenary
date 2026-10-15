@@ -55,6 +55,9 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  MOVE_ORDER_SEC: 12, // 기병 이동 지시(땅을 우클릭)가 이어지는 시간
+  MOVE_ENGAGE_RADIUS: 150, // 이동 지시 지점에 도착한 기병이 맞서 싸우는 반경
+  ORDER_ATTACK_PICK: 90, // 우클릭한 곳 이 거리 안에 적이 있으면 공격 지시, 없으면 이동 지시
   SHAKEN_SEC: 3, // 사기 저하(공포)로 용병이 도망치는 시간(초)
   SHAKEN_FLEE_SPEED: 1.3, // 도망칠 때 이동 속도 배율
   MOUNT_SPEED_MAX: 1.7, // 기마 주인공이 달려서 붙는 최고 속도 배율(걸어갈 때 대비)

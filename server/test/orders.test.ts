@@ -161,3 +161,43 @@ test("적 마법사는 수 제한 없이 낮은 비율로만 나온다", () => {
   assert.ok(mages > 3, `이전의 동시 3명 제한을 넘어 나올 수 있다: ${mages}`);
   assert.ok(mages / all.length < 0.08, "빈도는 낮다");
 });
+
+test("우클릭 지시: 빈 땅을 찍으면 기병이 그곳으로 가서 자리를 지키고, 적 주변을 찍으면 공격한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  (p as { invuln: number }).invuln = 1e9;
+  const cav = g.addMerc(a, CAVALRY, p.x, p.y);
+  const shield = g.addMerc(a, SHIELD, p.x, p.y);
+  // 빈 땅: 이동 지시
+  const tx = p.x + 600;
+  g.charge(a, tx, p.y);
+  assert.equal(p.chargeKind, 1);
+  assert.equal(p.chargeLeft, TUNE.MOVE_ORDER_SEC);
+  const bystander = dummy(g, tx + 420, p.y, 4); // 이동 지점에서 멀리 떨어진 적(싸우러 가지 않는다)
+  run(g, 7);
+  const c = g.getMerc(cav)!;
+  assert.ok(Math.hypot(c.x - tx, c.y - p.y) < 80, `지점에 도착해 머문다: ${Math.hypot(c.x - tx, c.y - p.y).toFixed(0)}`);
+  assert.equal(bystander.hp, bystander.maxHp, "이동 지시 중에는 멀리 있는 적을 쫓지 않는다");
+  assert.ok(Math.hypot(g.getMerc(shield)!.x - tx, g.getMerc(shield)!.y - p.y) > 300, "다른 병종은 움직이지 않는다");
+  // 지점에 적이 다가오면 맞서 싸운다
+  const comer = dummy(g, tx + 60, p.y + 20, 4);
+  run(g, 3);
+  assert.ok(comer.hp < comer.maxHp, "도착한 기병은 지점에 온 적과 싸운다");
+  // 시간이 지나면 돌아온다
+  run(g, TUNE.MOVE_ORDER_SEC);
+  assert.equal(p.chargeLeft, 0);
+
+  // 적 주변: 공격 지시
+  const g2 = quiet();
+  const a2 = g2.addPlayer("a")!;
+  const p2 = g2.getPlayer(a2)!;
+  (p2 as { invuln: number }).invuln = 1e9;
+  g2.addMerc(a2, CAVALRY, p2.x, p2.y);
+  const foe = dummy(g2, p2.x + 500, p2.y, 4);
+  g2.charge(a2, p2.x + 500 + 40, p2.y);
+  assert.equal(p2.chargeKind, 0);
+  assert.equal(p2.chargeLeft, 6);
+  run(g2, 5);
+  assert.ok(foe.hp < foe.maxHp, "적 주변을 찍으면 그 일대의 적을 공격한다");
+});
