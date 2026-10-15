@@ -48,7 +48,7 @@ export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: rea
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
 /** 용병 능력치 종류. 배율 계열(hp~area, respawn)은 곱해지고, 나머지는 더해진다. */
-export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "lifesteal" | "pierce" | "multi" | "poison" | "armor" | "respawn" | "knock" | "xp";
+export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "lifesteal" | "pierce" | "multi" | "poison" | "armor" | "respawn" | "knock" | "xp" | "cast";
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
@@ -77,7 +77,8 @@ export type CardEffect =
   | { k: "heroLifesteal"; v: number } // 준 피해의 v(비율)만큼 회복
   | { k: "heroRegen"; v: number } // 초당 체력 회복
   | { k: "heroShield"; v: number } // 검 방패 체력 최대치 +v
-  | { k: "heroShieldRegen"; v: number }; // 검 방패 재생 속도 +v(비율)
+  | { k: "heroShieldRegen"; v: number }
+  | { k: "heroCast"; v: number }; // 지팡이 시전 시간 배율 변화(음수가 빨라짐) // 검 방패 재생 속도 +v(비율)
 
 export interface CardDef {
   name: string;
@@ -112,10 +113,11 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
   respawn: "부활 시간",
   knock: "넉백",
   xp: "경험치 획득",
+  cast: "시전 시간",
 };
 /** 병종 전용 일반 카드 한 장의 효과량. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.00125, lifesteal: 0.003, pierce: 1, multi: 1, poison: 0.5, armor: 2, respawn: -0.25, knock: 30, xp: 0.3,
+  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.00125, lifesteal: 0.003, pierce: 1, multi: 1, poison: 0.5, armor: 2, respawn: -0.25, knock: 30, xp: 0.3, cast: -0.15,
 };
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
@@ -125,7 +127,7 @@ export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
   ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "armor", "xp"], // 궁병(화살이라 범위는 없다)
   ["hp", "defense", "armor", "regen", "lifesteal", "dmg", "respawn", "atkSpeed", "area", "knock", "xp"], // 검방병
   ["dmg", "area", "hp", "armor", "lifesteal", "critMult", "atkSpeed", "knock", "xp"], // 둔기병
-  ["dmg", "area", "range", "atkSpeed", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
+  ["dmg", "area", "range", "atkSpeed", "cast", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
 ];
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -177,7 +179,7 @@ const statCards = (): CardDef[] => {
     }
   }
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
-    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "lifesteal") continue; // 관통·발사 수는 화살을 쏘는 궁병만
+    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "lifesteal" || stat === "cast") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만
     for (let r = 0; r < 3; r++) {
       const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR);
       out.push({
@@ -196,7 +198,7 @@ const statCards = (): CardDef[] => {
 };
 
 /** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용) */
-const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" }[] = [
+const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
   { k: "heroMaxHp", label: "최대 체력", base: 25, weight: 8, fmt: "flat" },
   { k: "heroSpeed", label: "이동 속도", base: 0.12, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.25, weight: 8, fmt: "pct" },
@@ -214,6 +216,7 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroDodge", label: "회피율", base: 0.06, weight: 5, fmt: "pct" },
   { k: "heroRegen", label: "체력 재생", base: 0.06, weight: 9, fmt: "regen" },
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
+  { k: "heroCast", label: "시전 시간", base: -0.15, weight: 4, fmt: "cut" },
   { k: "heroShield", label: "방패 체력", base: 80, weight: 5, fmt: "flat" },
   { k: "heroShieldRegen", label: "방패 재생 속도", base: 0.4, weight: 5, fmt: "pct" },
 ];
@@ -221,10 +224,10 @@ const heroCards = (): CardDef[] =>
   HERO_STATS.flatMap((h) =>
     (h.k === "heroArmor" ? [1, 2] : [0, 1, 2]).map((r): CardDef => {
       const v = h.k === "heroArmor" ? h.base * r : h.k === "heroPierce" || h.k === "heroMulti" ? h.base * (r + 1) : h.fmt === "flat" ? Math.round(h.base * RARITY[r]!.mult) : round3(h.base * RARITY[r]!.mult);
-      const text = h.k === "heroArmor" ? `-${v}` : h.k === "heroPoison" ? `화살 피해의 ${Math.round(v * 100)}%` : h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 +${Math.round(v * 10) / 10}` : `+${v}`;
+      const text = h.k === "heroArmor" ? `-${v}` : h.k === "heroPoison" ? `화살 피해의 ${Math.round(v * 100)}%` : h.fmt === "cut" ? `-${Math.round(Math.abs(v) * 1000) / 10}%` : h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 +${Math.round(v * 10) / 10}` : `+${v}`;
       return {
         name: `${h.label} ${text}`,
-        desc: h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : h.k === "heroShield" ? `주인공이 검을 들었을 때: 방패 체력 ${text}` : h.k === "heroShieldRegen" ? `주인공이 검을 들었을 때: 방패가 차오르는 속도 ${text} (맞지 않고 기다리는 시간은 그대로)` : `주인공만: ${h.label} ${text}`,
+        desc: h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : h.k === "heroCast" ? `주인공이 지팡이를 들었을 때: 주문을 외우는 시간 ${text}` : h.k === "heroShield" ? `주인공이 검을 들었을 때: 방패 체력 ${text}` : h.k === "heroShieldRegen" ? `주인공이 검을 들었을 때: 방패가 차오르는 속도 ${text} (맞지 않고 기다리는 시간은 그대로)` : `주인공만: ${h.label} ${text}`,
         category: 2,
         rarity: r as 0 | 1 | 2,
         weight: h.weight * RARITY[r]!.weight,

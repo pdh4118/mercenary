@@ -37,6 +37,7 @@ import {
   STAGE_COUNT,
   applyTuning,
   TOURNAMENT_ARENA_RADIUS,
+  meleeArc,
   CHEST_OPEN_RADIUS,
   MERC_STATS,
   mercName,
@@ -1679,23 +1680,25 @@ async function main() {
     for (const p of latest.players) {
       const w = WEAPONS[p.weapon]!;
       const v = players.views.get(p.id);
+      const reachNow = p.hs?.[2] || w.reach; // 사거리·범위 카드가 반영된 값(철퇴는 범위가 사거리로 간다)
+      const arcNow = meleeArc(w.type, w.arc, p.hs?.[6] || 1);
       if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
         // 철퇴 준비 동작: 범위가 점점 진하게 차오른다(맞기 직전까지 피하라는 신호가 아니라 휘두르는 타이밍 표시)
         const prog = Math.max(0, Math.min(1, 1 - p.wind / w.windup));
         fxLayer
           .moveTo(v.x, v.y)
-          .arc(v.x, v.y, w.reach * (0.4 + 0.6 * prog), p.aim - w.arc, p.aim + w.arc)
+          .arc(v.x, v.y, reachNow * (0.4 + 0.6 * prog), p.aim - arcNow, p.aim + arcNow)
           .closePath()
           .fill({ color: 0xffc27a, alpha: 0.12 + 0.3 * prog });
       }
       if (!v || p.swing <= 0 || w.ranged || w.type === MAGE_TYPE) continue;
       if (w.type === SPEAR_TYPE) {
-        drawSpearBox(v.x, v.y, p.aim, w.reach, 1, TYPE_COLORS[w.type]!, 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC));
+        drawSpearBox(v.x, v.y, p.aim, reachNow, p.hs?.[6] || 1, TYPE_COLORS[w.type]!, 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC));
         continue;
       }
       fxLayer
         .moveTo(v.x, v.y)
-        .arc(v.x, v.y, w.reach, p.aim - w.arc, p.aim + w.arc)
+        .arc(v.x, v.y, reachNow, p.aim - arcNow, p.aim + arcNow)
         .closePath()
         .fill({ color: TYPE_COLORS[w.type]!, alpha: 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC) });
     }

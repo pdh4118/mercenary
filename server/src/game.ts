@@ -21,7 +21,9 @@ import {
   DODGE_MAX,
   EVT_DODGE,
   CRIT_MAX_CHANCE,
-  AREA_ARC_MAX,
+  CAST_TIME_MIN_MULT,
+  meleeArc,
+  meleeReach,
   EVT_CRIT,
   EVT_BACKSTAB,
   EVT_KNOCK,
@@ -203,9 +205,9 @@ const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mod
 
 /** 용병 능력치 강화 묶음(전체용 하나, 병종별 다섯). 배율 계열은 1에서, 가산 계열은 0에서 시작한다. */
 type MercMods = Record<MercStat, number>;
-const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn", "xp"];
+const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn", "xp", "cast"];
 const newMercMods = (): MercMods => ({
-  hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1,
+  hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1, cast: 1,
   crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, xp: 1,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
@@ -238,6 +240,7 @@ interface Mods {
   heroLifesteal: number;
   heroShield: number; // 방패 체력 최대치 추가
   heroShieldRegen: number; // 방패 재생 속도 추가 비율
+  heroCast: number; // 지팡이 시전 시간 배율
 }
 
 const newMods = (): Mods => ({
@@ -265,6 +268,7 @@ const newMods = (): Mods => ({
   heroLifesteal: 0,
   heroShield: 0,
   heroShieldRegen: 0,
+  heroCast: 1,
 });
 
 interface Slot {
@@ -815,7 +819,7 @@ export class Game {
     return [
       r2(w.damage * m.heroDmg),
       r2(rate / (w.cooldown + w.windup)),
-      Math.round(w.reach * m.heroRange),
+      Math.round(meleeReach(w.type, w.reach * m.heroRange, m.heroArea)),
       r2(Math.min(CRIT_MAX_CHANCE, m.heroCrit)),
       r2(m.heroCritMult),
       m.heroPierce,
@@ -1876,7 +1880,7 @@ export class Game {
     const rate = s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0));
     if (!w.ranged && w.windup > 0) {
       // 준비 동작: 이 동안은 움직일 수 있지만 공격은 나가지 않고, 끝나는 순간 조준 방향으로 휘두른다
-      s.windT = w.windup / rate;
+      s.windT = (w.windup * (w.type === MAGE ? Math.max(CAST_TIME_MIN_MULT, s.mods.heroCast) : 1)) / rate;
       p.wind = s.windT;
       s.fireCd = s.windT + w.cooldown / rate;
       if (w.type === MAGE) {
@@ -1894,7 +1898,7 @@ export class Game {
     const w = WEAPONS[p.weapon]!;
     const crit = this.rollCrit(s.mods.heroCrit);
     const damage = w.damage * s.mods.heroDmg * (crit ? s.mods.heroCritMult : 1);
-    const reach = w.reach * s.mods.heroRange;
+    const reach = meleeReach(w.type, w.reach * s.mods.heroRange, s.mods.heroArea);
     if (w.windup <= 0 || w.ranged) s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
     if (crit && hasLegend(s.mods, "stormfire", "hero")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
     if (w.type === MAGE) {
@@ -1928,7 +1932,7 @@ export class Game {
       return;
     }
     p.swing = SWING_VISUAL_SEC;
-    const arc = Math.min(AREA_ARC_MAX, w.arc * s.mods.heroArea);
+    const arc = meleeArc(w.type, w.arc, s.mods.heroArea);
     // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
     const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) : 0;
     if (w.type === CAVALRY) s.mom *= CAV_MOMENTUM_AFTER_HIT;
@@ -3317,7 +3321,7 @@ export class Game {
       case "luck": p.luck += e.v; break;
       case "mercStat": {
         const target = e.type === undefined ? m.all : m.type[e.type]!;
-        if (e.stat === "respawn") target.respawn *= 1 + e.v;
+        if (e.stat === "respawn" || e.stat === "cast") target[e.stat] *= 1 + e.v;
         else target[e.stat] += e.v;
         break;
       }
@@ -3348,6 +3352,7 @@ export class Game {
       case "heroRegen": m.heroRegen += e.v; break;
       case "heroShield": m.heroShield += e.v; p.shield += e.v; p.shieldMax += e.v; break;
       case "heroShieldRegen": m.heroShieldRegen += e.v; break;
+      case "heroCast": m.heroCast *= 1 + e.v; break;
       case "heroLifesteal": m.heroLifesteal += e.v; break;
     }
     for (const merc of this.mercs.values()) {
@@ -3372,11 +3377,12 @@ export class Game {
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
       damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)),
+      windup: base.windup * Math.max(CAST_TIME_MIN_MULT, mstat(mods, t, "cast")),
       cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
-      reach: base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier),
+      reach: meleeReach(t, base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier), area * (1 + TIER_AREA[t]! * tier)),
       splash: base.splash * area * (1 + TIER_AREA[t]! * tier),
-      arc: Math.min(AREA_ARC_MAX, base.arc * area),
+      arc: meleeArc(t, base.arc, area),
     };
   }
 

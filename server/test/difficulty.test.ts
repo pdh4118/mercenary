@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DIFFICULTY_REDUCTION, SPEAR, TICK_RATE } from "@mercenary/shared";
+import { BLUNT, CAST_TIME_MIN_MULT, DIFFICULTY_REDUCTION, MAGE, SHIELD, SPEAR, TICK_RATE, meleeArc, meleeReach } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 import { RoomManager } from "../src/rooms.js";
 
@@ -113,4 +113,52 @@ test("방패 카드: 방패 체력 최대치가 늘고, 재생 카드는 더 빨
   const base = regenAfter(false);
   const fast = regenAfter(true);
   assert.ok(base > 0 && Math.abs(fast / base - 1.5) < 0.05, `${base} -> ${fast}`);
+});
+
+test("철퇴 범위 증가는 부채꼴을 넓히지 않고 앞으로 길게 늘린다(다른 근접 무기는 각도가 넓어진다)", () => {
+  assert.equal(meleeArc(BLUNT, 1.7, 2), 1.7);
+  assert.equal(meleeReach(BLUNT, 50, 1.5), 75);
+  assert.ok(meleeArc(SHIELD, 1.2, 1.5) > 1.2);
+  assert.equal(meleeReach(SHIELD, 50, 1.5), 50);
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const id = g.addMerc(a, BLUNT, p.x, p.y);
+  type Stats = { reach: number; arc: number; windup: number };
+  const st = () => (g as unknown as { mercStats(m: unknown): Stats }).mercStats(g.getMerc(id)!);
+  const before = st();
+  g.applyCardForTest(a, { k: "mercStat", stat: "area", v: 0.5, type: BLUNT });
+  const after = st();
+  assert.equal(after.arc, before.arc);
+  assert.ok(Math.abs(after.reach / before.reach - 1.5) < 1e-9);
+});
+
+test("시전 시간 카드: 마법사 용병과 주인공 지팡이의 주문이 빨라지고, 한계가 있다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const id = g.addMerc(a, MAGE, p.x, p.y);
+  const windup = () => (g as unknown as { mercStats(m: unknown): { windup: number } }).mercStats(g.getMerc(id)!).windup;
+  const w0 = windup();
+  g.applyCardForTest(a, { k: "mercStat", stat: "cast", v: -0.25, type: MAGE });
+  assert.ok(Math.abs(windup() - w0 * 0.75) < 1e-9);
+  for (let i = 0; i < 20; i++) g.applyCardForTest(a, { k: "mercStat", stat: "cast", v: -0.25, type: MAGE });
+  assert.ok(Math.abs(windup() - w0 * CAST_TIME_MIN_MULT) < 1e-9, "아무리 모아도 한계 밑으로는 줄지 않는다");
+  // 주인공 지팡이
+  const castTime = (card: boolean) => {
+    const h = new Game();
+    h.autoSpawn = false;
+    const b = h.addPlayer("b")!;
+    if (card) h.applyCardForTest(b, { k: "heroCast", v: -0.3 });
+    h.setWeapon(b, 4);
+    run(h, 1);
+    h.setInput(b, { dx: 0, dy: 0, aim: 0, fire: true });
+    h.step();
+    return h.getPlayer(b)!.wind;
+  };
+  const t0 = castTime(false);
+  const t1 = castTime(true);
+  assert.ok(t0 > 1.5 && Math.abs(t1 / t0 - 0.7) < 0.03, `${t0} -> ${t1}`);
 });
