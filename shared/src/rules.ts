@@ -55,6 +55,10 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  CAV_RUNUP_SEC: 2.6, // 기병이 한 대 치고 빠져 다시 속도를 붙이는 최대 시간
+  CAV_RUNUP_DIST: 240, // 달리기 위해 대상에서 떨어지는 거리(px)
+  CAV_RUNUP_READY: 0.85, // 이 속도(최고 속도 대비)가 붙고 옆·뒤를 잡으면 다시 돌격
+  CAV_FINISH_HP: 0.3, // 대상 체력이 이 비율 이하이면 빠지지 않고 끝까지 싸운다
   BLUNT_STAGGER_SEC: 0.3, // 둔기병이 때린 적이 경직되는 시간(0단계)
   BLUNT_STAGGER_PER_TIER: 0.15, // 강화 단계마다 늘어나는 경직 시간
   BLUNT_STAGGER_BOSS_FRAC: 0.3, // 보스는 이 비율만큼만 경직된다

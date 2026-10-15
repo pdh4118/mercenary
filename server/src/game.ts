@@ -328,6 +328,8 @@ interface Merc extends Fighter {
   paid: number; // 고용에 쓴 금화(해고 환급 기준)
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   flankT: number; // 기병이 우회 접근에 쓴 시간
+  runId?: number; // 기병이 마지막으로 친 대상(그 뒤로 돌아 들어간다)
+  brawl?: boolean; // 기병이 마무리 싸움 중(대상 체력이 얼마 안 남아 치고 빠지지 않는다)
   tier: number; // 강화 단계 0~4
   nameId: number;
   xp: number; // 강화에 쓰는 경험치
@@ -382,6 +384,7 @@ interface Target {
   ranged: boolean;
   id: number;
   hero: boolean;
+  hpFrac: number; // 남은 체력 비율(0~1)
 }
 interface Ally {
   x: number;
@@ -1992,7 +1995,7 @@ export class Game {
   private enemyTargets(): Target[] {
     const out: Target[] = [];
     for (const e of this.enemies.values()) {
-      out.push({ x: e.x, y: e.y, r: radiusOf(e), type: e.type, face: e.face, shield: e.shield, ranged: ENEMY_STATS[e.type]!.ranged, id: e.id, hero: false });
+      out.push({ x: e.x, y: e.y, r: radiusOf(e), type: e.type, face: e.face, shield: e.shield, ranged: ENEMY_STATS[e.type]!.ranged, id: e.id, hero: false, hpFrac: Math.max(0, e.hp) / e.maxHp });
     }
     return out;
   }
@@ -2001,10 +2004,10 @@ export class Game {
     const out: Target[] = [];
     for (const f of this.duelFoes(owner, all)) {
       if (f.merc) {
-        out.push({ x: f.x, y: f.y, r: f.radius, type: f.merc.type, face: f.merc.face, shield: f.merc.shield, ranged: MERC_STATS[f.merc.type]!.ranged, id: f.merc.id, hero: false });
+        out.push({ x: f.x, y: f.y, r: f.radius, type: f.merc.type, face: f.merc.face, shield: f.merc.shield, ranged: MERC_STATS[f.merc.type]!.ranged, id: f.merc.id, hero: false, hpFrac: Math.max(0, f.merc.hp) / this.mercStats(f.merc).hp });
       } else {
         const sl = this.slots.get(f.ownerId)!;
-        out.push({ x: f.x, y: f.y, r: f.radius, type: NO_TYPE, face: sl.state.aim, shield: 0, ranged: WEAPONS[sl.state.weapon]!.ranged, id: -f.ownerId, hero: true });
+        out.push({ x: f.x, y: f.y, r: f.radius, type: NO_TYPE, face: sl.state.aim, shield: 0, ranged: WEAPONS[sl.state.weapon]!.ranged, id: -f.ownerId, hero: true, hpFrac: Math.max(0, sl.state.hp) / sl.state.maxHp });
       }
     }
     return out;
@@ -2418,11 +2421,35 @@ export class Game {
     const owner = c.owner;
     const spears = c.targets.filter((t) => t.type === SPEAR);
     if (m.evadeT > 0) {
-      m.evadeT = Math.max(0, m.evadeT - dt);
-      const back = st.speed * CAV_EVADE_SPEED_FRAC;
-      m.x += Math.cos(m.atkAng + Math.PI) * back * dt;
-      m.y += Math.sin(m.atkAng + Math.PI) * back * dt;
-      return;
+      // 한 대 치고 빠진다: 대상에서 떨어져 후방으로 돌아 들어가며 속도를 다시 붙인다
+      const prey = c.targets.find((t) => t.id === m.runId);
+      const hurt = m.hp <= st.hp * CAV_RETREAT_HP;
+      if (!prey || hurt) {
+        m.evadeT = 0; // 대상이 사라졌거나 체력이 낮으면 달리기를 멈추고 아래 규칙대로
+      } else {
+        m.evadeT = Math.max(0, m.evadeT - dt);
+        const d = Math.hypot(m.x - prey.x, m.y - prey.y);
+        const a = Math.atan2(m.y - prey.y, m.x - prey.x);
+        const diff = angleDiff(prey.face + Math.PI, a); // 대상 뒤쪽까지 남은 각도
+        const radius = TUNE.CAV_RUNUP_DIST;
+        let turn = Math.max(-0.6, Math.min(0.6, diff));
+        if (Math.abs(turn) < 0.35) turn = (diff >= 0 ? 1 : -1) * 0.35; // 이미 뒤쪽이어도 멈추지 말고 원을 그리며 속도를 붙인다
+        let gx = prey.x + Math.cos(a + turn) * radius;
+        let gy = prey.y + Math.sin(a + turn) * radius;
+        // 진형에서 너무 멀리 벗어나지 않게 한다
+        const hx = gx - c.home[0];
+        const hy = gy - c.home[1];
+        const hd = Math.hypot(hx, hy);
+        if (hd > c.leash) {
+          gx = c.home[0] + (hx / hd) * c.leash;
+          gy = c.home[1] + (hy / hd) * c.leash;
+        }
+        const sp = cavSpeed(st.speed, m.momentum);
+        this.updateMomentum(m, this.steer(m, gx, gy, sp, dt, spears, prey, 4), dt);
+        const ready = m.momentum >= TUNE.CAV_RUNUP_READY && Math.abs(diff) < 1.1 && d >= TUNE.CAV_RUNUP_DIST * 0.6;
+        if (ready) m.evadeT = 0; // 충분히 달렸고 옆·뒤를 잡았으면 다시 돌격한다
+        return;
+      }
     }
     const healthy = m.hp > st.hp * CAV_RETREAT_HP; // 체력이 낮으면 모험을 멈추고 복귀한다
     const charging = healthy && !!owner && owner.state.chargeLeft > 0;
@@ -2453,6 +2480,8 @@ export class Game {
           m.face = m.atkAng;
           m.chargeSnap = chargeBonus(st.speed, m.momentum); // 지금까지 붙은 속도가 돌격 피해가 된다
           m.flankT = 0;
+          m.runId = target.id;
+          m.brawl = target.hpFrac <= TUNE.CAV_FINISH_HP; // 상대가 거의 죽었으면 빠지지 않고 끝까지 싸운다
         }
         return;
       }
@@ -2460,7 +2489,7 @@ export class Game {
       let gx = target.x;
       let gy = target.y;
       const theta = angleDiff(Math.atan2(m.y - target.y, m.x - target.x), target.face);
-      if (d > 70 && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
+      if (d > 70 && target.hpFrac > TUNE.CAV_FINISH_HP && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
         m.flankT += dt;
         const phi = target.face + (theta >= 0 ? 1 : -1) * Math.min(Math.PI, Math.abs(theta) + 0.7);
         const radius = Math.min(220, Math.max(reachNow + 40, d));
@@ -2546,7 +2575,7 @@ export class Game {
     }
     const charge = m.type === CAVALRY ? m.chargeSnap * (hasLegend(mods, "chargeBoost", CAVALRY) ? LEGEND_CONST.chargeMult : 1) : 0;
     if (m.type === CAVALRY) {
-      m.evadeT = CAV_EVADE_SEC; // 치고 빠지기
+      m.evadeT = m.brawl ? 0 : TUNE.CAV_RUNUP_SEC; // 치고 빠지기(마무리 싸움 중에는 빠지지 않는다)
       m.momentum *= CAV_MOMENTUM_AFTER_HIT; // 부딪히면 속도를 잃는다
     }
     m.chargeSnap = 0;

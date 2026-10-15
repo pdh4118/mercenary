@@ -481,3 +481,33 @@ test("검방병·창병은 궁병 옆이 아니라 궁병과 적을 잇는 선�
     assert.ok(r.x < r.ax - 60, "궁병보다 앞(아군 쪽)에 선다");
   }
 });
+
+test("기병은 한 대 치고 빠져 속도를 붙여 다시 돌격하고, 상대 체력이 30% 이하면 빠지지 않고 마무리한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  (p as { invuln: number }).invuln = 1e9;
+  g.setStance(a, 1);
+  const mid = g.addMerc(a, CAVALRY, p.x + 60, p.y);
+  const foe = g.spawnEnemyAt(p.x + 250, p.y, BLUNT);
+  hpOf(g, foe, 400);
+  const e = g.getEnemy(foe) as unknown as { hp: number; maxHp: number; face: number };
+  e.face = Math.PI;
+  const m = g.getMerc(mid) as unknown as { evadeT: number; brawl?: boolean };
+  const hits: number[] = [];
+  let brawlHit = false;
+  let retreatedAfterBrawl = false;
+  for (let i = 0; i < TICK_RATE * 24 && e.hp > 0; i++) {
+    const before = e.hp;
+    g.step();
+    if (e.hp < before) {
+      hits.push(before - e.hp);
+      if (m.brawl) brawlHit = true;
+      if (m.brawl && m.evadeT > 0) retreatedAfterBrawl = true;
+    }
+  }
+  assert.ok(e.hp <= 0, "끝내 처치한다");
+  assert.ok(Math.max(...hits) > 45, "속도를 붙여 친 한 방은 훨씬 세다: " + hits.map((h) => h.toFixed(0)).join(","));
+  assert.ok(brawlHit, "체력이 30% 이하가 되면 마무리 싸움으로 바뀐다");
+  assert.ok(!retreatedAfterBrawl, "마무리 싸움 중에는 빠지지 않는다");
+});
