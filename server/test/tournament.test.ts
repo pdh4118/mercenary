@@ -23,31 +23,47 @@ const idle = { dx: 0, dy: 0, aim: 0, fire: false };
 type Priv = { onBossDown(at: { x: number; y: number }): void; phaseT: number; stageTime: number };
 const bossDown = (g: Game, x = 0, y = 0) => (g as unknown as Priv).onBossDown({ x, y });
 
-test("한 라운드(성장 시간)는 2분 30초다", () => {
-  assert.equal(TUNE.STAGE_GROW_SEC, 150);
+test("한 라운드(성장 시간)는 2분이다", () => {
+  assert.equal(TUNE.STAGE_GROW_SEC, 120);
   assert.deepEqual([3, 6, 9, 10].map(isTournamentStage), [true, true, true, true]);
   assert.ok(!isTournamentStage(1) && !isTournamentStage(5));
   assert.deepEqual([1, 2, 3, 4].map(tournamentRoundName), ["결승", "준결승", "8강", "16강"]);
 });
 
-test("보스를 못 잡아도 보스 단계가 시작되고 1분이 지나면 보스군이 물러나고 다음 스테이지로 넘어간다", () => {
+test("보스를 1분 안에 못 잡으면 보스군이 격노해 병력이 늘고 점점 강해지며, 끝내 못 잡으면 강제로 다음 스테이지로 넘어간다", () => {
   const g = new Game();
   const a = g.addPlayer("a")!;
   (g as unknown as Priv).phaseT = 0.01;
   run(g, 0.2);
   assert.equal(g.info().phase, "boss");
-  assert.equal(g.info().timer, TUNE.BOSS_TIMEOUT_SEC);
+  assert.equal(g.info().timer, TUNE.BOSS_TIMEOUT_SEC, "격노까지 남은 시간");
+  assert.equal(g.info().rage, 0);
   g.getPlayer(a)!.invuln = 9999;
+  const army = () => [...(g as unknown as { enemies: Map<number, { army: boolean; maxHp: number; dmgMult: number; boss: boolean }> }).enemies.values()].filter((e) => e.army && !e.boss);
+  const before = army().length;
+  const hp0 = army()[0]!.maxHp;
+  const dmg0 = army()[0]!.dmgMult;
   run(g, TUNE.BOSS_TIMEOUT_SEC - 2);
-  assert.equal(g.info().phase, "boss", "아직 제한 시간 안");
-  assert.ok(g.info().timer <= 3);
-  run(g, 3);
+  assert.equal(g.info().rage, 0, "아직 제한 시간 안");
+  assert.equal(army().length, before);
+  run(g, 2 + TUNE.BOSS_RAGE_INTERVAL_SEC + 0.5);
+  assert.equal(g.info().rage, 1, "제한 시간이 지나 격노 1단계");
+  assert.ok(army().length >= before + 3 - 5, "증원이 합류한다(전투로 줄어든 것을 감안)");
+  assert.ok(g.info().armyTotal >= before + 3, "병력 총수가 늘었다");
+  const stronger = army().find((e) => e.maxHp > hp0 * 1.05);
+  assert.ok(stronger, "보스군이 강해진다");
+  assert.ok(army().every((e) => e.dmgMult >= dmg0 * 0.999), "공격력은 줄지 않는다");
+  run(g, TUNE.BOSS_RAGE_INTERVAL_SEC * 2);
+  assert.ok(g.info().rage >= 3, "시간이 갈수록 격노 단계가 오른다");
+  assert.equal(g.info().phase, "boss", "격노 중에는 다음 스테이지로 넘어가지 않는다");
+  // 끝내 못 잡으면 강제로 넘어간다
+  for (let i = 0; i < TICK_RATE * TUNE.BOSS_HARD_TIMEOUT_SEC && g.info().phase === "boss"; i++) g.step();
   assert.equal(g.info().phase, "break");
   assert.equal(g.info().armyLeft, 0, "보스군이 물러났다");
   assert.equal(g.info().stage, 1);
   run(g, 11);
   assert.equal(g.info().phase, "grow");
-  assert.equal(g.info().stage, 2, "보스를 못 잡아도 다음 라운드");
+  assert.equal(g.info().stage, 2);
 });
 
 test("보스를 잡으면 접속 인원만큼 상자가 떨어지고, 주인이 다가가면 레벨업과 별개로 카드를 고른다", () => {

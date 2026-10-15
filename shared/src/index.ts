@@ -30,7 +30,7 @@ export const FIRE_COOLDOWN_SEC = 0.3;
 export const BULLET_SPEED = 600;
 export const BULLET_RANGE = 520;
 export const BULLET_RADIUS = 5;
-export const BULLET_DAMAGE = 7;
+export const BULLET_DAMAGE = 6; // 주인공 무기 피해는 용병을 키우려고 낮췄다(이전 7)
 
 /**
  * 주인공 무기. 무기마다 병종 속성이 있어 병종과 같은 규칙이 적용된다(방패에 주는 피해 배율, 창의 돌격 반사, 철퇴의 범위 공격 등).
@@ -51,11 +51,11 @@ export interface WeaponDef {
 const rad = (d: number) => (d * Math.PI) / 180;
 export const WEAPONS: readonly WeaponDef[] = [
   { name: "활", type: ARCHER, ranged: true, reach: BULLET_RANGE, arc: 0, damage: BULLET_DAMAGE, cooldown: FIRE_COOLDOWN_SEC, windup: 0, splash: 0, note: "원거리 · 방패 정면에는 약함(25%)" },
-  { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 14, cooldown: 0.55, windup: 0, splash: 0, note: "기병 돌격 무효·반사 · 아주 긴 사거리, 좁은 폭" },
-  { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 9, cooldown: 0.35, windup: 0, splash: 0, note: "정면 피해 절반 방어 · 빠른 공격" },
-  { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 42, cooldown: 1.2, windup: 0.5, splash: 46, note: "방패 파괴(250%) · 범위 공격 · 휘두르기 전 준비 동작이 길다" },
-  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 150, cooldown: 1.5, windup: 2, splash: 140, note: "마우스 위치에 운석 · 2초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
-  { name: "기마", type: CAVALRY, ranged: false, reach: 54, arc: rad(80), damage: 14, cooldown: 0.65, windup: 0.12, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창병에게는 반사" },
+  { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 11, cooldown: 0.55, windup: 0, splash: 0, note: "기병 돌격 무효·반사 · 아주 긴 사거리, 좁은 폭" },
+  { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 7, cooldown: 0.35, windup: 0, splash: 0, note: "정면 피해 절반 방어 · 빠른 공격" },
+  { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 34, cooldown: 1.2, windup: 0.5, splash: 46, note: "방패 파괴(250%) · 범위 공격 · 휘두르기 전 준비 동작이 길다" },
+  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 120, cooldown: 1.5, windup: 2, splash: 140, note: "마우스 위치에 운석 · 2초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
+  { name: "기마", type: CAVALRY, ranged: false, reach: 54, arc: rad(80), damage: 11, cooldown: 0.65, windup: 0.12, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창병에게는 반사" },
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
 export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간
@@ -170,6 +170,7 @@ export interface GameInfo {
   bossType: number; // 이번 스테이지 보스 병종
   bossHp: number; // 보스 체력 비율 0..100(보스 단계가 아니면 0)
   armyLeft: number; // 남은 보스군 병력(장군 포함)
+  rage: number; // 보스를 오래 못 잡았을 때 오르는 보스군 격노 단계(0이면 아직 아님)
   armyTotal: number;
   squads: number; // 지금 다가오는 소대 수
   tour?: TourInfo | null; // 토너먼트 단계에서만

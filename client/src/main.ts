@@ -72,6 +72,10 @@ const tourBigEl = document.getElementById("tourBig")!;
 const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 const PLAYER_COLORS = [0xe05d5d, 0x5da6e0, 0x6fd16f, 0xe0c05d, 0xb07be0, 0x5de0d0, 0xe08f5d, 0xd96fb0];
+/** 토너먼트에서 선수 팀 색: 관전할 때는 빨강 대 파랑, 참전할 때는 나는 파랑·상대는 빨강 */
+const TEAM_RED = 0xe84848;
+const TEAM_BLUE = 0x3d8ff5;
+const TEAM_CSS = { red: "#ff6b6b", blue: "#6db3ff" } as const;
 /** 병종 색: 기병 주황, 창병 초록, 궁병 노랑, 검방병 파랑, 둔기병 보라, 마법사 청록 */
 const TYPE_COLORS = [0xe8883a, 0x6fc46f, 0xe6d45d, 0x5da6e0, 0xb07be0, 0x4fd1d9];
 /** 스프라이트 파일 이름(병종 번호 순서) */
@@ -277,25 +281,38 @@ async function main() {
       .fill(hp / max > 0.3 ? 0x6fd16f : 0xe05d5d);
   };
 
+  /** 토너먼트 팀: 내가 선수면 나는 파랑·상대는 빨강, 관전이면 먼저 호명된 선수가 빨강·다른 선수가 파랑. 선수가 아니면 null. */
+  function teamSide(owner: number): "red" | "blue" | null {
+    const gi = latest?.g;
+    const tour = gi?.phase === "tournament" ? gi.tour : null;
+    if (!tour || !tour.a || !tour.b || (owner !== tour.a && owner !== tour.b)) return null;
+    if (myId === tour.a || myId === tour.b) return owner === myId ? "blue" : "red";
+    return owner === tour.a ? "red" : "blue";
+  }
+  function ownerColor(owner: number): number {
+    const t = teamSide(owner);
+    return t === "red" ? TEAM_RED : t === "blue" ? TEAM_BLUE : PLAYER_COLORS[(owner - 1) % PLAYER_COLORS.length]!;
+  }
+
   interface MercView extends Tracked, Facing {
     bar: Graphics;
     sprite: Sprite;
     lastKey: string;
     label: Text;
     wasDown: boolean;
+    ring: Graphics;
+    ringColor: number;
+    ringTeam: boolean;
+    ringShape: [number, number, number, number]; // 중심 x, 중심 y, 가로 반지름, 세로 반지름
   }
   const mercs = new Pool<MercView, MercWire>(
     (w) => {
       const node = new Container();
       const st = MERC_STATS[w[4]]!;
       const t = allyTex[w[4]]!;
-      const color = PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!;
       // 어느 플레이어의 용병인지 발밑 고리 색으로 구분한다
       const footY = t.height * SPRITE_SCALE * (1 - SPRITE_ANCHOR_Y) * 0.85;
-      const ring = new Graphics()
-        .ellipse(0, footY, st.radius * 1.25, st.radius * 0.6)
-        .fill({ color, alpha: 0.28 })
-        .stroke({ width: 3, color });
+      const ring = new Graphics();
       const sprite = new Sprite(t);
       sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       const bar = new Graphics();
@@ -305,7 +322,7 @@ async function main() {
       label.visible = false;
       node.addChild(ring, sprite, bar, label);
       mercLayer.addChild(node);
-      return { node, bar, sprite, label, x: 0, y: 0, lastKey: "", lastX: w[1], face: 1, wasDown: w[8] > 0 };
+      return { node, bar, sprite, label, ring, ringColor: -1, ringTeam: false, ringShape: [0, footY, st.radius * 1.25, st.radius * 0.6], x: 0, y: 0, lastKey: "", lastX: w[1], face: 1, wasDown: w[8] > 0 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -317,18 +334,31 @@ async function main() {
     sprite: Sprite;
     lastSwing: number;
     wasDown: boolean;
+    ring: Graphics;
+    ringColor: number;
+    ringTeam: boolean;
+    ringShape: [number, number, number, number];
+    label: Text;
   }
+  /** 발밑 고리를 주인 색(토너먼트에서는 팀 색)으로 그린다. 색이 바뀌었을 때만 다시 그린다. */
+  const paintRing = (v: { ring: Graphics; ringColor: number; ringTeam: boolean; ringShape: [number, number, number, number] }, color: number, team: boolean) => {
+    if (v.ringColor === color && v.ringTeam === team) return;
+    v.ringColor = color;
+    v.ringTeam = team;
+    const [cx, cy, rx, ry] = v.ringShape;
+    v.ring
+      .clear()
+      .ellipse(cx, cy, rx * (team ? 1.25 : 1), ry * (team ? 1.25 : 1))
+      .fill({ color, alpha: team ? 0.5 : 0.28 })
+      .stroke({ width: team ? 4.5 : 3, color });
+  };
   const HERO_TOP = -Math.max(...heroTex.map((t) => t.height)) * HERO_SCALE * SPRITE_ANCHOR_Y; // 가장 큰 포즈의 머리 위쪽
   const players = new Pool<PlayerView, PlayerState>(
     (p) => {
       const node = new Container();
-      const color = PLAYER_COLORS[(p.id - 1) % PLAYER_COLORS.length]!;
       // 어느 플레이어인지 발밑 고리 색으로 구분한다(용병과 같은 방식)
       const footY = Math.max(...heroTex.map((t) => t.height)) * HERO_SCALE * (1 - SPRITE_ANCHOR_Y) * 0.85;
-      const ring = new Graphics()
-        .ellipse(0, footY, PLAYER_RADIUS * 1.5, PLAYER_RADIUS * 0.7)
-        .fill({ color, alpha: 0.3 })
-        .stroke({ width: 3, color });
+      const ring = new Graphics();
       const sprite = new Sprite(heroTex[0]!);
       sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       const aimMark = new Graphics(); // 조준 방향 표시(몸 바깥에)
@@ -338,7 +368,7 @@ async function main() {
       label.y = HERO_TOP - 12;
       node.addChild(ring, sprite, aimMark, bar, label);
       playerLayer.addChild(node);
-      return { node, aimMark, bar, sprite, x: 0, y: 0, lastSwing: 0, wasDown: false };
+      return { node, aimMark, bar, sprite, label, ring, ringColor: -1, ringTeam: false, ringShape: [0, footY, PLAYER_RADIUS * 1.5, PLAYER_RADIUS * 0.7], x: 0, y: 0, lastSwing: 0, wasDown: false };
     },
     (p) => [p.id, p.x, p.y],
     true,
@@ -751,7 +781,7 @@ async function main() {
   let toastLeft = 0;
   let lastSquads = 0;
   // 소리용: 이전 프레임 값을 기억해 변화 순간에 소리를 낸다
-  const snd = { gold: -1, down: false, shaken: 0, near: -1, phase: "", status: "playing", mercTier: new Map<number, number>(), mercSeen: false, downPlayers: new Set<number>() };
+  const snd = { gold: -1, down: false, shaken: 0, rage: 0, near: -1, phase: "", status: "playing", mercTier: new Map<number, number>(), mercSeen: false, downPlayers: new Set<number>() };
   let levelToastLeft = 0;
   let lastLevel = 0;
   let nearCampId = -1;
@@ -1077,11 +1107,15 @@ async function main() {
       return;
     }
     const fighter = me === tour.a || me === tour.b;
+    const sa = teamSide(tour.a) ?? "red";
+    const sb = teamSide(tour.b) ?? "blue";
+    const tag = (side: "red" | "blue", id: number) => (id === me ? `${side === "blue" ? "파랑" : "빨강"} · 나` : side === "red" ? "빨강" : "파랑");
+    const nm = (name: string, side: "red" | "blue", id: number) => `<span style="color:${TEAM_CSS[side]}">${esc(name)}</span> <small style="color:${TEAM_CSS[side]}">(${tag(side, id)})</small>`;
     tourBannerEl.style.display = tourBracketEl.style.display = "block";
     tourBannerEl.innerHTML =
       `<div class="tt">토너먼트 · ${esc(tour.title)}</div>` +
-      `<div class="vs"><div class="side"><div class="nm">${esc(tour.an)}</div><div class="bar"><div style="width:${tour.ha}%"></div></div></div>` +
-      `<span>VS</span><div class="side"><div class="nm">${esc(tour.bn)}</div><div class="bar b"><div style="width:${tour.hb}%"></div></div></div></div>` +
+      `<div class="vs"><div class="side"><div class="nm">${nm(tour.an, sa, tour.a)}</div><div class="bar"><div style="width:${tour.ha}%;background:${TEAM_CSS[sa]}"></div></div></div>` +
+      `<span>VS</span><div class="side"><div class="nm">${nm(tour.bn, sb, tour.b)}</div><div class="bar b"><div style="width:${tour.hb}%;background:${TEAM_CSS[sb]}"></div></div></div></div>` +
       `<div class="tm">${tour.step === "fight" ? `남은 시간 ${tour.t}초 · 주인공이 쓰러지면 패배` : tour.step === "outro" ? "경기 종료" : tour.step === "end" ? "토너먼트 종료" : fighter ? "선수 입장" : "관전 중"}</div>`;
     let html = "<h3>대진표</h3>";
     tour.rounds.forEach((r, ri) => {
@@ -1095,7 +1129,7 @@ async function main() {
     tourBracketEl.innerHTML = html;
     let big = "";
     if (tour.step === "intro") {
-      big = `<div class="a">${esc(tour.title)}</div><div class="b">${esc(tour.an)} vs ${esc(tour.bn)}</div><div class="c">${fighter ? "준비하세요!" : "관전 중입니다"} ${tour.t}</div>`;
+      big = `<div class="a">${esc(tour.title)}</div><div class="b"><span style="color:${TEAM_CSS[sa]}">${esc(tour.an)}</span> vs <span style="color:${TEAM_CSS[sb]}">${esc(tour.bn)}</span></div><div class="c">${fighter ? "준비하세요! 당신은 파랑, 상대는 빨강입니다" : "관전 중입니다 · 빨강 대 파랑"} ${tour.t}</div>`;
     } else if (tour.step === "fight" && tour.t >= TUNE.TOURNAMENT_MATCH_SEC - 1.5) {
       big = `<div class="b">시작!</div>`;
     } else if (tour.step === "outro") {
@@ -1133,7 +1167,7 @@ async function main() {
       statValues[i]!.text = value;
     });
   };
-  const miniColor = (owner: number) => PLAYER_COLORS[(owner - 1) % PLAYER_COLORS.length]!;
+  const miniColor = (owner: number) => ownerColor(owner);
   const drawMinimap = (dt: number) => {
     const st = latest;
     mini.visible = miniOn && !!st;
@@ -1317,6 +1351,7 @@ async function main() {
     }
     mercs.update(latest.mercs, k, (v, w) => {
       v.node.visible = w[8] <= 0; // 쓰러진 용병은 부활할 때까지 숨긴다
+      paintRing(v, ownerColor(w[5]), teamSide(w[5]) !== null);
       if (v.wasDown && w[8] <= 0 && w[5] === myId) audio.play("merc_respawn", { x: v.x, y: v.y });
       v.wasDown = w[8] > 0;
       faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
@@ -1343,6 +1378,9 @@ async function main() {
     });
     players.update(latest.players, k, (v, p) => {
       const dead = p.down;
+      paintRing(v, ownerColor(p.id), teamSide(p.id) !== null);
+      const side = teamSide(p.id);
+      v.label.style.fill = side === "red" ? TEAM_RED : side === "blue" ? 0x8fc3ff : 0xffffff; // 토너먼트 선수는 이름도 팀 색
       // 근접 무기를 휘두르는 순간과 쓰러지는 순간의 소리(위치는 그 주인공 자리)
       if (p.swing > 0 && v.lastSwing <= 0 && !WEAPONS[p.weapon]!.ranged) audio.play((["", "spear_thrust", "sword_swing", "mace_smash"] as const)[p.weapon] || "sword_swing", { x: v.x, y: v.y });
       v.lastSwing = p.swing;
@@ -1425,7 +1463,7 @@ async function main() {
       if (w[5] === undefined || w[6] <= 0) continue;
       const v = mercs.views.get(w[0]);
       const st = MERC_STATS[w[4]]!;
-      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], PLAYER_COLORS[(w[5] - 1) % PLAYER_COLORS.length]!, w[4] === SPEAR_TYPE); // 마법사의 예고는 낙하 지점 표시가 대신한다
+      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], ownerColor(w[5]), w[4] === SPEAR_TYPE); // 마법사의 예고는 낙하 지점 표시가 대신한다
     }
 
     // 방패(검방병): 정면을 막는 호. 깨지면 회색으로 비고, 재생되면 다시 파랗게 돌아온다.
@@ -1528,7 +1566,7 @@ async function main() {
     // 지점 방어: 지키는 지점에 깃발과 구역을 표시한다
     for (const hp of latest.players) {
       if (hp.stance !== 2) continue;
-      const hc = PLAYER_COLORS[(hp.id - 1) % PLAYER_COLORS.length]!;
+      const hc = ownerColor(hp.id);
       const own = hp.id === myId;
       fxLayer
         .circle(hp.holdX, hp.holdY, 130)
@@ -1732,6 +1770,13 @@ async function main() {
       if (meState.down && !snd.down) audio.play("hero_down");
       snd.down = meState.down;
       if (meState.shaken > 0 && snd.shaken <= 0) audio.play("morale_break");
+      const rageNow = latest.g?.rage ?? 0;
+      if (rageNow > snd.rage) {
+        audio.play("boss_warning");
+        toast.text = `보스군이 격노했다! 증원이 합류하고 모두 강해진다 (Lv.${rageNow})`;
+        toastLeft = 3;
+      }
+      snd.rage = rageNow;
       snd.shaken = meState.shaken;
       const nowTiers = new Map(mine.map((w) => [w[0], w[15]] as const));
       if (snd.mercSeen) {
@@ -1834,7 +1879,7 @@ async function main() {
       }
       lastSquads = gi.squads;
       if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · 보스군 도착까지 ${mmss(gi.timer)}${squadText}`;
-      else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${UNIT_NAMES[gi.bossType]} 장군의 군대 ${gi.armyLeft}/${gi.armyTotal}${gi.timer > 0 ? ` · 제한 ${gi.timer}초` : ""}`;
+      else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${UNIT_NAMES[gi.bossType]} 장군의 군대 ${gi.armyLeft}/${gi.armyTotal}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}${gi.timer > 0 ? ` (다음 ${gi.timer}초)` : " (최대)"}` : gi.timer > 0 ? ` · 격노까지 ${gi.timer}초` : ""}`;
       else if (gi.phase === "tournament") stageText.text = ""; // 위쪽 대진 배너가 대신한다
       else stageText.text = `스테이지 ${gi.stage} 클리어! 다음 스테이지까지 ${gi.timer}초`;
       stageText.position.set(app.screen.width / 2, 8);

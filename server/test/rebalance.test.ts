@@ -102,7 +102,7 @@ test("용병 경험치 요구량이 크게 늘었고, 통솔력 카드가 가장
   const lead = CARDS.filter((c) => c.effect.k === "leadership" && c.rarity === 0)[0]!;
   const others = CARDS.filter((c) => c.rarity === 0 && c.category !== 3 && c.effect.k !== "leadership");
   assert.ok(lead.weight > Math.max(...others.map((c) => c.weight)) * 1.5, "일반 등급에서 통솔력이 가장 자주 나온다");
-  assert.ok(LEGENDS.bloodthirst.desc.includes("2.5%"));
+  assert.ok(LEGENDS.bloodthirst.desc.includes("0.6%"));
 });
 
 test("통솔력이 거의 찼을 때는 통솔력 카드가 더 자주 나온다", () => {

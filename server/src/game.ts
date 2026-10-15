@@ -7,6 +7,8 @@ import {
   CARDS,
   ENEMY_XP,
   ARMY_AGGRO,
+  ARMY_LATERAL_SPACING,
+  ARMY_RANK_SPACING,
   ARMY_ENGAGE_DISTANCE,
   ARMY_LEASH,
   ARMY_MARCH_SPEED,
@@ -182,7 +184,7 @@ import {
   TUNE,
 } from "@mercenary/shared";
 import { resolveHit, type Hit, type HitResult } from "./combat.js";
-import { SQUAD_KINDS, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
+import { SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
 /** 한 번에 n발을 쏠 때 i번째 화살의 각도 오프셋: 0번은 정면, 나머지는 좌우로 번갈아 퍼진다 */
@@ -314,6 +316,7 @@ interface Foe {
 interface Enemy extends Fighter {
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
+  rage?: number; // 보스군 격노 단계(이동 속도가 단계마다 조금씩 빨라진다)
   poisonT?: number; // 독이 남은 시간
   poisonDps?: number;
   poisonOwner?: number;
@@ -472,6 +475,9 @@ export class Game {
   private tour: Tournament | null = null;
   private tourPending = false; // 보스를 잡은 직후, 다음 틱에 토너먼트를 연다
   private bossT = 0; // 보스 단계가 시작된 뒤 흐른 시간
+  private rage = 0; // 보스군 격노 단계
+  private rageT = 0; // 다음 격노 단계까지 흐른 시간
+  private armyBase = 0; // 처음 보스군 병력(증원 수를 정하는 기준)
   private bullets: Bullet[] = [];
   private nextId = 1;
   private nextEntityId = 1;
@@ -922,12 +928,13 @@ export class Game {
     return {
       stage: this.stage,
       phase: this.phase,
-      timer: this.phase === "boss" ? (this.stage < STAGE_COUNT ? Math.max(0, Math.ceil(TUNE.BOSS_TIMEOUT_SEC - this.bossT)) : 0) : this.phase === "tournament" ? 0 : Math.ceil(Math.max(0, this.phaseT)),
+      timer: this.phase === "boss" ? this.bossTimer() : this.phase === "tournament" ? 0 : Math.ceil(Math.max(0, this.phaseT)),
       status: this.status,
       bossType: bossTypeOf(this.stage),
       bossHp,
       armyLeft,
       armyTotal: this.armyTotal,
+      rage: this.phase === "boss" ? this.rage : 0,
       squads: this.squads.size,
       tour: this.phase === "tournament" ? this.tourInfo() : null,
     };
@@ -1007,8 +1014,16 @@ export class Game {
     } else if (this.phase === "boss") {
       this.stepArmy(dt);
       this.bossT += dt;
-      // 보스를 못 잡아도 제한 시간이 지나면 보스군은 물러나고 다음 스테이지로 넘어간다(마지막 스테이지는 끝까지 잡아야 한다)
-      if (this.autoSpawn && this.bossT >= TUNE.BOSS_TIMEOUT_SEC && this.stage < STAGE_COUNT) this.skipBoss();
+      if (this.autoSpawn && this.bossT >= TUNE.BOSS_TIMEOUT_SEC) {
+        // 제한 시간 안에 장군을 못 잡으면 보스군이 격노한다: 간격마다 병력이 늘고 모두 강해진다
+        this.rageT += dt;
+        while (this.rageT >= TUNE.BOSS_RAGE_INTERVAL_SEC && this.rage < TUNE.BOSS_RAGE_MAX) {
+          this.rageT -= TUNE.BOSS_RAGE_INTERVAL_SEC;
+          this.enrageArmy();
+        }
+        // 격노해도 끝내 못 잡으면 강제로 다음 스테이지로(마지막 스테이지는 끝까지 잡아야 한다)
+        if (TUNE.BOSS_HARD_TIMEOUT_SEC > 0 && this.bossT >= TUNE.BOSS_HARD_TIMEOUT_SEC && this.stage < STAGE_COUNT) this.skipBoss();
+      }
     } else if (this.phase === "tournament") {
       this.stepTournament(dt);
     } else {
@@ -1030,6 +1045,8 @@ export class Game {
     this.phase = "boss";
     this.phaseT = 0;
     this.bossT = 0;
+    this.rage = 0;
+    this.rageT = 0;
     const cx = alive.reduce((a, s) => a + s.state.x, 0) / alive.length;
     const cy = alive.reduce((a, s) => a + s.state.y, 0) / alive.length;
     const layout = armyLayout(this.stage, armySize(this.stage, this.slots.size));
@@ -1072,6 +1089,58 @@ export class Game {
       });
     }
     this.armyTotal = layout.length;
+    this.armyBase = layout.length;
+  }
+
+  /** 보스 단계에서 화면에 보이는 시간: 격노 시작까지, 시작한 뒤에는 다음 격노 단계(또는 최대 단계면 강제 종료)까지 */
+  private bossTimer(): number {
+    if (this.bossT < TUNE.BOSS_TIMEOUT_SEC) return Math.ceil(TUNE.BOSS_TIMEOUT_SEC - this.bossT);
+    if (this.rage < TUNE.BOSS_RAGE_MAX) return Math.max(0, Math.ceil(TUNE.BOSS_RAGE_INTERVAL_SEC - this.rageT));
+    return 0;
+  }
+
+  /**
+   * 보스군 격노: 증원이 합류하고(처음 병력의 일부, 병종은 보스군 비율대로) 살아 있는 보스군 전원이 강해진다.
+   * 새로 합류한 병력도 지금 단계의 강화를 받는다.
+   */
+  private enrageArmy(): void {
+    this.rage++;
+    const p = 1 + TUNE.BOSS_RAGE_POWER;
+    for (const e of this.enemies.values()) {
+      if (!e.army) continue;
+      e.maxHp *= p;
+      e.hp *= p;
+      e.shield *= p;
+      e.shieldMax *= p;
+      e.dmgMult *= p;
+      e.rage = this.rage;
+    }
+    if (!this.army) return;
+    const add = Math.max(3, Math.round(this.armyBase * TUNE.BOSS_RAGE_REINFORCE));
+    const comp = armyComposition(this.stage, add);
+    let minF = 0;
+    for (const e of this.enemies.values()) if (e.army) minF = Math.min(minF, e.slotF);
+    const types: number[] = [];
+    comp.forEach((n, t) => { for (let k = 0; k < n; k++) types.push(t); });
+    // 진형 맨 뒤에 새 줄을 만들어 합류한다
+    const perRow = 8;
+    types.forEach((type, i) => {
+      const row = Math.floor(i / perRow);
+      const col = i % perRow;
+      const inRow = Math.min(perRow, types.length - row * perRow);
+      const f = minF - ARMY_RANK_SPACING * (row + 1);
+      const l = (col - (inRow - 1) / 2) * ARMY_LATERAL_SPACING;
+      const [px, py] = this.armySlotPos(f, l);
+      const e = this.makeEnemy(clampToWorld(px, 14), clampToWorld(py, 14), type, { army: true, slotF: f, slotL: l, face: this.army!.heading });
+      const k = Math.pow(p, this.rage);
+      e.maxHp *= k;
+      e.hp *= k;
+      e.shield *= k;
+      e.shieldMax *= k;
+      e.dmgMult *= k;
+      e.rage = this.rage;
+    });
+    this.armyTotal += types.length;
   }
 
   private armySlotPos(f: number, l: number, army: Army | null = this.army): [number, number] {
@@ -3393,7 +3462,7 @@ export class Game {
         continue;
       }
       // 이동 속도가 곧 위협이다: 적은 조금 더 빠르고, 움직이는 대상을 앞질러 막아선다
-      const speed = st.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT;
+      const speed = st.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0));
 
       if (e.type === MAGE) {
         // 적 마법사: 쿨다운이 끝나면 사거리 안에서 아군이 가장 많이 모인 곳에 운석을 겨눈다(외우는 동안 멈춰 선다). 그 외에는 궁병처럼 거리를 유지한다.

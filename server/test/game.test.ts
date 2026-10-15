@@ -162,7 +162,7 @@ test("주인공 투사체로 적을 처치하면 처치 수와 금화가 오른�
   const p = me(g, a);
   g.spawnEnemyAt(p.x + 200, p.y, SPEAR);
   g.setInput(a, { ...idle, fire: true });
-  run(g, 3);
+  run(g, 6);
   assert.ok(me(g, a).kills >= 1);
   assert.equal(me(g, a).gold, TUNE.START_GOLD + ENEMY_GOLD[SPEAR]!);
 });
@@ -408,8 +408,8 @@ test("용병의 공격: 방패 정면은 창이 60%만 들어가고, 방패 없�
     const e2 = g.getEnemy(e)!;
     return { hp: e2.hp, shield: e2.shield };
   };
-  const vsArcher = after(ARCHER);
-  assert.ok(Math.abs(vsArcher.hp - (ENEMY_STATS[ARCHER]!.hp - MERC_STATS[SPEAR]!.damage * (1 + SWARM_PER_MERC))) < 1e-9); // 용병 1명의 군세 보너스 포함
+  const vsBare = after(BLUNT); // 방패 없는 적(몸이 한 방에 죽지 않는 둔기병)
+  assert.ok(Math.abs(vsBare.hp - (ENEMY_STATS[BLUNT]!.hp - MERC_STATS[SPEAR]!.damage * (1 + SWARM_PER_MERC))) < 1e-9); // 용병 1명의 군세 보너스 포함
   const vsShield = after(SHIELD);
   assert.equal(vsShield.hp, ENEMY_STATS[SHIELD]!.hp, "몸은 맞지 않는다");
   assert.ok(Math.abs(vsShield.shield - (ENEMY_STATS[SHIELD]!.shield - MERC_STATS[SPEAR]!.damage * (1 + SWARM_PER_MERC) * SHIELD_DAMAGE_FACTOR[SPEAR]!)) < 1e-6);
@@ -482,7 +482,7 @@ test("기병은 오래 걸리는 부활 시간을 가진다", () => {
   const p = me(g, a);
   const c = g.addMerc(a, CAVALRY, p.x + 300, p.y);
   const spear = g.addMerc(a, SPEAR, p.x - 300, p.y);
-  for (let i = 0; i < 400 && (g.getMerc(c)!.respawn === 0 || g.getMerc(spear)!.respawn === 0); i++) {
+  for (let i = 0; i < 1600 && (g.getMerc(c)!.respawn === 0 || g.getMerc(spear)!.respawn === 0); i++) {
     g.getPlayer(a)!.hp = TUNE.PLAYER_MAX_HP; // 주인공이 먼저 쓰러져 게임이 끝나지 않게
     if (i % 4 === 0) {
       g.spawnEnemyAt(g.getMerc(c)!.x, g.getMerc(c)!.y, BLUNT);
@@ -742,7 +742,7 @@ test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
   forceCard(g, a, "heroRegen");
   g.getPlayer(a)!.hp = 50;
   run(g, 10);
-  assert.ok(Math.abs(g.getPlayer(a)!.hp - 51.2) < 0.01); // 초당 0.12(너프 후)
+  assert.ok(Math.abs(g.getPlayer(a)!.hp - 50.6) < 0.01); // 초당 0.06(너프 후)
 });
 
 test("카드 효과: 용병 부활 시간 단축", () => {

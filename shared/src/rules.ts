@@ -13,7 +13,7 @@ export const TUNE = {
   CAMP_LIFETIME_SEC: 60,
   CAMP_SPAWN_INTERVAL_SEC: 18,
   XP_TEAM_SHARE: 0.5, // 팀 공유 비율. 나머지(0.5)는 처치한 사람 몫
-  STAGE_GROW_SEC: 150, // 스테이지당 자유 성장 시간(2분 30초)
+  STAGE_GROW_SEC: 120, // 스테이지당 자유 성장 시간(2분)
   STAGE_BREAK_SEC: 10, // 클리어 뒤 쉬는 시간(회복·부활·보상)
   STAGE_ENEMY_HP_GROWTH: 0.3, // 스테이지가 오를 때마다 적 체력 +30%
   STAGE_ENEMY_DMG_GROWTH: 0.14, // 적 피해 +14%
@@ -27,7 +27,13 @@ export const TUNE = {
   BOSS_HP_BASE: 7, // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
   BOSS_HP_PER_STAGE: 2.5,
   BOSS_DMG_MULT: 1.6,
-  BOSS_TIMEOUT_SEC: 60,
+  BOSS_TIMEOUT_SEC: 60, // 보스군이 등장한 뒤 이 시간 안에 장군을 못 잡으면 보스군이 격노해 점점 강해진다
+  BOSS_HARD_TIMEOUT_SEC: 240, // 그래도 못 잡고 이 시간이 지나면 보스군이 물러나고 다음 스테이지로 넘어간다(마지막 스테이지 제외, 0이면 없음)
+  BOSS_RAGE_INTERVAL_SEC: 12, // 격노 단계가 올라가는 간격
+  BOSS_RAGE_REINFORCE: 0.1, // 단계마다 늘어나는 병력(처음 병력 대비 비율, 최소 3명)
+  BOSS_RAGE_POWER: 0.08, // 단계마다 보스군의 체력·방패·공격력이 곱해지는 비율
+  BOSS_RAGE_SPEED: 0.02, // 단계마다 늘어나는 이동 속도 비율
+  BOSS_RAGE_MAX: 12, // 격노 최대 단계
   REVIVE_SEC: 5, // 한 명이 눌러서 가득 채우는 데 걸리는 시간
   CRIT_BASE_MULT: 1.5, // 치명타 기본 피해 배율
   BACKSTAB_MULT: 1.5,
@@ -79,7 +85,7 @@ export const TUNE = {
   MULTISHOT_SPREAD: 0.14, // 화살 사이 각도(라디안)
   SPEAR_HALF_WIDTH_NEAR: 18, // 몸 바로 앞의 반폭(px)
   SPEAR_HALF_WIDTH_FAR: 18, // 사거리 끝의 반폭(px)
-  PLAYER_MAX_HP: 100,
+  PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s
   ENEMY_SPAWN_BASE_PER_SEC: 1.1, // 플레이어 1명당
   ENEMY_SPAWN_GROWTH_PER_SEC: 0.012, // 시간이 지날수록 초당 늘어나는 양
@@ -171,16 +177,16 @@ const deg = rad;
 
 export const MERC_STATS: readonly UnitStats[] = [
   // 기병: speed는 최대 속도. 평소엔 느리게 출발해 점점 빨라진다. 피해는 기본 + 속도에 비례한 돌격 피해.
-  { hp: 160, speed: 300, reach: 30, damage: 12, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
+  { hp: 200, speed: 300, reach: 30, damage: 15, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
   // 창병: 사거리가 가장 길고 폭이 좁다(찌르기)
-  { hp: 145, speed: 95, reach: 100, damage: 15, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
-  { hp: 95, speed: 95, reach: 280, damage: 12, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
+  { hp: 181, speed: 95, reach: 100, damage: 19, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
+  { hp: 119, speed: 95, reach: 280, damage: 15, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
   // 검방병: 몸 체력과 별개로 방패 체력이 있다
-  { hp: 160, speed: 90, reach: 32, damage: 8, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 120, splash: 0 },
+  { hp: 200, speed: 90, reach: 32, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 150, splash: 0 },
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
-  { hp: 180, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
+  { hp: 225, speed: 75, reach: 40, damage: 45, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
   // 마법사: 느리고 약하지만 2초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
-  { hp: 70, speed: 60, reach: 280, damage: 150, windup: 2, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
+  { hp: 88, speed: 60, reach: 280, damage: 150.0, windup: 2, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
