@@ -33,6 +33,7 @@ const G = {
   combat: "전투 규칙",
   xp: "경험치·보상",
   ai: "용병 AI·진형",
+  terrain: "지형",
 };
 
 /** 숫자 하나의 설명: [이름, 묶음, 최솟값, 최댓값, 단계]. 최솟값 등을 생략하면 기본값 크기로 알맞게 잡는다. */
@@ -89,6 +90,10 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   HERO_SHIELD_REGEN_DELAY: ["주인공 방패: 맞지 않아야 차오르기 시작하는 시간(초)", G.combat, 0, 30, 0.5],
   HERO_SHIELD_BROKEN_DELAY: ["주인공 방패: 깨진 뒤 차오르기 시작하는 시간(초)", G.combat, 0, 30, 0.5],
   HERO_SHIELD_REGEN_PCT: ["주인공 방패 재생(초당 최대치 비율)", G.combat, 0, 0.5, 0.005],
+  HIGH_GROUND_ARROW_MULT: ["고지대에서 쏜 화살 피해 배율", G.terrain, 1, 3, 0.05],
+  LOW_GROUND_ARROW_MULT: ["낮은 곳에서 고지대를 쏜 화살 피해 배율", G.terrain, 0.2, 1, 0.05],
+  PLATEAU_TOP_SPEED: ["고지대 윗면 이동 속도 배율", G.terrain, 0.2, 1.2, 0.05],
+  SLOPE_SPEED: ["고지대 비탈(오르는 길) 이동 속도 배율", G.terrain, 0.1, 1.2, 0.05],
   MERC_SPACING: ["용병끼리 유지하는 거리 배율(반지름 합 x 이 값)", G.ai, 1, 4, 0.1],
   MERC_SEPARATION_SPEED: ["겹친 용병이 밀려나는 속도(px/초)", G.ai, 0, 600, 10],
   GUARD_HERO_RADIUS: ["주인공 호위: 주인공 둘레 이 거리 안의 적은 막으러 나선다(px)", G.ai, 0, 800, 10],

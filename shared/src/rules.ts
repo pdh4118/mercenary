@@ -66,6 +66,10 @@ export const TUNE = {
   HERO_SHIELD_REGEN_DELAY: 3, // 맞지 않고 이만큼(초) 지나면 방패가 차오르기 시작한다
   HERO_SHIELD_BROKEN_DELAY: 6, // 방패가 깨졌을 때는 이만큼(초) 뒤부터 차오른다
   HERO_SHIELD_REGEN_PCT: 0.06, // 차오르는 속도(초당 최대치 비율)
+  HIGH_GROUND_ARROW_MULT: 1.4, // 고지대에서 낮은 곳을 쏜 화살의 피해 배율
+  LOW_GROUND_ARROW_MULT: 0.8, // 낮은 곳에서 고지대를 쏜 화살의 피해 배율
+  PLATEAU_TOP_SPEED: 0.85, // 고지대 윗면에서의 이동 속도 배율
+  SLOPE_SPEED: 0.4, // 고지대를 오르는 비탈에서의 이동 속도 배율
   MERC_SPACING: 1.9, // 용병끼리 유지하려는 거리 = 두 용병 반지름 합 x 이 값(뭉치지 않게)
   MERC_SEPARATION_SPEED: 160, // 겹친 용병이 서로 밀려나는 최대 속도(px/초)
   GUARD_HERO_RADIUS: 260, // 주인공 호위에서 주인공 둘레 이 거리 안의 적은 진형 자리에서 멀어도 막으러 나선다

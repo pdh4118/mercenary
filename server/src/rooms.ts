@@ -14,7 +14,9 @@ import {
   type RoomInfo,
   type RoomPhase,
   type ServerMsg,
+  type TerrainWire,
 } from "@mercenary/shared";
+type ServerMsgTerrain = TerrainWire[];
 import { Game } from "./game.js";
 
 /** 네트워크 연결을 추상화한 것. 실제로는 WebSocket을 감싸고, 테스트에서는 가짜를 쓴다. */
@@ -225,6 +227,7 @@ export class RoomManager {
       const name = clean(playerName, NAME_MAX_LENGTH);
       best = this.makeRoom(`${name || "용병단"}의 방`, false);
       best.phase = "playing"; // 빠른 시작은 기다리지 않고 바로 시작한다
+      best.game.generateTerrain();
     }
     this.enter(conn, best, clean(playerName, NAME_MAX_LENGTH));
   }
@@ -248,6 +251,7 @@ export class RoomManager {
     this.where.set(conn, { room: at.room, id: m.id });
     at.room.game.setAway(m.id, false);
     conn.send({ t: "welcome", id: m.id, tick: at.room.game.tick, code: at.room.code, token: m.token });
+    if (at.room.game.terrain) conn.send(this.terrainMsg(at.room));
     if (at.room.phase === "ended") conn.send({ t: "result", ...at.room.game.result() });
     this.broadcastRoom(at.room);
   }
@@ -285,6 +289,8 @@ export class RoomManager {
     const notReady = [...room.members.values()].filter((m) => m.id !== room.hostId && m.conn && !m.ready);
     if (notReady.length > 0) return this.fail(conn, `아직 준비하지 않은 사람이 있습니다 (${notReady.map((m) => m.name).join(", ")})`);
     room.phase = "playing";
+    room.game.generateTerrain(); // 판마다 새 지형
+    this.broadcastTerrain(room);
     this.broadcastRoom(room);
     this.broadcastLobby();
   }
@@ -308,6 +314,7 @@ export class RoomManager {
     if (room.hostId !== at.id) return this.fail(conn, "방장만 다시 시작할 수 있습니다");
     if (room.phase !== "ended") return;
     room.game.reset();
+    this.broadcastTerrain(room); // 지형을 비운다
     for (const m of room.members.values()) m.ready = false;
     room.phase = "waiting";
     this.broadcastRoom(room);
@@ -356,6 +363,7 @@ export class RoomManager {
     this.where.set(conn, { room, id });
     this.tokens.set(token, { room, id });
     conn.send({ t: "welcome", id, tick: room.game.tick, code: room.code, token });
+    if (room.game.terrain) conn.send(this.terrainMsg(room));
     this.broadcastRoom(room);
     this.broadcastLobby();
   }
@@ -381,6 +389,14 @@ export class RoomManager {
     }
     if (this.rooms.has(room.code)) this.broadcastRoom(room);
     this.broadcastLobby();
+  }
+
+  private terrainMsg(room: Room): ServerMsg {
+    return { t: "terrain", items: room.game.terrainItems() as ServerMsgTerrain };
+  }
+  private broadcastTerrain(room: Room): void {
+    const msg = this.terrainMsg(room);
+    for (const m of room.members.values()) m.conn?.send(msg);
   }
 
   private broadcastRoom(room: Room): void {

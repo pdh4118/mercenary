@@ -134,6 +134,9 @@ import {
   WARD_WEIGHT,
   CHEST_OPEN_RADIUS,
   TOURNAMENT_ARENA_RADIUS,
+  TerrainMap,
+  generateTerrain,
+  type TerrainWire,
   TOURNAMENT_END_SEC,
   TOURNAMENT_OUTRO_SEC,
   TOURNAMENT_START_DIST,
@@ -370,6 +373,7 @@ interface Bullet {
   owner: number; // 처치 보상을 받을 플레이어(적 투사체는 0)
   radius: number;
   pierce: number; // 더 뚫고 지나갈 수 있는 적 수
+  hi?: boolean; // 쏜 곳이 고지대인가(처음 움직일 때 정해진다)
   crit: boolean;
   hitIds: Set<number>; // 이미 맞힌 적(관통 중 중복 피해 방지)
   poison?: number; // 독 피해 비율(화살 피해 대비, 지속 POISON_SEC초)
@@ -542,6 +546,70 @@ export class Game {
   }
 
   /** 같은 참가자들로 판을 처음부터 다시 시작한다(다시 하기) */
+  // --- 지형 ---------------------------------------------------------------
+  /** 이번 판의 지형(없으면 평지). 방이 게임을 시작할 때 generateTerrain()으로 만든다. */
+  terrain: TerrainMap | null = null;
+  private terrainTrack: { o: { x: number; y: number }; px: number; py: number; r: number }[] = [];
+
+  /** 이번 판의 지형을 새로 만든다(시작 지점 둘레는 비워 둔다) */
+  generateTerrain(): TerrainWire[] {
+    const items = generateTerrain(this.rng, WORLD_SIZE / 2, [[0, 0, 420]]);
+    this.setTerrain(items);
+    return items;
+  }
+  setTerrain(items: readonly TerrainWire[] | null): void {
+    this.terrain = items && items.length > 0 ? new TerrainMap(items, TOURNAMENT_ARENA_RADIUS + 60) : null;
+  }
+  terrainItems(): readonly TerrainWire[] {
+    return this.terrain?.items ?? [];
+  }
+
+  /** 이번 틱에 움직이기 전의 위치를 기억한다(끝난 뒤 지형 속도 보정·충돌에 쓴다) */
+  private terrainBegin(): void {
+    const t = this.terrain;
+    this.terrainTrack.length = 0;
+    if (!t) return;
+    const tr = this.terrainTrack;
+    for (const s of this.slots.values()) if (!s.state.down) tr.push({ o: s.state, px: s.state.x, py: s.state.y, r: PLAYER_RADIUS });
+    for (const m of this.mercs.values()) if (m.respawn <= 0) tr.push({ o: m, px: m.x, py: m.y, r: MERC_STATS[m.type]!.radius });
+    for (const e of this.enemies.values()) tr.push({ o: e, px: e.x, py: e.y, r: radiusOf(e) });
+  }
+
+  /** 고지대·비탈에서는 이번 틱에 움직인 만큼을 줄이고, 통과할 수 없는 지형 밖으로 밀어낸다 */
+  private terrainEnd(): void {
+    const t = this.terrain;
+    if (!t) return;
+    t.setDuel(this.phase === "tournament");
+    for (const u of this.terrainTrack) {
+      const o = u.o;
+      let x = o.x;
+      let y = o.y;
+      const dx = x - u.px;
+      const dy = y - u.py;
+      const d = Math.hypot(dx, dy);
+      if (d > 0.01 && d < 120) {
+        const f = t.speedMult(x, y);
+        if (f < 1) {
+          x = u.px + dx * f;
+          y = u.py + dy * f;
+        }
+      }
+      [x, y] = t.pushOut(x, y, u.r);
+      o.x = x;
+      o.y = y;
+    }
+  }
+
+  /** 화살 피해 배율: 높은 곳에서 아래로 쏘면 강하고, 아래에서 위로 쏘면 약하다 */
+  private arrowTerrainMult(b: Bullet, x: number, y: number): number {
+    const t = this.terrain;
+    if (!t || t.plateaus.length === 0) return 1;
+    const targetHigh = t.elevated(x, y);
+    if (b.hi && !targetHigh) return TUNE.HIGH_GROUND_ARROW_MULT;
+    if (!b.hi && targetHigh) return TUNE.LOW_GROUND_ARROW_MULT;
+    return 1;
+  }
+
   /** 난이도(DIFFICULTY_REDUCTION 인덱스). 방 설정이라 reset()해도 유지한다. */
   difficulty: number = DEFAULT_DIFFICULTY;
 
@@ -551,6 +619,7 @@ export class Game {
   }
 
   reset(): void {
+    this.terrain = null;
     const old = [...this.slots.values()];
     this.slots.clear();
     this.enemies.clear();
@@ -779,6 +848,7 @@ export class Game {
       this.beginTournament();
     }
     const duel = this.phase === "tournament";
+    this.terrainBegin();
     this.stepPlayers(dt);
     this.stepStage(dt);
     this.stepChests(dt);
@@ -796,6 +866,7 @@ export class Game {
       this.stepEnemies(dt, friendlies);
       this.separateEnemies();
     }
+    this.terrainEnd();
     this.stepBullets(dt, friendlies);
     this.clampUnits();
     this.pruneCasts();
@@ -1594,10 +1665,11 @@ export class Game {
     owners.forEach((owner, i) => {
       const ang = (i / owners.length) * Math.PI * 2 + 0.4;
       const id = this.nextEntityId++;
+      const [cx, cy] = this.terrain?.pushOut(clampToWorld(x + Math.cos(ang) * 70, 20), clampToWorld(y + Math.sin(ang) * 70, 20), 24) ?? [clampToWorld(x + Math.cos(ang) * 70, 20), clampToWorld(y + Math.sin(ang) * 70, 20)]; // 바위 안에 묻히지 않게
       this.chests.set(id, {
         id,
-        x: clampToWorld(x + Math.cos(ang) * 70, 20),
-        y: clampToWorld(y + Math.sin(ang) * 70, 20),
+        x: cx,
+        y: cy,
         owner,
         left: TUNE.CHEST_LIFETIME_SEC,
       });
@@ -2024,6 +2096,7 @@ export class Game {
       const x = clampToWorld(around.x + Math.cos(angle) * dist, 150);
       const y = clampToWorld(around.y + Math.sin(angle) * dist, 150);
       if ([...this.camps.values()].some((c) => Math.hypot(c.x - x, c.y - y) < 300)) continue;
+      if (this.terrain?.blocked(x, y, 90)) continue; // 바위·고지대 위에는 캠프를 세우지 않는다
       this.spawnCampAt(x, y, this.pickOffers());
       return;
     }
@@ -3900,6 +3973,7 @@ export class Game {
     const remaining: Bullet[] = [];
     const half = WORLD_SIZE / 2;
     for (const b of this.bullets) {
+      if (b.hi === undefined) b.hi = this.terrain?.elevated(b.x, b.y) ?? false;
       const mx = b.vx * dt;
       const my = b.vy * dt;
       // 빠른 투사체가 대상을 건너뛰지 않도록 이동 구간을 쪼개 검사한다
@@ -3908,10 +3982,14 @@ export class Game {
       for (let i = 1; i <= steps && !hit; i++) {
         const px = b.x + (mx * i) / steps;
         const py = b.y + (my * i) / steps;
+        if (this.terrain?.hitsSolid(px, py, 2, true)) {
+          hit = true; // 바위·폐허에 막힌다
+          break;
+        }
         if (b.hostile) {
           for (const f of friendlies) {
             if (Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
-            f.hit({ damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }); // 날아온 쪽이 정면인지 본다
+            f.hit({ damage: b.damage * this.arrowTerrainMult(b, f.x, f.y), charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }); // 날아온 쪽이 정면인지 본다
             this.pushEvent(EVT_ENEMY_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             hit = true;
             break;
@@ -3937,7 +4015,7 @@ export class Game {
           for (const e of [...this.enemies.values()]) {
             if (b.hitIds.has(e.id) || Math.hypot(e.x - px, e.y - py) > b.radius + radiusOf(e)) continue;
             b.hitIds.add(e.id);
-            this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit, poison: b.poison ? b.damage * b.poison : 0 }, b.owner, b.merc);
+            this.damageEnemy(e, { damage: b.damage * this.arrowTerrainMult(b, e.x, e.y), charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), crit: b.crit, poison: b.poison ? b.damage * b.poison : 0 }, b.owner, b.merc);
             this.pushEvent(EVT_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             if (b.pierce > 0) {
               b.pierce--; // 뚫고 지나가 다음 적을 노린다

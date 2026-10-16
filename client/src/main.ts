@@ -38,6 +38,12 @@ import {
   applyTuning,
   TOURNAMENT_ARENA_RADIUS,
   meleeArc,
+  TerrainMap,
+  SPRITE_BY_ID,
+  anchorOf,
+  TK_PLATEAU,
+  TK_DECOR,
+  type TerrainWire,
   CHEST_OPEN_RADIUS,
   MERC_STATS,
   mercName,
@@ -188,7 +194,10 @@ async function main() {
   ground.position.set(-half, -half);
   ground.tint = 0xa6a6a6; // 전투가 잘 보이도록 바닥을 한 단계 어둡게 눌러 둔다
   const border = new Graphics().rect(-half, -half, WORLD_SIZE, WORLD_SIZE).stroke({ width: 4, color: 0x5a3b3b });
-  world.addChild(ground, border);
+  const terrainFlat = new Container(); // 고지대·장식: 모든 유닛 아래
+  const terrainLow = new Container(); // 바위·나무·폐허: 유닛 뒤에 있을 때
+  terrainLow.sortableChildren = true;
+  world.addChild(ground, border, terrainFlat, terrainLow);
 
   const campLayer = new Container();
   const enemyLayer = new Container();
@@ -205,7 +214,48 @@ async function main() {
   chargeLabel.anchor.set(0.5, 1);
   chargeMark.visible = chargeLabel.visible = false;
   const dmgLayer = new Container(); // 피해 숫자는 모든 그림 위에
-  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, skyLayer, chargeMark, chargeLabel, dmgLayer);
+  const terrainHigh = new Container(); // 유닛이 뒤에 서 있는 바위·나무: 유닛을 가린다
+  terrainHigh.sortableChildren = true;
+  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, dmgLayer);
+
+  // --- 지형: 서버가 판마다 보내 준다 ---
+  const terrainTex = new Map<number, Texture>();
+  interface TView {
+    sp: Sprite;
+    obj: number;
+    solid: boolean;
+    x: number;
+    footY: number;
+    halfW: number;
+    top: number;
+    high: boolean;
+  }
+  let terrain: TerrainMap | null = null;
+  let tviews: TView[] = [];
+  let terrainSeq = 0;
+  const setTerrain = async (items: TerrainWire[]) => {
+    const seq = ++terrainSeq;
+    const ids = [...new Set(items.map((i) => i[0]))].filter((id) => !terrainTex.has(id));
+    await Promise.all(ids.map(async (id) => terrainTex.set(id, await Assets.load<Texture>(`assets/terrain/t${String(id).padStart(2, "0")}.png`))));
+    if (seq !== terrainSeq) return; // 더 새 지형이 왔다
+    for (const v of tviews) v.sp.destroy();
+    tviews = [];
+    terrain = items.length > 0 ? new TerrainMap(items, TOURNAMENT_ARENA_RADIUS + 60) : null;
+    items.forEach((it, n) => {
+      const s = SPRITE_BY_ID.get(it[0]);
+      const tex = terrainTex.get(it[0]);
+      if (!s || !tex) return;
+      const [ax, ay] = anchorOf(s);
+      const sp = new Sprite(tex);
+      sp.anchor.set(ax / s.w, ay / s.h);
+      sp.position.set(it[1], it[2]);
+      sp.scale.set(it[4] ? -it[3] : it[3], it[3]);
+      const solid = s.kind !== TK_PLATEAU && s.kind !== TK_DECOR;
+      sp.zIndex = it[2];
+      (solid ? terrainLow : terrainFlat).addChild(sp);
+      tviews.push({ sp, obj: n, solid, x: it[1], footY: it[2], halfW: (s.w / 2) * it[3], top: it[2] - ay * it[3], high: false });
+    });
+  };
 
   /** 스프라이트는 오른쪽을 보고 그려져 있어, 왼쪽으로 움직이거나 공격할 때는 좌우 반전한다 */
   interface Facing {
@@ -870,6 +920,10 @@ async function main() {
         applyTuning(msg.values, true); // 서버에서 조정한 수치를 같이 쓴다(화면의 사거리·범위 표시 등)
         return;
       }
+      if (msg.t === "terrain") {
+        void setTerrain(msg.items);
+        return;
+      }
       if (lobby.handle(msg)) return;
       if (msg.t === "notice") {
         toast.text = msg.text;
@@ -1230,6 +1284,11 @@ async function main() {
       g.moveTo(offX + 2, (S * i) / 4).lineTo(offX + S - 2, (S * i) / 4).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
     }
     if (duel) g.circle(sx(0), sy(0), (TOURNAMENT_ARENA_RADIUS / WORLD_SIZE) * S).stroke({ width: 1.5, color: 0xe0c05d, alpha: 0.8 });
+    // 지형: 고지대는 갈색 타원, 바위·폐허는 회색 점
+    if (terrain) {
+      for (const p of terrain.plateaus) if (terrain.liveObj(p.obj)) for (const t of p.tops) g.ellipse(sx(t.x), sy(t.y), Math.max(1.5, (t.rx / WORLD_SIZE) * S), Math.max(1, (t.ry / WORLD_SIZE) * S)).fill({ color: 0x8a6b3a, alpha: 0.55 });
+      for (const c of terrain.solids) if (terrain.liveObj(c.obj)) g.circle(sx(c.x), sy(c.y), Math.max(0.8, (c.r / WORLD_SIZE) * S)).fill({ color: c.arrow ? 0x9aa0a8 : 0x3f6b38, alpha: 0.8 });
+    }
     // 지점 방어 깃발
     for (const hp of st.players) {
       if (hp.stance !== 2) continue;
@@ -1713,6 +1772,28 @@ async function main() {
       fxLayer.circle(r.x, r.y, LEVELUP_PUSH_RADIUS * (0.25 + 0.75 * k2)).stroke({ width: 5 * (1 - k2) + 1, color: 0xffe08a, alpha: 0.8 * (1 - k2) });
     }
 
+    // 지형: 유닛이 바위·나무 뒤에 서 있으면 그것을 유닛 위에 그린다
+    if (terrain) {
+      terrain.setDuel(latest.g?.phase === "tournament");
+      const cx = -world.x + app.screen.width / 2;
+      const cy = -world.y + app.screen.height / 2;
+      for (const tv of tviews) {
+        const vis = Math.abs(tv.x - cx) < app.screen.width / 2 + tv.halfW + 80 && Math.abs(tv.footY - cy) < app.screen.height / 2 + 400 && terrain.liveObj(tv.obj);
+        tv.sp.visible = vis;
+        if (!vis || !tv.solid) continue;
+        let behind = false;
+        const check = (v: { x: number; y: number }) => {
+          if (!behind && Math.abs(v.x - tv.x) < tv.halfW && v.y < tv.footY && v.y > tv.top) behind = true;
+        };
+        for (const v of players.views.values()) check(v);
+        if (!behind) for (const v of mercs.views.values()) check(v);
+        if (!behind) for (const v of enemies.views.values()) check(v);
+        if (behind !== tv.high) {
+          tv.high = behind;
+          (behind ? terrainHigh : terrainLow).addChild(tv.sp);
+        }
+      }
+    }
     // 카메라와 HUD
     const me = players.views.get(myId);
     const meState = latest.players.find((p) => p.id === myId);
@@ -1769,6 +1850,10 @@ async function main() {
       if (meState.shaken > 0) extra.push(`공포! 용병이 도망칩니다 (${Math.ceil(meState.shaken)}초)`);
       else if (meState.swarm > 0) extra.push(`군세: 공격력 +${Math.round(meState.swarm * 100)}%`);
       if (meState.luck > 0) extra.push(`행운 +${Math.round(meState.luck * 100)}%`);
+      if (terrain) {
+        if (terrain.elevated(meState.x, meState.y)) extra.push(`고지대: 화살 피해 +${Math.round((TUNE.HIGH_GROUND_ARROW_MULT - 1) * 100)}%`);
+        else if (terrain.speedMult(meState.x, meState.y) < 1) extra.push("비탈: 이동 속도가 크게 느려집니다");
+      }
       if (down > 0) extra.push(`용병 ${down}명 쓰러짐 (부활 대기)`);
       hudExtra.text = extra.join("\n");
       hudExtra.style.fill = meState.shaken > 0 ? 0xff9b8f : 0xffe08a;
