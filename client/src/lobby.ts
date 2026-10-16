@@ -90,7 +90,7 @@ export function createLobby(opts: Options): Lobby {
   let myId = -1;
   let inRoom = false;
   let hostId = -1;
-  let difficulty = 3;
+  let ranked = false;
   let phase: RoomPhase = "playing";
   let rooms: RoomInfo[] = [];
   let members: RoomMember[] = [];
@@ -151,6 +151,13 @@ export function createLobby(opts: Options): Lobby {
       label.className = "grow";
       label.textContent = p.name + (p.id === myId ? " (나)" : "");
       item.append(label);
+      if (showReady) {
+        const d = document.createElement("span");
+        d.className = "tag";
+        const red = Math.round((DIFFICULTY_REDUCTION[p.difficulty] ?? 0) * 100);
+        d.textContent = red > 0 ? `피해 -${red}%` : "피해 감소 없음";
+        item.append(d);
+      }
       if (p.id === hostId) {
         const t = document.createElement("span");
         t.className = "tag";
@@ -186,13 +193,14 @@ export function createLobby(opts: Options): Lobby {
     $("waitCode").textContent = code;
     $("waitCount").textContent = `(${members.length}명)`;
     renderMembers($("waitMembers"), members, true);
+    $("waitDiffNote").textContent = ranked ? "(랭크 게임: 난이도 고정, 바꿀 수 없습니다)" : "(내가 받는 피해 감소 · 사람마다 따로 정합니다)";
     const diffBox = $("waitDiff");
     diffBox.replaceChildren();
     DIFFICULTY_REDUCTION.forEach((r, i) => {
       const b = document.createElement("button");
       b.textContent = `${DIFFICULTY_NAMES[i]} ${Math.round(r * 100)}%`;
-      b.className = i === difficulty ? "primary" : "";
-      b.disabled = hostId !== myId;
+      b.className = i === (members.find((m) => m.id === myId)?.difficulty ?? 3) ? "primary" : "";
+      b.disabled = ranked;
       b.onclick = () => opts.send({ t: "difficulty", v: i });
       diffBox.append(b);
     });
@@ -418,7 +426,7 @@ export function createLobby(opts: Options): Lobby {
           code = msg.code;
           hostId = msg.hostId;
           phase = msg.phase;
-          difficulty = msg.difficulty;
+          ranked = msg.ranked;
           members = msg.players;
           $("roomTitle").textContent = msg.name;
           $("roomCode").textContent = msg.code;

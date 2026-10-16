@@ -294,6 +294,7 @@ interface Slot {
   revives: number; // 동료를 일으켜 세운 횟수
   stats: { dealt: number; taken: number; downs: number; mercDeaths: number; gold: number; wins: number; champion: number }; // 기록용 누적
   facing: number; // 진형이 바라보는 방향. 조준 방향을 천천히 따라간다
+  difficulty: number; // 이 플레이어의 난이도(DIFFICULTY_REDUCTION 인덱스). 방에서 판이 시작되기 전에만 바뀐다
   shieldIdle: number; // 마지막으로 방패 체력이 깎인 뒤 지난 시간(초). 차오르기 시작할 때를 잰다
   shieldDelay: number; // 차오르기 시작하기까지 필요한 시간(깨졌으면 더 길다)
 }
@@ -610,12 +611,21 @@ export class Game {
     return 1;
   }
 
-  /** 난이도(DIFFICULTY_REDUCTION 인덱스). 방 설정이라 reset()해도 유지한다. */
-  difficulty: number = DEFAULT_DIFFICULTY;
+  /** 한 플레이어의 난이도를 바꾼다(범위 밖이면 무시). 개인별 설정이다. */
+  setDifficulty(playerId: number, v: number): boolean {
+    const s = this.slots.get(playerId);
+    if (!s || !Number.isInteger(v) || v < 0 || v >= DIFFICULTY_REDUCTION.length) return false;
+    s.difficulty = v;
+    return true;
+  }
+  getDifficulty(playerId: number): number {
+    return this.slots.get(playerId)?.difficulty ?? DEFAULT_DIFFICULTY;
+  }
 
-  /** 적에게 받는 피해에 곱한다. 토너먼트(플레이어끼리)에는 적용하지 않는다. */
-  private damageTakenMult(): number {
-    return this.phase === "tournament" ? 1 : 1 - (DIFFICULTY_REDUCTION[this.difficulty] ?? 0);
+  /** 적에게 받는 피해에 곱한다(그 플레이어의 난이도). 토너먼트(플레이어끼리)에는 적용하지 않는다. */
+  private damageTakenMult(ownerId: number): number {
+    if (this.phase === "tournament") return 1;
+    return 1 - (DIFFICULTY_REDUCTION[this.slots.get(ownerId)?.difficulty ?? DEFAULT_DIFFICULTY] ?? 0);
   }
 
   reset(): void {
@@ -643,6 +653,7 @@ export class Game {
       const slot = this.newSlot(o.state.id, o.state.name);
       slot.away = o.away;
       slot.zones = o.zones; // 고른 진형은 다시 시작해도 유지한다
+      slot.difficulty = o.difficulty; // 난이도도 유지한다
       slot.spacing = o.spacing;
       this.placeAtSpawn(slot.state, o.state.id);
       this.slots.set(o.state.id, slot);
@@ -711,6 +722,7 @@ export class Game {
       facing: 0,
       shieldIdle: 99,
       shieldDelay: 0,
+      difficulty: DEFAULT_DIFFICULTY,
     };
   }
 
@@ -2176,7 +2188,7 @@ export class Game {
             s.shieldDelay = p.shield <= 0 ? TUNE.HERO_SHIELD_BROKEN_DELAY : TUNE.HERO_SHIELD_REGEN_DELAY;
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(-p.id, h.poison); // 토너먼트: 몸에 맞은 독 화살
-          const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)) * this.damageTakenMult(); // 고정 감소가 먼저, 방어력(%)은 그다음
+          const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)) * this.damageTakenMult(p.id); // 고정 감소가 먼저, 방어력(%)은 그다음
           p.hp -= taken;
           s.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
@@ -2207,7 +2219,7 @@ export class Game {
           const r = h.dot || h.pierceGuard ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
-          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)) * this.damageTakenMult();
+          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)) * this.damageTakenMult(m.owner);
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner);

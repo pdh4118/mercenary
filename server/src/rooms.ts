@@ -5,6 +5,7 @@ import {
   JOIN_FAIL_LIMIT,
   MAX_PLAYERS,
   MAX_ROOMS,
+  RANKED_DIFFICULTY,
   NAME_MAX_LENGTH,
   RECONNECT_GRACE_SEC,
   ROOM_CODE_LENGTH,
@@ -47,6 +48,7 @@ interface Room {
   hostId: number;
   members: Map<number, Member>;
   phase: RoomPhase; // waiting: 대기실(게임 정지), playing: 진행 중
+  ranked: boolean; // 랭크(ELO 등) 게임: 난이도가 RANKED_DIFFICULTY로 고정되고 바꿀 수 없다
   isPrivate: boolean; // 비공개: 목록·빠른 시작에서 제외, 코드로만 입장
 }
 
@@ -288,6 +290,7 @@ export class RoomManager {
     if (room.phase !== "waiting") return;
     const notReady = [...room.members.values()].filter((m) => m.id !== room.hostId && m.conn && !m.ready);
     if (notReady.length > 0) return this.fail(conn, `아직 준비하지 않은 사람이 있습니다 (${notReady.map((m) => m.name).join(", ")})`);
+    if (room.ranked) for (const m of room.members.values()) room.game.setDifficulty(m.id, RANKED_DIFFICULTY); // 랭크는 난이도 고정
     room.phase = "playing";
     room.game.generateTerrain(); // 판마다 새 지형
     this.broadcastTerrain(room);
@@ -295,14 +298,14 @@ export class RoomManager {
     this.broadcastLobby();
   }
 
+  /** 자기 난이도를 고른다(개인별). 대기실에서만, 랭크 방에서는 바꿀 수 없다. */
   private setDifficulty(conn: Conn, v: number): void {
     const at = this.where.get(conn);
     if (!at) return;
     const { room } = at;
-    if (room.hostId !== at.id) return this.fail(conn, "방장만 난이도를 바꿀 수 있습니다");
+    if (room.ranked) return this.fail(conn, "랭크 게임에서는 난이도를 바꿀 수 없습니다");
     if (room.phase !== "waiting") return this.fail(conn, "게임 중에는 난이도를 바꿀 수 없습니다");
-    if (!Number.isInteger(v) || v < 0 || v >= DIFFICULTY_REDUCTION.length) return;
-    room.game.difficulty = v;
+    if (!room.game.setDifficulty(at.id, v)) return;
     this.broadcastRoom(room);
   }
 
@@ -345,7 +348,7 @@ export class RoomManager {
     do {
       code = Array.from({ length: ROOM_CODE_LENGTH }, () => CODE_CHARS[Math.floor(this.rng() * CODE_CHARS.length)]).join("");
     } while (this.rooms.has(code));
-    const room: Room = { code, name, game: new Game(this.rng), hostId: -1, members: new Map(), phase: "waiting", isPrivate };
+    const room: Room = { code, name, game: new Game(this.rng), hostId: -1, members: new Map(), phase: "waiting", ranked: false, isPrivate };
     this.rooms.set(code, room);
     return room;
   }
@@ -356,6 +359,7 @@ export class RoomManager {
       if (room.members.size === 0) this.rooms.delete(room.code);
       return this.fail(conn, "방이 가득 찼습니다");
     }
+    if (room.ranked) room.game.setDifficulty(id, RANKED_DIFFICULTY);
     const token = randomBytes(12).toString("hex");
     room.members.set(id, { id, name: room.game.getPlayer(id)!.name, conn, token, offlineLeft: 0, ready: false });
     if (room.hostId < 0) room.hostId = id; // 처음 들어온 사람이 방장
@@ -407,8 +411,8 @@ export class RoomManager {
       hostId: room.hostId,
       phase: room.phase,
       private: room.isPrivate,
-      difficulty: room.game.difficulty,
-      players: [...room.members.values()].map((m) => ({ id: m.id, name: m.name, online: !!m.conn, ready: m.ready })),
+      ranked: room.ranked,
+      players: [...room.members.values()].map((m) => ({ id: m.id, name: m.name, online: !!m.conn, ready: m.ready, difficulty: room.game.getDifficulty(m.id) })),
     };
     for (const m of room.members.values()) m.conn?.send(msg);
   }

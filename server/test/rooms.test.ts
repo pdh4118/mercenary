@@ -62,7 +62,7 @@ test("방 만들기: 4글자 코드를 받고 방장이 되며 방 목록에 나
   const room = a.last("room")!;
   assert.equal(room.hostId, w.id);
   assert.equal(room.name, "우리 방");
-  assert.deepEqual(room.players, [{ id: w.id, name: "철수", online: true, ready: false }]);
+  assert.deepEqual(room.players, [{ id: w.id, name: "철수", online: true, ready: false, difficulty: 3 }]);
   const b = conn();
   assert.deepEqual(b.last("rooms")!.rooms, [{ code: w.code, name: "우리 방", players: 1, max: MAX_PLAYERS, playing: false }]);
 });
@@ -212,7 +212,7 @@ test("접속이 끊겨도 제한 시간 안에는 자리를 지키고, 같은 �
   game.getPlayer(id)!.gold = 777;
 
   m.disconnect(b);
-  assert.deepEqual(a.last("room")!.players.find((p) => p.id === id), { id, name: "B", online: false, ready: true });
+  assert.deepEqual(a.last("room")!.players.find((p) => p.id === id), { id, name: "B", online: false, ready: true, difficulty: 3 });
   seconds(m, RECONNECT_GRACE_SEC - 5);
   assert.equal(game.playerCount, 2, "아직 자리가 남아 있다");
 

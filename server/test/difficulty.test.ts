@@ -11,8 +11,8 @@ const run = (g: Game, sec: number) => {
 function lostHp(difficulty: number): number {
   const g = new Game(() => 0.99); // 회피가 나지 않게
   g.autoSpawn = false;
-  g.difficulty = difficulty;
   const a = g.addPlayer("a")!;
+  g.setDifficulty(a, difficulty);
   const p = g.getPlayer(a)!;
   p.hp = p.maxHp = 100000;
   for (let i = 0; i < 4; i++) g.spawnEnemyAt(p.x + 30 + i * 8, p.y, 1);
@@ -29,23 +29,68 @@ test("난이도: 받는 피해가 감소율만큼 줄어든다", () => {
   });
 });
 
-test("난이도: 방장만 대기실에서 바꿀 수 있고 방 정보로 알려 준다", () => {
-  const sent: { t: string; difficulty?: number }[][] = [[], []];
-  const mk = (i: number) => ({ send: (m: { t: string; difficulty?: number }) => sent[i]!.push(m), close() {} }) as never;
+test("난이도: 사람마다 따로 고르고(대기실에서만) 방 정보로 모두에게 알려 준다", () => {
+  type Msg = { t: string; players?: { id: number; difficulty: number }[] };
+  const sent: Msg[][] = [[], []];
+  const mk = (i: number) => ({ send: (m: Msg) => sent[i]!.push(m), close() {} }) as never;
   const rm = new RoomManager();
   const host = mk(0);
   const guest = mk(1);
   rm.handle(host, { t: "create", name: "h" });
   const code = rm.roomOf(host)!.code;
   rm.handle(guest, { t: "join", name: "g", code });
+  const game = rm.roomOf(host)!.game;
+  const hostId = rm.roomOf(host)!.hostId;
+  const guestId = [...(sent[1]!.filter((m) => m.t === "room").pop()!.players ?? [])].find((p) => p.id !== hostId)!.id;
   rm.handle(guest, { t: "difficulty", v: 0 });
-  assert.equal(rm.roomOf(host)!.game.difficulty, 3, "방장이 아니면 무시");
+  assert.equal(game.getDifficulty(guestId), 0, "손님도 자기 난이도를 바꾼다");
+  assert.equal(game.getDifficulty(hostId), 3, "다른 사람에게는 영향이 없다");
   rm.handle(host, { t: "difficulty", v: 1 });
-  assert.equal(rm.roomOf(host)!.game.difficulty, 1);
+  assert.equal(game.getDifficulty(hostId), 1);
+  assert.equal(game.getDifficulty(guestId), 0);
   rm.handle(host, { t: "difficulty", v: 9 });
-  assert.equal(rm.roomOf(host)!.game.difficulty, 1, "범위 밖은 무시");
+  assert.equal(game.getDifficulty(hostId), 1, "범위 밖은 무시");
   const last = sent[1]!.filter((m) => m.t === "room").pop()!;
-  assert.equal(last.difficulty, 1);
+  assert.deepEqual(last.players!.map((p) => p.difficulty).sort(), [0, 1]);
+  // 게임이 시작되면 바꿀 수 없다
+  rm.handle(guest, { t: "ready", ready: true });
+  rm.handle(host, { t: "start" });
+  rm.handle(guest, { t: "difficulty", v: 2 });
+  assert.equal(game.getDifficulty(guestId), 0, "시작한 뒤에는 바꿀 수 없다");
+});
+
+test("랭크 방: 난이도가 고정되고 바꿀 수 없다", () => {
+  const rm = new RoomManager();
+  const conn = { send() {}, close() {} } as never;
+  rm.handle(conn, { t: "create", name: "r" });
+  const room = (rm as unknown as { rooms: Map<string, { ranked: boolean; game: Game }> }).rooms.values().next().value!;
+  room.ranked = true;
+  const id = rm.roomOf(conn)!.hostId;
+  rm.handle(conn, { t: "difficulty", v: 0 });
+  assert.equal(room.game.getDifficulty(id), 3, "랭크에서는 난이도를 바꿀 수 없다");
+  const guest = { send() {}, close() {} } as never;
+  rm.handle(guest, { t: "join", name: "g", code: rm.roomOf(conn)!.code });
+  const gid = [...new Set([1, 2, 3, 4])].map((n) => n).find((n) => n !== id && room.game.getPlayer(n))!;
+  assert.equal(room.game.getDifficulty(gid), 3, "랭크 방에 들어온 사람은 고정 난이도");
+});
+
+test("난이도는 사람마다 적용된다: 한 명이 쉬움이어도 다른 사람의 피해는 그대로", () => {
+  const g = new Game(() => 0.99);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const b = g.addPlayer("b")!;
+  g.setDifficulty(a, 0); // 피해 -75%
+  const pa = g.getPlayer(a)!;
+  const pb = g.getPlayer(b)!;
+  for (const p of [pa, pb]) p.hp = p.maxHp = 100000;
+  pa.x = -1000;
+  pb.x = 1000;
+  for (const p of [pa, pb]) for (let i = 0; i < 4; i++) g.spawnEnemyAt(p.x + 30 + i * 8, p.y, 1);
+  run(g, 12);
+  const la = 100000 - pa.hp;
+  const lb = 100000 - pb.hp;
+  assert.ok(lb > 40);
+  assert.ok(Math.abs(la / lb - 0.25) < 0.1, `${la} vs ${lb}`);
 });
 
 test("용병은 한 자리에 뭉쳐 쌓이지 않는다", () => {
@@ -69,7 +114,6 @@ test("용병은 한 자리에 뭉쳐 쌓이지 않는다", () => {
 test("검을 든 주인공은 방패 체력이 정면 피해를 받아 내고, 맞지 않으면 차오른다", () => {
   const g = new Game(() => 0.99);
   g.autoSpawn = false;
-  g.difficulty = 3;
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
   g.setWeapon(a, 2); // 검
