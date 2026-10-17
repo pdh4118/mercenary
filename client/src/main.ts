@@ -79,7 +79,8 @@ const tourBracketEl = document.getElementById("tourBracket")!;
 const tourBigEl = document.getElementById("tourBig")!;
 const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-const PLAYER_COLORS = [0xe05d5d, 0x5da6e0, 0x6fd16f, 0xe0c05d, 0xb07be0, 0x5de0d0, 0xe08f5d, 0xd96fb0];
+/** 아군 색은 적(붉은 계열)과 헷갈리지 않도록 빨강·주황을 뺀 밝은 색만 쓴다 */
+const PLAYER_COLORS = [0x5da6e0, 0x6fd16f, 0xf2d24a, 0xb07be0, 0x5de0d0, 0xf0f0ff, 0xf08fd8, 0xb8e84f];
 /** 토너먼트에서 선수 팀 색: 관전할 때는 빨강 대 파랑, 참전할 때는 나는 파랑·상대는 빨강 */
 const TEAM_RED = 0xe84848;
 const TEAM_BLUE = 0x3d8ff5;
@@ -177,7 +178,7 @@ async function main() {
   // 기병은 8방위(0=북,1=북동,2=동,…) 기본 자세·찌르기 자세 그림을 쓴다. 아군은 주인 색, 적은 어두운 붉은색으로 칠한다.
   const cavRaw = await Promise.all((["idle", "thrust"] as const).map((pose) => Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((d) => Assets.load<Texture>(`assets/units/cav_${pose}_${d}.png`)))));
   const cavTex = (key: string, pose: number, dir: number, color: number) => recolored(`cav/${key}/${pose}/${dir}`, cavRaw[pose]![dir]!, CAV8_RULE, color);
-  const ENEMY_CAV_COLOR = 0x5c1018;
+  const ENEMY_CAV_COLOR = 0x45101a;
   const enemyCav = cavRaw.map((_, pose) => cavRaw[pose]!.map((_t, d) => cavTex("e", pose, d, ENEMY_CAV_COLOR)));
   /** 8방위 그림은 크기가 달라 별도 배율·기준점을 쓴다 */
   const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5;
