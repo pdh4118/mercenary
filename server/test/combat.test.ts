@@ -150,3 +150,12 @@ test("배후 공격: 등 뒤(반각 60도)에서 오면 피해와 돌격 피해�
   close(sp.body, 15);
   assert.equal(sp.reflected, 8);
 });
+
+import { inBox, CAVALRY as CAV_T, SPEAR as SPEAR_T, MERC_STATS as MS } from "../../shared/src/rules.js";
+test("기병 찌르기는 창병보다 짧은 직사각형이다", () => {
+  const reach = MS[CAV_T]!.reach;
+  assert.ok(reach < MS[SPEAR_T]!.reach);
+  assert.ok(inBox(CAV_T, 0, 0, 0, reach - 5, 0, 10, reach)); // 정면은 맞는다
+  assert.ok(!inBox(CAV_T, 0, 0, 0, reach - 5, 60, 10, reach)); // 옆으로 크게 벗어나면 맞지 않는다(부채꼴이었다면 맞았을 위치)
+  assert.ok(!inBox(CAV_T, 0, 0, 0, reach + 30, 0, 10, reach)); // 사거리 밖
+});

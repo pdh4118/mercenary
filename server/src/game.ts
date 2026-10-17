@@ -45,6 +45,9 @@ import {
   STAGE_COUNT,
   ARCHER_KITE_HOME_PULL,
   inSpearBox,
+  inBox,
+  usesBox,
+  boxWidthMult,
   ARCHER_KITE_SPEED_MULT,
   OFFER_SIZE,
   xpNeeded,
@@ -2518,7 +2521,7 @@ export class Game {
         leash,
         assault,
         guard,
-        widthMult: st.arc / MERC_STATS[SPEAR]!.arc,
+        widthMult: boxWidthMult(m.type, st.arc),
       };
       switch (m.type) {
         case CAVALRY: this.aiCavalry(c); break;
@@ -3043,8 +3046,8 @@ export class Game {
       const foes = this.duelFoes(m.owner);
       const hitFoes: Friendly[] = [];
       for (const f of foes) {
-        if (m.type === SPEAR) {
-          if (!inSpearBox(m.x, m.y, m.atkAng, f.x, f.y, f.radius, st.reach, st.arc / MERC_STATS[SPEAR]!.arc)) continue;
+        if (usesBox(m.type)) {
+          if (!inBox(m.type, m.x, m.y, m.atkAng, f.x, f.y, f.radius, st.reach, boxWidthMult(m.type, st.arc))) continue;
         } else {
           if (Math.hypot(f.x - m.x, f.y - m.y) > st.reach + f.radius) continue;
           if (Math.abs(angleDiff(Math.atan2(f.y - m.y, f.x - m.x), m.atkAng)) > st.arc) continue;
@@ -3064,9 +3067,9 @@ export class Game {
     }
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
-      if (m.type === SPEAR) {
-        // 창병도 직사각형 찌르기. 범위 증가 능력은 폭에 적용된다.
-        if (!inSpearBox(m.x, m.y, m.atkAng, e.x, e.y, radiusOf(e), st.reach, st.arc / MERC_STATS[SPEAR]!.arc)) continue;
+      if (usesBox(m.type)) {
+        // 창병·기병은 직사각형 찌르기. 범위 증가 능력은 폭에 적용된다.
+        if (!inBox(m.type, m.x, m.y, m.atkAng, e.x, e.y, radiusOf(e), st.reach, boxWidthMult(m.type, st.arc))) continue;
       } else {
         if (Math.hypot(e.x - m.x, e.y - m.y) > st.reach + radiusOf(e)) continue;
         if (Math.abs(angleDiff(Math.atan2(e.y - m.y, e.x - m.x), m.atkAng)) > st.arc) continue;

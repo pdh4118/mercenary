@@ -96,6 +96,7 @@ export const TUNE = {
   MULTISHOT_SPREAD: 0.14, // 화살 사이 각도(라디안)
   SPEAR_HALF_WIDTH_NEAR: 18, // 몸 바로 앞의 반폭(px)
   SPEAR_HALF_WIDTH_FAR: 18, // 사거리 끝의 반폭(px)
+  CAV_HALF_WIDTH: 20, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
   PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s
   ENEMY_SPAWN_BASE_PER_SEC: 1.1, // 플레이어 1명당
@@ -184,11 +185,30 @@ export function inSpearBox(ox: number, oy: number, aim: number, tx: number, ty: 
   return l <= spearHalfWidth(f, reach, widthMult) + r;
 }
 
+/** 직사각형 찌르기 범위를 쓰는 병종(창병, 기병). 기병은 짧고 약간 넓다. */
+export function usesBox(type: number): boolean {
+  return type === SPEAR || type === CAVALRY;
+}
+/** 병종별 범위 안 판정: 직사각형 병종이면 inSpearBox/기병 폭, 아니면 부채꼴이 아니라 호출부에서 처리하므로 false를 돌려주지 않는다(usesBox로 먼저 가를 것) */
+export function inBox(type: number, ox: number, oy: number, aim: number, tx: number, ty: number, r: number, reach: number, widthMult = 1): boolean {
+  if (type !== CAVALRY) return inSpearBox(ox, oy, aim, tx, ty, r, reach, widthMult);
+  const dx = tx - ox;
+  const dy = ty - oy;
+  const f = dx * Math.cos(aim) + dy * Math.sin(aim);
+  const l = Math.abs(-dx * Math.sin(aim) + dy * Math.cos(aim));
+  if (f < -r * 0.5 || f > reach + r) return false;
+  return l <= TUNE.CAV_HALF_WIDTH * widthMult + r;
+}
+/** 범위 증가 능력이 폭에 주는 배율: 기본 부채꼴 각 대비 현재 각의 비 */
+export function boxWidthMult(type: number, arc: number): number {
+  return arc / MERC_STATS[type === CAVALRY ? CAVALRY : SPEAR]!.arc;
+}
+
 const deg = rad;
 
 export const MERC_STATS: readonly UnitStats[] = [
   // 기병: speed는 최대 속도. 평소엔 느리게 출발해 점점 빨라진다. 피해는 기본 + 속도에 비례한 돌격 피해.
-  { hp: 200, speed: 300, reach: 30, damage: 15, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
+  { hp: 200, speed: 300, reach: 48, damage: 15, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
   // 창병: 사거리가 가장 길고 폭이 좁다(찌르기)
   { hp: 181, speed: 95, reach: 100, damage: 19, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
   { hp: 119, speed: 95, reach: 280, damage: 15, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },

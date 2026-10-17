@@ -126,6 +126,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   MULTISHOT_SPREAD: ["발사 수 카드 화살 사이 각도(라디안)", G.combat, 0, 0.6, 0.01],
   SPEAR_HALF_WIDTH_NEAR: ["창 찌르기 폭(몸 앞, 반폭 px)", G.combat, 2, 150, 1],
   SPEAR_HALF_WIDTH_FAR: ["창 찌르기 폭(끝, 반폭 px)", G.combat, 2, 150, 1],
+  CAV_HALF_WIDTH: ["기병 찌르기 폭(반폭 px)", G.combat, 2, 150, 1],
   PLAYER_MAX_HP: ["주인공 기본 체력", G.hero, 10, 2000, 5],
   PLAYER_SPEED: ["주인공 이동 속도", G.hero, 50, 800, 5],
   ASSAULT_ADVANCE: ["돌격 진형: 대열이 앞으로 나가는 거리(px)", G.ai, 0, 800, 10],

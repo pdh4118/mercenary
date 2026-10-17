@@ -51,6 +51,8 @@ import {
   PLAYER_RADIUS,
   TICK_RATE,
   spearHalfWidth,
+  boxWidthMult,
+  usesBox,
   unitCost,
   decodeOffer,
   TIER_BUY_MULT,
@@ -1251,18 +1253,18 @@ async function main() {
 
   /** 공격 예고(부채꼴 또는 직선). 진행될수록 진해지고, 끝나는 순간 판정이 일어난다. */
   /** 창 찌르기 범위(앞으로 뻗은 직사각형. 폭 상수가 다르면 사다리꼴) */
-  const drawSpearBox = (x: number, y: number, ang: number, reach: number, widthMult: number, color: number, alpha: number) => {
+  const drawSpearBox = (x: number, y: number, ang: number, reach: number, widthMult: number, color: number, alpha: number, cav = false) => {
     const c = Math.cos(ang);
     const s = Math.sin(ang);
-    const nearW = spearHalfWidth(0, reach, widthMult);
-    const farW = spearHalfWidth(reach, reach, widthMult);
+    const nearW = cav ? TUNE.CAV_HALF_WIDTH * widthMult : spearHalfWidth(0, reach, widthMult);
+    const farW = cav ? nearW : spearHalfWidth(reach, reach, widthMult);
     fxLayer
       .poly([x - s * nearW, y + c * nearW, x + c * reach - s * farW, y + s * reach + c * farW, x + c * reach + s * farW, y + s * reach - c * farW, x + s * nearW, y - c * nearW])
       .fill({ color, alpha });
   };
-  const drawTelegraph = (x: number, y: number, ang: number, reach: number, arc: number, ranged: boolean, prog: number, color: number, spear = false) => {
-    if (spear) {
-      drawSpearBox(x, y, ang, reach, arc / MERC_STATS[SPEAR_TYPE]!.arc, color, 0.1 + 0.35 * prog);
+  const drawTelegraph = (x: number, y: number, ang: number, reach: number, arc: number, ranged: boolean, prog: number, color: number, boxType = -1) => {
+    if (boxType >= 0) {
+      drawSpearBox(x, y, ang, reach, boxWidthMult(boxType, arc), color, 0.1 + 0.35 * prog, boxType === 0);
       return;
     }
     if (ranged) {
@@ -1669,7 +1671,7 @@ async function main() {
       if (w[5] === undefined || w[6] <= 0) continue;
       const v = mercs.views.get(w[0]);
       const st = MERC_STATS[w[4]]!;
-      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], ownerColor(w[5]), w[4] === SPEAR_TYPE); // 마법사의 예고는 낙하 지점 표시가 대신한다
+      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[7], st.reach, st.arc, st.ranged, w[6], ownerColor(w[5]), usesBox(w[4]) ? w[4] : -1); // 마법사의 예고는 낙하 지점 표시가 대신한다
     }
 
     // 방패(검방병): 정면을 막는 호. 깨지면 회색으로 비고, 재생되면 다시 파랗게 돌아온다.
