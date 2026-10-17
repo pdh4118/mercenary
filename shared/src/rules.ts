@@ -66,9 +66,9 @@ export const TUNE = {
   ARCHER_KITE_MARGIN: 55,
   DEFEND_LEASH_MULT: 1.8, // 주인공 호위(기본)에서 용병이 진형 자리를 벗어나 적을 쫓을 수 있는 거리 배율(기병 제외)
   HERO_SHIELD_MAX: 240, // 주인공이 검을 들었을 때 방패 체력(정면 공격을 먼저 받아 낸다)
-  HERO_SHIELD_REGEN_DELAY: 3, // 맞지 않고 이만큼(초) 지나면 방패가 차오르기 시작한다
+  HERO_SHIELD_REGEN_DELAY: 5, // 맞지 않고 이만큼(초) 지나면 방패가 차오르기 시작한다
   HERO_SHIELD_BROKEN_DELAY: 6, // 방패가 깨졌을 때는 이만큼(초) 뒤부터 차오른다
-  HERO_SHIELD_REGEN_PCT: 0.06, // 차오르는 속도(초당 최대치 비율)
+  HERO_SHIELD_REGEN_PCT: 0.03, // 차오르는 속도(초당 최대치 비율)
   HIGH_GROUND_ARROW_MULT: 1.4, // 고지대에서 낮은 곳을 쏜 화살의 피해 배율
   LOW_GROUND_ARROW_MULT: 0.8, // 낮은 곳에서 고지대를 쏜 화살의 피해 배율
   PLATEAU_TOP_SPEED: 0.85, // 고지대 윗면에서의 이동 속도 배율
