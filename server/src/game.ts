@@ -5,6 +5,7 @@ import {
   EVT_METEOR,
   EVT_REFLECT,
   EVT_COUNTER,
+  EVT_DMG_POISON,
   type MeteorWire,
   CARDS,
   ENEMY_XP,
@@ -3397,7 +3398,7 @@ export class Game {
     if (owner) owner.stats.dealt += dealt;
     if (e.poisonSrc) this.gainMercXp(e.poisonSrc, dealt * MERC_XP_PER_DAMAGE);
     if (e.poisonAcc >= 1 || (e.poisonT <= 0 && e.poisonAcc > 0.05)) {
-      this.pushDamage(EVT_DMG_ENEMY, e.id, e.x, e.y, e.poisonAcc, e.poisonOwner ?? 0);
+      this.pushDamage(EVT_DMG_POISON, e.id, e.x, e.y, e.poisonAcc, e.poisonOwner ?? 0);
       e.poisonAcc = 0;
     }
     if (e.hp <= 0) {

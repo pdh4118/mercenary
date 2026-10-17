@@ -157,6 +157,7 @@ export const EVT_DODGE = 6; // 회피
 export const EVT_BACKSTAB = 7; // 배후 공격
 export const EVT_KNOCK = 12; // 넉백으로 밀려남(소리용)
 export const EVT_REFLECT = 14; // 가시 갑옷이 피해를 되돌려줌(val = 반사된 피해, owner = 관련된 플레이어)
+export const EVT_DMG_POISON = 16; // 독이 적에게 준 피해(보라색 숫자)
 export const EVT_COUNTER = 15; // 달려오던 기병이 창에 먼저 맞아 속도를 잃고 카운터를 입음(val = 카운터 피해)
 export const EVT_METEOR = 13; // 운석이 떨어져 폭발함(val = 반경)
 // 피해 숫자: val은 피해량, owner는 때린 쪽(적에게 준 피해) 또는 맞은 쪽(받은 피해) 플레이어. 같은 대상에게 한 틱에 들어간 피해는 합쳐서 보낸다.
