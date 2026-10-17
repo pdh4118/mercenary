@@ -18,6 +18,7 @@ export interface TerrainSprite {
   readonly h: number;
   readonly circles: readonly (readonly number[])[]; // [x, y, 반지름] 스프라이트 픽셀(왼쪽 위 원점)
   readonly tops: readonly (readonly number[])[]; // 고지대 윗면 타원 [cx, cy, rx, ry]
+  readonly ramp?: readonly (readonly number[])[]; // 올라가는 길(꺾은선, 스프라이트 픽셀). 이 길 위에서는 비탈이 덜 느리다
 }
 
 export const SPRITE_BY_ID = new Map<number, TerrainSprite>((TERRAIN_SPRITES as unknown as TerrainSprite[]).map((s) => [s.i, s]));
@@ -38,6 +39,13 @@ interface Ell {
   rx: number;
   ry: number;
 }
+const segDist = (x: number, y: number, a: readonly number[], b: readonly number[]): number => {
+  const dx = b[0]! - a[0]!;
+  const dy = b[1]! - a[1]!;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - a[0]!) * dx + (y - a[1]!) * dy) / l2)) : 0;
+  return Math.hypot(x - (a[0]! + dx * t), y - (a[1]! + dy * t));
+};
 const inEll = (e: Ell, x: number, y: number): boolean => ((x - e.x) / e.rx) ** 2 + ((y - e.y) / e.ry) ** 2 <= 1;
 
 interface Solid {
@@ -50,6 +58,8 @@ interface Solid {
 interface Plateau {
   tops: Ell[];
   slope: Ell;
+  ramp: [number, number][]; // 올라가는 길 꺾은선(월드)
+  rampHalf: number;
   obj: number;
 }
 
@@ -88,7 +98,8 @@ export class TerrainMap {
           return { x: wx, y: wy, rx: t[2]! * sc, ry: t[3]! * sc };
         });
         const [sx, sy] = world(s.w / 2, s.h * 0.58);
-        this.plateaus.push({ tops, slope: { x: sx, y: sy, rx: s.w * 0.5 * sc, ry: s.h * 0.4 * sc }, obj: n });
+        const ramp = (s.ramp ?? []).map((p) => world(p[0]!, p[1]!));
+        this.plateaus.push({ tops, slope: { x: sx, y: sy, rx: s.w * 0.5 * sc, ry: s.h * 0.4 * sc }, ramp, rampHalf: Math.max(28, s.w * 0.045 * sc), obj: n });
         extent = Math.max(extent, s.w * 0.5 * sc);
       }
       this.inArena.push(arenaRadius > 0 && Math.hypot(x, y) < arenaRadius + extent);
@@ -178,13 +189,27 @@ export class TerrainMap {
     return false;
   }
 
-  /** 지형이 이동 속도에 주는 배율: 고지대 윗면은 조금, 그 비탈(올라가는 길)은 많이 느리다 */
+  private onRampOf(p: Plateau, x: number, y: number): boolean {
+    for (let i = 0; i + 1 < p.ramp.length; i++) if (segDist(x, y, p.ramp[i]!, p.ramp[i + 1]!) <= p.rampHalf) return true;
+    return false;
+  }
+
+  /** 올라가는 길(계단·다리) 위에 서 있는가 */
+  onRamp(x: number, y: number): boolean {
+    for (const p of this.plateaus) {
+      if (!this.live(p.obj) || p.ramp.length < 2 || !inEll(p.slope, x, y)) continue;
+      for (let i = 0; i + 1 < p.ramp.length; i++) if (segDist(x, y, p.ramp[i]!, p.ramp[i + 1]!) <= p.rampHalf) return true;
+    }
+    return false;
+  }
+
+  /** 지형이 이동 속도에 주는 배율: 고지대 윗면은 조금, 비탈은 많이, 올라가는 길은 비탈보다 덜 느리다 */
   speedMult(x: number, y: number): number {
     let m = 1;
     for (const p of this.plateaus) {
       if (!this.live(p.obj)) continue;
       if (p.tops.some((t) => inEll(t, x, y))) m = Math.min(m, TUNE.PLATEAU_TOP_SPEED);
-      else if (inEll(p.slope, x, y)) m = Math.min(m, TUNE.SLOPE_SPEED);
+      else if (inEll(p.slope, x, y)) m = Math.min(m, p.ramp.length >= 2 && this.onRampOf(p, x, y) ? TUNE.RAMP_SPEED : TUNE.SLOPE_SPEED);
     }
     return m;
   }
@@ -208,11 +233,18 @@ const SCALE: Record<number, [number, number]> = {
   [TK_ROCK]: [1.0, 1.5],
   [TK_TREE]: [0.9, 1.25],
   [TK_RUIN]: [1.1, 1.5],
-  [TK_PLATEAU]: [3.0, 3.8],
+  [TK_PLATEAU]: [1.0, 1.0], // 고지대는 목표 너비로 따로 정한다(plateauScale)
   [TK_DECOR]: [0.9, 1.4],
 };
 
 /** 스프라이트의 월드 기준 대략적인 점유 반지름(겹침 방지용) */
+/** 고지대의 배율: 스프라이트 크기와 상관없이 월드에서 큼직하게(큰 것 650~950px, 작은 것 520~760px) */
+function plateauScale(s: TerrainSprite, rng: () => number): number {
+  const big = s.w >= 280;
+  const target = big ? 650 + rng() * 300 : 520 + rng() * 240;
+  return target / s.w;
+}
+
 function footprint(s: TerrainSprite, sc: number): number {
   if (s.kind === TK_PLATEAU) return s.w * 0.5 * sc;
   if (s.kind === TK_TREE) return s.w * 0.28 * sc;
@@ -247,7 +279,7 @@ export function generateTerrain(rng: () => number, half: number, avoid: readonly
       const id = pick(ids);
       const s = SPRITE_BY_ID.get(id)!;
       const [lo, hi] = SCALE[s.kind]!;
-      const sc = lo + rng() * (hi - lo);
+      const sc = s.kind === TK_PLATEAU ? plateauScale(s, rng) : lo + rng() * (hi - lo);
       const x = (rng() * 2 - 1) * lim;
       const y = (rng() * 2 - 1) * lim;
       if (!free(x, y, footprint(s, sc), gap, s.kind !== TK_DECOR)) continue;
@@ -258,7 +290,7 @@ export function generateTerrain(rng: () => number, half: number, avoid: readonly
   };
 
   // 1) 고지대(크게)
-  const nPlateau = 6 + Math.floor(rng() * 3);
+  const nPlateau = 5 + Math.floor(rng() * 3);
   for (let n = 0; n < nPlateau; n++) place(PLATEAUS, 40, 160);
   // 2) 방벽: 폐허·바위 3~5개를 한 줄로 세우되 사이에 좁은 통로를 남긴다
   const nWalls = 7 + Math.floor(rng() * 4);

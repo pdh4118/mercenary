@@ -1852,6 +1852,7 @@ async function main() {
       if (meState.luck > 0) extra.push(`행운 +${Math.round(meState.luck * 100)}%`);
       if (terrain) {
         if (terrain.elevated(meState.x, meState.y)) extra.push(`고지대: 화살 피해 +${Math.round((TUNE.HIGH_GROUND_ARROW_MULT - 1) * 100)}%`);
+        else if (terrain.onRamp(meState.x, meState.y)) extra.push("올라가는 길: 비탈보다 덜 느립니다");
         else if (terrain.speedMult(meState.x, meState.y) < 1) extra.push("비탈: 이동 속도가 크게 느려집니다");
       }
       if (down > 0) extra.push(`용병 ${down}명 쓰러짐 (부활 대기)`);

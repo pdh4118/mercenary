@@ -11,9 +11,11 @@ const seeded = (seed: number) => {
   return () => (r = (r * 16807) % 2147483647) / 2147483647;
 };
 const ROCK = 0; // 큰 바위(발밑 원 3개)
-const PLATEAU = 30;
+const PLATEAU = 61; // 길이 없는 고지대(418x413)
+const RAMP_PLATEAU = 40; // 올라가는 길이 있는 고지대
 const rockAt = (x: number, y: number): TerrainWire => [ROCK, x, y, 1, 0];
-const plateauAt = (x: number, y: number): TerrainWire => [PLATEAU, x, y, 3, 0];
+const plateauAt = (x: number, y: number): TerrainWire => [PLATEAU, x, y, 1.6, 0];
+const slopePoint = (m: TerrainMap): [number, number] => [m.plateaus[0]!.slope.x, m.plateaus[0]!.slope.y + m.plateaus[0]!.slope.ry * 0.7];
 
 test("지형 생성: 판마다 다르고, 시작 지점은 비어 있으며, 고지대·바위·나무가 섞인다", () => {
   const a = generateTerrain(seeded(1), WORLD_SIZE / 2, [[0, 0, 420]]);
@@ -56,11 +58,17 @@ test("고지대: 올라가는 길은 크게, 윗면은 조금 느리고 고지�
   assert.equal(map.speedMult(0, 0), TUNE.PLATEAU_TOP_SPEED);
   assert.equal(map.elevated(1500, 0), false);
   assert.equal(map.speedMult(1500, 0), 1);
-  // 윗면 바로 아래 절벽 쪽은 비탈
-  const s = SPRITE_BY_ID.get(PLATEAU)!;
-  const slopeY = s.h * 0.62 * 3 - s.tops[0]![1]! * 3;
-  assert.equal(map.elevated(0, slopeY), false);
-  assert.equal(map.speedMult(0, slopeY), TUNE.SLOPE_SPEED);
+  // 윗면 아래 절벽 쪽은 비탈
+  const [sx, sy] = slopePoint(map);
+  assert.equal(map.elevated(sx, sy), false);
+  assert.equal(map.speedMult(sx, sy), TUNE.SLOPE_SPEED);
+  assert.equal(map.onRamp(sx, sy), false);
+  // 올라가는 길이 있는 고지대: 길 위는 비탈보다 덜 느리다
+  const r = new TerrainMap([[RAMP_PLATEAU, 0, 0, 1.6, 0]]);
+  const [rx, ry] = r.plateaus[0]!.ramp[1]!;
+  assert.equal(r.onRamp(rx, ry), true);
+  assert.equal(r.speedMult(rx, ry), r.elevated(rx, ry) ? TUNE.PLATEAU_TOP_SPEED : TUNE.RAMP_SPEED);
+  assert.ok(TUNE.RAMP_SPEED > TUNE.SLOPE_SPEED);
 });
 
 test("비탈에서는 이동한 거리가 줄어든다", () => {
@@ -70,9 +78,9 @@ test("비탈에서는 이동한 거리가 줄어든다", () => {
     g.setTerrain(terrain);
     const a = g.addPlayer("a")!;
     const p = g.getPlayer(a)!;
-    const s = SPRITE_BY_ID.get(PLATEAU)!;
-    p.x = -100;
-    p.y = s.h * 0.62 * 3 - s.tops[0]![1]! * 3; // 비탈 위
+    const [sx, sy] = terrain ? slopePoint(new TerrainMap(terrain)) : [-100, 0];
+    p.x = sx - 60;
+    p.y = sy; // 비탈 위
     const x0 = p.x;
     g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false });
     run(g, 1);

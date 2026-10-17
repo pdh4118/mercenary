@@ -93,6 +93,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   HIGH_GROUND_ARROW_MULT: ["고지대에서 쏜 화살 피해 배율", G.terrain, 1, 3, 0.05],
   LOW_GROUND_ARROW_MULT: ["낮은 곳에서 고지대를 쏜 화살 피해 배율", G.terrain, 0.2, 1, 0.05],
   PLATEAU_TOP_SPEED: ["고지대 윗면 이동 속도 배율", G.terrain, 0.2, 1.2, 0.05],
+  RAMP_SPEED: ["고지대 올라가는 길(계단·다리) 이동 속도 배율", G.terrain, 0.1, 1.2, 0.05],
   SLOPE_SPEED: ["고지대 비탈(오르는 길) 이동 속도 배율", G.terrain, 0.1, 1.2, 0.05],
   MERC_SPACING: ["용병끼리 유지하는 거리 배율(반지름 합 x 이 값)", G.ai, 1, 4, 0.1],
   MERC_SEPARATION_SPEED: ["겹친 용병이 밀려나는 속도(px/초)", G.ai, 0, 600, 10],
