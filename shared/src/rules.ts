@@ -16,6 +16,9 @@ export const TUNE = {
   STAGE_GROW_SEC: 120, // 스테이지당 자유 성장 시간(2분)
   STAGE_BREAK_SEC: 10, // 클리어 뒤 쉬는 시간(회복·부활·보상)
   STAGE_ENEMY_HP_GROWTH: 0.3, // 스테이지가 오를 때마다 적 체력 +30%
+  VENOM_CHANCE_PER_STAGE: 0.08, // 스테이지마다 늘어나는 독 궁병 비율(2스테이지부터)
+  VENOM_CHANCE_MAX: 0.4, // 독 궁병 비율 상한
+  VENOM_POISON: 0.8, // 독 화살의 독 피해(화살 피해 대비, 4초에 걸쳐)
   STAGE_ENEMY_DMG_GROWTH: 0.14, // 적 피해 +14%
   STAGE_SPAWN_GROWTH: 0.18, // 일반 적 생성량 +18%
   ENEMY_TIME_HP_GROWTH: 0.12, // 스테이지 시작 후 60초마다 적 체력 +12%

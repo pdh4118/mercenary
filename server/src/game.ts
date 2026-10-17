@@ -356,6 +356,7 @@ interface Enemy extends Fighter {
   poisonOwner?: number;
   poisonSrc?: Merc;
   poisonAcc?: number; // 아직 숫자로 띄우지 않은 독 피해
+  venom?: boolean; // 독 화살을 쏘는 궁병(맞은 아군이 중독된다)
   stunT?: number; // 경직(움직이지도 공격하지도 못하는) 남은 시간
   maxHp: number;
   shieldMax: number;
@@ -916,8 +917,7 @@ export class Game {
       this.stepSquads(dt);
     }
     const friendlies = this.collectFriendlies();
-    if (duel) this.tickDuelPoison(dt, friendlies);
-    else if (this.duelPoison.size > 0) this.duelPoison.clear();
+    this.tickDuelPoison(dt, friendlies); // 토너먼트 독 화살과 독 궁병의 화살 모두 아군에게 독을 건다
     this.stepMercs(dt);
     this.separateMercs(dt);
     if (!duel) {
@@ -1069,6 +1069,11 @@ export class Game {
       boss: false, army: false, squad: 0, slotF: 0, slotL: 0,
       ...extra,
     };
+    // 스테이지가 오르면 일부 궁병이 독 화살을 쏜다(보스·장군 제외)
+    if (type === ARCHER && !e.boss && e.venom === undefined) {
+      const chance = Math.min(TUNE.VENOM_CHANCE_MAX, TUNE.VENOM_CHANCE_PER_STAGE * (this.stage - 1));
+      e.venom = chance > 0 && this.rng() < chance;
+    }
     this.enemies.set(id, e);
     return e;
   }
@@ -4038,6 +4043,7 @@ export class Game {
         radius: 4,
         pierce: 0,
         crit: false,
+        poison: e.venom ? TUNE.VENOM_POISON : undefined,
         hitIds: new Set(),
       });
       return;
@@ -4257,7 +4263,7 @@ export class Game {
         if (b.hostile) {
           for (const f of friendlies) {
             if (Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
-            f.hit({ damage: b.damage * this.arrowTerrainMult(b, f.x, f.y), charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx) }); // 날아온 쪽이 정면인지 본다
+            f.hit({ damage: b.damage * this.arrowTerrainMult(b, f.x, f.y), charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), poison: b.poison ? b.damage * b.poison : 0 }); // 날아온 쪽이 정면인지 본다. 독 궁병의 화살은 독을 건다
             this.pushEvent(EVT_ENEMY_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             hit = true;
             break;

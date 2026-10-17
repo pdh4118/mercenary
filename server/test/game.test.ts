@@ -1354,3 +1354,28 @@ test("겹침 방지: 주인공 위에 포개진 적은 비켜 나가지만, 달�
   for (let i = 0; i < 10; i++) sep(0.05);
   assert.ok(Math.abs(g.getEnemy(cav)!.x - cx) > 1, "속도가 없으면 기병도 밀려난다");
 });
+
+test("독 궁병: 화살에 맞은 아군이 중독 상태가 된다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const m = g.addMerc(a, BLUNT, p.x + 60, p.y); // 방패가 화살을 막으면 독도 묻지 않으므로 방패 없는 병종으로
+  const e = g.spawnEnemyAt(p.x + 60 + 200, p.y, ARCHER);
+  (g.getEnemy(e) as { venom?: boolean }).venom = true;
+  let poisoned = false;
+  for (let i = 0; i < 6 * TICK_RATE && !poisoned; i++) {
+    g.step();
+    poisoned = g.snapshotMercs().find((w) => w[0] === m)![18] === 1 || g.snapshotPlayers().find((q) => q.id === a)!.poisoned === true;
+  }
+  assert.ok(poisoned, "독 화살에 맞으면 중독 표시가 켜진다");
+});
+
+test("독 궁병은 1스테이지에는 나오지 않고 스테이지가 오르면 일부가 된다", () => {
+  const g = quiet();
+  const v1 = g.spawnEnemyAt(0, 0, ARCHER);
+  assert.ok(!g.getEnemy(v1)!.venom);
+  (g as unknown as { stage: number }).stage = 10;
+  let n = 0;
+  for (let i = 0; i < 200; i++) if ((g.getEnemy(g.spawnEnemyAt(0, 0, ARCHER)) as { venom?: boolean }).venom) n++;
+  assert.ok(n > 40 && n < 120, `상한 40% 근처: ${n}/200`);
+});

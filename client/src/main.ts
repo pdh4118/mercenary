@@ -283,6 +283,13 @@ async function main() {
     top: number;
     high: boolean;
   }
+  /** 로딩 화면: 처음 그림을 불러오는 동안과 판이 시작될 때 지형이 준비될 때까지 */
+  const loadingEl = document.getElementById("loading")!;
+  const loadingMsgEl = document.getElementById("loadingMsg")!;
+  const setLoading = (text: string | null) => {
+    if (text !== null) loadingMsgEl.textContent = text;
+    loadingEl.classList.toggle("open", text !== null);
+  };
   let terrain: TerrainMap | null = null;
   let tviews: TView[] = [];
   let terrainSeq = 0;
@@ -1055,7 +1062,13 @@ async function main() {
         return;
       }
       if (msg.t === "terrain") {
-        void setTerrain(msg.items);
+        // 지형 그림이 다 올라올 때까지 로딩 화면을 덮는다
+        setLoading("지형을 불러오는 중...");
+        const p = setTerrain(msg.items);
+        const mine = terrainSeq;
+        void p.finally(() => {
+          if (mine === terrainSeq) requestAnimationFrame(() => requestAnimationFrame(() => setLoading(null))); // 두 프레임 그려진 뒤에 걷는다
+        });
         return;
       }
       if (msg.t === "left" && msg.reason.includes("아무 조작이 없어")) idleKicked = true;
@@ -1125,6 +1138,7 @@ async function main() {
     if (ws && ws.readyState === WebSocket.OPEN) send({ t: "active" });
   };
   for (const ev of ["keydown", "mousedown", "mousemove", "touchstart", "wheel"]) window.addEventListener(ev, reportActive, { passive: true });
+  setLoading(null); // 처음 그림을 모두 불러왔다
   connect();
 
   // 입력: WASD/방향키 이동, 마우스 조준, 마우스 버튼(또는 스페이스) 누르고 있으면 발사, 캠프 근처에서 1~3 키로 고용
