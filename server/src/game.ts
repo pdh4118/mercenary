@@ -208,7 +208,11 @@ const fanOffset = (i: number, n: number): number => {
 
 const POISON_PULSE_SEC = 0.5;
 /** 이보다 작은 돌격 피해는 카운터로 치지 않는다(막 출발한 기병) */
+/** 근접 피해 반사 비율 상한(공격 피해의 이 비율까지) */
+const THORNS_MAX_FRAC = 1;
 const COUNTER_MIN = 1;
+/** 카운터로 밀려나는 거리(px): 돌격 피해가 클수록 멀리 튕긴다 */
+const counterKnock = (amount: number): number => 50 + amount * 2;
 /** 속도가 이만큼(0..1)은 붙어 있어야 카운터가 일어난다(멈춰 있는 기병은 해당 없음) */
 const COUNTER_MOMENTUM = 0.1;
 const DOT_RESULT = (damage: number): HitResult => ({ body: damage, shield: 0, reflected: 0, shieldBroke: false, backstab: false });
@@ -220,7 +224,7 @@ type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn", "xp", "cast"];
 const newMercMods = (): MercMods => ({
   hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1, cast: 1,
-  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, xp: 1,
+  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, thorns: 0, xp: 1,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
 const mstat = (mods: Mods, type: number, stat: MercStat): number =>
@@ -247,6 +251,7 @@ interface Mods {
   heroCritMult: number;
   heroArea: number;
   heroKnock: number;
+  heroThorns: number; // 근접 피해 반사 비율
   heroFireRate: number;
   heroRegen: number;
   heroLifesteal: number;
@@ -275,6 +280,7 @@ const newMods = (): Mods => ({
   heroCritMult: TUNE.CRIT_BASE_MULT,
   heroArea: 1,
   heroKnock: 0,
+  heroThorns: 0,
   heroFireRate: 1,
   heroRegen: 0,
   heroLifesteal: 0,
@@ -2256,6 +2262,10 @@ export class Game {
             if (amount >= COUNTER_MIN && s.mom >= COUNTER_MOMENTUM) {
               s.mom = 0;
               this.hurtHeroReflect(s, amount);
+              const d = Math.min(TUNE.KNOCK_MAX, counterKnock(amount));
+              p.x = clampToWorld(p.x - Math.cos(h.fromAngle) * d, PLAYER_RADIUS);
+              p.y = clampToWorld(p.y - Math.sin(h.fromAngle) * d, PLAYER_RADIUS);
+              this.pushEvent(EVT_KNOCK, p.x, p.y, h.fromAngle + Math.PI);
             }
           }
           if (w.type === SHIELD && r.shield > 0) {
@@ -2273,7 +2283,7 @@ export class Game {
           p.hp -= taken;
           s.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
-          this.thorns(s, h, taken);
+          this.thorns(s, h);
           if (p.hp <= 0) {
             p.hp = 0;
             p.down = true;
@@ -2307,6 +2317,7 @@ export class Game {
               m.chargeSnap = 0;
               this.pushDamage(EVT_COUNTER, m.id, m.x, m.y, amount, m.owner);
               this.hurtMerc(m, amount);
+              this.knockMerc(m, h.fromAngle, counterKnock(amount));
             }
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
@@ -2314,7 +2325,7 @@ export class Game {
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
           this.pushDamage(EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner);
-          this.thorns(this.slots.get(m.owner), h, taken, m);
+          this.thorns(this.slots.get(m.owner), h, m);
           return r.reflected;
         },
       });
@@ -3142,6 +3153,7 @@ export class Game {
         e.chargeSnap = 0;
         e.hp -= amount;
         this.pushDamage(EVT_COUNTER, e.id, e.x, e.y, amount, ownerId);
+        this.knockBack(e, hit.fromAngle, counterKnock(amount)); // 부딪히기 전에 창에 막혀 뒤로 튕겨 난다
       }
     }
     const dealt = Math.min(r.body, Math.max(0, e.hp));
@@ -3412,6 +3424,16 @@ export class Game {
     this.pushEvent(EVT_KNOCK, e.x, e.y, fromAngle + Math.PI);
   }
 
+  /** 용병이 밀려난다(창병 카운터). 하던 공격은 끊기고 잠깐 움직일 수 없다. */
+  private knockMerc(m: Merc, fromAngle: number, amount: number): void {
+    const dist = Math.min(TUNE.KNOCK_MAX, amount);
+    m.x = clampToWorld(m.x - Math.cos(fromAngle) * dist, 14);
+    m.y = clampToWorld(m.y - Math.sin(fromAngle) * dist, 14);
+    m.atkT = 0;
+    m.cd = Math.max(m.cd, KNOCK_STUN_SEC);
+    this.pushEvent(EVT_KNOCK, m.x, m.y, fromAngle + Math.PI);
+  }
+
   /** 피의 갈증: 때린 쪽(용병 또는 주인공)이 체력을 회복한다 */
   private lifesteal(owner: Slot, src: Merc | undefined, amount: number): void {
     if (src) {
@@ -3429,11 +3451,13 @@ export class Game {
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
   }
 
-  /** 가시 갑옷: 받은 피해의 일부를 공격자에게 돌려준다 */
-  private thorns(owner: Slot | undefined, h: Hit, taken: number, src?: Merc): void {
-    if (!owner || !hasLegend(owner.mods, "thorns", src ? src.type : "hero") || taken <= 0 || !h.src) return;
+  /** 근접 피해 반사(카드): 근접 공격을 받으면 그 공격의 피해(방어·방패로 줄기 전)의 일부를 공격자에게 돌려준다. 화살·마법·독에는 없다. */
+  private thorns(owner: Slot | undefined, h: Hit, src?: Merc): void {
+    if (!owner || h.dot || h.pierceGuard || !h.src) return;
+    const frac = Math.min(THORNS_MAX_FRAC, src ? mstat(owner.mods, src.type, "thorns") : owner.mods.heroThorns);
+    if (frac <= 0) return;
     const attacker = h.src as Enemy;
-    if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, taken * LEGEND_CONST.thornsFrac, owner.state.id, src);
+    if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, h.damage * frac, owner.state.id, src);
   }
 
   private killEnemy(e: Enemy, ownerId: number, src?: Merc): void {
@@ -3584,6 +3608,7 @@ export class Game {
       case "heroSpeed": m.heroSpeed += e.v; break;
       case "heroDmg": m.heroDmg += e.v; break;
       case "heroKnock": m.heroKnock += e.v; break;
+      case "heroThorns": m.heroThorns += e.v; break;
       case "heroDefense": m.heroDefense += e.v; break;
       case "heroDodge": m.heroDodge += e.v; break;
       case "heroRange": m.heroRange += e.v; break;

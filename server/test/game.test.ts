@@ -1307,7 +1307,9 @@ test("창병 카운터: 달려오는 적 기병이 창에 맞으면 속도를 �
   enemy.momentum = 1;
   const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed * TUNE.ENEMY_SPEED_MULT, 1);
   const hp0 = enemy.hp;
+  const x0 = (enemy as unknown as { x: number }).x;
   (g as unknown as Priv).damageEnemy(enemy, spearHit, a, g.getMerc(sm));
+  assert.ok(Math.abs((enemy as unknown as { x: number }).x - x0) > 40, "카운터로 뒤로 밀려난다");
   assert.equal(enemy.momentum, 0, "속도를 잃는다");
   assert.equal(enemy.chargeSnap, 0);
   assert.ok(hp0 - enemy.hp >= 10 + bonus - 1e-6, `창 피해 + 카운터: ${hp0 - enemy.hp}`);
@@ -1328,7 +1330,9 @@ test("창병 카운터: 아군 기병 용병도 적 창병에게 먼저 맞으�
   m.momentum = 1;
   const f = (g as unknown as Priv).collectFriendlies().find((x) => x.merc?.id === c)!;
   const hp0 = m.hp;
+  const x0 = g.getMerc(c)!.x;
   f.hit(spearHit);
+  assert.ok(Math.abs(g.getMerc(c)!.x - x0) > 40, "카운터로 뒤로 밀려난다");
   assert.equal(m.momentum, 0);
   assert.ok(hp0 - m.hp >= 10 + chargeBonus(MERC_STATS[CAVALRY]!.speed, 1) - 1e-6);
 });

@@ -245,12 +245,12 @@ test("전설 카드: 드물고 한 번만 나오며 다섯 이상의 레벨에�
   p.level = 8;
   g.giveXp(a, 1);
   p.pending = 1;
-  p.offer = [legendIdx("thorns"), 0, 1];
+  p.offer = [legendIdx("execute"), 0, 1];
   g.pick(a, 0);
-  assert.deepEqual(p.legends, ["thorns@hero"]);
+  assert.deepEqual(p.legends, ["execute@hero"]);
   for (let n = 0; n < 60; n++) {
     g.giveXp(a, xpNeeded(p.level));
-    assert.ok(!p.offer.includes(legendIdx("thorns")), "이미 고른 전설은 다시 나오지 않는다");
+    assert.ok(!p.offer.includes(legendIdx("execute")), "이미 고른 전설은 다시 나오지 않는다");
     g.pick(a, 0);
   }
 });
@@ -276,17 +276,18 @@ test("전설 효과: 처형은 체력이 낮은 적에게 피해가 2배", () =>
   assert.ok(Math.abs(dmg(true) - dmg(false) * LEGEND_CONST.executeMult) < 1e-6);
 });
 
-test("전설 효과: 가시 갑옷은 받은 피해의 일부를 공격자에게 되돌린다", () => {
-  const g = quiet();
-  const a = g.addPlayer("a")!;
-  g.applyCardForTest(a, { k: "legend", id: "thorns", scope: "hero" });
-  const p = g.getPlayer(a)!;
-  const e = g.spawnEnemyAt(p.x + 20, p.y, 4);
-  const hp0 = g.getEnemy(e)!.hp;
-  run(g, 2);
-  const taken = TUNE.PLAYER_MAX_HP - g.getPlayer(a)!.hp;
-  assert.ok(taken > 0);
-  assert.ok(Math.abs(hp0 - g.getEnemy(e)!.hp - taken * LEGEND_CONST.thornsFrac) < 1e-6 || g.getEnemy(e)!.hp < hp0);
+test("근접 피해 반사 카드: 근접 공격을 받으면 공격 피해의 일부가 공격자에게 돌아간다", () => {
+  const enemyHpAfter = (frac: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    if (frac > 0) g.applyCardForTest(a, { k: "heroThorns", v: frac });
+    const p = g.getPlayer(a)!;
+    const e = g.spawnEnemyAt(p.x + 20, p.y, 4);
+    run(g, 2);
+    assert.ok(TUNE.PLAYER_MAX_HP - g.getPlayer(a)!.hp > 0, "맞았다");
+    return g.getEnemy(e)!.hp;
+  };
+  assert.ok(enemyHpAfter(0.3) < enemyHpAfter(0), "반사 카드가 있으면 공격자가 더 아프다");
 });
 
 test("전설 효과: 피의 갈증은 준 피해만큼 체력을 회복한다", () => {
