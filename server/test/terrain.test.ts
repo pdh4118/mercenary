@@ -185,3 +185,48 @@ test("토너먼트 중에는 경기장에 걸친 지형이 사라진다", () => 
   assert.equal(map.hitsSolid(100, -20, 5), false, "경기장 안의 바위는 없는 셈");
   assert.equal(map.hitsSolid(1500, -20, 5), true, "바깥 바위는 그대로");
 });
+
+test("올라가는 길이 있는 고지대는 길 밖에서(특히 뒤쪽에서) 윗면으로 걸어 올라갈 수 없다", () => {
+  const ramps = [40, 41, 43, 44, 45, 47, 49, 50, 51, 52, 70, 71];
+  for (const id of ramps) {
+    const s = SPRITE_BY_ID.get(id)!;
+    const sc = s.w >= 280 ? 1.5 : 2.2;
+    const m = new TerrainMap([[id, 0, 0, sc, 0]]);
+    const p = m.plateaus[0]!;
+    const step = 12;
+    const R = 14;
+    const lim = Math.max(s.w, s.h) * sc;
+    const nearRamp = (x: number, y: number) => {
+      for (let i = 0; i + 1 < p.ramp.length; i++) {
+        const a = p.ramp[i]!;
+        const b = p.ramp[i + 1]!;
+        const dx = b[0]! - a[0]!;
+        const dy = b[1]! - a[1]!;
+        const l2 = dx * dx + dy * dy;
+        const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - a[0]!) * dx + (y - a[1]!) * dy) / l2)) : 0;
+        if (Math.hypot(x - a[0]! - dx * t, y - a[1]! - dy * t) < p.rampHalf + 40) return true;
+      }
+      return false;
+    };
+    const top = p.tops[0]!;
+    let start: [number, number] | null = null;
+    for (let y = Math.round((top.y - top.ry - s.h * sc) / step) * step; y < top.y && !start; y += step) if (!m.hitsSolid(top.x, y, R) && !nearRamp(top.x, y)) start = [Math.round(top.x / step) * step, y];
+    assert.ok(start, `${id}: 뒤쪽 시작점`);
+    const seen = new Set<string>([`${start![0]},${start![1]}`]);
+    const q: [number, number][] = [start!];
+    let leak = 0;
+    while (q.length) {
+      const [x, y] = q.pop()!;
+      if (m.elevated(x, y)) leak++;
+      for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        const k = `${nx},${ny}`;
+        if (Math.abs(nx) > lim || Math.abs(ny) > lim || seen.has(k) || m.hitsSolid(nx, ny, R) || nearRamp(nx, ny)) continue;
+        seen.add(k);
+        q.push([nx, ny]);
+      }
+    }
+    assert.equal(leak, 0, `${id}: 길 밖에서 윗면에 닿는 칸 ${leak}`);
+  }
+});
