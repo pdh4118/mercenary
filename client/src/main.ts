@@ -528,7 +528,7 @@ async function main() {
     lead.position.set(CAMP_W - 28 - 20, 38);
     node.addChild(bg, icon, key, name, sub, price, lead);
     campPanel.addChild(node);
-    return { bg, icon, name, sub, price, lead };
+    return { bg, icon, key, name, sub, price, lead };
   });
   const campDismiss = new Text({ text: "", style: { fill: 0xe6e9f0, fontSize: 16, lineHeight: 22 } });
   campPanel.addChild(campDismiss);
@@ -541,14 +541,24 @@ async function main() {
   const legendBg = new Graphics();
   legend.addChild(legendBg);
   let lx = 12;
+  // 병종 선택 키: 1 = 모든 병종, 2~7 = 병종마다 고정(캠프에서 고용 키이기도 하다). 선택한 것은 노랗게 표시한다.
+  const legendLabels: { label: Text; mask: number }[] = [];
+  {
+    const all = new Text({ text: "1 전체", style: { fill: 0xcfd3dc, fontSize: 12 } });
+    all.position.set(lx, 6);
+    legend.addChild(all);
+    legendLabels.push({ label: all, mask: (1 << UNIT_TYPES.length) - 1 });
+    lx += all.width + 14;
+  }
   for (const t of UNIT_TYPES) {
     const icon = new Sprite(allyTex[t]!);
     icon.anchor.set(0.5);
     icon.scale.set(22 / icon.texture.height);
     icon.position.set(lx + 14, 14);
-    const label = new Text({ text: UNIT_NAMES[t], style: { fill: 0xcfd3dc, fontSize: 12 } });
+    const label = new Text({ text: `${t + 2} ${UNIT_NAMES[t]}`, style: { fill: 0xcfd3dc, fontSize: 12 } });
     label.position.set(lx + 32, 6);
     legend.addChild(icon, label);
+    legendLabels.push({ label, mask: 1 << t });
     lx += 32 + label.width + 12;
   }
   const legendText = new Text({
@@ -558,7 +568,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 우클릭 기병 이동/공격 지시 · 캠프에서 1~3 고용 / Shift+1~6 해고 · F1 주인공 호위 · F2 위치 고수 · F3 돌격 · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 주인공 호위 · F2 위치 고수 · F3 돌격(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -841,6 +851,36 @@ async function main() {
   let levelToastLeft = 0;
   let lastLevel = 0;
   let nearCampId = -1;
+  let nearCampOffers: number[] = []; // 가까운 캠프가 파는 용병(병종·단계 코드)
+  // 병종 선택: 1 = 모든 병종, 2~7 = 기병·창병·궁병·검방병·둔기병·마법사. 우클릭 지시와 F1~F3 진형이 선택한 병종에 적용된다.
+  const ALL_MASK = (1 << UNIT_TYPES.length) - 1;
+  let selMask = ALL_MASK;
+  const typesField = () => (selMask === ALL_MASK ? undefined : selMask);
+  /** 선택한 병종들의 진형이 모두 같으면 그 값, 다르면 -1 */
+  const selectedStance = (p: PlayerState | undefined): number => {
+    const st = p?.stances;
+    if (!st) return p?.stance ?? 0;
+    let v = -2;
+    for (const t of UNIT_TYPES) {
+      if (!(selMask & (1 << t))) continue;
+      if (v === -2) v = st[t] ?? 0;
+      else if (v !== (st[t] ?? 0)) return -1;
+    }
+    return v === -2 ? 0 : v;
+  };
+  /** 지점 방어 지점들(같은 지점은 한 번만) */
+  const holdPoints = (p: PlayerState): [number, number][] => {
+    const out: [number, number][] = [];
+    const st = p.stances;
+    if (!st) return p.stance === 2 ? [[p.holdX, p.holdY]] : out;
+    for (const t of UNIT_TYPES) {
+      if (st[t] !== 2) continue;
+      const x = p.holds[t * 2]!;
+      const y = p.holds[t * 2 + 1]!;
+      if (!out.some((q) => q[0] === x && q[1] === y)) out.push([x, y]);
+    }
+    return out;
+  };
   // 자동 화면 검증용: 최신 서버 상태를 읽을 수 있게 노출한다
   Object.defineProperty(window, "__game", { get: () => ({ latest, myId }) });
 
@@ -1019,7 +1059,7 @@ async function main() {
   };
   // 용병 진형 모드: 기본 진형(주인공 주변을 지킨다) / 돌격 진형(대열이 앞으로 나가 더 멀리 쫓는다). V 키로 바꾼다.
   const stanceBtns = [document.getElementById("stance0")!, document.getElementById("stance1")!, document.getElementById("stance2")!];
-  const setStance = (v: number) => send({ t: "stance", v });
+  const setStance = (v: number) => send({ t: "stance", v, types: typesField() });
   // 지점 방어: 버튼을 누르면 지점 지정 모드(다음 클릭한 곳을 지킨다), T 키는 마우스 위치를 바로 지킨다
   let pickingHold = false;
   const endPickHold = () => {
@@ -1028,7 +1068,7 @@ async function main() {
   };
   const holdAtMouse = () => {
     const me = latest?.players.find((p) => p.id === myId);
-    if (me) send({ t: "hold", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2 });
+    if (me) send({ t: "hold", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2, types: typesField() });
   };
   stanceBtns.forEach(
     (b, i) =>
@@ -1059,7 +1099,7 @@ async function main() {
       const me = latest?.players.find((p) => p.id === myId);
       if (e.key === "F1") setStance(0);
       else if (e.key === "F2") {
-        if (me) send({ t: "hold", x: me.x, y: me.y });
+        if (me) send({ t: "hold", x: me.x, y: me.y, types: typesField() });
       } else if (e.key === "F3") setStance(1);
       return;
     }
@@ -1091,7 +1131,7 @@ async function main() {
       return;
     }
     if (k === "v" && !e.repeat) {
-      const cur = latest?.players.find((p) => p.id === myId)?.stance ?? 0;
+      const cur = selectedStance(latest?.players.find((p) => p.id === myId));
       setStance(cur === 0 ? 2 : cur === 2 ? 1 : 0); // 주인공 호위 → 위치 고수(마지막으로 정한 지점) → 돌격 → 주인공 호위
       return;
     }
@@ -1118,10 +1158,21 @@ async function main() {
       send({ t: "pick", index: idx });
     }
     if (k === "m" && !e.repeat) audio.toggleMute();
-    if (!e.repeat && nearCampId >= 0) {
-      if (!e.shiftKey && (k === "1" || k === "2" || k === "3")) send({ t: "buy", camp: nearCampId, slot: Number(k) - 1 });
-      const digit = /^Digit([1-6])$/.exec(e.code);
-      if (e.shiftKey && digit) send({ t: "dismiss", type: Number(digit[1]) - 1 });
+    // 숫자 키: 병종마다 고정 번호(2 기병·3 창병·4 궁병·5 검방병·6 둔기병·7 마법사). 캠프 곁에서는 그 병종을 고용하고, 아니면 그 병종을 선택한다. 1은 모든 병종.
+    const dig = /^Digit([1-7])$/.exec(e.code);
+    if (dig && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      const d = Number(dig[1]);
+      if (e.shiftKey) {
+        if (nearCampId >= 0 && d >= 2) send({ t: "dismiss", type: d - 2 });
+      } else {
+        const slot = nearCampId >= 0 && d >= 2 ? nearCampOffers.findIndex((code) => decodeOffer(code).type === d - 2) : -1;
+        if (slot >= 0) send({ t: "buy", camp: nearCampId, slot });
+        else {
+          selMask = d === 1 ? ALL_MASK : 1 << (d - 2);
+          toast.text = `선택: ${d === 1 ? "모든 병종" : UNIT_NAMES[d - 2]} (우클릭 지시 · F1~F3 진형)`;
+          toastLeft = 1.6;
+        }
+      }
     }
     keys.add(k);
     pushInput();
@@ -1133,10 +1184,10 @@ async function main() {
     mouseX = e.offsetX;
     mouseY = e.offsetY;
     if (e.button === 2) {
-      // 우클릭: 커서가 가리키는 월드 위치로 기병 돌격 지시
+      // 우클릭: 선택한 병종에게 이동(빈 땅) 또는 공격(적 근처, 넉넉하게) 지시
       const me = latest?.players.find((p) => p.id === myId);
-      if (me) audio.play("cavalry_charge");
-      if (me) send({ t: "charge", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2 });
+      if (me && (selMask & 1) !== 0) audio.play("cavalry_charge");
+      if (me) send({ t: "order", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2, types: typesField() });
       return;
     }
     if (pickingHold) {
@@ -1312,10 +1363,11 @@ async function main() {
     }
     // 지점 방어 깃발
     for (const hp of st.players) {
-      if (hp.stance !== 2) continue;
-      const hx = sx(hp.holdX);
-      const hy = sy(hp.holdY);
+      for (const [px, py] of holdPoints(hp)) {
+      const hx = sx(px);
+      const hy = sy(py);
       g.moveTo(hx, hy + 3).lineTo(hx, hy - 6).stroke({ width: 1.2, color: 0xffffff }).poly([hx, hy - 6, hx + 6, hy - 4, hx, hy - 2]).fill(miniColor(hp.id));
+      }
     }
     // 캠프와 상자
     for (const c of st.camps) g.rect(sx(c[1]) - 3, sy(c[2]) - 3, 6, 6).fill(0xe0c05d);
@@ -1658,20 +1710,29 @@ async function main() {
       if (v) streak(v.x, v.y, v.face, w[13]);
     }
 
+    // 병종 선택 표시: 범례를 노랗게, 일부만 선택했을 때는 그 병종 용병 발밑에 고리를 그린다
+    for (const it of legendLabels) it.label.style.fill = it.mask === selMask ? 0xffe08a : 0xcfd3dc;
+    if (selMask !== ALL_MASK) {
+      for (const w of latest.mercs) {
+        if (w[5] !== myId || w[8] > 0 || !(selMask & (1 << w[4]))) continue;
+        fxLayer.circle(w[1], w[2], 20).stroke({ width: 2, color: 0xffe08a, alpha: 0.75 });
+      }
+    }
     // 지점 방어: 지키는 지점에 깃발과 구역을 표시한다
     for (const hp of latest.players) {
-      if (hp.stance !== 2) continue;
+      for (const [hpx, hpy] of holdPoints(hp)) {
       const hc = ownerColor(hp.id);
       const own = hp.id === myId;
       fxLayer
-        .circle(hp.holdX, hp.holdY, 130)
+        .circle(hpx, hpy, 130)
         .fill({ color: hc, alpha: own ? 0.06 : 0.03 })
         .stroke({ width: own ? 2 : 1, color: hc, alpha: own ? 0.55 : 0.3 })
-        .moveTo(hp.holdX, hp.holdY + 8)
-        .lineTo(hp.holdX, hp.holdY - 36)
+        .moveTo(hpx, hpy + 8)
+        .lineTo(hpx, hpy - 36)
         .stroke({ width: 3, color: 0xe8e8e8, alpha: own ? 0.95 : 0.6 })
-        .poly([hp.holdX, hp.holdY - 36, hp.holdX + 24, hp.holdY - 28, hp.holdX, hp.holdY - 20])
+        .poly([hpx, hpy - 36, hpx + 24, hpy - 28, hpx, hpy - 20])
         .fill({ color: hc, alpha: own ? 0.95 : 0.6 });
+      }
     }
 
     // 마법사 운석: 낙하 지점 예고(진해지는 원과 줄어드는 고리), 마지막에 하늘에서 떨어지는 운석, 폭발과 그을음
@@ -1857,7 +1918,8 @@ async function main() {
       const mine = latest.mercs.filter((w) => w[5] === myId);
       const down = mine.filter((w) => w[8] > 0).length;
       const used = mine.reduce((sum, w) => sum + unitCost(w[4], w[15]), 0);
-      stanceBtns.forEach((b, i) => b.classList.toggle("active", (meState.stance ?? 0) === i));
+      const curSt = selectedStance(meState);
+      stanceBtns.forEach((b, i) => b.classList.toggle("active", curSt === i));
       updateStats(meState);
       hudLv.text = `Lv ${meState.level}`;
       hudTime.text = `${m}:${s}`;
@@ -1968,6 +2030,7 @@ async function main() {
       if (best && !meState.down) {
         if (snd.near < 0) audio.play("camp_open"); // 방금 범위에 들어왔다
         nearCampId = best[0];
+        nearCampOffers = [best[4], best[5], best[6]];
         const owned = mine.length;
         campHint.text = `보유 금화 ${meState.gold}G · 통솔력 ${used}/${meState.leadership}`;
         [best[4], best[5], best[6]].forEach((code, i) => {
@@ -1981,9 +2044,10 @@ async function main() {
           row.icon.texture = allyTex[t]!;
           row.icon.scale.set(44 / row.icon.texture.height);
           row.icon.alpha = ok ? 1 : 0.45;
+          row.key.text = String(t + 2); // 병종마다 고정 번호
           row.name.text = `${tierName(t, tier)}${tier > 0 ? " " + "★".repeat(tier) : ""}`;
           row.name.style.fill = ok ? 0xffffff : 0x8d96a8;
-          row.sub.text = noLeader ? "통솔력이 부족합니다" : noGold ? `금화가 ${price - meState.gold}G 부족합니다` : `${UNIT_NAMES[t]} · 숫자 ${i + 1} 키로 고용`;
+          row.sub.text = noLeader ? "통솔력이 부족합니다" : noGold ? `금화가 ${price - meState.gold}G 부족합니다` : `${UNIT_NAMES[t]} · ${t + 2}번 키로 고용`;
           row.sub.style.fill = ok ? 0xb8bdc9 : 0xff9b8f;
           row.price.text = `${price}G`;
           row.price.style.fill = noGold ? 0xff9b8f : 0xffd45d;
@@ -1997,7 +2061,7 @@ async function main() {
         });
         const counts = UNIT_TYPES.map((t) => mine.filter((w) => w[4] === t).length);
         const dismiss = counts.some((c) => c > 0)
-          ? ["해고 (Shift+숫자, 낸 금화의 절반 환급)", ...UNIT_TYPES.filter((t) => counts[t]! > 0).map((t) => `[Shift+${t + 1}] ${UNIT_NAMES[t]} x${counts[t]}`)]
+          ? ["해고 (Shift+숫자, 낸 금화의 절반 환급)", ...UNIT_TYPES.filter((t) => counts[t]! > 0).map((t) => `[Shift+${t + 2}] ${UNIT_NAMES[t]} x${counts[t]}`)]
           : [];
         campDismiss.text = dismiss.join("   ").replace("   [", "\n[");
         const rowsEnd = 52 + 3 * (CAMP_ROW_H + 8);
@@ -2007,6 +2071,7 @@ async function main() {
         campPanel.visible = true;
       } else {
         campPanel.visible = false;
+        nearCampOffers = [];
       }
     }
     const gi = latest.g;

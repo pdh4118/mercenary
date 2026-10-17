@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { WORLD_SIZE, CAVALRY, MAGE, SHIELD, SPEAR, STANCE_DEFEND, STANCE_HOLD, TICK_RATE, TUNE, WEAPONS, CAV_MOMENTUM_AFTER_HIT } from "@mercenary/shared";
+import { WORLD_SIZE, CAVALRY, MAGE, SHIELD, SPEAR, STANCE_ASSAULT, STANCE_DEFEND, STANCE_HOLD, TICK_RATE, TUNE, WEAPONS, CAV_MOMENTUM_AFTER_HIT } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -227,4 +227,42 @@ test("맵 바깥으로 나가지 않는다: 용병·적·주인공이 밀리거�
   p.y = 0;
   for (let i = 0; i < 40; i++) g.step();
   assert.ok(Math.abs(merc.x) <= WORLD_SIZE / 2 && Math.abs(merc.y) <= WORLD_SIZE / 2);
+});
+
+test("병종별 진형: 고른 병종만 지점 방어가 되고 나머지는 주인공 곁에 남는다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const spear = g.addMerc(a, SPEAR, p.x, p.y);
+  const shield = g.addMerc(a, SHIELD, p.x, p.y);
+  g.setHold(a, p.x + 500, p.y, 1 << SPEAR);
+  assert.deepEqual(p.stances, [0, STANCE_HOLD, 0, 0, 0, 0]);
+  const slots = g.formationSlots(a);
+  assert.ok(slots.get(spear)![0] > p.x + 350, "창병 자리는 지정한 지점 쪽");
+  assert.ok(Math.abs(slots.get(shield)![0] - p.x) < 250, "검방병 자리는 주인공 곁");
+  g.setStance(a, STANCE_DEFEND, 1 << SPEAR); // 창병만 다시 기본으로
+  assert.equal(p.stances[SPEAR], STANCE_DEFEND);
+  g.setStance(a, STANCE_ASSAULT); // 전체
+  assert.ok(p.stances.every((v) => v === STANCE_ASSAULT));
+  assert.equal(p.stance, STANCE_ASSAULT);
+});
+
+test("병종 선택 명령: 고른 병종만 빈 땅으로 이동하고, 적 근처를 넉넉하게 찍어도 공격 지시가 된다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const spear = g.addMerc(a, SPEAR, p.x, p.y);
+  const shield = g.addMerc(a, SHIELD, p.x, p.y);
+  g.order(a, p.x + 600, p.y, 1 << SPEAR);
+  assert.equal(p.chargeKind, 1, "빈 땅 → 이동 지시");
+  run(g, 10);
+  const sp = mercPos(g, spear);
+  const sh = mercPos(g, shield);
+  assert.ok(Math.hypot(sp.x - (p.x + 600), sp.y - p.y) < 200, `창병은 지시 지점 근처: ${Math.round(sp.x - p.x)}`);
+  assert.ok(sh.x - p.x < 250, "검방병은 주인공 곁에 남는다");
+  // 적을 120px 비껴 찍어도 공격 지시
+  const e = dummy(g, p.x + 400, p.y + 300);
+  g.order(a, e.x + 120, e.y, 1 << SHIELD);
+  assert.equal(p.chargeKind, 0, "정확히 찍지 않아도 공격");
+  assert.ok(Math.abs(p.chargeX - e.x) < 1 && Math.abs(p.chargeY - e.y) < 1, "지시 지점이 그 적으로 맞춰진다");
 });

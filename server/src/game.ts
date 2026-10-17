@@ -283,8 +283,11 @@ interface Slot {
   fireCd: number;
   windT: number; // 공격 준비 동작이 남은 시간(철퇴). 0이면 준비 중이 아니다
   mom: number; // 기마 주인공의 속도(0~1). 달리면 오르고 멈추면 줄어든다
-  holdSet: boolean; // 지점 방어 지점을 한 번이라도 지정했다
-  holdFacing: number; // 지점 방어 진형이 바라보는 방향
+  stances: number[]; // 병종별 진형 모드
+  holdPts: [number, number][]; // 병종별 지점 방어 지점
+  holdSets: boolean[]; // 병종별로 지점을 한 번이라도 지정했다
+  holdFacings: number[]; // 병종별 지점 방어 진형이 바라보는 방향
+  orders: ({ kind: number; x: number; y: number; left: number; targetId: number } | null)[]; // 병종별 이동(1)/공격(0) 지시
   deaths: number[]; // 최근 용병이 쓰러진 시각(사기 저하 판정)
   shakenGrace: number; // 사기 저하가 다시 걸리지 않는 남은 시간
   haste: Record<string, number>; // 전장의 함성 중첩(대상별: hero 또는 병종 번호)
@@ -683,6 +686,8 @@ export class Game {
         stance: STANCE_DEFEND,
         holdX: 0,
         holdY: 0,
+        stances: UNIT_TYPES.map(() => STANCE_DEFEND),
+        holds: UNIT_TYPES.flatMap(() => [0, 0]),
         box: 0,
         rerolls: REROLL_START,
         legends: [],
@@ -709,8 +714,11 @@ export class Game {
       fireCd: 0,
       windT: 0,
       mom: 0,
-      holdSet: false,
-      holdFacing: 0,
+      stances: UNIT_TYPES.map(() => STANCE_DEFEND),
+      holdPts: UNIT_TYPES.map(() => [0, 0] as [number, number]),
+      holdSets: UNIT_TYPES.map(() => false),
+      holdFacings: UNIT_TYPES.map(() => 0),
+      orders: UNIT_TYPES.map(() => null),
       deaths: [],
       shakenGrace: 0,
       haste: {},
@@ -791,8 +799,11 @@ export class Game {
     return { ok: true };
   }
 
-  /** 기병에게 돌격 지점을 지시한다. 주인공 가까운 곳으로 제한하고, 일정 시간 뒤 자동으로 해제된다. */
-  charge(playerId: number, x: unknown, y: unknown): void {
+  /**
+   * 병종(types 비트마스크, 생략하면 전체)에 이동·공격을 지시한다. 주인공 가까운 곳으로 제한하고, 일정 시간 뒤 자동으로 해제된다.
+   * 적 근처(ORDER_ATTACK_PICK, 넉넉하게)를 찍으면 가장 가까운 그 적을 쫓아 공격하고, 빈 땅을 찍으면 그곳으로 이동해 자리를 지킨다.
+   */
+  order(playerId: number, x: unknown, y: unknown, types?: unknown): void {
     const s = this.slots.get(playerId);
     if (!s || s.state.down || typeof x !== "number" || typeof y !== "number") return;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -800,14 +811,34 @@ export class Game {
     const dy = y - s.state.y;
     const d = Math.hypot(dx, dy);
     const k = d > CHARGE_MAX_DISTANCE ? CHARGE_MAX_DISTANCE / d : 1;
-    s.state.chargeX = clampToWorld(s.state.x + dx * k, 20);
-    s.state.chargeY = clampToWorld(s.state.y + dy * k, 20);
-    // 적 주변을 찍으면 그 일대의 적을 공격하고, 빈 땅을 찍으면 그곳으로 이동해 자리를 지킨다
-    const foes: { x: number; y: number; r: number }[] =
-      this.phase === "tournament" ? this.duelFoes(playerId).map((f) => ({ x: f.x, y: f.y, r: f.radius })) : [...this.enemies.values()].map((e) => ({ x: e.x, y: e.y, r: radiusOf(e) }));
-    const attack = foes.some((f) => Math.hypot(f.x - s.state.chargeX, f.y - s.state.chargeY) <= TUNE.ORDER_ATTACK_PICK + f.r);
-    s.state.chargeKind = attack ? 0 : 1;
-    s.state.chargeLeft = attack ? CHARGE_DURATION_SEC : TUNE.MOVE_ORDER_SEC;
+    const ox = clampToWorld(s.state.x + dx * k, 20);
+    const oy = clampToWorld(s.state.y + dy * k, 20);
+    const foes: { id: number; x: number; y: number; r: number }[] =
+      this.phase === "tournament" ? this.duelFoes(playerId).map((f) => ({ id: 0, x: f.x, y: f.y, r: f.radius })) : [...this.enemies.values()].map((e) => ({ id: e.id, x: e.x, y: e.y, r: radiusOf(e) }));
+    let pick: { id: number; x: number; y: number } | null = null;
+    let best = Infinity;
+    for (const f of foes) {
+      const dd = Math.hypot(f.x - ox, f.y - oy);
+      if (dd <= TUNE.ORDER_ATTACK_PICK + f.r && dd < best) {
+        best = dd;
+        pick = f;
+      }
+    }
+    const left = pick ? CHARGE_DURATION_SEC : TUNE.MOVE_ORDER_SEC;
+    const ax = pick ? pick.x : ox;
+    const ay = pick ? pick.y : oy;
+    const mask = this.typeMask(types);
+    for (const t of UNIT_TYPES) if (mask & (1 << t)) s.orders[t] = { kind: pick ? 0 : 1, x: ax, y: ay, left, targetId: pick?.id ?? 0 };
+    // 화면 표시용(마지막 지시 지점)
+    s.state.chargeX = ax;
+    s.state.chargeY = ay;
+    s.state.chargeKind = pick ? 0 : 1;
+    s.state.chargeLeft = left;
+  }
+
+  /** 기병에게 돌격 지점을 지시한다(order의 기병 전용 약식). */
+  charge(playerId: number, x: unknown, y: unknown): void {
+    this.order(playerId, x, y, 1 << CAVALRY);
   }
 
   leadershipUsed(owner: number): number {
@@ -1773,47 +1804,79 @@ export class Game {
     return this.slots.get(id)?.state;
   }
 
-  /** 용병 진형 자리(테스트용). 주인공 기준으로 플레이어가 고른 진형(병종별 구역·간격)대로 배치된다. */
+  /** 용병 진형 자리(테스트용). 주인공 기준으로 플레이어가 고른 진형(병종별 구역·간격)대로 배치되고, 병종마다 자기 진형 모드(기본·돌격·지점 방어)에 따라 기준점이 다르다. */
   formationSlots(owner: number): Map<number, [number, number]> {
     const s = this.slots.get(owner);
     const out = new Map<number, [number, number]>();
     if (!s) return out;
     const alive = [...this.mercs.values()].filter((m) => m.owner === owner && m.respawn <= 0);
+    const typeOf = new Map(alive.map((m) => [m.id, m.type]));
     const rel = layoutFormation(alive, s.zones, s.spacing);
-    // 지점 방어: 진형을 주인공이 아니라 지정한 지점에 편다(토너먼트에서는 쓰지 않는다)
-    const hold = s.state.stance === STANCE_HOLD && this.phase !== "tournament";
-    const face = hold ? s.holdFacing : s.facing;
-    const ox = hold ? s.state.holdX : s.state.x;
-    const oy = hold ? s.state.holdY : s.state.y;
-    const fx = Math.cos(face);
-    const fy = Math.sin(face);
-    const adv = s.state.stance === STANCE_ASSAULT ? TUNE.ASSAULT_ADVANCE : 0; // 돌격 진형은 대열이 앞으로 나간다
-    for (const [id, [fwd, lat]] of rel) out.set(id, [clampToWorld(ox + fx * (fwd + adv) - fy * lat, 24), clampToWorld(oy + fy * (fwd + adv) + fx * lat, 24)]); // 진형 자리가 맵 밖이면 가장자리로
+    for (const [id, [fwd, lat]] of rel) {
+      const t = typeOf.get(id) ?? 0;
+      const stance = s.stances[t] ?? STANCE_DEFEND;
+      // 지점 방어: 진형을 주인공이 아니라 지정한 지점에 편다(토너먼트에서는 쓰지 않는다)
+      const hold = stance === STANCE_HOLD && this.phase !== "tournament";
+      const face = hold ? s.holdFacings[t]! : s.facing;
+      const ox = hold ? s.holdPts[t]![0] : s.state.x;
+      const oy = hold ? s.holdPts[t]![1] : s.state.y;
+      const fx = Math.cos(face);
+      const fy = Math.sin(face);
+      const adv = stance === STANCE_ASSAULT ? TUNE.ASSAULT_ADVANCE : 0; // 돌격 진형은 대열이 앞으로 나간다
+      out.set(id, [clampToWorld(ox + fx * (fwd + adv) - fy * lat, 24), clampToWorld(oy + fy * (fwd + adv) + fx * lat, 24)]); // 진형 자리가 맵 밖이면 가장자리로
+    }
     return out;
   }
 
-  /** 진형을 바꾼다(병종별 구역과 간격). 잘못된 값은 무시한다. */
-  /** 용병 진형 모드(기본 / 돌격)를 바꾼다 */
-  setStance(playerId: number, v: unknown): boolean {
+  /** 병종 비트마스크(UNIT_TYPES 번호별 1<<t)를 정리한다. 없거나 잘못되면 전체 */
+  private typeMask(types: unknown): number {
+    const all = (1 << UNIT_TYPES.length) - 1;
+    return typeof types === "number" && Number.isInteger(types) && (types & all) !== 0 ? types & all : all;
+  }
+
+  /** 상태 표시용 요약 값을 갱신한다: 모든 병종의 진형이 같으면 그 값 */
+  private syncStance(sl: Slot): void {
+    if (sl.stances.every((v) => v === sl.stances[0])) sl.state.stance = sl.stances[0]!;
+    sl.state.stances = [...sl.stances];
+    sl.state.holds = sl.holdPts.flatMap((p) => [Math.round(p[0]), Math.round(p[1])]);
+  }
+
+  /** 용병 진형 모드(기본 / 돌격 / 지점 방어)를 바꾼다. types로 병종을 고를 수 있다(생략하면 전체). */
+  setStance(playerId: number, v: unknown, types?: unknown): boolean {
     const sl = this.slots.get(playerId);
     if (!sl || (v !== STANCE_DEFEND && v !== STANCE_ASSAULT && v !== STANCE_HOLD)) return false;
-    if (v === STANCE_HOLD && !sl.holdSet) this.setHold(playerId, sl.state.x + Math.cos(sl.facing) * 120, sl.state.y + Math.sin(sl.facing) * 120); // 지점을 정한 적이 없으면 주인공 앞쪽
-    sl.state.stance = v;
+    const mask = this.typeMask(types);
+    if (v === STANCE_HOLD) {
+      // 지점을 정한 적이 없는 병종은 주인공 앞쪽에 지점을 둔다
+      const need = UNIT_TYPES.filter((t) => mask & (1 << t) && !sl.holdSets[t]).reduce<number>((m, t) => m | (1 << t), 0);
+      if (need) this.setHold(playerId, sl.state.x + Math.cos(sl.facing) * 120, sl.state.y + Math.sin(sl.facing) * 120, need);
+    }
+    for (const t of UNIT_TYPES) if (mask & (1 << t)) sl.stances[t] = v;
+    this.syncStance(sl);
     return true;
   }
 
-  /** 지점 방어: 이 지점에 진형을 펴고 지키도록 지시한다 */
-  setHold(playerId: number, x: unknown, y: unknown): boolean {
+  /** 지점 방어: 이 지점에 진형을 펴고 지키도록 지시한다(types로 병종을 고를 수 있다) */
+  setHold(playerId: number, x: unknown, y: unknown, types?: unknown): boolean {
     const sl = this.slots.get(playerId);
     if (!sl || typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+    const mask = this.typeMask(types);
     const hx = clampToWorld(x, 60);
     const hy = clampToWorld(y, 60);
     const d = Math.hypot(hx - sl.state.x, hy - sl.state.y);
-    sl.state.holdX = Math.round(hx);
-    sl.state.holdY = Math.round(hy);
-    sl.holdFacing = d > 40 ? Math.atan2(hy - sl.state.y, hx - sl.state.x) : sl.facing; // 주인공에서 바깥쪽을 보고 선다
-    sl.holdSet = true;
-    sl.state.stance = STANCE_HOLD;
+    const face = d > 40 ? Math.atan2(hy - sl.state.y, hx - sl.state.x) : sl.facing; // 주인공에서 바깥쪽을 보고 선다
+    for (const t of UNIT_TYPES) {
+      if (!(mask & (1 << t))) continue;
+      sl.holdPts[t] = [Math.round(hx), Math.round(hy)];
+      sl.holdFacings[t] = face;
+      sl.holdSets[t] = true;
+      sl.stances[t] = STANCE_HOLD;
+    }
+    if (mask === (1 << UNIT_TYPES.length) - 1) {
+      sl.state.holdX = Math.round(hx);
+      sl.state.holdY = Math.round(hy);
+    }
+    this.syncStance(sl);
     return true;
   }
 
@@ -2325,7 +2388,7 @@ export class Game {
 
   /** 진형 자리에서 벗어나 적을 쫓을 수 있는 거리: 돌격 진형이면 훨씬 멀리까지 쫓는다 */
   private leashOf(st: UnitStats, type: number, owner: Slot | undefined): number {
-    const assault = owner?.state.stance === STANCE_ASSAULT;
+    const assault = owner?.stances[type] === STANCE_ASSAULT;
     return st.leash * (assault ? (type === CAVALRY ? ASSAULT_LEASH_MULT_CAVALRY : TUNE.ASSAULT_LEASH_MULT) : type === CAVALRY ? 1 : TUNE.DEFEND_LEASH_MULT);
   }
 
@@ -2338,6 +2401,28 @@ export class Game {
         sl.state.shaken = Math.max(0, sl.state.shaken - dt);
         if (sl.state.shaken === 0) sl.shakenGrace = SHAKEN_GRACE_SEC;
       } else sl.shakenGrace = Math.max(0, sl.shakenGrace - dt);
+    }
+    // 병종별 지시: 시간이 다하면 풀리고, 공격 지시는 쫓던 적이 있으면 그 적의 위치를 따라간다(죽었으면 곧 풀린다)
+    for (const sl of this.slots.values()) {
+      for (const t of UNIT_TYPES) {
+        const o = sl.orders[t];
+        if (!o) continue;
+        o.left -= dt;
+        if (o.left <= 0 || sl.state.down) {
+          sl.orders[t] = null;
+          continue;
+        }
+        if (o.targetId) {
+          const e = this.enemies.get(o.targetId);
+          if (e) {
+            o.x = e.x;
+            o.y = e.y;
+          } else {
+            o.targetId = 0;
+            o.left = Math.min(o.left, 1.5);
+          }
+        }
+      }
     }
     const slotsByOwner = new Map<number, Map<number, [number, number]>>();
     for (const owner of this.slots.keys()) slotsByOwner.set(owner, this.formationSlots(owner));
@@ -2401,7 +2486,26 @@ export class Game {
         allies = this.allyList(m.owner);
         allyCache.set(m.owner, allies);
       }
-      const home = slotsByOwner.get(m.owner)?.get(m.id) ?? [m.x, m.y];
+      let home = slotsByOwner.get(m.owner)?.get(m.id) ?? [m.x, m.y];
+      let leash = this.leashOf(st, m.type, ownerSlot);
+      let assault = ownerSlot?.stances[m.type] === STANCE_ASSAULT;
+      let guard = ownerSlot?.stances[m.type] === STANCE_DEFEND;
+      const ord = m.type === CAVALRY ? null : ownerSlot?.orders[m.type];
+      if (ord) {
+        // 지시를 받은 병종: 지시 지점이 새 "자리"가 된다(이동이면 그 둘레에 흩어져 서고 가까운 적과 싸우며, 공격이면 그 일대의 적을 쫓는다)
+        if (ord.kind === 1) {
+          const ang = m.id * 2.399;
+          const rr = 20 + (m.id % 5) * 16;
+          home = [clampToWorld(ord.x + Math.cos(ang) * rr, 24), clampToWorld(ord.y + Math.sin(ang) * rr, 24)];
+          leash = TUNE.MOVE_ENGAGE_RADIUS;
+          assault = false;
+        } else {
+          home = [ord.x, ord.y];
+          leash = CHARGE_TARGET_RADIUS;
+          assault = true;
+        }
+        guard = false;
+      }
       const c: AiCtx = {
         m,
         st,
@@ -2411,9 +2515,9 @@ export class Game {
         home,
         homeDist: Math.hypot(home[0] - m.x, home[1] - m.y),
         owner: ownerSlot,
-        leash: this.leashOf(st, m.type, ownerSlot),
-        assault: ownerSlot?.state.stance === STANCE_ASSAULT,
-        guard: ownerSlot?.state.stance === STANCE_DEFEND,
+        leash,
+        assault,
+        guard,
         widthMult: st.arc / MERC_STATS[SPEAR]!.arc,
       };
       switch (m.type) {
@@ -2793,9 +2897,10 @@ export class Game {
       }
     }
     const healthy = m.hp > st.hp * CAV_RETREAT_HP; // 체력이 낮으면 모험을 멈추고 복귀한다
-    const charging = healthy && !!owner && owner.state.chargeLeft > 0;
-    const anchor: [number, number] = charging ? [owner!.state.chargeX, owner!.state.chargeY] : c.home;
-    const moveOrder = charging && owner!.state.chargeKind === 1; // 이동 지시: 그곳까지 싸우지 않고 가서 자리를 지킨다
+    const ord = owner?.orders[CAVALRY] ?? null;
+    const charging = healthy && !!ord;
+    const anchor: [number, number] = charging ? [ord!.x, ord!.y] : c.home;
+    const moveOrder = charging && ord!.kind === 1; // 이동 지시: 그곳까지 싸우지 않고 가서 자리를 지킨다
     const arrived = moveOrder && Math.hypot(m.x - anchor[0], m.y - anchor[1]) <= TUNE.MOVE_ENGAGE_RADIUS + 60;
     let target: Target | null = null;
     let best = Infinity;

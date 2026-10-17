@@ -155,10 +155,13 @@ export class RoomManager {
         room.game.setInput(id, msg);
         return;
       case "stance":
-        room.game.setStance(id, msg.v);
+        room.game.setStance(id, msg.v, msg.types);
         return;
       case "hold":
-        room.game.setHold(id, msg.x, msg.y);
+        room.game.setHold(id, msg.x, msg.y, msg.types);
+        return;
+      case "order":
+        room.game.order(id, msg.x, msg.y, msg.types);
         return;
       case "record":
         conn.send({ t: "result", ...room.game.result(), partial: true });
