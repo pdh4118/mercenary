@@ -105,15 +105,11 @@ test("창병은 기병의 돌격 피해를 받지 않는다", () => {
   }
 });
 
-test("창을 든 주인공도 돌격을 반사하고, 검을 든 주인공은 정면 피해가 줄어든다", () => {
+test("창을 든 주인공도 돌격 피해를 받지 않는다", () => {
   const spearHero: Guard = { type: -1, spearStance: true, shield: 0, face: 0 };
   const r = resolveHit(spearHero, front(CAVALRY, 4, 13));
   assert.equal(r.body, 4);
   assert.equal(r.reflected, 0);
-  const sword: Guard = { type: -1, shield: 0, face: 0, frontBlock: 0.5 };
-  assert.equal(resolveHit(sword, front(SPEAR, 10)).body, 5);
-  assert.equal(resolveHit(sword, { damage: 10, charge: 0, srcType: SPEAR, fromAngle: Math.PI }).body, 15, "뒤에서는 막지 못하고 배후 보너스까지 받는다");
-  assert.equal(resolveHit(sword, { damage: 10, charge: 0, srcType: SPEAR, fromAngle: Math.PI / 2 }).body, 10, "옆에서는 막지 못할 뿐 보너스는 없다");
 });
 
 test("기병 속도: 점점 빨라지고, 돌격 피해는 현재 속도에 비례한다", () => {

@@ -34,7 +34,6 @@ import {
   WORLD_SIZE,
   mercPrice,
   SHIELD_DAMAGE_FACTOR,
-  HERO_SWORD_FRONT_BLOCK,
   chargeBonus,
   SWARM_PER_MERC,
   TUNE,
@@ -927,7 +926,7 @@ function swordAndSpearCase(): void {
   const bow = hpLost(0, SPEAR).lost;
   const sword = hpLost(2, SPEAR).lost;
   assert.equal(bow, ENEMY_STATS[SPEAR]!.damage);
-  assert.ok(Math.abs(sword - bow * HERO_SWORD_FRONT_BLOCK) < 1e-6);
+  assert.equal(sword, bow, "검을 들어도 방패가 없으면 정면 피해가 줄지 않는다(정면 반감은 없앴다)");
   // 기병의 돌격
   const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed * TUNE.ENEMY_SPEED_MULT, 1); // 적은 이동 속도 배율이 붙는다
   const vsBow = hpLost(0, CAVALRY, 1);

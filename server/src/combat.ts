@@ -13,7 +13,6 @@ export interface Guard {
   spearStance?: boolean; // 창을 든 주인공도 창병처럼 돌격을 반사한다
   shield: number; // 남은 방패 체력(0이면 방패 없음 또는 깨져서 재생 대기 중)
   face: number; // 바라보는 방향(라디안). 방패가 막는 방향
-  frontBlock?: number; // 정면 피해 배율(검을 든 주인공)
 }
 
 /** 들어오는 공격 */
@@ -62,6 +61,5 @@ export function resolveHit(g: Guard, h: Hit): HitResult {
     return { body: (onShield - g.shield) / factor, shield: g.shield, reflected, shieldBroke: true, backstab };
   }
   let body = base;
-  if (g.frontBlock !== undefined && frontal) body *= g.frontBlock;
   return { body, shield: 0, reflected, shieldBroke: false, backstab };
 }

@@ -81,7 +81,6 @@ import {
   CAMP_MAX,
   CAMP_OFFERS,
   CAMP_USE_RADIUS,
-  HERO_SWORD_FRONT_BLOCK,
   SHIELD,
   cavSpeed,
   chargeBonus,
@@ -2265,7 +2264,7 @@ export class Game {
           const r = h.dot || h.pierceGuard
             ? DOT_RESULT(h.damage)
             : resolveHit(
-                { type: NO_TYPE, spearStance: w.type === SPEAR, shield: w.type === SHIELD ? p.shield : 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
+                { type: NO_TYPE, spearStance: w.type === SPEAR, shield: w.type === SHIELD ? p.shield : 0, face: p.aim },
                 h,
               );
           if (w.type === CAVALRY && h.srcType === SPEAR && !h.dot && !h.pierceGuard) {

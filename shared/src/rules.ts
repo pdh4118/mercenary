@@ -140,7 +140,6 @@ export const SHIELD_FRONT_ARC = rad(70); // 정면 반각. 이 안에서 오는 
  * 화살은 거의 막혀 방패가 오래 버티고, 철퇴는 방패를 쉽게 부순다. 기병의 돌격도 정면에서는 일부 흡수된다.
  */
 export const SHIELD_DAMAGE_FACTOR = [0.5, 0.6, 0.25, 1.0, 3.0, 1.0] as const;
-export const HERO_SWORD_FRONT_BLOCK = 0.5; // 주인공이 검을 들면 정면 피해가 이 배율로 줄어든다
 export function shieldFactor(srcType: number): number {
   return SHIELD_DAMAGE_FACTOR[srcType] ?? 1;
 }
