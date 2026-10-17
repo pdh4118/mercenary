@@ -183,9 +183,14 @@ async function main() {
   const [allyTex, enemyTex] = await Promise.all([loadUnits("ally"), loadUnits("enemy")]);
   // 기병은 8방위(0=북,1=북동,2=동,…) 기본 자세·찌르기 자세 그림을 쓴다. 아군은 주인 색, 적은 어두운 붉은색으로 칠한다.
   const cavRaw = await Promise.all((["idle", "thrust"] as const).map((pose) => Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((d) => Assets.load<Texture>(`assets/units/cav_${pose}_${d}.png`)))));
-  const cavTex = (key: string, pose: number, dir: number, color: number) => recolored(`cav/${key}/${pose}/${dir}`, cavRaw[pose]![dir]!, CAV8_RULE, color);
+  // 달리기 4프레임(방향 × 프레임). 기본 자세를 변형해서 만든 그림이다.
+  const cavRunRaw = await Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((d) => Promise.all([0, 1, 2, 3].map((k) => Assets.load<Texture>(`assets/units/cav_run_${d}_${k}.png`)))));
+  /** pose: 0 기본, 1 찌르기, 2 달리기(frame 0~3) */
+  const cavTex = (key: string, pose: number, dir: number, color: number, frame = 0) =>
+    recolored(`cav/${key}/${pose}/${dir}/${frame}`, pose === 2 ? cavRunRaw[dir]![frame]! : cavRaw[pose]![dir]!, CAV8_RULE, color);
   const ENEMY_CAV_COLOR = 0x45101a;
-  const enemyCav = cavRaw.map((_, pose) => cavRaw[pose]!.map((_t, d) => cavTex("e", pose, d, ENEMY_CAV_COLOR)));
+  const enemyCav = [0, 1].map((pose) => cavRaw[pose]!.map((_t, d) => cavTex("e", pose, d, ENEMY_CAV_COLOR)));
+  const enemyCavRun = [0, 1, 2, 3, 4, 5, 6, 7].map((d) => [0, 1, 2, 3].map((k) => cavTex("e", 2, d, ENEMY_CAV_COLOR, k)));
   /** 8방위 그림은 크기가 달라 별도 배율·기준점을 쓴다 */
   const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5;
   const CAV_ANCHOR: [number, number] = [0.483, 0.72];
@@ -206,14 +211,22 @@ async function main() {
   ]);
 
   // 바닥은 타일을 반복해서 깔고, 월드 경계를 선으로 표시한다
-  const ground = new TilingSprite({ texture: groundTex, width: WORLD_SIZE, height: WORLD_SIZE });
-  ground.position.set(-half, -half);
+  // 월드 가장자리에서 화면이 검게 비지 않도록 바닥을 경계 밖으로 넓게 깔고, 경계 밖은 어둡게 눌러 경계를 알아보게 한다
+  const GROUND_MARGIN = 1800;
+  const ground = new TilingSprite({ texture: groundTex, width: WORLD_SIZE + GROUND_MARGIN * 2, height: WORLD_SIZE + GROUND_MARGIN * 2 });
+  ground.position.set(-half - GROUND_MARGIN, -half - GROUND_MARGIN);
+  ground.tileScale.set(1);
   ground.tint = 0xa6a6a6; // 전투가 잘 보이도록 바닥을 한 단계 어둡게 눌러 둔다
   const border = new Graphics().rect(-half, -half, WORLD_SIZE, WORLD_SIZE).stroke({ width: 4, color: 0x5a3b3b });
   const terrainFlat = new Container(); // 고지대·장식: 모든 유닛 아래
   const terrainLow = new Container(); // 바위·나무·폐허: 유닛 뒤에 있을 때
   terrainLow.sortableChildren = true;
-  world.addChild(ground, border, terrainFlat, terrainLow);
+  const outside = new Graphics()
+    .rect(-half - GROUND_MARGIN, -half - GROUND_MARGIN, WORLD_SIZE + GROUND_MARGIN * 2, WORLD_SIZE + GROUND_MARGIN * 2)
+    .fill({ color: 0x000000, alpha: 0.5 })
+    .rect(-half, -half, WORLD_SIZE, WORLD_SIZE)
+    .cut();
+  world.addChild(ground, outside, border, terrainFlat, terrainLow);
 
   const campLayer = new Container();
   const enemyLayer = new Container();
@@ -283,6 +296,7 @@ async function main() {
     dir: number; // 8방위 그림용 방향(0=북, 시계 방향)
     spd: number; // 부드럽게 만든 이동 속도(px/초) - 기병 달리기 모션용
     phase: number; // 달리기 박자(라디안)
+    runT: number; // 달리기 프레임 시계
     face: 1 | -1;
   }
   const faceFrom = (v: Facing, x: number, attackAng: number | null) => {
@@ -291,15 +305,17 @@ async function main() {
     v.lastX = x;
   };
   /** 기병 달리기 모션: 속도에 비례해 말이 위아래로 출렁이고 몸이 앞뒤로 기운다. 찌르는 동안과 멈춰 있을 때는 가만히. */
-  const cavGait = (v: Facing & { x: number; y: number; sprite: Sprite }, dtMs: number, thrusting: boolean, scale: number) => {
+  const cavGait = (v: Facing & { x: number; y: number; sprite: Sprite }, dtMs: number, thrusting: boolean, scale: number): number => {
     const dt = Math.max(dtMs, 1) / 1000;
     const inst = Math.hypot(v.x - v.lastX, v.y - v.lastY) / dt;
     v.spd += (Math.min(inst, 400) - v.spd) * Math.min(1, dt * 8);
     const run = thrusting ? 0 : Math.min(1, Math.max(0, (v.spd - 25) / 130));
     v.phase += dt * (8 + v.spd * 0.022);
     const s = Math.sin(v.phase);
-    v.sprite.pivot.y = (Math.abs(s) * 3.2 * run) / scale; // 화면에서 최대 약 3px 튀어 오른다
-    v.sprite.rotation = s * 0.045 * run;
+    v.sprite.pivot.y = (Math.abs(s) * 2 * run) / scale; // 화면에서 최대 약 2px 튀어 오른다(다리 모양은 달리기 프레임이 맡는다)
+    v.sprite.rotation = s * 0.03 * run;
+    v.runT += dt * (5 + v.spd * 0.022);
+    return run > 0.25 ? Math.floor(v.runT) % 4 : -1; // 달리는 중이면 달리기 프레임 번호, 아니면 -1
   };
   /** 8방위 방향: 공격 중이면 공격 방향, 아니면 움직인 방향. 경계 근처에서 깜빡이지 않게 충분히 넘어갔을 때만 바꾼다. */
   const cavDir = (v: Facing, x: number, y: number, attackAng: number | null) => {
@@ -320,7 +336,7 @@ async function main() {
       if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
       else sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       enemyLayer.addChild(sprite);
-      return { node: sprite, sprite, x: 0, y: 0, lastX: w[1], lastY: w[2], dir: 2, spd: 0, phase: 0, face: 1 };
+      return { node: sprite, sprite, x: 0, y: 0, lastX: w[1], lastY: w[2], dir: 2, spd: 0, phase: 0, runT: 0, face: 1 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -421,7 +437,7 @@ async function main() {
       label.visible = false;
       node.addChild(ring, sprite, bar, label);
       mercLayer.addChild(node);
-      return { node, bar, sprite, label, ring, ringColor: -1, ringTeam: false, ringShape: [0, footY, st.radius * 1.25, st.radius * 0.6], x: 0, y: 0, lastKey: "", lastX: w[1], lastY: w[2], dir: 2, spd: 0, phase: 0, face: 1, wasDown: w[8] > 0 };
+      return { node, bar, sprite, label, ring, ringColor: -1, ringTeam: false, ringShape: [0, footY, st.radius * 1.25, st.radius * 0.6], x: 0, y: 0, lastKey: "", lastX: w[1], lastY: w[2], dir: 2, spd: 0, phase: 0, runT: 0, face: 1, wasDown: w[8] > 0 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -1500,8 +1516,8 @@ async function main() {
       const size = w[11] === 1 ? BOSS_SIZE : 1;
       if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
-        cavGait(v, ticker.deltaMS, w[5] > 0, CAV_SCALE * size);
-        v.sprite.texture = enemyCav[w[5] > 0 ? 1 : 0]![v.dir]!;
+        const fr = cavGait(v, ticker.deltaMS, w[5] > 0, CAV_SCALE * size);
+        v.sprite.texture = w[5] > 0 ? enemyCav[1]![v.dir]! : fr >= 0 ? enemyCavRun[v.dir]![fr]! : enemyCav[0]![v.dir]!;
         v.sprite.scale.set(CAV_SCALE * size);
         v.lastX = v.x;
         v.lastY = v.y;
@@ -1574,8 +1590,8 @@ async function main() {
       const col = ownerColor(w[5]);
       if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[6] > 0 ? w[7] : null);
-        cavGait(v, ticker.deltaMS, w[6] > 0, CAV_SCALE * grow);
-        v.sprite.texture = cavTex(`a${col}`, w[6] > 0 ? 1 : 0, v.dir, col);
+        const fr = cavGait(v, ticker.deltaMS, w[6] > 0, CAV_SCALE * grow);
+        v.sprite.texture = w[6] > 0 ? cavTex(`a${col}`, 1, v.dir, col) : fr >= 0 ? cavTex(`a${col}`, 2, v.dir, col, fr) : cavTex(`a${col}`, 0, v.dir, col);
         v.sprite.scale.set(CAV_SCALE * grow);
         v.lastX = v.x;
         v.lastY = v.y;
