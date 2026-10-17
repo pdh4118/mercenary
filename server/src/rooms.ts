@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import {
   DIFFICULTY_REDUCTION,
+  IDLE_KICK_SEC,
+  IDLE_WARN_SEC,
   JOIN_FAIL_BLOCK_SEC,
   JOIN_FAIL_LIMIT,
   MAX_PLAYERS,
@@ -38,6 +40,8 @@ interface Member {
   conn: Conn | null; // null이면 접속이 끊겨 돌아오기를 기다리는 중
   token: string;
   offlineLeft: number;
+  idleSec: number; // 게임 중 마지막 조작 이후 지난 시간(초)
+  lastAim: number; // 직전 조준 방향(마우스를 움직였는지 알아보려고)
   ready: boolean; // 대기실에서 준비 여부
 }
 
@@ -142,6 +146,15 @@ export class RoomManager {
     if (!at) return;
     const { room, id } = at;
     if (room.phase !== "playing") return; // 대기실에서는 게임 조작을 받지 않는다
+    const mem = room.members.get(id);
+    if (mem) {
+      // 가만히 있는 입력(같은 상태를 계속 보내는 것)은 조작으로 치지 않는다. 키·마우스·클릭·구매 등은 조작이다.
+      if (msg.t !== "input") mem.idleSec = 0;
+      else if (msg.dx !== 0 || msg.dy !== 0 || msg.fire || msg.revive || msg.aim !== mem.lastAim) {
+        mem.idleSec = 0;
+        mem.lastAim = msg.aim;
+      }
+    }
     switch (msg.t) {
       case "input":
         room.game.setInput(id, msg);
@@ -361,7 +374,7 @@ export class RoomManager {
     }
     if (room.ranked) room.game.setDifficulty(id, RANKED_DIFFICULTY);
     const token = randomBytes(12).toString("hex");
-    room.members.set(id, { id, name: room.game.getPlayer(id)!.name, conn, token, offlineLeft: 0, ready: false });
+    room.members.set(id, { id, name: room.game.getPlayer(id)!.name, conn, token, offlineLeft: 0, idleSec: 0, lastAim: 0, ready: false });
     if (room.hostId < 0) room.hostId = id; // 처음 들어온 사람이 방장
     this.lobby.delete(conn);
     this.where.set(conn, { room, id });
@@ -436,7 +449,21 @@ export class RoomManager {
       for (const [k, f] of this.failures) if (f.blockedUntil <= this.clock) this.failures.delete(k); // 차단이 풀렸거나 오래된 기록
     }
     for (const room of [...this.rooms.values()]) {
-      if (room.phase === "playing") room.game.step();
+      if (room.phase === "playing") {
+        room.game.step();
+        // 오래 아무 조작이 없는 사람은 내보낸다(토너먼트 구경 중에는 조작할 일이 없어 세지 않는다)
+        const watching = room.game.info().phase === "tournament";
+        for (const m of [...room.members.values()]) {
+          if (!m.conn || watching) {
+            m.idleSec = 0;
+            continue;
+          }
+          m.idleSec += 1 / TICK_RATE;
+          if (Math.abs(m.idleSec - (IDLE_KICK_SEC - IDLE_WARN_SEC)) < 0.5 / TICK_RATE) m.conn.send({ t: "notice", text: `${IDLE_WARN_SEC}초 안에 움직이지 않으면 방에서 나가게 됩니다` });
+          if (m.idleSec >= IDLE_KICK_SEC) this.removeMember(room, m.id, `${Math.round(IDLE_KICK_SEC / 60)}분 동안 아무 조작이 없어 방에서 나왔습니다`);
+        }
+        if (!this.rooms.has(room.code)) continue;
+      }
       for (const m of [...room.members.values()]) {
         if (m.conn) continue;
         m.offlineLeft -= 1 / TICK_RATE;

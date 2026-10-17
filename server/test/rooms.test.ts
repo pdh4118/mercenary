@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  IDLE_KICK_SEC,
+  IDLE_WARN_SEC,
   JOIN_FAIL_BLOCK_SEC,
   JOIN_FAIL_LIMIT,
   MAX_PLAYERS,
@@ -610,4 +612,28 @@ test("모두 쓰러지면 결과가 전달되고 방은 끝난 상태가 되며,
   assert.equal(host.last("room")!.phase, "waiting");
   assert.equal(game.status, "playing");
   assert.equal(game.getPlayer(host.last("welcome")!.id)!.down, false);
+});
+
+test("게임 중 5분 동안 아무 조작이 없으면 방에서 나온다(조작하면 시간이 다시 시작된다)", () => {
+  const { m, conn } = setup();
+  const idle = conn();
+  const active = conn();
+  m.handle(idle, { t: "quick", name: "가만" });
+  m.handle(active, { t: "quick", name: "활동" });
+  assert.ok(idle.last("welcome") && active.last("welcome"));
+  m.roomOf(idle)!.game.autoSpawn = false; // 가만히 있다가 죽어서 게임이 끝나지 않게
+  const still = { t: "input", dx: 0, dy: 0, aim: 0, fire: false } as const;
+  // 4분 동안: 한 명은 가만히(같은 입력만 계속 보낸다), 한 명은 조준을 바꾼다
+  for (let s = 0; s < IDLE_KICK_SEC - 60; s += 10) {
+    m.handle(idle, still);
+    m.handle(active, { ...still, aim: 1 + s / 100 });
+    seconds(m, 10);
+  }
+  assert.equal(idle.last("left"), undefined, "아직 나가지 않았다");
+  m.handle(active, { t: "input", dx: 1, dy: 0, aim: 3, fire: false }); // 활동한 사람만 다시 조작
+  seconds(m, 65);
+  const left = idle.last("left");
+  assert.ok(left && /5분/.test(left.reason), `가만히 있던 사람은 나왔다: ${left?.reason}`);
+  assert.equal(active.last("left"), undefined, "조작한 사람은 남는다");
+  assert.ok(idle.msgs.some((x) => x.t === "notice" && x.text.includes(`${IDLE_WARN_SEC}초`)), "나가기 전에 알려 준다");
 });
