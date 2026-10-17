@@ -341,10 +341,11 @@ export const CHEST_OPEN_RADIUS = 60;
 export const TOURNAMENT_STAGES = [3, 6, 9, 10] as const;
 export const TOURNAMENT_OUTRO_SEC = 4; // 경기 뒤 결과 표시
 export const TOURNAMENT_END_SEC = 7; // 우승자 발표
-/** 게임 중에 이 시간(초) 동안 아무 조작(이동·공격·조준·구매·카드 선택 등)이 없으면 방에서 내보낸다 */
+/**
+ * 로비나 대기실(게임이 진행 중이 아닐 때)에서 이 시간(초) 동안 아무 조작이 없으면 연결을 끊는다.
+ * 창을 안 끄고 둔 접속 때문에 자동 업데이트(접속자 0명을 기다린다)가 막히지 않게 한다. 게임 진행 중에는 적용하지 않는다.
+ */
 export const IDLE_KICK_SEC = 300;
-/** 내보내기 전에 미리 알리는 시간(초) */
-export const IDLE_WARN_SEC = 30;
 export const TOURNAMENT_ARENA_RADIUS = 800; // 경기장 반지름(px). 월드 중앙
 export const TOURNAMENT_START_DIST = 520; // 두 선수가 중앙에서 떨어져 서는 거리
 export const isTournamentStage = (stage: number): boolean => (TOURNAMENT_STAGES as readonly number[]).includes(stage);

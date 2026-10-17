@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   IDLE_KICK_SEC,
-  IDLE_WARN_SEC,
   JOIN_FAIL_BLOCK_SEC,
   JOIN_FAIL_LIMIT,
   MAX_PLAYERS,
@@ -614,26 +613,30 @@ test("모두 쓰러지면 결과가 전달되고 방은 끝난 상태가 되며,
   assert.equal(game.getPlayer(host.last("welcome")!.id)!.down, false);
 });
 
-test("게임 중 5분 동안 아무 조작이 없으면 방에서 나온다(조작하면 시간이 다시 시작된다)", () => {
+test("로비·대기실에서 5분 동안 아무 조작이 없으면 연결을 끊는다(조작하면 시간이 다시 시작되고, 게임 중에는 끊지 않는다)", () => {
   const { m, conn } = setup();
-  const idle = conn();
-  const active = conn();
-  m.handle(idle, { t: "quick", name: "가만" });
-  m.handle(active, { t: "quick", name: "활동" });
-  assert.ok(idle.last("welcome") && active.last("welcome"));
-  m.roomOf(idle)!.game.autoSpawn = false; // 가만히 있다가 죽어서 게임이 끝나지 않게
-  const still = { t: "input", dx: 0, dy: 0, aim: 0, fire: false } as const;
-  // 4분 동안: 한 명은 가만히(같은 입력만 계속 보낸다), 한 명은 조준을 바꾼다
-  for (let s = 0; s < IDLE_KICK_SEC - 60; s += 10) {
-    m.handle(idle, still);
-    m.handle(active, { ...still, aim: 1 + s / 100 });
+  const idleLobby = conn();
+  const activeLobby = conn();
+  const idleWait = conn();
+  m.handle(idleWait, { t: "create", name: "대기" });
+  assert.ok(idleWait.last("welcome"));
+  for (let s = 0; s < IDLE_KICK_SEC - 30; s += 10) {
+    m.handle(activeLobby, { t: "active" });
     seconds(m, 10);
   }
-  assert.equal(idle.last("left"), undefined, "아직 나가지 않았다");
-  m.handle(active, { t: "input", dx: 1, dy: 0, aim: 3, fire: false }); // 활동한 사람만 다시 조작
-  seconds(m, 65);
-  const left = idle.last("left");
-  assert.ok(left && /5분/.test(left.reason), `가만히 있던 사람은 나왔다: ${left?.reason}`);
-  assert.equal(active.last("left"), undefined, "조작한 사람은 남는다");
-  assert.ok(idle.msgs.some((x) => x.t === "notice" && x.text.includes(`${IDLE_WARN_SEC}초`)), "나가기 전에 알려 준다");
+  m.handle(activeLobby, { t: "active" });
+  seconds(m, 40);
+  assert.equal(idleLobby.closed, true, "로비에서 가만히 있던 접속은 끊긴다");
+  assert.ok(idleLobby.last("left"), "이유를 알려 준다");
+  assert.equal(activeLobby.closed, false, "조작한 접속은 유지된다");
+  assert.equal(idleWait.closed, true, "대기실에서 가만히 있던 접속도 끊긴다");
+  assert.equal(m.roomCount(), 0, "방도 정리된다");
+
+  // 게임이 진행 중인 방의 접속은 아무리 가만히 있어도 끊지 않는다
+  const player = conn();
+  m.handle(player, { t: "quick", name: "게임중" });
+  m.roomOf(player)!.game.autoSpawn = false;
+  seconds(m, IDLE_KICK_SEC + 60);
+  assert.equal(player.closed, false);
+  assert.equal(player.last("left"), undefined);
 });

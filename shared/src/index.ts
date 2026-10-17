@@ -258,6 +258,7 @@ export interface RoomMember {
 
 export type ClientMsg =
   // 로비
+  | { t: "active" } // 키·마우스 입력이 있었다는 신호(자리 비움 판정용). 클라이언트가 가끔 보낸다
   | { t: "list" }
   | { t: "create"; name: string; room?: string; private?: boolean } // 비공개 방은 목록에 안 나오고 코드로만 입장
   | { t: "join"; name: string; code: string }

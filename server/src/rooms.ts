@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto";
 import {
   DIFFICULTY_REDUCTION,
   IDLE_KICK_SEC,
-  IDLE_WARN_SEC,
   JOIN_FAIL_BLOCK_SEC,
   JOIN_FAIL_LIMIT,
   MAX_PLAYERS,
@@ -40,8 +39,6 @@ interface Member {
   conn: Conn | null; // null이면 접속이 끊겨 돌아오기를 기다리는 중
   token: string;
   offlineLeft: number;
-  idleSec: number; // 게임 중 마지막 조작 이후 지난 시간(초)
-  lastAim: number; // 직전 조준 방향(마우스를 움직였는지 알아보려고)
   ready: boolean; // 대기실에서 준비 여부
 }
 
@@ -68,6 +65,8 @@ function clean(text: unknown, max: number): string {
  * 방마다 독립된 판(Game)을 가지고, 비면 사라진다.
  */
 export class RoomManager {
+  /** 접속별로 마지막 조작 이후 지난 시간(초) */
+  private idle = new Map<Conn, number>();
   private rooms = new Map<string, Room>();
   private where = new Map<Conn, { room: Room; id: number }>();
   private tokens = new Map<string, { room: Room; id: number }>();
@@ -81,12 +80,14 @@ export class RoomManager {
   // --- 연결 -------------------------------------------------------------
 
   connect(conn: Conn): void {
+    this.idle.set(conn, 0);
     this.lobby.add(conn);
     conn.send({ t: "rooms", rooms: this.list() });
   }
 
   /** 연결이 끊겼다. 방에 있었다면 바로 지우지 않고 일정 시간 자리를 지켜 준다. */
   disconnect(conn: Conn): void {
+    this.idle.delete(conn);
     this.lobby.delete(conn);
     const at = this.where.get(conn);
     if (!at) return;
@@ -102,7 +103,10 @@ export class RoomManager {
   // --- 요청 처리 ---------------------------------------------------------
 
   handle(conn: Conn, msg: ClientMsg): void {
+    if (this.idle.has(conn)) this.idle.set(conn, 0); // 무슨 메시지든 보냈다면 자리에 있는 것(클라이언트는 키·마우스 입력 때 "active"를 보낸다)
     switch (msg.t) {
+      case "active":
+        return;
       case "list":
         conn.send({ t: "rooms", rooms: this.list() });
         return;
@@ -146,15 +150,6 @@ export class RoomManager {
     if (!at) return;
     const { room, id } = at;
     if (room.phase !== "playing") return; // 대기실에서는 게임 조작을 받지 않는다
-    const mem = room.members.get(id);
-    if (mem) {
-      // 가만히 있는 입력(같은 상태를 계속 보내는 것)은 조작으로 치지 않는다. 키·마우스·클릭·구매 등은 조작이다.
-      if (msg.t !== "input") mem.idleSec = 0;
-      else if (msg.dx !== 0 || msg.dy !== 0 || msg.fire || msg.revive || msg.aim !== mem.lastAim) {
-        mem.idleSec = 0;
-        mem.lastAim = msg.aim;
-      }
-    }
     switch (msg.t) {
       case "input":
         room.game.setInput(id, msg);
@@ -374,7 +369,7 @@ export class RoomManager {
     }
     if (room.ranked) room.game.setDifficulty(id, RANKED_DIFFICULTY);
     const token = randomBytes(12).toString("hex");
-    room.members.set(id, { id, name: room.game.getPlayer(id)!.name, conn, token, offlineLeft: 0, idleSec: 0, lastAim: 0, ready: false });
+    room.members.set(id, { id, name: room.game.getPlayer(id)!.name, conn, token, offlineLeft: 0, ready: false });
     if (room.hostId < 0) room.hostId = id; // 처음 들어온 사람이 방장
     this.lobby.delete(conn);
     this.where.set(conn, { room, id });
@@ -440,6 +435,28 @@ export class RoomManager {
     conn.send({ t: "error", text });
   }
 
+  /** 로비·대기실·결과 화면에 오래 아무 조작 없이 있는 접속은 끊는다(게임 진행 중인 방은 건드리지 않는다) */
+  private stepIdle(room: Room): void {
+    for (const m of [...room.members.values()]) {
+      if (!m.conn) continue;
+      if (room.phase === "playing") this.idle.set(m.conn, 0);
+      else this.bumpIdle(m.conn);
+    }
+  }
+  private bumpIdle(conn: Conn): void {
+    const t = (this.idle.get(conn) ?? 0) + 1 / TICK_RATE;
+    this.idle.set(conn, t);
+    if (t >= IDLE_KICK_SEC) this.idleKick(conn);
+  }
+  private idleKick(conn: Conn): void {
+    const reason = `${Math.round(IDLE_KICK_SEC / 60)}분 동안 아무 조작이 없어 연결을 끊었습니다. 다시 하려면 페이지를 새로 고쳐 주세요`;
+    this.idle.delete(conn);
+    const at = this.where.get(conn);
+    if (at) this.removeMember(at.room, at.id, reason);
+    else conn.send({ t: "left", reason });
+    conn.close();
+  }
+
   // --- 진행 -----------------------------------------------------------------
 
   /** 한 틱: 모든 방의 판을 진행하고, 끊긴 사람의 대기 시간을 줄이고, 상태를 보낸다 */
@@ -448,22 +465,10 @@ export class RoomManager {
     if (this.failures.size > 0 && Math.round(this.clock * TICK_RATE) % (60 * TICK_RATE) === 0) {
       for (const [k, f] of this.failures) if (f.blockedUntil <= this.clock) this.failures.delete(k); // 차단이 풀렸거나 오래된 기록
     }
+    for (const c of [...this.lobby]) this.bumpIdle(c);
     for (const room of [...this.rooms.values()]) {
-      if (room.phase === "playing") {
-        room.game.step();
-        // 오래 아무 조작이 없는 사람은 내보낸다(토너먼트 구경 중에는 조작할 일이 없어 세지 않는다)
-        const watching = room.game.info().phase === "tournament";
-        for (const m of [...room.members.values()]) {
-          if (!m.conn || watching) {
-            m.idleSec = 0;
-            continue;
-          }
-          m.idleSec += 1 / TICK_RATE;
-          if (Math.abs(m.idleSec - (IDLE_KICK_SEC - IDLE_WARN_SEC)) < 0.5 / TICK_RATE) m.conn.send({ t: "notice", text: `${IDLE_WARN_SEC}초 안에 움직이지 않으면 방에서 나가게 됩니다` });
-          if (m.idleSec >= IDLE_KICK_SEC) this.removeMember(room, m.id, `${Math.round(IDLE_KICK_SEC / 60)}분 동안 아무 조작이 없어 방에서 나왔습니다`);
-        }
-        if (!this.rooms.has(room.code)) continue;
-      }
+      if (room.phase === "playing") room.game.step();
+      this.stepIdle(room);
       for (const m of [...room.members.values()]) {
         if (m.conn) continue;
         m.offlineLeft -= 1 / TICK_RATE;

@@ -885,6 +885,7 @@ async function main() {
     },
   });
   let retries = 0;
+  let idleKicked = false;
   let autoStarted = false;
   const connect = () => {
     ws = new WebSocket(serverUrl);
@@ -907,6 +908,13 @@ async function main() {
     };
     ws.onclose = () => {
       lobby.markDisconnected();
+      if (idleKicked) {
+        // 자리를 비워 서버가 끊었다: 자동으로 다시 접속하지 않는다(그래야 서버가 업데이트될 수 있다)
+        lobby.clearToken();
+        statusEl.textContent = "";
+        lobby.showLobby("오래 아무 조작이 없어 연결이 끊겼습니다. 다시 하려면 페이지를 새로 고쳐 주세요");
+        return;
+      }
       if (lobby.token() && retries < 15) {
         retries++;
         statusEl.textContent = `연결이 끊겼습니다. 다시 접속하는 중... (${retries}/15)`;
@@ -927,6 +935,7 @@ async function main() {
         void setTerrain(msg.items);
         return;
       }
+      if (msg.t === "left" && msg.reason.includes("아무 조작이 없어")) idleKicked = true;
       if (lobby.handle(msg)) return;
       if (msg.t === "notice") {
         toast.text = msg.text;
@@ -972,6 +981,15 @@ async function main() {
       }
     };
   };
+  // 키·마우스·터치 입력이 있으면 가끔 서버에 알린다(로비·대기실에서 자리를 비웠는지 판단하는 데 쓴다)
+  let lastActive = 0;
+  const reportActive = () => {
+    const now = performance.now();
+    if (now - lastActive < 20000) return;
+    lastActive = now;
+    if (ws && ws.readyState === WebSocket.OPEN) send({ t: "active" });
+  };
+  for (const ev of ["keydown", "mousedown", "mousemove", "touchstart", "wheel"]) window.addEventListener(ev, reportActive, { passive: true });
   connect();
 
   // 입력: WASD/방향키 이동, 마우스 조준, 마우스 버튼(또는 스페이스) 누르고 있으면 발사, 캠프 근처에서 1~3 키로 고용
