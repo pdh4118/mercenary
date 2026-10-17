@@ -64,10 +64,10 @@ test("옆이나 뒤에서 오는 공격은 방패를 무시하고 몸에 그대�
 });
 
 test("방패가 버티지 못하면 깨지고 남은 몫이 몸에 들어간다", () => {
-  const r = resolveHit(shield({ shield: 20 }), front(BLUNT, 26)); // 26 x 2.5 = 65
+  const r = resolveHit(shield({ shield: 20 }), front(BLUNT, 26)); // 26 x 3 = 78
   assert.equal(r.shield, 20);
   assert.equal(r.shieldBroke, true);
-  close(r.body, (65 - 20) / SHIELD_DAMAGE_FACTOR[BLUNT]!);
+  close(r.body, (26 * SHIELD_DAMAGE_FACTOR[BLUNT]! - 20) / SHIELD_DAMAGE_FACTOR[BLUNT]!);
   // 정확히 맞춰 깨지는 경우도 깨진 것으로 본다
   assert.equal(resolveHit(shield({ shield: 5 }), front(SHIELD, 5)).shieldBroke, true);
 });
