@@ -10,8 +10,8 @@ export const TIER_NAMES: readonly (readonly string[])[] = [
   ["둔기병", "중갑 둔기병", "철퇴 전사", "파쇄병", "분쇄자"],
   ["마법사", "견습 마도사", "마도사", "대마도사", "현자"],
 ];
-export const TIER_HP = [1, 1.3, 1.65, 2.05, 2.5] as const;
-export const TIER_DMG = [1, 1.2, 1.45, 1.75, 2.1] as const;
+export const TIER_HP = [1, 1.4, 1.9, 2.5, 3.3] as const;
+export const TIER_DMG = [1, 1.3, 1.7, 2.2, 3] as const;
 /** 병종별 단계 보너스(단계마다): 기병 이동 속도, 창병·궁병 사거리, 검방병 방패, 둔기병 범위 */
 export const TIER_SPEED = [0.05, 0, 0, 0, 0, 0] as const;
 export const TIER_REACH = [0, 0.08, 0.07, 0, 0, 0.05] as const;
@@ -21,7 +21,7 @@ export const TIER_AREA = [0, 0, 0, 0, 0.08, 0.1] as const;
 export const UPGRADE_COST_MULT = [1.2, 2.2, 3.6, 5.5] as const;
 
 /** 용병 경험치: 다음 단계로 강화하려면 이만큼 모아야 한다(현재 단계 기준). 피해를 주고받으면 조금씩, 막타를 치면 많이 오른다. */
-export const MERC_XP_NEED = [140, 280, 500, 800] as const;
+export const MERC_XP_NEED = [200, 450, 900, 1600] as const;
 export const MERC_XP_PER_DAMAGE = 0.08; // 준 피해 1당
 export const MERC_XP_PER_HURT = 0.12; // 받은 피해 1당
 export const MERC_XP_KILL = 14; // 막타(보스는 x4). 적 병종과 무관한 기본값
