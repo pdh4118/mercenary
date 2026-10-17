@@ -99,9 +99,9 @@ export const TUNE = {
   ARMOR_MAX_FRAC: 0.7, // 피해 감소(고정치)로 한 번의 피해를 줄일 수 있는 최대 비율
   MULTISHOT_DAMAGE: 0.7, // 발사 수 카드로 늘어난 화살의 피해 비율
   MULTISHOT_SPREAD: 0.14, // 화살 사이 각도(라디안)
-  SPEAR_HALF_WIDTH_NEAR: 18, // 몸 바로 앞의 반폭(px)
-  SPEAR_HALF_WIDTH_FAR: 18, // 사거리 끝의 반폭(px)
-  CAV_HALF_WIDTH: 20, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
+  SPEAR_HALF_WIDTH_NEAR: 15, // 몸 바로 앞의 반폭(px)
+  SPEAR_HALF_WIDTH_FAR: 15, // 사거리 끝의 반폭(px)
+  CAV_HALF_WIDTH: 15, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
   PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s
   ENEMY_SPAWN_BASE_PER_SEC: 1.1, // 플레이어 1명당
@@ -204,8 +204,8 @@ export function inBox(type: number, ox: number, oy: number, aim: number, tx: num
   if (f < -r * 0.5 || f > reach + r) return false;
   return l <= TUNE.CAV_HALF_WIDTH * widthMult + r;
 }
-/** 적의 직사각형 찌르기 폭 배율: 적 기병은 아군 기병의 절반 폭, 적 창병은 창병 용병과 같은 폭 */
-export const ENEMY_BOX_WIDTH_MULT: Readonly<Record<number, number>> = { [CAVALRY]: 0.5, [SPEAR]: 1 };
+/** 적의 직사각형 찌르기 폭 배율: 적 기병·창병 모두 아군과 같은 폭(기병·창병 전체 폭 30) */
+export const ENEMY_BOX_WIDTH_MULT: Readonly<Record<number, number>> = { [CAVALRY]: 1, [SPEAR]: 1 };
 /** 범위 증가 능력이 폭에 주는 배율: 기본 부채꼴 각 대비 현재 각의 비 */
 export function boxWidthMult(type: number, arc: number): number {
   return arc / MERC_STATS[type === CAVALRY ? CAVALRY : SPEAR]!.arc;
@@ -215,7 +215,7 @@ const deg = rad;
 
 export const MERC_STATS: readonly UnitStats[] = [
   // 기병: speed는 최대 속도. 평소엔 느리게 출발해 점점 빨라진다. 피해는 기본 + 속도에 비례한 돌격 피해.
-  { hp: 200, speed: 300, reach: 48, damage: 15, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
+  { hp: 200, speed: 300, reach: 53, damage: 15, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
   // 창병: 사거리가 가장 길고 폭이 좁다(찌르기)
   { hp: 181, speed: 95, reach: 100, damage: 19, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
   { hp: 119, speed: 95, reach: 280, damage: 15, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
@@ -228,7 +228,7 @@ export const MERC_STATS: readonly UnitStats[] = [
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
-  { hp: 24, speed: 230, reach: 46, damage: 4, windup: 0.35, cooldown: 1.2, arc: deg(55), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
+  { hp: 24, speed: 230, reach: 51, damage: 4, windup: 0.35, cooldown: 1.2, arc: deg(55), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
   { hp: 28, speed: 85, reach: 58, damage: 5, windup: 0.45, cooldown: 1.3, arc: deg(22), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
   { hp: 18, speed: 75, reach: 260, damage: 4.5, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 0 },
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },

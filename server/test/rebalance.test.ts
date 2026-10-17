@@ -158,7 +158,7 @@ test("창 찌르기 범위는 폭이 일정한 직사각형이다", async () => 
   assert.ok(inSpearBox(0, 0, Math.PI / 2, 0, 80, 0, reach));
   assert.ok(!inSpearBox(0, 0, Math.PI / 2, 80, 0, 0, reach));
   // 범위 증가는 폭을 넓힌다
-  assert.ok(!inSpearBox(0, 0, 0, 60, 26, 0, reach, 1) && inSpearBox(0, 0, 0, 60, 26, 0, reach, 1.6));
+  assert.ok(!inSpearBox(0, 0, 0, 60, 20, 0, reach, 1) && inSpearBox(0, 0, 0, 60, 20, 0, reach, 1.6));
 });
 
 test("주인공 창은 정면 직사각형 안의 적만 맞히고, 근접 옆의 적은 맞힌다", () => {

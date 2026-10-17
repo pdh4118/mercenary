@@ -161,14 +161,13 @@ test("기병 찌르기는 창병보다 짧은 직사각형이다", () => {
 });
 
 import { ENEMY_BOX_WIDTH_MULT, ENEMY_STATS as ES } from "../../shared/src/rules.js";
-test("적 기병은 사거리 그대로 폭이 절반이고, 적 창병은 창병 용병과 같은 직사각형이다", () => {
-  const reach = ES[CAV_T]!.reach;
-  // 적 기병: 반폭 10(+대상 반경)
-  assert.ok(inBox(CAV_T, 0, 0, 0, reach - 5, 18, 10, reach, ENEMY_BOX_WIDTH_MULT[CAV_T]));
-  assert.ok(!inBox(CAV_T, 0, 0, 0, reach - 5, 24, 10, reach, ENEMY_BOX_WIDTH_MULT[CAV_T]));
-  assert.ok(inBox(CAV_T, 0, 0, 0, reach - 5, 24, 10, reach, 1), "아군 기병 폭이면 맞는다");
-  // 적 창병: 용병 창병과 같은 폭(18)
-  const sr = ES[SPEAR_T]!.reach;
-  assert.ok(inBox(SPEAR_T, 0, 0, 0, sr - 5, 26, 10, sr, ENEMY_BOX_WIDTH_MULT[SPEAR_T]));
-  assert.ok(!inBox(SPEAR_T, 0, 0, 0, sr - 5, 32, 10, sr, ENEMY_BOX_WIDTH_MULT[SPEAR_T]));
+test("기병·창병은 아군·적 모두 전체 폭 30(반폭 15)의 직사각형이다", () => {
+  const w = ENEMY_BOX_WIDTH_MULT;
+  assert.equal(w[CAV_T], 1);
+  assert.equal(w[SPEAR_T], 1);
+  for (const [t, reach] of [[CAV_T, ES[CAV_T]!.reach], [SPEAR_T, ES[SPEAR_T]!.reach]] as const) {
+    assert.ok(inBox(t, 0, 0, 0, reach - 5, 22, 10, reach, w[t]), "반폭 15 + 대상 반경 10 안쪽은 맞는다");
+    assert.ok(!inBox(t, 0, 0, 0, reach - 5, 28, 10, reach, w[t]), "그보다 옆은 빗나간다");
+  }
+  assert.ok(ES[CAV_T]!.reach >= 50 && MS[CAV_T]!.reach >= 52, "기병 사거리를 약 10% 늘렸다");
 });
