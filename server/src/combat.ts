@@ -32,7 +32,7 @@ export interface Hit {
 export interface HitResult {
   body: number; // 몸에 들어가는 피해
   shield: number; // 방패 체력에서 깎이는 양
-  reflected: number; // 공격자에게 되돌아가는 피해(창병의 돌격 반사)
+  reflected: number; // 공격자에게 되돌아가는 피해(지금은 항상 0)
   shieldBroke: boolean; // 이번 공격으로 방패가 깨졌다
   backstab: boolean; // 등 뒤에서 맞았다(피해 x1.5)
 }
@@ -47,7 +47,7 @@ export interface HitResult {
 export function resolveHit(g: Guard, h: Hit): HitResult {
   if (h.pierceGuard) return { body: h.damage, shield: 0, reflected: 0, shieldBroke: false, backstab: false };
   const spear = g.type === SPEAR || g.spearStance === true;
-  const reflected = spear ? h.charge : 0;
+  const reflected = 0; // 창병의 카운터는 돌격이 들어갈 때가 아니라, 기병이 돌격하기 전에 창에 맞을 때 일어난다(Game.counterCharge)
   // 등 뒤에서 오는 공격은 피해가 늘어난다(돌격 피해도 포함). 방패는 정면만 막으므로 등 뒤에서는 어차피 소용없다.
   const backstab = Math.abs(angleDiff(h.fromAngle, g.face + Math.PI)) <= BACKSTAB_ARC;
   const mult = backstab ? TUNE.BACKSTAB_MULT : 1;

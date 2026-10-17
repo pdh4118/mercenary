@@ -206,6 +206,10 @@ const fanOffset = (i: number, n: number): number => {
 };
 
 const POISON_PULSE_SEC = 0.5;
+/** 이보다 작은 돌격 피해는 카운터로 치지 않는다(막 출발한 기병) */
+const COUNTER_MIN = 1;
+/** 속도가 이만큼(0..1)은 붙어 있어야 카운터가 일어난다(멈춰 있는 기병은 해당 없음) */
+const COUNTER_MOMENTUM = 0.1;
 const DOT_RESULT = (damage: number): HitResult => ({ body: damage, shield: 0, reflected: 0, shieldBroke: false, backstab: false });
 
 const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mods.legends.has(legendKey(id, scope));
@@ -2245,6 +2249,14 @@ export class Game {
                 { type: NO_TYPE, spearStance: w.type === SPEAR, shield: w.type === SHIELD ? p.shield : 0, face: p.aim, frontBlock: w.type === SHIELD ? HERO_SWORD_FRONT_BLOCK : undefined },
                 h,
               );
+          if (w.type === CAVALRY && h.srcType === SPEAR && !h.dot && !h.pierceGuard) {
+            // 기마 주인공도 돌격하기 전에 창에 맞으면 속도를 잃고 돌격 피해를 되돌려받는다
+            const amount = TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s);
+            if (amount >= COUNTER_MIN && s.mom >= COUNTER_MOMENTUM) {
+              s.mom = 0;
+              this.hurtHeroReflect(s, amount);
+            }
+          }
           if (w.type === SHIELD && r.shield > 0) {
             // 방패가 받아 낸 만큼 깎인다
             p.shield = r.shieldBroke ? 0 : Math.max(0, p.shield - r.shield);
@@ -2286,6 +2298,16 @@ export class Game {
           if (!h.dot && !h.pierceGuard && this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
           const r = h.dot || h.pierceGuard ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
+          if (m.type === CAVALRY && h.srcType === SPEAR && !h.dot && !h.pierceGuard) {
+            // 돌격하기 전에 창에 맞으면 속도를 잃고 쌓아 둔 돌격 피해를 되돌려받는다
+            const amount = Math.max(m.chargeSnap, chargeBonus(MERC_STATS[CAVALRY]!.speed, m.momentum));
+            if (amount >= COUNTER_MIN && (m.momentum >= COUNTER_MOMENTUM || m.chargeSnap > 0)) {
+              m.momentum = 0;
+              m.chargeSnap = 0;
+              this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, amount, m.owner);
+              this.hurtMerc(m, amount);
+            }
+          }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
           const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)) * this.damageTakenMult(m.owner);
           this.hurtMerc(m, taken);
@@ -3111,6 +3133,16 @@ export class Game {
     if (has("execute") && e.hp < e.maxHp * LEGEND_CONST.executeBelow) hit = { ...hit, damage: hit.damage * LEGEND_CONST.executeMult };
     const r = resolveHit({ type: e.type, shield: e.shield, face: e.face }, hit);
     this.applyShield(e, r.shield, r.shieldBroke);
+    if (e.type === CAVALRY && hit.srcType === SPEAR && !hit.dot && !hit.pierceGuard) {
+      // 돌격하기 전에 창에 맞으면 속도를 잃고 쌓아 둔 돌격 피해를 되돌려받는다
+      const amount = Math.max(e.chargeSnap, chargeBonus(this.enemySpeed(e), e.momentum));
+      if (amount >= COUNTER_MIN && (e.momentum >= COUNTER_MOMENTUM || e.chargeSnap > 0)) {
+        e.momentum = 0;
+        e.chargeSnap = 0;
+        e.hp -= amount;
+        this.pushDamage(EVT_REFLECT, e.id, e.x, e.y, amount, ownerId);
+      }
+    }
     const dealt = Math.min(r.body, Math.max(0, e.hp));
     e.hp -= r.body;
     if (owner) owner.stats.dealt += dealt + r.shield;
@@ -3132,6 +3164,11 @@ export class Game {
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
     else if (owner && r.body + r.shield > 0) this.knockBack(e, hit.fromAngle, src ? mstat(owner.mods, src.type, "knock") : owner.mods.heroKnock);
     return r.reflected;
+  }
+
+  /** 적의 현재 최대 이동 속도(보스·격노 반영) */
+  private enemySpeed(e: Enemy): number {
+    return ENEMY_STATS[e.type]!.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0));
   }
 
   /** 독: total만큼의 피해를 POISON_SEC초에 걸쳐 준다. 다시 맞으면 시간이 새로 시작하고 더 센 쪽을 따른다. */

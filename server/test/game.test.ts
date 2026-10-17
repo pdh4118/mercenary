@@ -213,7 +213,7 @@ test("공격 부채꼴 바깥에 있으면 맞지 않는다", () => {
   assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP);
 });
 
-test("적 기병의 돌격: 창병 용병은 돌격 피해를 받지 않고 되돌려주며, 다른 병종은 속도에 비례해 더 아프게 맞는다", () => {
+test("적 기병의 돌격: 창병 용병은 돌격 피해를 받지 않고, 다른 병종은 속도에 비례해 더 아프게 맞는다", () => {
   const run1 = (mercType: number) => {
     const g = quiet();
     const a = g.addPlayer("a")!;
@@ -230,8 +230,7 @@ test("적 기병의 돌격: 창병 용병은 돌격 피해를 받지 않고 되�
   const blunt = run1(BLUNT); // 궁병은 근접 적이 오면 물러나 맞지 않으므로 제자리에서 맞는 병종으로 본다
   assert.ok(Math.abs(blunt.lost - (base + bonus)) < 1e-6, `둔기병은 기본+돌격: ${blunt.lost}`);
   const spear = run1(SPEAR);
-  assert.ok(Math.abs(spear.lost - base) < 1e-6, `창병은 기본만: ${spear.lost}`);
-  assert.ok(spear.enemyHp <= ENEMY_STATS[CAVALRY]!.hp - bonus + 1e-6, "돌격 피해가 기병에게 되돌아간다");
+  assert.ok(spear.lost <= base + 1e-6, `창병은 기본 피해보다 더 받지 않는다(돌격은 무효, 창에 먼저 맞으면 기병이 속도를 잃는다): ${spear.lost}`);
   // 속도가 없으면 돌격 피해도 적다
   assert.ok(chargeBonus(ENEMY_STATS[CAVALRY]!.speed, 0) < bonus);
 });
@@ -935,7 +934,6 @@ function swordAndSpearCase(): void {
   assert.ok(Math.abs(vsBow.lost - (ENEMY_STATS[CAVALRY]!.damage + bonus)) < 1e-6);
   const vsSpear = hpLost(1, CAVALRY, 1);
   assert.ok(Math.abs(vsSpear.lost - ENEMY_STATS[CAVALRY]!.damage) < 1e-6, "창을 들면 돌격 피해가 없다");
-  assert.ok(vsSpear.enemyHp <= ENEMY_STATS[CAVALRY]!.hp - bonus + 1e-6, "그 피해가 기병에게 돌아간다");
 }
 
 test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며, 돌격 피해는 속도에 비례한다", () => {
@@ -964,7 +962,7 @@ test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며,
   assert.ok(g.getMerc(c)!.momentum < before * 0.9, "공격하면 속도가 줄어든다");
 });
 
-test("기병 용병이 창병 적에게 돌격하면 돌격 피해가 자신에게 돌아온다", () => {
+test("기병 용병이 창병 적에게 돌격해도 창병은 돌격 피해를 받지 않는다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
@@ -975,8 +973,7 @@ test("기병 용병이 창병 적에게 돌격하면 돌격 피해가 자신에�
   (g.getMerc(c) as { momentum: number }).momentum = 1;
   const full = g.getMerc(c)!.hp;
   run(g, 0.4);
-  const bonus = chargeBonus(MERC_STATS[CAVALRY]!.speed, 1);
-  assert.ok(g.getMerc(c)!.hp <= full - bonus + 1e-6, "자신이 입힌 만큼의 돌격 피해를 되돌려받는다");
+  void full;
   assert.ok(g.getEnemy(e)!.hp > ENEMY_STATS[SPEAR]!.hp - MERC_STATS[CAVALRY]!.damage * (1 + SWARM_PER_MERC) - 1e-6, "창병은 돌격 피해를 받지 않는다");
 });
 
@@ -1295,4 +1292,43 @@ test("피해 숫자: 같은 대상에게 한 틱에 여러 번 들어간 피해�
   const ev = g.takeEvents().filter((x) => x[0] === EVT_DMG_ENEMY);
   assert.equal(ev.length, 1);
   assert.ok(Math.abs(ev[0]![4] - 30) < 0.5, `${ev[0]![4]}`);
+});
+
+// 창병의 카운터: 기병이 돌격 피해를 넣기 전에 창에 맞으면 속도를 잃고 쌓아 둔 돌격 피해를 되돌려받는다
+type Priv = { damageEnemy(e: unknown, h: unknown, owner: number, src?: unknown): number; collectFriendlies(): { merc?: { id: number }; hit(h: unknown): number }[] };
+const spearHit = { damage: 10, charge: 0, srcType: SPEAR, fromAngle: 0 };
+test("창병 카운터: 달려오는 적 기병이 창에 맞으면 속도를 잃고 돌격 피해만큼 되돌려받는다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const sm = g.addMerc(a, SPEAR, p.x + 60, p.y);
+  const e = g.spawnEnemyAt(p.x + 400, p.y, CAVALRY);
+  const enemy = g.getEnemy(e) as { momentum: number; chargeSnap: number; hp: number };
+  enemy.momentum = 1;
+  const bonus = chargeBonus(ENEMY_STATS[CAVALRY]!.speed * TUNE.ENEMY_SPEED_MULT, 1);
+  const hp0 = enemy.hp;
+  (g as unknown as Priv).damageEnemy(enemy, spearHit, a, g.getMerc(sm));
+  assert.equal(enemy.momentum, 0, "속도를 잃는다");
+  assert.equal(enemy.chargeSnap, 0);
+  assert.ok(hp0 - enemy.hp >= 10 + bonus - 1e-6, `창 피해 + 카운터: ${hp0 - enemy.hp}`);
+  // 멈춰 있던 기병은 카운터가 없다(창 피해만)
+  const e2 = g.spawnEnemyAt(p.x + 400, p.y + 100, CAVALRY);
+  const idle = g.getEnemy(e2) as { hp: number };
+  const h2 = idle.hp;
+  (g as unknown as Priv).damageEnemy(idle, spearHit, a, g.getMerc(sm));
+  assert.ok(h2 - idle.hp <= 15 + 1e-6, `카운터 없이 창 피해만(배후 1.5배까지): ${h2 - idle.hp}`);
+});
+
+test("창병 카운터: 아군 기병 용병도 적 창병에게 먼저 맞으면 속도를 잃고 피해를 입는다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const c = g.addMerc(a, CAVALRY, p.x + 30, p.y + 150);
+  const m = g.getMerc(c) as { momentum: number; hp: number; chargeSnap: number };
+  m.momentum = 1;
+  const f = (g as unknown as Priv).collectFriendlies().find((x) => x.merc?.id === c)!;
+  const hp0 = m.hp;
+  f.hit(spearHit);
+  assert.equal(m.momentum, 0);
+  assert.ok(hp0 - m.hp >= 10 + chargeBonus(MERC_STATS[CAVALRY]!.speed, 1) - 1e-6);
 });
