@@ -12,9 +12,13 @@ export const TIER_NAMES: readonly (readonly string[])[] = [
 ];
 export const TIER_HP = [1, 1.4, 1.9, 2.5, 3.3] as const;
 export const TIER_DMG = [1, 1.3, 1.7, 2.2, 3] as const;
-/** 병종별 단계 보너스(단계마다): 기병 이동 속도, 창병·궁병 사거리, 검방병 방패, 둔기병 범위 */
+/** 병종별 단계 보너스(단계마다): 기병 이동 속도·돌격 피해, 창병 카운터 피해, 궁병 사거리, 검방병 방패, 둔기병 범위, 마법사 시전 시간·범위 */
 export const TIER_SPEED = [0.05, 0, 0, 0, 0, 0] as const;
-export const TIER_REACH = [0, 0.08, 0.07, 0, 0, 0.05] as const;
+export const TIER_REACH = [0, 0, 0.1, 0, 0, 0] as const;
+/** 창병: 카운터 피해 배율(단계마다), 기병: 돌격 피해 배율(단계마다), 마법사: 시전 시간 감소(단계마다) */
+export const TIER_COUNTER = [0, 0.1, 0, 0, 0, 0] as const;
+export const TIER_CHARGE = [0.1, 0, 0, 0, 0, 0] as const;
+export const TIER_CAST = [0, 0, 0, 0, 0, 0.05] as const;
 export const TIER_SHIELD = [0, 0, 0, 0.15, 0, 0] as const;
 export const TIER_AREA = [0, 0, 0, 0, 0.08, 0.1] as const;
 /** 강화 비용 = 고용 기본 가격 x 이 배율(현재 단계 → 다음 단계) */
@@ -71,11 +75,15 @@ export function nextTierBonus(type: number, tier: number): string[] {
   const out = [`체력 ${pct((TIER_HP[tier + 1]! / TIER_HP[tier]! - 1) * 100)}`, `공격 ${pct((TIER_DMG[tier + 1]! / TIER_DMG[tier]! - 1) * 100)}`];
   // 병종 보너스는 단계마다 기본 능력치의 일정 비율이 더해진다
   const step = (x: readonly number[]) => (x[type] ?? 0) > 0 ? pct(((1 + x[type]! * (tier + 1)) / (1 + x[type]! * tier) - 1) * 100) : "";
-  if (type === CAVALRY) out.push(`이동 속도 ${step(TIER_SPEED)}`);
-  if (type === SPEAR || type === ARCHER) out.push(`사거리 ${step(TIER_REACH)}`);
+  if (type === CAVALRY) {
+    out.push(`이동 속도 ${step(TIER_SPEED)}`);
+    out.push(`돌격 피해 ${step(TIER_CHARGE)}`);
+  }
+  if (type === SPEAR) out.push(`카운터 피해 ${step(TIER_COUNTER)}`);
+  if (type === ARCHER) out.push(`사거리 ${step(TIER_REACH)}`);
   if (type === SHIELD) out.push(`방패 ${step(TIER_SHIELD)}`);
   if (type === MAGE) {
-    out.push(`사거리 ${step(TIER_REACH)}`);
+    out.push(`시전 시간 -${Math.round(TIER_CAST[type]! * 100)}%p`);
     out.push(`폭발 범위 ${step(TIER_AREA)}`);
   }
   if (type === BLUNT) {

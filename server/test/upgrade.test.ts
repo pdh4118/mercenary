@@ -18,6 +18,9 @@ import {
   SHIELD,
   SPEAR,
   TIER_HP,
+  TIER_COUNTER,
+  TIER_CHARGE,
+  MAGE,
   TIER_NAMES,
   UNIT_TYPES,
   upgradeCost,
@@ -124,7 +127,7 @@ test("용병 강화: 단계가 오를 때마다 금화를 내고 능력치가 �
   }
   assert.equal(g.upgrade(a, m).ok, false, "최고 단계");
   const stats = g.mercStatsForTest(m);
-  assert.ok(stats.reach > base.reach && stats.damage > base.damage * 2, "창병은 사거리도 늘어난다");
+  assert.ok(stats.reach === base.reach && stats.damage > base.damage * 2, "창병은 사거리 대신 카운터 피해가 늘어난다");
   assert.equal(g.snapshotMercs().find((w) => w[0] === m)![15], MAX_TIER, "전송에 단계가 실린다");
 });
 
@@ -594,8 +597,24 @@ test("행운이 높으면 제시되는 카드의 평균 등급이 실제로 올�
 
 test("강화 시 늘어나는 능력치 문구: 병종 보너스와 둔기병 경직 시간이 들어 있고 최고 단계는 비어 있다", async () => {
   const { nextTierBonus } = await import("@mercenary/shared");
-  assert.ok(nextTierBonus(4, 0).some((t) => t.includes("경직 0.30→0.45")));
+  assert.ok(nextTierBonus(4, 0).some((t) => t.includes("경직 0.30→0.40")));
   assert.ok(nextTierBonus(0, 0).some((t) => t.startsWith("이동 속도")));
-  assert.ok(nextTierBonus(1, 1).some((t) => t.startsWith("사거리")));
+  assert.ok(nextTierBonus(1, 1).some((t) => t.startsWith("카운터 피해")));
+  assert.ok(nextTierBonus(0, 0).some((t) => t.startsWith("돌격 피해")));
+  assert.ok(nextTierBonus(2, 0).some((t) => t.startsWith("사거리")));
+  assert.ok(nextTierBonus(5, 0).some((t) => t.startsWith("시전 시간")));
   assert.deepEqual(nextTierBonus(2, 4), []);
+});
+
+test("단계 특화: 창병은 카운터 피해, 기병은 돌격 피해, 마법사는 시전 시간이 단계마다 좋아진다", () => {
+  const g = new Game(() => 0.999);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const mage = g.addMerc(a, MAGE, p.x + 50, p.y);
+  const w0 = g.mercStatsForTest(mage).windup;
+  (g.getMerc(mage) as { tier: number }).tier = 4;
+  assert.ok(g.mercStatsForTest(mage).windup < w0 * 0.85, "시전 시간이 줄어든다");
+  assert.equal(g.mercStatsForTest(mage).reach, MERC_STATS[MAGE]!.reach, "마법사 사거리는 늘지 않는다");
+  assert.ok(TIER_COUNTER[SPEAR]! > 0 && TIER_CHARGE[0]! > 0);
 });

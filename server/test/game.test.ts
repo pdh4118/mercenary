@@ -1113,7 +1113,7 @@ test("둔기병 경직: 맞은 적이 잠깐 멈추고, 단계가 오를수록 �
   e.stunT = 0;
   m.tier = 2;
   hit();
-  assert.ok(e.stunT > t0 + 0.25, "단계가 높으면 경직이 길다");
+  assert.ok(Math.abs(e.stunT - 0.5) < 1e-9 && e.stunT > t0 + 0.15, `단계가 높으면 경직이 길다(0.3+0.1×단계): ${e.stunT}`);
   const x = e.x;
   run(g, 0.2);
   assert.equal(e.x, x, "경직 중에는 움직이지 않는다");

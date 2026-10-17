@@ -186,6 +186,9 @@ import {
   REROLL_PER_PICK,
   REROLL_START,
   TIER_AREA,
+  TIER_CAST,
+  TIER_CHARGE,
+  TIER_COUNTER,
   TIER_DMG,
   TIER_HP,
   TIER_REACH,
@@ -2319,7 +2322,7 @@ export class Game {
           this.applyShield(m, r.shield, r.shieldBroke);
           if (m.type === CAVALRY && h.srcType === SPEAR && !h.dot && !h.pierceGuard) {
             // 돌격하기 전에 창에 맞으면 속도를 잃고 쌓아 둔 돌격 피해를 되돌려받는다
-            const amount = Math.max(m.chargeSnap, chargeBonus(MERC_STATS[CAVALRY]!.speed, m.momentum));
+            const amount = Math.max(m.chargeSnap, chargeBonus(MERC_STATS[CAVALRY]!.speed, m.momentum) * (1 + TIER_CHARGE[CAVALRY]! * m.tier));
             if (amount >= COUNTER_MIN && (m.momentum >= COUNTER_MOMENTUM || m.chargeSnap > 0)) {
               m.momentum = 0;
               m.chargeSnap = 0;
@@ -2973,7 +2976,7 @@ export class Game {
           m.atkT = st.windup;
           m.atkAng = Math.atan2(target.y - m.y, target.x - m.x);
           m.face = m.atkAng;
-          m.chargeSnap = chargeBonus(st.speed, m.momentum); // 지금까지 붙은 속도가 돌격 피해가 된다
+          m.chargeSnap = chargeBonus(st.speed, m.momentum) * (1 + TIER_CHARGE[CAVALRY]! * m.tier); // 지금까지 붙은 속도가 돌격 피해가 된다(단계마다 배수가 늘어난다)
           m.flankT = 0;
           m.runId = target.id;
           m.brawl = target.hpFrac <= TUNE.CAV_FINISH_HP || target.ranged; // 상대가 거의 죽었거나 궁병이면 빠지지 않고 끝까지 쫓아 싸운다
@@ -3155,7 +3158,8 @@ export class Game {
     this.applyShield(e, r.shield, r.shieldBroke);
     if (e.type === CAVALRY && hit.srcType === SPEAR && !hit.dot && !hit.pierceGuard) {
       // 돌격하기 전에 창에 맞으면 속도를 잃고 쌓아 둔 돌격 피해를 되돌려받는다
-      const amount = Math.max(e.chargeSnap, chargeBonus(this.enemySpeed(e), e.momentum));
+      // 창병 용병은 단계가 오를수록 카운터가 세다
+      const amount = Math.max(e.chargeSnap, chargeBonus(this.enemySpeed(e), e.momentum)) * (src?.type === SPEAR ? 1 + TIER_COUNTER[SPEAR]! * src.tier : 1);
       if (amount >= COUNTER_MIN && (e.momentum >= COUNTER_MOMENTUM || e.chargeSnap > 0)) {
         e.momentum = 0;
         e.chargeSnap = 0;
@@ -3656,7 +3660,7 @@ export class Game {
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
       damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)),
-      windup: base.windup * Math.max(CAST_TIME_MIN_MULT, mstat(mods, t, "cast")),
+      windup: base.windup * Math.max(CAST_TIME_MIN_MULT, mstat(mods, t, "cast") * (1 - TIER_CAST[t]! * tier)),
       cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
       reach: meleeReach(t, base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier), area * (1 + TIER_AREA[t]! * tier)),

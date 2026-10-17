@@ -94,7 +94,7 @@ export const TUNE = {
   CAV_RUNUP_READY: 0.85, // 이 속도(최고 속도 대비)가 붙고 옆·뒤를 잡으면 다시 돌격
   CAV_FINISH_HP: 0.3, // 대상 체력이 이 비율 이하이면 빠지지 않고 끝까지 싸운다
   BLUNT_STAGGER_SEC: 0.3, // 둔기병이 때린 적이 경직되는 시간(0단계)
-  BLUNT_STAGGER_PER_TIER: 0.15, // 강화 단계마다 늘어나는 경직 시간
+  BLUNT_STAGGER_PER_TIER: 0.1, // 강화 단계마다 늘어나는 경직 시간
   BLUNT_STAGGER_BOSS_FRAC: 0.3, // 보스는 이 비율만큼만 경직된다
   ARMOR_MAX_FRAC: 0.7, // 피해 감소(고정치)로 한 번의 피해를 줄일 수 있는 최대 비율
   MULTISHOT_DAMAGE: 0.7, // 발사 수 카드로 늘어난 화살의 피해 비율
@@ -220,7 +220,7 @@ export const MERC_STATS: readonly UnitStats[] = [
   // 검방병: 몸 체력과 별개로 방패 체력이 있다
   { hp: 200, speed: 90, reach: 32, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 150, splash: 0 },
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
-  { hp: 225, speed: 75, reach: 40, damage: 36, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
+  { hp: 225, speed: 75, reach: 40, damage: 32.4, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
   // 마법사: 느리고 약하지만 2초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
   { hp: 88, speed: 60, reach: 280, damage: 150.0, windup: 2, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
 ];
@@ -230,7 +230,7 @@ export const ENEMY_STATS: readonly UnitStats[] = [
   { hp: 28, speed: 85, reach: 58, damage: 5, windup: 0.45, cooldown: 1.3, arc: deg(22), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
   { hp: 18, speed: 75, reach: 260, damage: 4.5, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 0 },
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },
-  { hp: 36, speed: 60, reach: 38, damage: 9.5, windup: 0.9, cooldown: 1.8, arc: deg(90), ranged: false, radius: 14, leash: 0, shield: 0, splash: 40 },
+  { hp: 36, speed: 60, reach: 38, damage: 8.55, windup: 0.9, cooldown: 1.8, arc: deg(90), ranged: false, radius: 14, leash: 0, shield: 0, splash: 40 },
   // 적 마법사: 드물게 나온다. 3.5초 주문 뒤 모여 있는 아군에게 운석을 떨어뜨린다(낙하 지점이 미리 보이니 피할 수 있다). 넉백이나 둔기병의 타격으로 밀려나면 주문이 끊긴다.
   { hp: 22, speed: 55, reach: 280, damage: 55, windup: 3.5, cooldown: 4, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 110 },
 ];
