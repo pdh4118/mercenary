@@ -159,3 +159,16 @@ test("기병 찌르기는 창병보다 짧은 직사각형이다", () => {
   assert.ok(!inBox(CAV_T, 0, 0, 0, reach - 5, 60, 10, reach)); // 옆으로 크게 벗어나면 맞지 않는다(부채꼴이었다면 맞았을 위치)
   assert.ok(!inBox(CAV_T, 0, 0, 0, reach + 30, 0, 10, reach)); // 사거리 밖
 });
+
+import { ENEMY_BOX_WIDTH_MULT, ENEMY_STATS as ES } from "../../shared/src/rules.js";
+test("적 기병은 사거리 그대로 폭이 절반이고, 적 창병은 창병 용병과 같은 직사각형이다", () => {
+  const reach = ES[CAV_T]!.reach;
+  // 적 기병: 반폭 10(+대상 반경)
+  assert.ok(inBox(CAV_T, 0, 0, 0, reach - 5, 18, 10, reach, ENEMY_BOX_WIDTH_MULT[CAV_T]));
+  assert.ok(!inBox(CAV_T, 0, 0, 0, reach - 5, 24, 10, reach, ENEMY_BOX_WIDTH_MULT[CAV_T]));
+  assert.ok(inBox(CAV_T, 0, 0, 0, reach - 5, 24, 10, reach, 1), "아군 기병 폭이면 맞는다");
+  // 적 창병: 용병 창병과 같은 폭(18)
+  const sr = ES[SPEAR_T]!.reach;
+  assert.ok(inBox(SPEAR_T, 0, 0, 0, sr - 5, 26, 10, sr, ENEMY_BOX_WIDTH_MULT[SPEAR_T]));
+  assert.ok(!inBox(SPEAR_T, 0, 0, 0, sr - 5, 32, 10, sr, ENEMY_BOX_WIDTH_MULT[SPEAR_T]));
+});

@@ -91,6 +91,7 @@ import {
   ENEMY_SPAWN_DISTANCE,
   ENEMY_SPAWN_WEIGHTS,
   ENEMY_STATS,
+  ENEMY_BOX_WIDTH_MULT,
   FIRE_COOLDOWN_SEC,
   FORMATION_TURN_RATE,
   MAX_MERCS_PER_PLAYER,
@@ -4061,9 +4062,9 @@ export class Game {
     // 예비 동작이 끝난 시점에 부채꼴 안에 있는 아군만 맞는다. 그 사이 피하면 맞지 않는다.
     const struck: Friendly[] = [];
     for (const f of friendlies) {
-      if (e.type === CAVALRY) {
-        // 기병은 아군 기병처럼 짧은 직사각형으로 찌른다
-        if (!inBox(CAVALRY, e.x, e.y, e.atkAng, f.x, f.y, f.radius, st.reach)) continue;
+      if (e.type === CAVALRY || e.type === SPEAR) {
+        // 적 기병은 좁은 직사각형(폭 절반), 적 창병은 창병 용병과 같은 직사각형으로 찌른다. 사거리는 그대로.
+        if (!inBox(e.type, e.x, e.y, e.atkAng, f.x, f.y, f.radius, st.reach, ENEMY_BOX_WIDTH_MULT[e.type])) continue;
       } else {
         if (Math.hypot(f.x - e.x, f.y - e.y) > st.reach + f.radius) continue;
         if (Math.abs(angleDiff(Math.atan2(f.y - e.y, f.x - e.x), e.atkAng)) > st.arc) continue;

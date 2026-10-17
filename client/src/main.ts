@@ -55,6 +55,7 @@ import {
   PLAYER_RADIUS,
   TICK_RATE,
   spearHalfWidth,
+  ENEMY_BOX_WIDTH_MULT,
   boxWidthMult,
   usesBox,
   unitCost,
@@ -1330,9 +1331,9 @@ async function main() {
       .poly([x - s * nearW, y + c * nearW, x + c * reach - s * farW, y + s * reach + c * farW, x + c * reach + s * farW, y + s * reach - c * farW, x + s * nearW, y - c * nearW])
       .fill({ color, alpha });
   };
-  const drawTelegraph = (x: number, y: number, ang: number, reach: number, arc: number, ranged: boolean, prog: number, color: number, boxType = -1) => {
+  const drawTelegraph = (x: number, y: number, ang: number, reach: number, arc: number, ranged: boolean, prog: number, color: number, boxType = -1, boxMult?: number) => {
     if (boxType >= 0) {
-      drawSpearBox(x, y, ang, reach, boxWidthMult(boxType, arc), color, 0.1 + 0.35 * prog, boxType === 0);
+      drawSpearBox(x, y, ang, reach, boxMult ?? boxWidthMult(boxType, arc), color, 0.1 + 0.35 * prog, boxType === 0);
       return;
     }
     if (ranged) {
@@ -1738,7 +1739,7 @@ async function main() {
       if (w[5] <= 0) continue;
       const v = enemies.views.get(w[0]);
       const st = ENEMY_STATS[w[4]]!;
-      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[6], st.reach, st.arc, st.ranged, w[5], 0xff3b3b, w[4] === 0 ? 0 : -1); // 적 마법사의 예고는 낙하 지점 표시가 대신한다
+      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[6], st.reach, st.arc, st.ranged, w[5], 0xff3b3b, w[4] === 0 || w[4] === SPEAR_TYPE ? w[4] : -1, ENEMY_BOX_WIDTH_MULT[w[4]!]); // 적 마법사의 예고는 낙하 지점 표시가 대신한다
     }
     for (const w of latest.mercs) {
       if (w[5] === undefined || w[6] <= 0) continue;
@@ -1824,24 +1825,30 @@ async function main() {
     }
 
     // 기병이 속도를 낼수록 뒤에 속도선이 길어진다
-    const streak = (x: number, y: number, face: number, mom: number) => {
+    const streak = (x: number, y: number, dir: number, mom: number) => {
       if (mom < 0.4) return;
-      for (const dy of [-8, 0, 8]) {
+      // 8방위 그림이 향한 방향의 반대쪽(뒤)으로, 몸 높이에서 평행한 세 줄
+      const ang = ((dir - 2) * Math.PI) / 4 + Math.PI;
+      const c = Math.cos(ang);
+      const s = Math.sin(ang);
+      for (const off of [-8, 0, 8]) {
+        const ox = x - s * off;
+        const oy = y - 8 + c * off;
         fxLayer
-          .moveTo(x - face * 16, y + dy)
-          .lineTo(x - face * (16 + 34 * mom), y + dy)
+          .moveTo(ox + c * 16, oy + s * 16)
+          .lineTo(ox + c * (16 + 34 * mom), oy + s * (16 + 34 * mom))
           .stroke({ width: 2, color: 0xffffff, alpha: 0.12 + 0.3 * mom });
       }
     };
     for (const w of latest.enemies) {
       if (w[4] !== 0) continue;
       const v = enemies.views.get(w[0]);
-      if (v) streak(v.x, v.y, v.face, w[9]);
+      if (v) streak(v.x, v.y, v.dir, w[9]);
     }
     for (const w of latest.mercs) {
       if (w[4] !== 0 || w[8] > 0) continue;
       const v = mercs.views.get(w[0]);
-      if (v) streak(v.x, v.y, v.face, w[13]);
+      if (v) streak(v.x, v.y, v.dir, w[13]);
     }
 
     // 병종 선택 표시: 범례를 노랗게, 일부만 선택했을 때는 그 병종 용병 발밑에 고리를 그린다

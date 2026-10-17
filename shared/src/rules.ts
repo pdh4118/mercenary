@@ -204,6 +204,8 @@ export function inBox(type: number, ox: number, oy: number, aim: number, tx: num
   if (f < -r * 0.5 || f > reach + r) return false;
   return l <= TUNE.CAV_HALF_WIDTH * widthMult + r;
 }
+/** 적의 직사각형 찌르기 폭 배율: 적 기병은 아군 기병의 절반 폭, 적 창병은 창병 용병과 같은 폭 */
+export const ENEMY_BOX_WIDTH_MULT: Readonly<Record<number, number>> = { [CAVALRY]: 0.5, [SPEAR]: 1 };
 /** 범위 증가 능력이 폭에 주는 배율: 기본 부채꼴 각 대비 현재 각의 비 */
 export function boxWidthMult(type: number, arc: number): number {
   return arc / MERC_STATS[type === CAVALRY ? CAVALRY : SPEAR]!.arc;
