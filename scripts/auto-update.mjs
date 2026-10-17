@@ -1,5 +1,5 @@
 // 서버를 켜 두고, GitHub에 새 버전이 올라오면 스스로 받아서(git pull) 다시 빌드하고 서버를 다시 켠다.
-//   node scripts/auto-update.mjs [--interval 120] [--branch main] [--force-after 30]
+//   node scripts/auto-update.mjs [--interval 60] [--branch main] [--force-after 30]
 // 접속자가 한 명도 없을 때만 업데이트하므로 게임 도중에 끊기지 않는다(--force-after N 이면 N분 기다린 뒤에는 접속자가 있어도 한다).
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -12,7 +12,7 @@ const opt = (name, def) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : def;
 };
 const ROOT = process.env.MERC_ROOT ?? join(dirname(fileURLToPath(import.meta.url)), "..");
-const INTERVAL_SEC = Math.max(5, Number(opt("interval", process.env.MERC_UPDATE_INTERVAL ?? 120)));
+const INTERVAL_SEC = Math.max(5, Number(opt("interval", process.env.MERC_UPDATE_INTERVAL ?? 60)));
 const BRANCH = opt("branch", process.env.MERC_UPDATE_BRANCH ?? "main");
 const FORCE_AFTER_MIN = Number(opt("force-after", process.env.MERC_UPDATE_FORCE_AFTER ?? 0)); // 0이면 접속자가 없을 때만
 const PORT = Number(process.env.PORT ?? 8080);
