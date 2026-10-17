@@ -209,8 +209,6 @@ const fanOffset = (i: number, n: number): number => {
 
 const POISON_PULSE_SEC = 0.5;
 /** 이보다 작은 돌격 피해는 카운터로 치지 않는다(막 출발한 기병) */
-/** 근접 피해 반사 비율 상한(공격 피해의 이 비율까지) */
-const THORNS_MAX_FRAC = 1;
 const COUNTER_MIN = 1;
 /** 카운터로 밀려나는 거리(px): 돌격 피해가 클수록 멀리 튕긴다 */
 const counterKnock = (amount: number): number => 50 + amount * 2;
@@ -252,7 +250,7 @@ interface Mods {
   heroCritMult: number;
   heroArea: number;
   heroKnock: number;
-  heroThorns: number; // 근접 피해 반사 비율
+  heroThorns: number; // 근접 반사 고정 피해
   heroFireRate: number;
   heroRegen: number;
   heroLifesteal: number;
@@ -3452,13 +3450,13 @@ export class Game {
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
   }
 
-  /** 근접 피해 반사(카드): 근접 공격을 받으면 그 공격의 피해(방어·방패로 줄기 전)의 일부를 공격자에게 돌려준다. 화살·마법·독에는 없다. */
+  /** 근접 반사(카드): 근접 공격을 받을 때마다 고정 피해를 공격자에게 돌려준다(방어·방패와 무관). 화살·마법·독에는 없다. */
   private thorns(owner: Slot | undefined, h: Hit, src?: Merc): void {
     if (!owner || h.dot || h.pierceGuard || !h.src) return;
-    const frac = Math.min(THORNS_MAX_FRAC, src ? mstat(owner.mods, src.type, "thorns") : owner.mods.heroThorns);
-    if (frac <= 0) return;
+    const flat = src ? mstat(owner.mods, src.type, "thorns") : owner.mods.heroThorns;
+    if (flat <= 0) return;
     const attacker = h.src as Enemy;
-    if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, h.damage * frac, owner.state.id, src);
+    if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, flat, owner.state.id, src);
   }
 
   private killEnemy(e: Enemy, ownerId: number, src?: Merc): void {

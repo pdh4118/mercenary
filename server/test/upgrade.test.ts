@@ -287,7 +287,7 @@ test("근접 피해 반사 카드: 근접 공격을 받으면 공격 피해의 �
     assert.ok(TUNE.PLAYER_MAX_HP - g.getPlayer(a)!.hp > 0, "맞았다");
     return g.getEnemy(e)!.hp;
   };
-  assert.ok(enemyHpAfter(0.3) < enemyHpAfter(0), "반사 카드가 있으면 공격자가 더 아프다");
+  assert.ok(enemyHpAfter(3) < enemyHpAfter(0), "반사 카드가 있으면 공격자가 더 아프다");
 });
 
 test("전설 효과: 피의 갈증은 준 피해만큼 체력을 회복한다", () => {
