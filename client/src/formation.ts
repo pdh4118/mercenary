@@ -50,6 +50,9 @@ export interface FormationUi {
 }
 
 /** 진형 저장·편집·빠른 적용. 저장은 이 브라우저(localStorage)에 하고, 서버에는 고른 진형만 보낸다. */
+/** 진형 선택·편성 화면을 보일지(지금은 끔. 다시 만들 때 true로) */
+export const FORMATION_UI_ENABLED = false;
+
 export function createFormationUi(opts: { send(m: ClientMsg): void; colors: readonly number[]; notify(text: string): void }): FormationUi {
   const saved = load();
   let editing = saved.active;
@@ -71,6 +74,7 @@ export function createFormationUi(opts: { send(m: ClientMsg): void; colors: read
 
   function renderBar(): void {
     bar.replaceChildren();
+    if (!FORMATION_UI_ENABLED) return; // 진형 선택 줄(기본·방진·양익 포위·측면 압박 + 편성)은 잠시 없앴다
     saved.presets.forEach((p, i) => {
       const b = document.createElement("button");
       b.className = i === saved.active ? "active" : "";
@@ -173,6 +177,7 @@ export function createFormationUi(opts: { send(m: ClientMsg): void; colors: read
   }
 
   const toggle = () => {
+    if (!FORMATION_UI_ENABLED) return;
     editor.classList.toggle("open");
     if (editor.classList.contains("open")) {
       editing = saved.active;
