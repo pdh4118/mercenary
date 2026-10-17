@@ -221,7 +221,7 @@ export const MERC_STATS: readonly UnitStats[] = [
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
-  { hp: 24, speed: 230, reach: 28, damage: 4, windup: 0.35, cooldown: 1.2, arc: deg(55), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
+  { hp: 24, speed: 230, reach: 46, damage: 4, windup: 0.35, cooldown: 1.2, arc: deg(55), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
   { hp: 28, speed: 85, reach: 58, damage: 5, windup: 0.45, cooldown: 1.3, arc: deg(22), ranged: false, radius: 12, leash: 0, shield: 0, splash: 0 },
   { hp: 18, speed: 75, reach: 260, damage: 4.5, windup: 0.5, cooldown: 2.0, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 0 },
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },

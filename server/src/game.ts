@@ -3,6 +3,7 @@ import {
   BLUNT,
   MAGE,
   EVT_METEOR,
+  EVT_REFLECT,
   type MeteorWire,
   CARDS,
   ENEMY_XP,
@@ -1988,6 +1989,7 @@ export class Game {
   /** 되돌려받은 피해(창병에게 돌격하면 자신에게 돌아온다)를 주인공이 입는다 */
   private hurtHeroReflect(s: Slot, amount: number): void {
     if (amount <= 0 || s.state.down) return;
+    this.pushDamage(EVT_REFLECT, 0, s.state.x, s.state.y, amount, s.state.id);
     const f = this.collectFriendlies().find((x) => x.ownerId === s.state.id && !x.merc);
     f?.hit({ damage: amount, charge: 0, srcType: SPEAR, fromAngle: 0, dot: true });
   }
@@ -3062,7 +3064,10 @@ export class Game {
           f.hit({ damage: dmg * this.splashFactor(mods, m.type), charge: 0, srcType: m.type, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit });
         }
       }
-      if (back > 0) this.hurtMerc(m, back);
+      if (back > 0) {
+        this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, back, m.owner);
+        this.hurtMerc(m, back);
+      }
       return;
     }
     const struck: Enemy[] = [];
@@ -3081,7 +3086,10 @@ export class Game {
       reflected += this.damageEnemy(e, { damage: dmg, charge, srcType: m.type, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit }, m.owner, m);
     }
     if (st.splash > 0) this.splashEnemies(struck, st.splash, dmg * this.splashFactor(mods, m.type), m.type, m.x, m.y, m.owner, m);
-    if (reflected > 0) this.hurtMerc(m, reflected); // 창병에게 돌격하면 그 피해가 자신에게 돌아온다
+    if (reflected > 0) {
+      this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, reflected, m.owner);
+      this.hurtMerc(m, reflected); // 창병에게 돌격하면 그 피해가 자신에게 돌아온다
+    }
   }
 
   /** 범위 공격: 맞힌 대상들 주변의 다른 적에게 일부 피해를 준다 */
@@ -3377,6 +3385,7 @@ export class Game {
 
   /** 되돌려받은 피해(방패·방어와 무관하게 몸에 직접 들어간다) */
   private reflectToEnemy(e: Enemy, amount: number, ownerId: number, src?: Merc): void {
+    this.pushDamage(EVT_REFLECT, e.id, e.x, e.y, amount, ownerId);
     if (src) this.gainMercXp(src, amount * MERC_XP_PER_DAMAGE);
     e.hp -= amount;
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
@@ -3976,8 +3985,13 @@ export class Game {
     // 예비 동작이 끝난 시점에 부채꼴 안에 있는 아군만 맞는다. 그 사이 피하면 맞지 않는다.
     const struck: Friendly[] = [];
     for (const f of friendlies) {
-      if (Math.hypot(f.x - e.x, f.y - e.y) > st.reach + f.radius) continue;
-      if (Math.abs(angleDiff(Math.atan2(f.y - e.y, f.x - e.x), e.atkAng)) > st.arc) continue;
+      if (e.type === CAVALRY) {
+        // 기병은 아군 기병처럼 짧은 직사각형으로 찌른다
+        if (!inBox(CAVALRY, e.x, e.y, e.atkAng, f.x, f.y, f.radius, st.reach)) continue;
+      } else {
+        if (Math.hypot(f.x - e.x, f.y - e.y) > st.reach + f.radius) continue;
+        if (Math.abs(angleDiff(Math.atan2(f.y - e.y, f.x - e.x), e.atkAng)) > st.arc) continue;
+      }
       struck.push(f);
     }
     for (const f of struck) {

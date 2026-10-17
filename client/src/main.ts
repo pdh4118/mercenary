@@ -32,6 +32,7 @@ import {
   EVT_DMG_ENEMY_CRIT,
   EVT_DMG_SHIELD,
   EVT_KNOCK,
+  EVT_REFLECT,
   EVT_SHIELD_BREAK,
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
@@ -337,7 +338,7 @@ async function main() {
   // 같은 순간에 나간 화살이 많으면 하나씩 소리 내는 대신 '화살 연사' 소리 하나로 낸다
   const shotBuf: { x: number; y: number; hostile: boolean }[] = [];
   let shotWindowStart = 0;
-  const hitFx: { node: Sprite; age: number }[] = [];
+  const hitFx: { node: Container; age: number; grow?: number; life?: number }[] = [];
   // 운석 폭발(폭발 컷 → 바닥 그을음 컷)과 떨어지는 운석 스프라이트
   const blasts: { x: number; y: number; r: number; age: number; boom: Sprite | null; scorch: Sprite | null }[] = [];
   const falling = new Map<number, Sprite>();
@@ -1036,6 +1037,15 @@ async function main() {
           else if (kind === EVT_METEOR) {
             blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
           }
+          else if (kind === EVT_REFLECT) {
+            // 창병의 반격: 맞은 자리에 주황 충격 고리와 금속음. 내 유닛과 관련된 반사는 피해 숫자도 띄운다.
+            audio.play("shield_block", { x, y });
+            const ring = new Graphics().circle(0, 0, 14).stroke({ width: 3, color: 0xffa23a }).circle(0, 0, 7).fill({ color: 0xfff0b0, alpha: 0.7 });
+            ring.position.set(x, y);
+            bulletLayer.addChild(ring);
+            hitFx.push({ node: ring, age: 0, grow: 2.2, life: 0.45 });
+            if (owner === myId) spawnFloat(`반사 ${numFmt(val)}`, x, y - 16, { fill: 0xffa23a, fontSize: 20, fontWeight: "900", stroke: { color: 0x3a1a00, width: 5 } }, 1.2, 0.4);
+          }
           else if (kind === EVT_DODGE) audio.play("dodge", { x, y });
           else if (kind === EVT_REVIVE) audio.play("revive_done", { x, y });
           else if ((kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) && !arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14)) audio.play("melee_hit", { x, y }); // 화살이 아닌 근접 타격
@@ -1540,8 +1550,10 @@ async function main() {
     for (let i = hitFx.length - 1; i >= 0; i--) {
       const fx = hitFx[i]!;
       fx.age += ticker.deltaMS / 1000;
-      fx.node.alpha = Math.max(0, 1 - fx.age / HIT_FX_SEC);
-      if (fx.age >= HIT_FX_SEC) {
+      const life = fx.life ?? HIT_FX_SEC;
+      fx.node.alpha = Math.max(0, 1 - fx.age / life);
+      if (fx.grow) fx.node.scale.set(1 + (fx.grow - 1) * Math.min(1, fx.age / life));
+      if (fx.age >= life) {
         fx.node.destroy();
         hitFx.splice(i, 1);
       }
@@ -1665,7 +1677,7 @@ async function main() {
       if (w[5] <= 0) continue;
       const v = enemies.views.get(w[0]);
       const st = ENEMY_STATS[w[4]]!;
-      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[6], st.reach, st.arc, st.ranged, w[5], 0xff3b3b); // 적 마법사의 예고는 낙하 지점 표시가 대신한다
+      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[6], st.reach, st.arc, st.ranged, w[5], 0xff3b3b, w[4] === 0 ? 0 : -1); // 적 마법사의 예고는 낙하 지점 표시가 대신한다
     }
     for (const w of latest.mercs) {
       if (w[5] === undefined || w[6] <= 0) continue;
