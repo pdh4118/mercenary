@@ -2877,6 +2877,12 @@ export class Game {
 
   /** 목표를 향해 한 걸음. 움직였으면 true. */
   private moveToward(f: { x: number; y: number }, tx: number, ty: number, speed: number, dt: number, stop: number): boolean {
+    const way = this.terrain?.route(f.x, f.y, tx, ty); // 고지대는 올라가는 길로만 오르내린다
+    if (way) {
+      tx = way[0];
+      ty = way[1];
+      stop = Math.min(stop, 4);
+    }
     const d = Math.hypot(tx - f.x, ty - f.y);
     if (d <= stop) return false;
     const step = Math.min(speed * dt, d - stop);

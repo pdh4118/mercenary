@@ -18,6 +18,8 @@ export interface TerrainSprite {
   readonly h: number;
   readonly circles: readonly (readonly number[])[]; // [x, y, 반지름] 스프라이트 픽셀(왼쪽 위 원점)
   readonly tops: readonly (readonly number[])[]; // 고지대 윗면 타원 [cx, cy, rx, ry]
+  readonly block?: boolean; // 올라갈 길이 없는 산: 통째로 통과할 수 없다(고지대 효과 없음)
+  readonly rampW?: number; // 올라가는 길의 반폭(스프라이트 픽셀)
   readonly ramp?: readonly (readonly number[])[]; // 올라가는 길(꺾은선, 스프라이트 픽셀). 이 길 위에서는 비탈이 덜 느리다
 }
 
@@ -89,17 +91,17 @@ export class TerrainMap {
       const world = (px: number, py: number): [number, number] => [x + (px - ax) * sc * fx, y + (py - ay) * sc];
       for (const c of s.circles) {
         const [wx, wy] = world(c[0]!, c[1]!);
-        this.solids.push({ x: wx, y: wy, r: c[2]! * sc, arrow: s.kind !== TK_TREE, obj: n });
+        this.solids.push({ x: wx, y: wy, r: c[2]! * sc, arrow: s.kind !== TK_TREE && c[3] !== 2, obj: n }); // 3번째 값 2: 절벽(화살은 넘어간다)
         extent = Math.max(extent, Math.hypot(wx - x, wy - y) + c[2]! * sc);
       }
-      if (s.kind === TK_PLATEAU) {
+      if (s.kind === TK_PLATEAU && !s.block) {
         const tops: Ell[] = s.tops.map((t) => {
           const [wx, wy] = world(t[0]!, t[1]!);
           return { x: wx, y: wy, rx: t[2]! * sc, ry: t[3]! * sc };
         });
         const [sx, sy] = world(s.w / 2, s.h * 0.58);
         const ramp = (s.ramp ?? []).map((p) => world(p[0]!, p[1]!));
-        this.plateaus.push({ tops, slope: { x: sx, y: sy, rx: s.w * 0.5 * sc, ry: s.h * 0.4 * sc }, ramp, rampHalf: Math.max(28, s.w * 0.045 * sc), obj: n });
+        this.plateaus.push({ tops, slope: { x: sx, y: sy, rx: s.w * 0.5 * sc, ry: s.h * 0.4 * sc }, ramp, rampHalf: Math.max(24, (s.rampW ?? s.w * 0.045) * sc), obj: n });
         extent = Math.max(extent, s.w * 0.5 * sc);
       }
       this.inArena.push(arenaRadius > 0 && Math.hypot(x, y) < arenaRadius + extent);
@@ -194,6 +196,52 @@ export class TerrainMap {
     return false;
   }
 
+  private inZone(p: Plateau, x: number, y: number): boolean {
+    return p.tops.some((t) => inEll(t, x, y)) || this.onRampOf(p, x, y);
+  }
+
+  /** 올라가는 길 꺾은선에서 가장 가까운 점의 위치(구간 번호 + 구간 안 비율)와 거리 */
+  private progress(p: Plateau, x: number, y: number): { pr: number; d: number } {
+    let best = { pr: 0, d: Infinity };
+    for (let i = 0; i + 1 < p.ramp.length; i++) {
+      const a = p.ramp[i]!;
+      const b = p.ramp[i + 1]!;
+      const dx = b[0]! - a[0]!;
+      const dy = b[1]! - a[1]!;
+      const l2 = dx * dx + dy * dy;
+      const u = l2 > 0 ? Math.max(0, Math.min(1, ((x - a[0]!) * dx + (y - a[1]!) * dy) / l2)) : 0;
+      const d = Math.hypot(x - (a[0]! + dx * u), y - (a[1]! + dy * u));
+      if (d < best.d) best = { pr: i + u, d };
+    }
+    return best;
+  }
+
+  /**
+   * 올라가는 길로만 오르내릴 수 있으므로, 고지대 안팎이나 층 사이를 오가는 유닛은 길을 따라가야 한다.
+   * 목적지(tx,ty)로 가기 위해 지금 향해야 할 중간 지점을 돌려준다. 그대로 가도 되면 null.
+   */
+  route(x: number, y: number, tx: number, ty: number): [number, number] | null {
+    for (const p of this.plateaus) {
+      if (!this.live(p.obj) || p.ramp.length < 2) continue;
+      const inS = this.inZone(p, x, y);
+      const inT = this.inZone(p, tx, ty);
+      if (!inS && !inT) continue; // 둘 다 밖: 이 고지대와 상관없다
+      const ps = inS ? this.progress(p, x, y).pr : -1;
+      const pt = inT ? this.progress(p, tx, ty).pr : -1;
+      if (Math.abs(ps - pt) < 0.6) continue; // 같은 층: 곧장
+      if (!inS) {
+        // 올라가기 전: 길 입구로(이미 입구 근처면 첫 구간으로)
+        return p.ramp[Math.abs(this.progress(p, x, y).d) < p.rampHalf * 1.6 ? 1 : 0]!;
+      }
+      if (pt > ps) return p.ramp[Math.min(p.ramp.length - 1, Math.floor(ps) + 1)]!; // 위로: 다음 꼭짓점
+      // 아래로: 지나온 꼭짓점
+      const k = Math.ceil(ps) - 1 < 0 ? 0 : Math.ceil(ps) - 1;
+      if (ps < 0.6 && pt < 0) return null; // 입구에 닿았다: 목적지로 곧장
+      return p.ramp[ps - Math.floor(ps) > 0.02 ? Math.floor(ps) : Math.max(0, k)]!;
+    }
+    return null;
+  }
+
   /** 올라가는 길(계단·다리) 위에 서 있는가 */
   onRamp(x: number, y: number): boolean {
     for (const p of this.plateaus) {
@@ -209,7 +257,11 @@ export class TerrainMap {
     for (const p of this.plateaus) {
       if (!this.live(p.obj)) continue;
       if (p.tops.some((t) => inEll(t, x, y))) m = Math.min(m, TUNE.PLATEAU_TOP_SPEED);
-      else if (inEll(p.slope, x, y)) m = Math.min(m, p.ramp.length >= 2 && this.onRampOf(p, x, y) ? TUNE.RAMP_SPEED : TUNE.SLOPE_SPEED);
+      else if (inEll(p.slope, x, y)) {
+        if (p.ramp.length >= 2) {
+          if (this.onRampOf(p, x, y)) m = Math.min(m, TUNE.RAMP_SPEED); // 길 밖은 절벽이라 들어올 수 없다
+        } else m = Math.min(m, TUNE.SLOPE_SPEED);
+      }
     }
     return m;
   }

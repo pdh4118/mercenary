@@ -11,11 +11,11 @@ const seeded = (seed: number) => {
   return () => (r = (r * 16807) % 2147483647) / 2147483647;
 };
 const ROCK = 0; // 큰 바위(발밑 원 3개)
-const PLATEAU = 61; // 길이 없는 고지대(418x413)
+const PLATEAU = 61; // 길이 없는 산(418x413): 통째로 통과 불가
 const RAMP_PLATEAU = 40; // 올라가는 길이 있는 고지대
+const RAMP_SMALL = 49; // 작은 고지대(윗면 하나)
 const rockAt = (x: number, y: number): TerrainWire => [ROCK, x, y, 1, 0];
-const plateauAt = (x: number, y: number): TerrainWire => [PLATEAU, x, y, 1.6, 0];
-const slopePoint = (m: TerrainMap): [number, number] => [m.plateaus[0]!.slope.x, m.plateaus[0]!.slope.y + m.plateaus[0]!.slope.ry * 0.7];
+const plateauAt = (x: number, y: number): TerrainWire => [RAMP_SMALL, x, y, 1.6, 0];
 
 test("지형 생성: 판마다 다르고, 시작 지점은 비어 있으며, 고지대·바위·나무가 섞인다", () => {
   const a = generateTerrain(seeded(1), WORLD_SIZE / 2, [[0, 0, 420]]);
@@ -52,44 +52,82 @@ test("바위는 통과할 수 없다: 주인공과 용병이 부딪혀 밀려난
   assert.equal(map.hitsSolid(300, -20, 5), true);
 });
 
-test("고지대: 올라가는 길은 크게, 윗면은 조금 느리고 고지대에서는 높음 판정", () => {
-  const map = new TerrainMap([plateauAt(0, 0)]);
-  assert.equal(map.elevated(0, 0), true);
+test("고지대: 윗면은 높음 판정, 올라가는 길만 오를 수 있고 나머지는 절벽이다", () => {
+  const map = new TerrainMap([[RAMP_PLATEAU, 0, 0, 1.6, 0]]);
+  assert.equal(map.elevated(0, 0), true, "윗면 중심");
   assert.equal(map.speedMult(0, 0), TUNE.PLATEAU_TOP_SPEED);
   assert.equal(map.elevated(1500, 0), false);
   assert.equal(map.speedMult(1500, 0), 1);
-  // 윗면 아래 절벽 쪽은 비탈
-  const [sx, sy] = slopePoint(map);
-  assert.equal(map.elevated(sx, sy), false);
-  assert.equal(map.speedMult(sx, sy), TUNE.SLOPE_SPEED);
-  assert.equal(map.onRamp(sx, sy), false);
-  // 올라가는 길이 있는 고지대: 길 위는 비탈보다 덜 느리다
-  const r = new TerrainMap([[RAMP_PLATEAU, 0, 0, 1.6, 0]]);
-  const [rx, ry] = r.plateaus[0]!.ramp[1]!;
-  assert.equal(r.onRamp(rx, ry), true);
-  assert.equal(r.speedMult(rx, ry), r.elevated(rx, ry) ? TUNE.PLATEAU_TOP_SPEED : TUNE.RAMP_SPEED);
+  const p = map.plateaus[0]!;
+  // 올라가는 길 위는 막히지 않고 비탈보다 덜 느리다
+  const [rx, ry] = p.ramp[1]!;
+  assert.equal(map.onRamp(rx, ry), true);
+  assert.equal(map.hitsSolid(rx, ry, 14), false, "길 위는 통과할 수 있다");
+  assert.equal(map.speedMult(rx, ry), map.elevated(rx, ry) ? TUNE.PLATEAU_TOP_SPEED : TUNE.RAMP_SPEED);
   assert.ok(TUNE.RAMP_SPEED > TUNE.SLOPE_SPEED);
+  // 절벽(길도 윗면도 아닌 곳)은 통과할 수 없지만 화살은 넘어간다
+  const wall = map.solids[0]!;
+  assert.equal(map.hitsSolid(wall.x, wall.y, 5), true);
+  assert.equal(map.hitsSolid(wall.x, wall.y, 5, true), false, "절벽은 화살을 막지 않는다");
+  const [ox, oy] = map.pushOut(wall.x, wall.y, 14);
+  assert.ok(Math.hypot(ox - wall.x, oy - wall.y) > 5);
+  // 길이 없는 산은 통째로 통과할 수 없고 화살도 막는다
+  const mountain = new TerrainMap([[PLATEAU, 0, 0, 1.6, 0]]);
+  assert.equal(mountain.plateaus.length, 0, "고지대 효과 없음");
+  assert.equal(mountain.elevated(0, 0), false);
+  assert.equal(mountain.hitsSolid(0, 0, 10), true, "산 한가운데는 막혀 있다");
+  assert.equal(mountain.hitsSolid(0, 0, 10, true), true);
 });
 
-test("비탈에서는 이동한 거리가 줄어든다", () => {
+test("올라가는 길 위에서는 이동한 거리가 줄어든다", () => {
   const dist = (terrain: TerrainWire[] | null) => {
     const g = new Game();
     g.autoSpawn = false;
     g.setTerrain(terrain);
     const a = g.addPlayer("a")!;
     const p = g.getPlayer(a)!;
-    const [sx, sy] = terrain ? slopePoint(new TerrainMap(terrain)) : [-100, 0];
-    p.x = sx - 60;
-    p.y = sy; // 비탈 위
+    let dx = 1;
+    let dy = 0;
+    if (terrain) {
+      const m = g.terrain!;
+      const r = m.plateaus[0]!.ramp;
+      p.x = r[1]![0]!;
+      p.y = r[1]![1]!;
+      dx = r[2]![0]! - r[1]![0]!;
+      dy = r[2]![1]! - r[1]![1]!;
+      const l = Math.hypot(dx, dy);
+      dx /= l;
+      dy /= l;
+    } else {
+      p.x = -300;
+      p.y = -300;
+    }
     const x0 = p.x;
-    g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false });
-    run(g, 1);
-    return p.x - x0;
+    const y0 = p.y;
+    g.setInput(a, { dx, dy, aim: 0, fire: false });
+    run(g, 0.4);
+    return Math.hypot(p.x - x0, p.y - y0);
   };
   const flat = dist(null);
-  const slope = dist([plateauAt(0, 0)]);
-  assert.ok(flat > 150);
-  assert.ok(Math.abs(slope / flat - TUNE.SLOPE_SPEED) < 0.08, `${slope} / ${flat}`);
+  const ramp = dist([[RAMP_PLATEAU, 0, 0, 1.6, 0]]);
+  assert.ok(flat > 60);
+  assert.ok(ramp / flat > 0.6 && ramp / flat < 0.95, `${ramp} / ${flat}`);
+});
+
+test("용병은 올라가는 길을 따라 고지대 위의 주인공에게 간다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  g.setTerrain([[RAMP_PLATEAU, 0, 0, 1.6, 0]]);
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  p.x = 0;
+  p.y = 0; // 윗면 중심
+  const map = g.terrain!;
+  const start = map.plateaus[0]!.ramp[0]!;
+  const id = g.addMerc(a, 1, start[0]! + 150, start[1]! + 150);
+  run(g, 40);
+  const m = g.getMerc(id)!;
+  assert.ok(map.elevated(m.x, m.y) || map.onRamp(m.x, m.y), `용병이 길을 못 찾았다: (${Math.round(m.x)}, ${Math.round(m.y)})`);
 });
 
 test("바위·폐허는 화살을 막는다", () => {
