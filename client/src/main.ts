@@ -33,6 +33,7 @@ import {
   EVT_DMG_SHIELD,
   EVT_KNOCK,
   EVT_REFLECT,
+  EVT_COUNTER,
   EVT_SHIELD_BREAK,
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
@@ -1037,14 +1038,15 @@ async function main() {
           else if (kind === EVT_METEOR) {
             blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
           }
-          else if (kind === EVT_REFLECT) {
-            // 창병의 반격: 맞은 자리에 주황 충격 고리와 금속음. 내 유닛과 관련된 반사는 피해 숫자도 띄운다.
+          else if (kind === EVT_REFLECT || kind === EVT_COUNTER) {
+            // 가시 갑옷의 반사(주황)와 창병의 카운터(붉은 주황, 더 크게): 맞은 자리에 충격 고리와 금속음. 내 유닛과 관련되면 피해 숫자도 띄운다.
+            const counter = kind === EVT_COUNTER;
             audio.play("shield_block", { x, y });
-            const ring = new Graphics().circle(0, 0, 14).stroke({ width: 3, color: 0xffa23a }).circle(0, 0, 7).fill({ color: 0xfff0b0, alpha: 0.7 });
+            const ring = new Graphics().circle(0, 0, 14).stroke({ width: counter ? 4 : 3, color: counter ? 0xff6a3a : 0xffa23a }).circle(0, 0, 7).fill({ color: 0xfff0b0, alpha: 0.7 });
             ring.position.set(x, y);
             bulletLayer.addChild(ring);
             hitFx.push({ node: ring, age: 0, grow: 2.2, life: 0.45 });
-            if (owner === myId) spawnFloat(`반사 ${numFmt(val)}`, x, y - 16, { fill: 0xffa23a, fontSize: 20, fontWeight: "900", stroke: { color: 0x3a1a00, width: 5 } }, 1.2, 0.4);
+            if (owner === myId) spawnFloat(`${counter ? "카운터!" : "반사"} ${numFmt(val)}`, x, y - 16, { fill: counter ? 0xff7a3a : 0xffa23a, fontSize: counter ? 24 : 20, fontWeight: "900", stroke: { color: 0x3a1000, width: 5 } }, counter ? 1.4 : 1.2, 0.5);
           }
           else if (kind === EVT_DODGE) audio.play("dodge", { x, y });
           else if (kind === EVT_REVIVE) audio.play("revive_done", { x, y });

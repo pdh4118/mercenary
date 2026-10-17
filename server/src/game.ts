@@ -4,6 +4,7 @@ import {
   MAGE,
   EVT_METEOR,
   EVT_REFLECT,
+  EVT_COUNTER,
   type MeteorWire,
   CARDS,
   ENEMY_XP,
@@ -1993,7 +1994,7 @@ export class Game {
   /** 되돌려받은 피해(창병에게 돌격하면 자신에게 돌아온다)를 주인공이 입는다 */
   private hurtHeroReflect(s: Slot, amount: number): void {
     if (amount <= 0 || s.state.down) return;
-    this.pushDamage(EVT_REFLECT, 0, s.state.x, s.state.y, amount, s.state.id);
+    this.pushDamage(EVT_COUNTER, 0, s.state.x, s.state.y, amount, s.state.id);
     const f = this.collectFriendlies().find((x) => x.ownerId === s.state.id && !x.merc);
     f?.hit({ damage: amount, charge: 0, srcType: SPEAR, fromAngle: 0, dot: true });
   }
@@ -2304,7 +2305,7 @@ export class Game {
             if (amount >= COUNTER_MIN && (m.momentum >= COUNTER_MOMENTUM || m.chargeSnap > 0)) {
               m.momentum = 0;
               m.chargeSnap = 0;
-              this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, amount, m.owner);
+              this.pushDamage(EVT_COUNTER, m.id, m.x, m.y, amount, m.owner);
               this.hurtMerc(m, amount);
             }
           }
@@ -3140,7 +3141,7 @@ export class Game {
         e.momentum = 0;
         e.chargeSnap = 0;
         e.hp -= amount;
-        this.pushDamage(EVT_REFLECT, e.id, e.x, e.y, amount, ownerId);
+        this.pushDamage(EVT_COUNTER, e.id, e.x, e.y, amount, ownerId);
       }
     }
     const dealt = Math.min(r.body, Math.max(0, e.hp));
