@@ -275,12 +275,25 @@ async function main() {
     lastX: number;
     lastY: number;
     dir: number; // 8방위 그림용 방향(0=북, 시계 방향)
+    spd: number; // 부드럽게 만든 이동 속도(px/초) - 기병 달리기 모션용
+    phase: number; // 달리기 박자(라디안)
     face: 1 | -1;
   }
   const faceFrom = (v: Facing, x: number, attackAng: number | null) => {
     if (attackAng !== null) v.face = Math.cos(attackAng) >= 0 ? 1 : -1;
     else if (Math.abs(x - v.lastX) > 0.15) v.face = x > v.lastX ? 1 : -1;
     v.lastX = x;
+  };
+  /** 기병 달리기 모션: 속도에 비례해 말이 위아래로 출렁이고 몸이 앞뒤로 기운다. 찌르는 동안과 멈춰 있을 때는 가만히. */
+  const cavGait = (v: Facing & { x: number; y: number; sprite: Sprite }, dtMs: number, thrusting: boolean, scale: number) => {
+    const dt = Math.max(dtMs, 1) / 1000;
+    const inst = Math.hypot(v.x - v.lastX, v.y - v.lastY) / dt;
+    v.spd += (Math.min(inst, 400) - v.spd) * Math.min(1, dt * 8);
+    const run = thrusting ? 0 : Math.min(1, Math.max(0, (v.spd - 25) / 130));
+    v.phase += dt * (8 + v.spd * 0.022);
+    const s = Math.sin(v.phase);
+    v.sprite.pivot.y = (Math.abs(s) * 3.2 * run) / scale; // 화면에서 최대 약 3px 튀어 오른다
+    v.sprite.rotation = s * 0.045 * run;
   };
   /** 8방위 방향: 공격 중이면 공격 방향, 아니면 움직인 방향. 경계 근처에서 깜빡이지 않게 충분히 넘어갔을 때만 바꾼다. */
   const cavDir = (v: Facing, x: number, y: number, attackAng: number | null) => {
@@ -301,7 +314,7 @@ async function main() {
       if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
       else sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       enemyLayer.addChild(sprite);
-      return { node: sprite, sprite, x: 0, y: 0, lastX: w[1], lastY: w[2], dir: 2, face: 1 };
+      return { node: sprite, sprite, x: 0, y: 0, lastX: w[1], lastY: w[2], dir: 2, spd: 0, phase: 0, face: 1 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -402,7 +415,7 @@ async function main() {
       label.visible = false;
       node.addChild(ring, sprite, bar, label);
       mercLayer.addChild(node);
-      return { node, bar, sprite, label, ring, ringColor: -1, ringTeam: false, ringShape: [0, footY, st.radius * 1.25, st.radius * 0.6], x: 0, y: 0, lastKey: "", lastX: w[1], lastY: w[2], dir: 2, face: 1, wasDown: w[8] > 0 };
+      return { node, bar, sprite, label, ring, ringColor: -1, ringTeam: false, ringShape: [0, footY, st.radius * 1.25, st.radius * 0.6], x: 0, y: 0, lastKey: "", lastX: w[1], lastY: w[2], dir: 2, spd: 0, phase: 0, face: 1, wasDown: w[8] > 0 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -1468,6 +1481,7 @@ async function main() {
       const size = w[11] === 1 ? BOSS_SIZE : 1;
       if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
+        cavGait(v, ticker.deltaMS, w[5] > 0, CAV_SCALE * size);
         v.sprite.texture = enemyCav[w[5] > 0 ? 1 : 0]![v.dir]!;
         v.sprite.scale.set(CAV_SCALE * size);
         v.lastX = v.x;
@@ -1539,6 +1553,7 @@ async function main() {
       const col = ownerColor(w[5]);
       if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[6] > 0 ? w[7] : null);
+        cavGait(v, ticker.deltaMS, w[6] > 0, CAV_SCALE * grow);
         v.sprite.texture = cavTex(`a${col}`, w[6] > 0 ? 1 : 0, v.dir, col);
         v.sprite.scale.set(CAV_SCALE * grow);
         v.lastX = v.x;
