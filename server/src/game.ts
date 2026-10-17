@@ -923,6 +923,7 @@ export class Game {
     if (!duel) {
       this.stepEnemies(dt, friendlies);
       this.separateEnemies();
+      this.separateCross(dt);
     }
     this.terrainEnd();
     this.stepBullets(dt, friendlies);
@@ -4133,6 +4134,68 @@ export class Game {
       const r = MERC_STATS[m.type]!.radius;
       m.x = clampToWorld(m.x + x * k, r);
       m.y = clampToWorld(m.y + y * k, r);
+    }
+  }
+
+  /**
+   * 적·아군 용병·주인공이 서로 포개지지 않게 약하게 밀어낸다. 주인공은 밀리지 않고 상대만 비켜 준다.
+   * 돌격 중인 기병(속도가 붙은 아군·적 기병)은 다른 유닛을 통과한다. 공격 준비 중인 쪽은 제자리를 지키고 상대가 더 밀린다.
+   */
+  private separateCross(dt: number): void {
+    const CELL = 64;
+    const key = (cx: number, cy: number) => cx * 100003 + cy;
+    const charging = (f: Fighter) => f.type === CAVALRY && f.momentum >= TUNE.CROSS_CHARGE_MOMENTUM;
+    const grid = new Map<number, Enemy[]>();
+    for (const e of this.enemies.values()) {
+      if (charging(e)) continue;
+      const k = key(Math.floor(e.x / CELL), Math.floor(e.y / CELL));
+      const cell = grid.get(k);
+      if (cell) cell.push(e);
+      else grid.set(k, [e]);
+    }
+    if (grid.size === 0) return;
+    const maxStep = TUNE.CROSS_SEPARATION_SPEED * dt;
+    const move = new Map<Fighter, [number, number]>();
+    const shove = (o: Fighter, x: number, y: number) => {
+      const v = move.get(o);
+      if (v) {
+        v[0] += x;
+        v[1] += y;
+      } else move.set(o, [x, y]);
+    };
+    // pusher: 밀리지 않는 쪽(주인공) 또는 둘 다 밀리는 용병
+    const around = (x: number, y: number, r: number, atk: boolean, hero: boolean, self: Merc | null) => {
+      const cx = Math.floor(x / CELL);
+      const cy = Math.floor(y / CELL);
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          for (const e of grid.get(key(cx + ox, cy + oy)) ?? []) {
+            const min = r + radiusOf(e);
+            const dx = e.x - x;
+            const dy = e.y - y;
+            const d = Math.hypot(dx, dy);
+            if (d >= min) continue;
+            const push = Math.min(maxStep, (min - d) * 0.5);
+            const nx = d > 0.001 ? dx / d : Math.cos(e.id);
+            const ny = d > 0.001 ? dy / d : Math.sin(e.id);
+            const eFixed = e.atkT > 0;
+            const wo = hero ? (eFixed ? 0.5 : 1) : eFixed ? 0 : atk ? 2 : 1;
+            shove(e, nx * push * wo, ny * push * wo);
+            if (self && !hero) shove(self, -nx * push * (atk ? 0 : eFixed ? 2 : 1), -ny * push * (atk ? 0 : eFixed ? 2 : 1));
+          }
+        }
+      }
+    };
+    for (const m of this.mercs.values()) {
+      if (m.respawn > 0 || charging(m)) continue;
+      around(m.x, m.y, MERC_STATS[m.type]!.radius, m.atkT > 0, false, m);
+    }
+    for (const s of this.slots.values()) if (!s.state.down) around(s.state.x, s.state.y, PLAYER_RADIUS, false, true, null);
+    for (const [f, [x, y]] of move) {
+      const l = Math.hypot(x, y);
+      const k = l > maxStep ? maxStep / l : 1;
+      f.x = clampToWorld(f.x + x * k, 14);
+      f.y = clampToWorld(f.y + y * k, 14);
     }
   }
 

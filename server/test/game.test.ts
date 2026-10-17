@@ -890,8 +890,8 @@ test("철퇴는 맞힌 대상 주변의 다른 적에게 절반 피해(범위 �
   const p = me(g, a);
   g.setWeapon(a, 3);
   run(g, WEAPON_SWITCH_DELAY_SEC + 0.1); // 무기 교체 대기가 끝난 뒤에 적을 놓아 위치가 흐트러지지 않게 한다
-  const main = g.spawnEnemyAt(p.x + 30, p.y, SPEAR);
-  const near = g.spawnEnemyAt(p.x - 10, p.y + 20, SPEAR); // 부채꼴(반각 100도) 밖이지만 대상 가까이
+  const main = g.spawnEnemyAt(p.x + 28, p.y + 10, SPEAR);
+  const near = g.spawnEnemyAt(p.x - 10, p.y + 30, SPEAR); // 부채꼴(반각 100도) 밖이지만 대상 가까이(주인공과 겹치면 밀려나므로 몸 밖에 둔다)
   const far = g.spawnEnemyAt(p.x + 30, p.y + 160, SPEAR); // 멀리 떨어진 적은 안 맞는다
   g.setInput(a, { ...idle, fire: true });
   run(g, WEAPONS[3]!.windup + 0.2); // 준비 동작이 끝나야 휘두른다
@@ -1335,4 +1335,22 @@ test("창병 카운터: 아군 기병 용병도 적 창병에게 먼저 맞으�
   assert.ok(Math.abs(g.getMerc(c)!.x - x0) > 40, "카운터로 뒤로 밀려난다");
   assert.equal(m.momentum, 0);
   assert.ok(hp0 - m.hp >= 10 + chargeBonus(MERC_STATS[CAVALRY]!.speed, 1) - 1e-6);
+});
+
+test("겹침 방지: 주인공 위에 포개진 적은 비켜 나가지만, 달리는 기병은 통과한다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = me(g, a);
+  const blunt = g.spawnEnemyAt(p.x + 2, p.y, BLUNT);
+  const cav = g.spawnEnemyAt(p.x - 2, p.y, CAVALRY);
+  (g.getEnemy(cav) as { momentum: number }).momentum = 1; // 돌격 중
+  const sep = (g as unknown as { separateCross(dt: number): void }).separateCross.bind(g);
+  const bx = g.getEnemy(blunt)!.x;
+  const cx = g.getEnemy(cav)!.x;
+  for (let i = 0; i < 10; i++) sep(0.05);
+  assert.ok(Math.abs(g.getEnemy(blunt)!.x - bx) + Math.abs(g.getEnemy(blunt)!.y - p.y) > 5, "겹친 적은 밀려난다");
+  assert.equal(g.getEnemy(cav)!.x, cx, "돌격 중인 기병은 밀리지 않는다");
+  (g.getEnemy(cav) as { momentum: number }).momentum = 0;
+  for (let i = 0; i < 10; i++) sep(0.05);
+  assert.ok(Math.abs(g.getEnemy(cav)!.x - cx) > 1, "속도가 없으면 기병도 밀려난다");
 });

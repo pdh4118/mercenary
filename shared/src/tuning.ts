@@ -96,6 +96,8 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   RAMP_SPEED: ["고지대 올라가는 길(계단·다리) 이동 속도 배율", G.terrain, 0.1, 1.2, 0.05],
   SLOPE_SPEED: ["고지대 비탈(오르는 길) 이동 속도 배율", G.terrain, 0.1, 1.2, 0.05],
   MERC_SPACING: ["용병끼리 유지하는 거리 배율(반지름 합 x 이 값)", G.ai, 1, 4, 0.1],
+  CROSS_SEPARATION_SPEED: ["아군·적·주인공이 겹쳤을 때 밀려나는 속도(px/초)", G.ai, 0, 600, 10],
+  CROSS_CHARGE_MOMENTUM: ["이 속도 이상의 기병은 돌격 중이라 통과한다(0~1)", G.ai, 0, 1, 0.05],
   MERC_SEPARATION_SPEED: ["겹친 용병이 밀려나는 속도(px/초)", G.ai, 0, 600, 10],
   GUARD_HERO_RADIUS: ["주인공 호위: 주인공 둘레 이 거리 안의 적은 막으러 나선다(px)", G.ai, 0, 800, 10],
   CATCHUP_MAX: ["용병이 진형으로 따라붙는 최대 속도 배율", G.ai, 1, 6, 0.1],

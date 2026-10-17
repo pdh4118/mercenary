@@ -71,6 +71,8 @@ export const TUNE = {
   PLATEAU_TOP_SPEED: 0.85, // 고지대 윗면에서의 이동 속도 배율
   SLOPE_SPEED: 0.4,
   RAMP_SPEED: 0.75, // 계단·다리 같은 올라가는 길 위에서의 이동 속도 배율 // 고지대를 오르는 비탈에서의 이동 속도 배율
+  CROSS_SEPARATION_SPEED: 120, // 아군과 적·주인공이 겹쳤을 때 밀려나는 최대 속도(px/초). 달리는 기병은 제외
+  CROSS_CHARGE_MOMENTUM: 0.3, // 기병이 이 속도(0..1) 이상이면 돌격 중이라 다른 유닛을 통과한다
   MERC_SPACING: 1.9, // 용병끼리 유지하려는 거리 = 두 용병 반지름 합 x 이 값(뭉치지 않게)
   MERC_SEPARATION_SPEED: 160, // 겹친 용병이 서로 밀려나는 최대 속도(px/초)
   GUARD_HERO_RADIUS: 260, // 주인공 호위에서 주인공 둘레 이 거리 안의 적은 진형 자리에서 멀어도 막으러 나선다
