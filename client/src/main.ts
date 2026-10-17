@@ -35,6 +35,7 @@ import {
   EVT_REFLECT,
   EVT_COUNTER,
   EVT_DMG_POISON,
+  EVT_DMG_POISON_ALLY,
   EVT_SHIELD_BREAK,
   EVT_SHIELD_BLOCK,
   REVIVE_RADIUS,
@@ -1058,6 +1059,7 @@ async function main() {
           if (owner === myId && kind === EVT_DMG_ENEMY) spawnFloat(numFmt(val), x, y, { fill: 0xffffff, fontSize: 15, fontWeight: "600", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_ENEMY_CRIT) spawnFloat(`${numFmt(val)}!`, x, y, { fill: 0xffd45d, fontSize: 25, fontWeight: "900", stroke: { color: 0x7a2e00, width: 5 } }, 1.1, 0.5);
           else if (owner === myId && kind === EVT_DMG_POISON) spawnFloat(numFmt(val), x, y, { fill: 0xc77dff, fontSize: 14, fontWeight: "700", stroke: { color: 0x2a0a40, width: 3 } }, 0.8, 0);
+          else if (owner === myId && kind === EVT_DMG_POISON_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xc77dff, fontSize: 16, fontWeight: "700", stroke: { color: 0x2a0a40, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DMG_SHIELD) spawnFloat(numFmt(val), x, y, { fill: 0x9fdcff, fontSize: 13, fontWeight: "600", stroke: { color: 0x0a1a2a, width: 3 } }, 0.6, 0);
           else if (owner === myId && kind === EVT_DMG_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xff5a5a, fontSize: 17, fontWeight: "700", stroke: { color: 0x2a0000, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DODGE) spawnFloat("회피", x, y, { fill: 0xd8e0ee, fontSize: 14, fontStyle: "italic", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);

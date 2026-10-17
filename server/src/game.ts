@@ -6,6 +6,7 @@ import {
   EVT_REFLECT,
   EVT_COUNTER,
   EVT_DMG_POISON,
+  EVT_DMG_POISON_ALLY,
   type MeteorWire,
   CARDS,
   ENEMY_XP,
@@ -2281,7 +2282,7 @@ export class Game {
           const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)) * this.damageTakenMult(p.id); // 고정 감소가 먼저, 방어력(%)은 그다음
           p.hp -= taken;
           s.stats.taken += taken;
-          this.pushDamage(EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
+          this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
           this.thorns(s, h);
           if (p.hp <= 0) {
             p.hp = 0;
@@ -2323,7 +2324,7 @@ export class Game {
           const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)) * this.damageTakenMult(m.owner);
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
-          this.pushDamage(EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner);
+          this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner); // 독 틱(dot, 병종 없음)은 보라색 숫자
           this.thorns(this.slots.get(m.owner), h, m);
           return r.reflected;
         },
