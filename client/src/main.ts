@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
-import { CAV8_RULE, UNIT_RULES, recolored } from "./recolor.js";
+import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
 import { bindAudioUi, createAudio } from "./audio.js";
@@ -97,6 +97,27 @@ const TYPE_COLORS = [0xe8883a, 0x6fc46f, 0xe6d45d, 0x5da6e0, 0xb07be0, 0x4fd1d9]
 const UNIT_FILES = ["cavalry", "spear", "archer", "sword", "mace", "mage"] as const;
 /** 이미지는 화면 표시 크기의 약 2배로 만들어 두었다 */
 const SPRITE_SCALE = 0.5;
+/** 독에 중독된 유닛은 몸 전체가 옅은 보라색으로 덮인다 */
+const POISON_TINT = 0xd2a8ff;
+const poisonOverlay = new WeakMap<Sprite, Sprite>();
+/** 중독 표시: 같은 모양의 흰 실루엣을 옅은 보라색으로 위에 씌운다. 끄면 숨긴다. */
+const setPoison = (sprite: Sprite, on: boolean) => {
+  let o = poisonOverlay.get(sprite);
+  if (!on) {
+    if (o) o.visible = false;
+    return;
+  }
+  if (!o) {
+    o = new Sprite();
+    o.tint = POISON_TINT;
+    o.alpha = 0.38;
+    sprite.addChild(o);
+    poisonOverlay.set(sprite, o);
+  }
+  o.visible = true;
+  o.anchor.copyFrom(sprite.anchor);
+  o.texture = silhouette(sprite.texture);
+};
 /** 스프라이트 기준점: 가로 중앙, 세로는 몸통 쪽(발은 그 아래). 서버의 유닛 좌표가 몸통 중심이 된다. */
 const SPRITE_ANCHOR_Y = 0.65;
 /** 주인공 스프라이트 파일 이름(무기 순서: 활, 창, 검, 철퇴, 지팡이, 기마) */
@@ -1527,6 +1548,7 @@ async function main() {
       }
       v.sprite.zIndex = v.y;
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
+      setPoison(v.sprite, w[12] === 1);
     });
     bullets.update(latest.bullets, k, (v, w) => {
       // 이동한 방향으로 화살을 돌린다
@@ -1601,6 +1623,7 @@ async function main() {
         v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
       }
       v.node.zIndex = v.y;
+      setPoison(v.sprite, w[18] === 1);
       v.label.visible = showNames || mercPanel.hovered() === w[0];
       const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}/${w[15]}/${isReady(w) ? 1 : 0}`;
       if (v.lastKey !== key) {
@@ -1635,6 +1658,7 @@ async function main() {
       const tex = heroTex[p.weapon] ?? heroTex[0]!;
       if (v.sprite.texture !== tex) v.sprite.texture = tex;
       v.sprite.scale.set(HERO_SCALE * (Math.cos(p.aim) >= 0 ? 1 : -1), HERO_SCALE);
+      setPoison(v.sprite, !!p.poisoned);
       drawBar(v.bar, p.hp, p.maxHp, 36, HERO_TOP - 6);
       if (dead) {
         // 부활 진행도

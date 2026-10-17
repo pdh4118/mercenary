@@ -70,3 +70,26 @@ export function recolored(key: string, src: Texture, rule: RecolorRule, color: n
   cache.set(ck, t);
   return t;
 }
+
+const silCache = new WeakMap<Texture, Texture>();
+/** 같은 모양의 흰 실루엣 텍스처(독에 중독된 유닛 위에 옅은 보라색 막을 씌울 때 쓴다) */
+export function silhouette(src: Texture): Texture {
+  const hit = silCache.get(src);
+  if (hit) return hit;
+  const w = src.source.pixelWidth;
+  const h = src.source.pixelHeight;
+  const cv = document.createElement("canvas");
+  cv.width = w;
+  cv.height = h;
+  const ctx = cv.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(src.source.resource as CanvasImageSource, 0, 0);
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = d[i + 1] = d[i + 2] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = Texture.from(cv);
+  silCache.set(src, t);
+  return t;
+}

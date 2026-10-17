@@ -937,7 +937,7 @@ export class Game {
   // --- 스냅샷 -----------------------------------------------------------
 
   snapshotPlayers(): PlayerState[] {
-    return [...this.slots.values()].map((s) => ({ ...s.state, hs: this.heroStats(s) }));
+    return [...this.slots.values()].map((s) => ({ ...s.state, hs: this.heroStats(s), poisoned: (this.duelPoison.get(-s.state.id)?.t ?? 0) > 0 }));
   }
 
   /** 화면에 보여 줄 주인공 능력치(지금 든 무기와 카드가 반영된 값) */
@@ -978,6 +978,7 @@ export class Game {
       round(e.momentum, 100),
       round(e.regenT, 10),
       e.boss ? 1 : 0,
+      e.poisonT && e.poisonT > 0 ? 1 : 0,
     ]);
   }
 
@@ -1001,6 +1002,7 @@ export class Game {
       m.tier,
       m.nameId,
       Math.floor(m.xp),
+      (this.duelPoison.get(m.id)?.t ?? 0) > 0 ? 1 : 0,
     ]);
   }
 

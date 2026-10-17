@@ -82,6 +82,7 @@ export interface PlayerState {
   xp: number; // 현재 레벨에서 모은 경험치
   xpNeed: number; // 다음 레벨까지 필요한 경험치
   pending: number; // 아직 고르지 않은 카드 선택 횟수(레벨업 + 보상 상자)
+  poisoned?: boolean; // 독에 중독된 상태(토너먼트)
   hs: number[]; // 주인공 능력치(지금 무기 기준): [공격력, 초당 공격 횟수, 사거리, 치명타 확률, 치명타 배율, 관통, 범위 배율, 넉백, 방어력, 회피율, 재생(초당), 이동 속도, 발사 수, 흡혈]
   stance: number; // 용병 진형 모드(STANCE_DEFEND / STANCE_ASSAULT / STANCE_HOLD)
   holdX: number; // 지점 방어 모드에서 지키는 지점(stance가 STANCE_HOLD일 때만 의미가 있다)
@@ -125,6 +126,7 @@ export type EnemyWire = [
   mom: number, // 기병의 속도 0..1
   regen: number, // 깨진 방패가 재생될 때까지 남은 초(0이면 해당 없음)
   boss: number, // 1이면 보스(장군)
+  poison: number, // 1이면 독에 중독된 상태(몸이 보랏빛으로 보인다)
 ];
 export type MercWire = [
   id: number,
@@ -145,6 +147,7 @@ export type MercWire = [
   tier: number, // 강화 단계 0~4
   nameId: number, // mercName()으로 이름을 얻는다
   xp: number, // 용병 경험치(다음 단계 필요량은 mercXpNeed)
+  poison: number, // 1이면 독에 중독된 상태(토너먼트)
 ];
 /** 서버가 알려 주는 순간 효과(그 틱에 일어난 일): [종류, x, y, 방향] */
 export const EVT_ARROW_HIT = 0; // 아군 화살 명중
