@@ -220,6 +220,9 @@ async function main() {
 
   // --- 지형: 서버가 판마다 보내 준다 ---
   const terrainTex = new Map<number, Texture>();
+  const terrainFile = (id: number) => `assets/terrain/t${String(id).padStart(2, "0")}.png`;
+  // 지형 그림을 전부 미리 불러온다(게임이 시작된 뒤 지형이 늦게 뜨지 않게)
+  await Promise.all([...SPRITE_BY_ID.keys()].map(async (id) => terrainTex.set(id, await Assets.load<Texture>(terrainFile(id)))));
   interface TView {
     sp: Sprite;
     obj: number;
@@ -236,7 +239,7 @@ async function main() {
   const setTerrain = async (items: TerrainWire[]) => {
     const seq = ++terrainSeq;
     const ids = [...new Set(items.map((i) => i[0]))].filter((id) => !terrainTex.has(id));
-    await Promise.all(ids.map(async (id) => terrainTex.set(id, await Assets.load<Texture>(`assets/terrain/t${String(id).padStart(2, "0")}.png`))));
+    await Promise.all(ids.map(async (id) => terrainTex.set(id, await Assets.load<Texture>(terrainFile(id)))));
     if (seq !== terrainSeq) return; // 더 새 지형이 왔다
     for (const v of tviews) v.sp.destroy();
     tviews = [];

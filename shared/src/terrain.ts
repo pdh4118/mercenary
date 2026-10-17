@@ -276,7 +276,15 @@ export class TerrainMap {
 
 // --- 만들기 -----------------------------------------------------------------
 
-const ROCKS = idsOf(TK_ROCK);
+/** 해상도가 낮은 옛 에셋(번호 40 미만): 작게, 드물게 쓴다 */
+export const LEGACY_SPRITE_BELOW = 40;
+const LEGACY_SCALE = 0.62;
+const legacyFactor = (id: number): number => (id < LEGACY_SPRITE_BELOW ? LEGACY_SCALE : 1);
+const ROCKS = (() => {
+  const all = idsOf(TK_ROCK);
+  const fresh = all.filter((id) => id >= LEGACY_SPRITE_BELOW);
+  return [...all, ...fresh, ...fresh, ...fresh]; // 새 바위가 옛 바위보다 4배쯤 자주 뽑힌다
+})();
 const TREES = idsOf(TK_TREE);
 const RUINS = idsOf(TK_RUIN);
 const PLATEAUS = idsOf(TK_PLATEAU);
@@ -331,7 +339,7 @@ export function generateTerrain(rng: () => number, half: number, avoid: readonly
       const id = pick(ids);
       const s = SPRITE_BY_ID.get(id)!;
       const [lo, hi] = SCALE[s.kind]!;
-      const sc = s.kind === TK_PLATEAU ? plateauScale(s, rng) : lo + rng() * (hi - lo);
+      const sc = s.kind === TK_PLATEAU ? plateauScale(s, rng) : (lo + rng() * (hi - lo)) * legacyFactor(id);
       const x = (rng() * 2 - 1) * lim;
       const y = (rng() * 2 - 1) * lim;
       if (!free(x, y, footprint(s, sc), gap, s.kind !== TK_DECOR)) continue;
@@ -345,7 +353,7 @@ export function generateTerrain(rng: () => number, half: number, avoid: readonly
   const nPlateau = 5 + Math.floor(rng() * 3);
   for (let n = 0; n < nPlateau; n++) place(PLATEAUS, 40, 160);
   // 2) 방벽: 폐허·바위 3~5개를 한 줄로 세우되 사이에 좁은 통로를 남긴다
-  const nWalls = 7 + Math.floor(rng() * 4);
+  const nWalls = 5 + Math.floor(rng() * 3);
   for (let n = 0; n < nWalls; n++) {
     const len = 3 + Math.floor(rng() * 3);
     const ang = rng() * Math.PI;
@@ -355,10 +363,10 @@ export function generateTerrain(rng: () => number, half: number, avoid: readonly
     const diry = Math.sin(ang);
     const pieces: { id: number; sc: number }[] = [];
     for (let k = 0; k < len; k++) {
-      const id = pick(rng() < 0.7 ? RUINS : ROCKS);
+      const id = pick(rng() < 0.45 ? RUINS : ROCKS);
       const s = SPRITE_BY_ID.get(id)!;
       const [lo, hi] = SCALE[s.kind]!;
-      pieces.push({ id, sc: lo + rng() * (hi - lo) });
+      pieces.push({ id, sc: (lo + rng() * (hi - lo)) * legacyFactor(id) });
     }
     // 이어 놓을 위치(조각 반지름 + 통로 폭)
     const gapPx = rng() < 0.5 ? 100 : 160;
@@ -372,8 +380,8 @@ export function generateTerrain(rng: () => number, half: number, avoid: readonly
     if (spots.every((p) => free(p.x, p.y, footprint(SPRITE_BY_ID.get(p.id)!, p.sc) * 0.8, 40, true))) for (const p of spots) add(p.id, p.x, p.y, p.sc, rng() < 0.5 ? 1 : 0);
   }
   // 3) 흩어진 바위·폐허·나무, 장식
-  for (let n = 0; n < 26; n++) place(rng() < 0.75 ? ROCKS : RUINS, 30, 90);
-  for (let n = 0; n < 48; n++) place(TREES, 30, 40);
-  for (let n = 0; n < 40; n++) place(DECOR, 10, 0);
+  for (let n = 0; n < 20; n++) place(rng() < 0.85 ? ROCKS : RUINS, 30, 90);
+  for (let n = 0; n < 22; n++) place(TREES, 30, 40);
+  for (let n = 0; n < 24; n++) place(DECOR, 10, 0);
   return out;
 }
