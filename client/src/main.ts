@@ -1,4 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
+import { CAV8_RULE, UNIT_RULES, recolored } from "./recolor.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
 import { bindAudioUi, createAudio } from "./audio.js";
@@ -173,6 +174,14 @@ async function main() {
   // 병종 스프라이트(기병, 창병, 궁병, 검방병, 둔기병 순). 적은 수백 마리가 되므로 텍스처 하나를 모두가 공유한다.
   const loadUnits = (side: "ally" | "enemy") => Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/units/${side}_${f}.png`)));
   const [allyTex, enemyTex] = await Promise.all([loadUnits("ally"), loadUnits("enemy")]);
+  // 기병은 8방위(0=북,1=북동,2=동,…) 기본 자세·찌르기 자세 그림을 쓴다. 아군은 주인 색, 적은 어두운 붉은색으로 칠한다.
+  const cavRaw = await Promise.all((["idle", "thrust"] as const).map((pose) => Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((d) => Assets.load<Texture>(`assets/units/cav_${pose}_${d}.png`)))));
+  const cavTex = (key: string, pose: number, dir: number, color: number) => recolored(`cav/${key}/${pose}/${dir}`, cavRaw[pose]![dir]!, CAV8_RULE, color);
+  const ENEMY_CAV_COLOR = 0x5c1018;
+  const enemyCav = cavRaw.map((_, pose) => cavRaw[pose]!.map((_t, d) => cavTex("e", pose, d, ENEMY_CAV_COLOR)));
+  /** 8방위 그림은 크기가 달라 별도 배율·기준점을 쓴다 */
+  const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5;
+  const CAV_ANCHOR: [number, number] = [0.483, 0.72];
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
   const [heroTex, campTex, groundTex, allyArrow, enemyArrow] = await Promise.all([
     Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_${f}.png`))),
@@ -263,6 +272,8 @@ async function main() {
   /** 스프라이트는 오른쪽을 보고 그려져 있어, 왼쪽으로 움직이거나 공격할 때는 좌우 반전한다 */
   interface Facing {
     lastX: number;
+    lastY: number;
+    dir: number; // 8방위 그림용 방향(0=북, 시계 방향)
     face: 1 | -1;
   }
   const faceFrom = (v: Facing, x: number, attackAng: number | null) => {
@@ -270,13 +281,26 @@ async function main() {
     else if (Math.abs(x - v.lastX) > 0.15) v.face = x > v.lastX ? 1 : -1;
     v.lastX = x;
   };
+  /** 8방위 방향: 공격 중이면 공격 방향, 아니면 움직인 방향. 경계 근처에서 깜빡이지 않게 충분히 넘어갔을 때만 바꾼다. */
+  const cavDir = (v: Facing, x: number, y: number, attackAng: number | null) => {
+    let ang: number | null = null;
+    if (attackAng !== null) ang = attackAng;
+    else if (Math.hypot(x - v.lastX, y - v.lastY) > 0.3) ang = Math.atan2(y - v.lastY, x - v.lastX);
+    if (ang !== null) {
+      const f = ((Math.atan2(Math.sin(ang), Math.cos(ang)) / (Math.PI / 4) + 2 + 8) % 8); // 0=북이 되도록 동(0°)을 2로 옮긴다
+      let diff = Math.abs(f - v.dir);
+      diff = Math.min(diff, 8 - diff);
+      if (diff > 0.65 || attackAng !== null) v.dir = Math.round(f) % 8;
+    }
+  };
 
   const enemies = new Pool<Tracked & Facing & { sprite: Sprite }, EnemyWire>(
     (w) => {
-      const sprite = new Sprite(enemyTex[w[4]]!);
-      sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
+      const sprite = new Sprite(w[4] === 0 ? enemyCav[0]![2]! : enemyTex[w[4]]!);
+      if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
+      else sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       enemyLayer.addChild(sprite);
-      return { node: sprite, sprite, x: 0, y: 0, lastX: w[1], face: 1 };
+      return { node: sprite, sprite, x: 0, y: 0, lastX: w[1], lastY: w[2], dir: 2, face: 1 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -368,7 +392,8 @@ async function main() {
       const footY = t.height * SPRITE_SCALE * (1 - SPRITE_ANCHOR_Y) * 0.85;
       const ring = new Graphics();
       const sprite = new Sprite(t);
-      sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
+      if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
+      else sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       const bar = new Graphics();
       const label = new Text({ text: mercName(w[16]), style: { fill: 0xffffff, fontSize: 11, stroke: { color: 0x000000, width: 3 } } });
       label.anchor.set(0.5, 1);
@@ -376,7 +401,7 @@ async function main() {
       label.visible = false;
       node.addChild(ring, sprite, bar, label);
       mercLayer.addChild(node);
-      return { node, bar, sprite, label, ring, ringColor: -1, ringTeam: false, ringShape: [0, footY, st.radius * 1.25, st.radius * 0.6], x: 0, y: 0, lastKey: "", lastX: w[1], face: 1, wasDown: w[8] > 0 };
+      return { node, bar, sprite, label, ring, ringColor: -1, ringTeam: false, ringShape: [0, footY, st.radius * 1.25, st.radius * 0.6], x: 0, y: 0, lastKey: "", lastX: w[1], lastY: w[2], dir: 2, face: 1, wasDown: w[8] > 0 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -1439,9 +1464,17 @@ async function main() {
     const k = 1 - Math.exp(-ticker.deltaMS / SMOOTH_MS);
 
     enemies.update(latest.enemies, k, (v, w) => {
-      faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
       const size = w[11] === 1 ? BOSS_SIZE : 1;
-      v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
+      if (w[4] === 0) {
+        cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
+        v.sprite.texture = enemyCav[w[5] > 0 ? 1 : 0]![v.dir]!;
+        v.sprite.scale.set(CAV_SCALE * size);
+        v.lastX = v.x;
+        v.lastY = v.y;
+      } else {
+        faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
+        v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
+      }
       v.sprite.zIndex = v.y;
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
     });
@@ -1501,9 +1534,19 @@ async function main() {
       paintRing(v, ownerColor(w[5]), teamSide(w[5]) !== null);
       if (v.wasDown && w[8] <= 0 && w[5] === myId) audio.play("merc_respawn", { x: v.x, y: v.y });
       v.wasDown = w[8] > 0;
-      faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
       const grow = 1 + 0.05 * w[15]; // 강화할수록 조금 커진다
-      v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
+      const col = ownerColor(w[5]);
+      if (w[4] === 0) {
+        cavDir(v, v.x, v.y, w[6] > 0 ? w[7] : null);
+        v.sprite.texture = cavTex(`a${col}`, w[6] > 0 ? 1 : 0, v.dir, col);
+        v.sprite.scale.set(CAV_SCALE * grow);
+        v.lastX = v.x;
+        v.lastY = v.y;
+      } else {
+        faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
+        v.sprite.texture = recolored(`u${w[4]}`, allyTex[w[4]]!, UNIT_RULES[w[4]]!, col);
+        v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
+      }
       v.node.zIndex = v.y;
       v.label.visible = showNames || mercPanel.hovered() === w[0];
       const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}/${w[15]}/${isReady(w) ? 1 : 0}`;
