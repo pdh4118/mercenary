@@ -155,7 +155,7 @@ function darken(color: number, f: number): number {
 
 async function main() {
   const app = new Application();
-  await app.init({ resizeTo: window, background: 0x14161c, antialias: true });
+  await app.init({ resizeTo: window, background: 0x14161c, antialias: true, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true }); // 고해상도 화면에서도 선명하게(최대 2배)
   document.body.appendChild(app.canvas);
 
   const world = new Container();

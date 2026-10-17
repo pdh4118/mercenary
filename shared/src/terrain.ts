@@ -278,8 +278,10 @@ export class TerrainMap {
 
 /** 해상도가 낮은 옛 에셋(번호 40 미만): 작게, 드물게 쓴다 */
 export const LEGACY_SPRITE_BELOW = 40;
-const LEGACY_SCALE = 0.62;
-const legacyFactor = (id: number): number => (id < LEGACY_SPRITE_BELOW ? LEGACY_SCALE : 1);
+const LEGACY_SCALE = 0.45; // 그림 크기가 100~200px라 이 정도까지 줄여야 확대 흐림이 안 보인다
+const SMALL_SHEET_SCALE = 0.7; // 새 시트의 작은 바위(번호 54~60)도 원본이 작다
+const HI_RES_FROM = 70; // 번호 70 이상은 800px급 고해상도 고지대
+const legacyFactor = (id: number): number => (id < LEGACY_SPRITE_BELOW ? LEGACY_SCALE : id >= 54 && id <= 60 ? SMALL_SHEET_SCALE : 1);
 const ROCKS = (() => {
   const all = idsOf(TK_ROCK);
   const fresh = all.filter((id) => id >= LEGACY_SPRITE_BELOW);
@@ -298,11 +300,10 @@ const SCALE: Record<number, [number, number]> = {
 };
 
 /** 스프라이트의 월드 기준 대략적인 점유 반지름(겹침 방지용) */
-/** 고지대의 배율: 스프라이트 크기와 상관없이 월드에서 큼직하게(큰 것 650~950px, 작은 것 520~760px) */
+/** 고지대의 배율: 원본 해상도가 크지 않아서 확대를 거의 하지 않는다 */
 function plateauScale(s: TerrainSprite, rng: () => number): number {
-  const big = s.w >= 280;
-  const target = big ? 650 + rng() * 300 : 520 + rng() * 240;
-  return target / s.w;
+  // 원본보다 크게 늘리면 흐려 보이므로, 중간 해상도(300~500px) 고지대는 원본의 1.0~1.25배까지만, 고해상도(800px급)는 0.85~1.05배로 쓴다
+  return s.i >= HI_RES_FROM ? 0.85 + rng() * 0.2 : 1.0 + rng() * 0.25;
 }
 
 function footprint(s: TerrainSprite, sc: number): number {
