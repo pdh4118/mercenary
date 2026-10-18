@@ -936,6 +936,7 @@ async function main() {
   let latest: Extract<ServerMsg, { t: "state" }> | null = null;
   let myId = -1;
   let toastLeft = 0;
+  let lastTourIn = 0;
   let lastSquads = 0;
   // 소리용: 이전 프레임 값을 기억해 변화 순간에 소리를 낸다
   const snd = { gold: -1, down: false, shaken: 0, rage: 0, near: -1, phase: "", status: "playing", mercTier: new Map<number, number>(), mercSeen: false, downPlayers: new Set<number>() };
@@ -1297,7 +1298,7 @@ async function main() {
       // 우클릭: 선택한 병종에게 이동(빈 땅) 또는 공격(적 근처, 넉넉하게) 지시
       const me = latest?.players.find((p) => p.id === myId);
       if (me && (selMask & 1) !== 0) audio.play("cavalry_charge");
-      if (me) send({ t: "order", x: me.x + mouseX - app.screen.width / 2, y: me.y + mouseY - app.screen.height / 2, types: typesField() });
+      if (me) send({ t: "order", x: mouseX - world.x, y: mouseY - world.y, types: typesField() }); // 카메라가 어디를 보든(관전 중에도) 화면에서 가리킨 월드 좌표
       return;
     }
     if (pickingHold) {
@@ -2206,9 +2207,21 @@ async function main() {
         toastLeft = 2.5;
       }
       lastSquads = gi.squads;
+      // 토너먼트 예고: 처음 한 번 크게 알리고, 마지막 5초는 매 초 알린다
+      const tin = gi.tourIn ?? 0;
+      if (tin > 0 && lastTourIn === 0) {
+        toast.text = `토너먼트가 ${tin}초 뒤 시작됩니다! 남은 적과 캠프가 사라지니 미리 준비하세요`;
+        toastLeft = 4;
+        audio.play("boss_warning");
+      } else if (tin > 0 && tin <= 5 && tin !== lastTourIn) {
+        toast.text = `토너먼트 시작까지 ${tin}...`;
+        toastLeft = 1.2;
+      }
+      lastTourIn = tin;
       if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · 보스군 도착까지 ${mmss(gi.timer)}${squadText}`;
       else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${UNIT_NAMES[gi.bossType]} 장군의 군대 ${gi.armyLeft}/${gi.armyTotal}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}${gi.timer > 0 ? ` (다음 ${gi.timer}초)` : " (최대)"}` : gi.timer > 0 ? ` · 격노까지 ${gi.timer}초` : ""}`;
       else if (gi.phase === "tournament") stageText.text = ""; // 위쪽 대진 배너가 대신한다
+      else if ((gi.tourIn ?? 0) > 0) stageText.text = `스테이지 ${gi.stage} 클리어! 토너먼트가 ${gi.tourIn}초 뒤에 시작됩니다`;
       else stageText.text = `스테이지 ${gi.stage} 클리어! 다음 스테이지까지 ${gi.timer}초`;
       stageText.position.set(app.screen.width / 2, 8);
       bossBar.clear();

@@ -76,7 +76,6 @@ import {
   CAV_SELF_DEFENSE,
   CAVALRY,
   CHARGE_DURATION_SEC,
-  CHARGE_MAX_DISTANCE,
   CHARGE_TARGET_RADIUS,
   CAMP_MAX,
   CAMP_OFFERS,
@@ -513,7 +512,7 @@ export class Game {
   private chests = new Map<number, Chest>();
   private foePos = new Map<string, [number, number]>(); // 적 AI가 아군의 이동 속도를 구하려고 기억하는 지난 위치
   private tour: Tournament | null = null;
-  private tourPending = false; // 보스를 잡은 직후, 다음 틱에 토너먼트를 연다
+  private tourCountdown = 0; // 보스를 잡은 뒤 토너먼트가 시작되기까지 남은 초(0이면 예고 중이 아니다)
   private bossT = 0; // 보스 단계가 시작된 뒤 흐른 시간
   private rage = 0; // 보스군 격노 단계
   private rageT = 0; // 다음 격노 단계까지 흐른 시간
@@ -826,14 +825,11 @@ export class Game {
    */
   order(playerId: number, x: unknown, y: unknown, types?: unknown): void {
     const s = this.slots.get(playerId);
-    if (!s || s.state.down || typeof x !== "number" || typeof y !== "number") return;
+    if (!s || typeof x !== "number" || typeof y !== "number") return; // 쓰러져 있어도 지시할 수 있다(쓰러진 자리 기준)
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-    const dx = x - s.state.x;
-    const dy = y - s.state.y;
-    const d = Math.hypot(dx, dy);
-    const k = d > CHARGE_MAX_DISTANCE ? CHARGE_MAX_DISTANCE / d : 1;
-    const ox = clampToWorld(s.state.x + dx * k, 20);
-    const oy = clampToWorld(s.state.y + dy * k, 20);
+    // 지시 지점은 화면에서 가리킨 절대 좌표다(주인공과의 거리 제한 없음. 쓰러져서 관전 중일 때도 보이는 곳을 가리킬 수 있다)
+    const ox = clampToWorld(x, 20);
+    const oy = clampToWorld(y, 20);
     const foes: { id: number; x: number; y: number; r: number }[] =
       this.phase === "tournament" ? this.duelFoes(playerId).map((f) => ({ id: 0, x: f.x, y: f.y, r: f.radius })) : [...this.enemies.values()].map((e) => ({ id: e.id, x: e.x, y: e.y, r: radiusOf(e) }));
     let pick: { id: number; x: number; y: number } | null = null;
@@ -902,7 +898,7 @@ export class Game {
       this.camps.clear();
       this.chests.clear();
       this.tour = null;
-      this.tourPending = false;
+      this.tourCountdown = 0;
       this.bossT = 0;
       this.bullets = [];
       this.tick++;
@@ -914,9 +910,13 @@ export class Game {
     }
     const dt = 1 / TICK_RATE;
     this.time += dt;
-    if (this.tourPending) {
-      this.tourPending = false;
-      this.beginTournament();
+    if (this.tourCountdown > 0) {
+      // 토너먼트 예고: 이 동안은 남은 적과 휴식 시간이 그대로 흐르고, 끝나면 대진이 시작된다
+      this.tourCountdown -= dt;
+      if (this.tourCountdown <= 0) {
+        this.tourCountdown = 0;
+        this.beginTournament();
+      }
     }
     const duel = this.phase === "tournament";
     this.terrainBegin();
@@ -1110,6 +1110,7 @@ export class Game {
       armyTotal: this.armyTotal,
       rage: this.phase === "boss" ? this.rage : 0,
       squads: this.squads.size,
+      tourIn: Math.ceil(this.tourCountdown),
       tour: this.phase === "tournament" ? this.tourInfo() : null,
     };
   }
@@ -1722,7 +1723,8 @@ export class Game {
     this.phaseT = TUNE.STAGE_BREAK_SEC;
     // 3·6·9·10 스테이지: 보스를 잡으면 남은 적을 모두 없애고 플레이어끼리 토너먼트를 연다(2명 이상일 때). 끝난 뒤에 승리 판정이 난다.
     if (isTournamentStage(this.stage) && this.slots.size >= 2) {
-      this.tourPending = true;
+      this.tourCountdown = Math.max(0.05, TUNE.TOURNAMENT_NOTICE_SEC);
+      this.phaseT = Math.max(this.phaseT, TUNE.TOURNAMENT_NOTICE_SEC + 1); // 예고 중에 다음 스테이지로 넘어가지 않게
       return;
     }
     if (this.stage >= STAGE_COUNT) this.status = "victory";

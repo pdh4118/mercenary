@@ -22,6 +22,11 @@ const quiet = () => {
 const idle = { dx: 0, dy: 0, aim: 0, fire: false };
 type Priv = { onBossDown(at: { x: number; y: number }): void; phaseT: number; stageTime: number };
 const bossDown = (g: Game, x = 0, y = 0) => (g as unknown as Priv).onBossDown({ x, y });
+/** 보스를 잡고 토너먼트 예고 시간이 지나 대진이 시작될 때까지 */
+const bossDownAndWait = (g: Game) => {
+  bossDown(g);
+  for (let i = 0; i < Math.ceil((TUNE.TOURNAMENT_NOTICE_SEC + 0.2) * 20); i++) g.step();
+};
 
 test("한 라운드(성장 시간)는 2분이다", () => {
   assert.equal(TUNE.STAGE_GROW_SEC, 120);
@@ -127,7 +132,7 @@ test("3스테이지 보스를 잡으면 적이 모두 사라지고 두 사람이
   g.jumpToStage(3);
   g.spawnEnemyAt(50, 50, 1);
   g.spawnEnemyAt(-50, 50, 2);
-  bossDown(g);
+  bossDownAndWait(g);
   g.step();
   assert.equal(g.info().phase, "tournament");
   assert.equal(g.enemyCount, 0, "남은 적이 모두 사라진다");
@@ -179,7 +184,7 @@ test("10스테이지 토너먼트가 끝나야 승리가 된다", () => {
   g.addPlayer("a");
   g.addPlayer("b");
   g.jumpToStage(10);
-  bossDown(g);
+  bossDownAndWait(g);
   run(g, 0.2);
   assert.equal(g.info().status, "playing", "토너먼트가 끝나기 전에는 승리가 아니다");
   assert.equal(g.info().phase, "tournament");
@@ -191,7 +196,7 @@ test("선수가 아닌 사람은 공격할 수 없고, 3명이면 준결승 뒤 
   const g = quiet();
   const ids = [g.addPlayer("a")!, g.addPlayer("b")!, g.addPlayer("c")!];
   g.jumpToStage(6);
-  bossDown(g);
+  bossDownAndWait(g);
   g.step();
   let tour = g.info().tour!;
   assert.equal(tour.title, "준결승");
@@ -215,7 +220,7 @@ test("토너먼트에서도 독 화살이 상대 주인공에게 걸려 시간�
   g.addPlayer("a");
   g.addPlayer("b");
   g.jumpToStage(3);
-  bossDown(g);
+  bossDownAndWait(g);
   g.step();
   const tour = g.info().tour!;
   run(g, TUNE.TOURNAMENT_INTRO_SEC + 0.5);
@@ -240,4 +245,21 @@ test("토너먼트에서도 독 화살이 상대 주인공에게 걸려 시간�
   const done = (() => { run(g, 4); return pb.hp; })();
   run(g, 1);
   assert.equal(pb.hp, done, "독이 끝나면 멈춘다");
+});
+
+test("토너먼트 예고: 보스를 잡아도 바로 시작하지 않고 예고 시간 동안 알리며, 그동안 휴식 시간이 끝나도 넘어가지 않는다", () => {
+  const g = quiet();
+  g.addPlayer("a");
+  g.addPlayer("b");
+  g.jumpToStage(3);
+  bossDown(g);
+  g.step();
+  assert.equal(g.info().phase, "break", "아직 토너먼트가 아니다");
+  assert.ok((g.info().tourIn ?? 0) > 0, "남은 초가 알려진다");
+  for (let i = 0; i < Math.floor((TUNE.TOURNAMENT_NOTICE_SEC - 1) * 20); i++) g.step();
+  assert.equal(g.info().phase, "break", "예고 중에는 휴식 시간이 지나도 다음 스테이지로 넘어가지 않는다");
+  assert.equal(g.info().stage, 3);
+  for (let i = 0; i < 2 * 20; i++) g.step();
+  assert.equal(g.info().phase, "tournament", "예고가 끝나면 시작한다");
+  assert.equal(g.info().tourIn, 0);
 });

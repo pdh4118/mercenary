@@ -266,3 +266,17 @@ test("병종 선택 명령: 고른 병종만 빈 땅으로 이동하고, 적 근
   assert.equal(p.chargeKind, 0, "정확히 찍지 않아도 공격");
   assert.ok(Math.abs(p.chargeX - e.x) < 1 && Math.abs(p.chargeY - e.y) < 1, "지시 지점이 그 적으로 맞춰진다");
 });
+
+test("쓰러져 있어도 우클릭 지시(절대 좌표)를 줄 수 있고, 주인공과 멀리 떨어진 곳도 지정할 수 있다", () => {
+  const g = new Game(() => 0.999);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const cav = g.addMerc(a, 0, p.x + 40, p.y);
+  p.down = true;
+  p.hp = 0;
+  g.order(a, p.x + 1500, p.y + 300, 1 << 0);
+  assert.ok(p.chargeLeft > 0, "지시가 받아들여진다");
+  assert.ok(Math.abs(p.chargeX - (p.x + 1500)) < 1, "주인공과 1500px 떨어진 지점도 그대로 지정된다");
+  void cav;
+});

@@ -50,6 +50,7 @@ export const TUNE = {
   SQUAD_INTERVAL_BASE: 42, // 소대 간격(초). 스테이지가 오를수록 짧아진다
   SQUAD_BASE_SIZE: 4,
   TOURNAMENT_MATCH_SEC: 60, // 한 경기 제한 시간
+  TOURNAMENT_NOTICE_SEC: 15, // 보스를 잡은 뒤 토너먼트가 시작되기까지 알려 주는 시간(이 동안 보상을 받고 준비할 수 있다)
   TOURNAMENT_INTRO_SEC: 5, // 대진 소개(움직일 수 없다)
   TOURNAMENT_WIN_GOLD: 30, // 경기 승리 보상 금화 = 이 값 x 스테이지
   TOURNAMENT_CHAMPION_GOLD: 100, // 우승 보상 금화 = 이 값 x 스테이지
@@ -265,7 +266,6 @@ export const CAV_RETREAT_HP = 0.4; // 체력이 이 비율 아래면 모험을 �
 export const SPEAR_AVOID_RADIUS = 150; // 기병이 창병 적을 피해 도는 거리
 // 우클릭 돌격 지시
 export const CHARGE_DURATION_SEC = 6;
-export const CHARGE_MAX_DISTANCE = 900; // 주인공으로부터 이 거리까지만 지정할 수 있다
 export const CHARGE_TARGET_RADIUS = 300; // 돌격 지점 주변에서 대상을 찾는 반경
 
 // 궁병 카이팅: 근접 적이 (적 사거리 + 이 여유) 안으로 들어오면 뒤로 물러나며 쏜다

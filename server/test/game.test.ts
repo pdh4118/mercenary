@@ -17,7 +17,6 @@ import {
   xpNeeded,
   CAVALRY,
   CHARGE_DURATION_SEC,
-  CHARGE_MAX_DISTANCE,
   ENEMY_GOLD,
   ENEMY_MAX,
   ENEMY_SPAWN_DISTANCE,
@@ -552,12 +551,12 @@ test("돌격 지시: 기병만 활동 범위를 넘어 지점으로 달려가고
   assert.ok(Math.hypot(g.getMerc(cav)!.x - p.x, g.getMerc(cav)!.y - p.y) < 300, "지시가 끝나면 복귀한다");
 });
 
-test("돌격 지점은 주인공 가까이로 제한되고 잘못된 값은 무시된다", () => {
+test("돌격 지점은 월드 안으로 맞춰지고 잘못된 값은 무시된다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = { ...me(g, a) };
   g.charge(a, p.x + 99999, p.y);
-  assert.ok(Math.abs(me(g, a).chargeX - p.x) <= CHARGE_MAX_DISTANCE + 1e-6);
+  assert.ok(me(g, a).chargeX <= 2000, "월드 밖은 안으로 맞춘다");
   const g2 = quiet();
   const b = g2.addPlayer("b")!;
   g2.charge(b, Number.NaN, "x");

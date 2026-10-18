@@ -185,6 +185,7 @@ export interface GameInfo {
   rage: number; // 보스를 오래 못 잡았을 때 오르는 보스군 격노 단계(0이면 아직 아님)
   armyTotal: number;
   squads: number; // 지금 다가오는 소대 수
+  tourIn?: number; // 토너먼트가 시작되기까지 남은 초(예고 중일 때만, 아니면 0)
   tour?: TourInfo | null; // 토너먼트 단계에서만
 }
 
