@@ -652,7 +652,7 @@ async function main() {
     lx += 32 + label.width + 12;
   }
   const legendText = new Text({
-    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창에 먼저 맞으면 속도를 잃고 카운터 · 마법사: 2초 주문 후 운석(방패 무시)",
+    text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창에 먼저 맞으면 속도를 잃고 카운터 · 마법사: 3초 주문 후 운석(방패 무시)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   legendText.position.set(12, 26);

@@ -55,7 +55,7 @@ export const WEAPONS: readonly WeaponDef[] = [
   { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 11, cooldown: 0.55, windup: 0, splash: 0, note: "기병 돌격 무효 · 달려오는 기병을 먼저 찌르면 속도를 잃고 카운터 · 아주 긴 사거리" },
   { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 7, cooldown: 0.35, windup: 0, splash: 0, note: "방패 체력이 정면 공격을 먼저 받아 냄 · 빠른 공격" },
   { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 24.3, cooldown: 1.2, windup: 0.5, splash: 46, note: "방패 파괴(300%) · 범위 공격 · 휘두르기 전 준비 동작이 길다" },
-  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 120, cooldown: 1.5, windup: 2, splash: 140, note: "마우스 위치에 운석 · 2초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
+  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 120, cooldown: 1.5, windup: 2.5, splash: 130, note: "마우스 위치에 운석 · 2.5초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
   { name: "기마", type: CAVALRY, ranged: false, reach: 65, arc: rad(80), damage: 11, cooldown: 0.65, windup: 0.12, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창에 먼저 맞으면 속도를 잃고 카운터" },
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
