@@ -1523,8 +1523,8 @@ export class Game {
         p.aim = s.facing;
       } else {
         const ang = (spectator++ / Math.max(1, spectators.length)) * Math.PI + Math.PI * 1.1; // 경기장 아래쪽 가장자리를 따라
-        x = Math.cos(ang) * (TOURNAMENT_ARENA_RADIUS + 90);
-        y = Math.sin(ang) * (TOURNAMENT_ARENA_RADIUS + 90) * -1;
+        x = Math.cos(ang) * (TOURNAMENT_ARENA_RADIUS + 40);
+        y = Math.sin(ang) * (TOURNAMENT_ARENA_RADIUS + 40) * -1;
       }
       p.x = x;
       p.y = y;

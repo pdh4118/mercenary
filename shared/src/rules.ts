@@ -371,8 +371,8 @@ export const TOURNAMENT_END_SEC = 7; // 우승자 발표
  * 창을 안 끄고 둔 접속 때문에 자동 업데이트(접속자 0명을 기다린다)가 막히지 않게 한다. 게임 진행 중에는 적용하지 않는다.
  */
 export const IDLE_KICK_SEC = 300;
-export const TOURNAMENT_ARENA_RADIUS = 800; // 경기장 반지름(px). 월드 중앙
-export const TOURNAMENT_START_DIST = 520; // 두 선수가 중앙에서 떨어져 서는 거리
+export const TOURNAMENT_ARENA_RADIUS = 1950; // 경기장 반지름(px). 월드 중앙. 지름이 예전(1600)의 약 2.4배로, 월드(4000)가 허락하는 최대에 가깝다
+export const TOURNAMENT_START_DIST = 1270; // 두 선수가 중앙에서 떨어져 서는 거리
 export const isTournamentStage = (stage: number): boolean => (TOURNAMENT_STAGES as readonly number[]).includes(stage);
 /** n명이 겨루는 토너먼트의 라운드 이름: 결승, 준결승, 8강... (roundsLeft는 이 라운드를 포함해 남은 라운드 수) */
 export const tournamentRoundName = (roundsLeft: number): string => (roundsLeft <= 1 ? "결승" : roundsLeft === 2 ? "준결승" : `${2 ** roundsLeft}강`);
