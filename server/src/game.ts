@@ -842,10 +842,26 @@ export class Game {
       }
     }
     const left = pick ? CHARGE_DURATION_SEC : TUNE.MOVE_ORDER_SEC;
-    const ax = pick ? pick.x : ox;
-    const ay = pick ? pick.y : oy;
+    // 공격 지시는 한 마리가 아니라 가리킨 적 둘레의 무리 전체가 대상이다: 무리의 중심을 지점으로 삼고, 각 병종이 그 안에서 상성에 맞는 적을 고른다
+    let ax = pick ? pick.x : ox;
+    let ay = pick ? pick.y : oy;
+    if (pick) {
+      let sx = 0;
+      let sy = 0;
+      let n = 0;
+      for (const f of foes) {
+        if (Math.hypot(f.x - pick.x, f.y - pick.y) > TUNE.ORDER_GROUP_RADIUS) continue;
+        sx += f.x;
+        sy += f.y;
+        n++;
+      }
+      if (n > 0) {
+        ax = sx / n;
+        ay = sy / n;
+      }
+    }
     const mask = this.typeMask(types);
-    for (const t of UNIT_TYPES) if (mask & (1 << t)) s.orders[t] = { kind: pick ? 0 : 1, x: ax, y: ay, left, targetId: pick?.id ?? 0 };
+    for (const t of UNIT_TYPES) if (mask & (1 << t)) s.orders[t] = { kind: pick ? 0 : 1, x: ax, y: ay, left, targetId: 0 };
     // 화면 표시용(마지막 지시 지점)
     s.state.chargeX = ax;
     s.state.chargeY = ay;
@@ -2473,15 +2489,21 @@ export class Game {
           sl.orders[t] = null;
           continue;
         }
-        if (o.targetId) {
-          const e = this.enemies.get(o.targetId);
-          if (e) {
-            o.x = e.x;
-            o.y = e.y;
-          } else {
-            o.targetId = 0;
-            o.left = Math.min(o.left, 1.5);
+        if (o.kind === 0 && this.phase !== "tournament") {
+          // 공격 지시: 무리의 움직임을 따라 지점을 옮기고(한 마리를 쫓지 않는다), 무리가 다 사라지면 곧 풀린다
+          let sx = 0;
+          let sy = 0;
+          let n = 0;
+          for (const e of this.enemies.values()) {
+            if (Math.hypot(e.x - o.x, e.y - o.y) > TUNE.ORDER_GROUP_RADIUS * 1.4) continue;
+            sx += e.x;
+            sy += e.y;
+            n++;
           }
+          if (n > 0) {
+            o.x += (sx / n - o.x) * 0.2;
+            o.y += (sy / n - o.y) * 0.2;
+          } else o.left = Math.min(o.left, 1.5);
         }
       }
     }
@@ -2952,10 +2974,6 @@ export class Game {
     const { m, st, dt } = c;
     const owner = c.owner;
     const spears = c.targets.filter((t) => t.type === SPEAR);
-    // 공격 지시(우클릭으로 적을 가리킴): 지시받은 그 적에게 곧장 돌격한다. 우회·창병 회피·치고 빠지기 없이 쓰러뜨릴 때까지 들이받는다.
-    const ordered = owner?.orders[CAVALRY];
-    const direct = m.hp > st.hp * CAV_RETREAT_HP && ordered && ordered.kind === 0 && ordered.targetId ? c.targets.find((t) => t.id === ordered.targetId) ?? null : null;
-    if (direct) m.evadeT = 0;
     if (m.evadeT > 0) {
       // 한 대 치고 빠진다: 대상에서 떨어져 후방으로 돌아 들어가며 속도를 다시 붙인다
       const prey = c.targets.find((t) => t.id === m.runId);
@@ -2993,9 +3011,9 @@ export class Game {
     const anchor: [number, number] = charging ? [ord!.x, ord!.y] : c.home;
     const moveOrder = charging && ord!.kind === 1; // 이동 지시: 그곳까지 싸우지 않고 가서 자리를 지킨다
     const arrived = moveOrder && Math.hypot(m.x - anchor[0], m.y - anchor[1]) <= TUNE.MOVE_ENGAGE_RADIUS + 60;
-    let target: Target | null = direct;
+    let target: Target | null = null;
     let best = Infinity;
-    if (!direct && healthy && (!moveOrder || arrived)) {
+    if (healthy && (!moveOrder || arrived)) {
       const radius = charging ? (moveOrder ? TUNE.MOVE_ENGAGE_RADIUS : CHARGE_TARGET_RADIUS) : c.leash;
       for (const t of c.targets) {
         if (Math.hypot(t.x - anchor[0], t.y - anchor[1]) > radius) continue;
@@ -3020,7 +3038,7 @@ export class Game {
           m.chargeSnap = chargeBonus(st.speed, m.momentum) * (1 + TIER_CHARGE[CAVALRY]! * m.tier); // 지금까지 붙은 속도가 돌격 피해가 된다(단계마다 배수가 늘어난다)
           m.flankT = 0;
           m.runId = target.id;
-          m.brawl = !!direct || target.hpFrac <= TUNE.CAV_FINISH_HP || target.ranged; // 지시받은 적은 끝까지. 상대가 거의 죽었거나 궁병이면 빠지지 않고 끝까지 쫓아 싸운다
+          m.brawl = target.hpFrac <= TUNE.CAV_FINISH_HP || target.ranged; // 지시받은 적은 끝까지. 상대가 거의 죽었거나 궁병이면 빠지지 않고 끝까지 쫓아 싸운다
         }
         return;
       }
@@ -3028,14 +3046,14 @@ export class Game {
       let gx = target.x;
       let gy = target.y;
       const theta = angleDiff(Math.atan2(m.y - target.y, m.x - target.x), target.face);
-      if (!direct && d > 70 && target.hpFrac > TUNE.CAV_FINISH_HP && !target.ranged && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
+      if (d > 70 && target.hpFrac > TUNE.CAV_FINISH_HP && !target.ranged && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
         m.flankT += dt;
         const phi = target.face + (theta >= 0 ? 1 : -1) * Math.min(Math.PI, Math.abs(theta) + 0.7);
         const radius = Math.min(220, Math.max(reachNow + 40, d));
         gx = target.x + Math.cos(phi) * radius;
         gy = target.y + Math.sin(phi) * radius;
       }
-      this.updateMomentum(m, this.steer(m, gx, gy, speed, dt, direct ? [] : spears, target, 0), dt);
+      this.updateMomentum(m, this.steer(m, gx, gy, speed, dt, spears, target, 0), dt);
       return;
     }
     m.flankT = 0;

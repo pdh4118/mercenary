@@ -114,6 +114,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   BOSS_RAGE_MAX: ["격노 최대 단계", G.boss, 0, 60, 1],
   MOVE_ORDER_SEC: ["기병 이동 지시 지속 시간(초)", G.ai, 1, 60, 1],
   MOVE_ENGAGE_RADIUS: ["이동 지시 지점에서 기병이 싸우는 반경", G.ai, 20, 500, 10],
+  ORDER_GROUP_RADIUS: ["공격 지시: 한 무리로 묶는 반경(px)", G.ai, 60, 600, 10],
   ORDER_ATTACK_PICK: ["우클릭 지점 주변에 적이 있으면 공격 지시로 보는 거리", G.ai, 10, 300, 5],
   SHAKEN_SEC: ["사기 저하(공포) 지속 시간(초)", G.merc, 0.5, 20, 0.5],
   SHAKEN_FLEE_SPEED: ["공포에 질린 용병의 도망 속도 배율", G.merc, 0.5, 3, 0.05],

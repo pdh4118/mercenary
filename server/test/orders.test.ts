@@ -281,21 +281,23 @@ test("쓰러져 있어도 우클릭 지시(절대 좌표)를 줄 수 있고, 주
   void cav;
 });
 
-test("공격 지시: 기병은 가리킨 적(창병이라도)에게 곧장 돌격해 들이받는다", () => {
+test("공격 지시는 한 마리가 아니라 무리 전체가 대상이다: 기병은 무리 안에서 상성이 좋은 궁병을 먼저 치고 창병은 피한다", () => {
   const g = new Game(() => 0.999);
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
-  const cav = g.addMerc(a, 0, p.x, p.y + 100);
-  const e = g.spawnEnemyAt(p.x + 450, p.y + 100, 1); // 창병: 평소 기병은 피해 간다
-  const en = g.getEnemy(e) as { hp: number; maxHp: number; stunT?: number };
-  en.hp = en.maxHp = 1e6;
-  en.stunT = 99; // 제자리에 묶어 둔다
-  const hp0 = en.hp;
-  g.order(a, p.x + 450, p.y + 100, 1 << 0); // 적을 가리킨다
+  g.addMerc(a, 0, p.x, p.y + 100);
+  const spear = g.getEnemy(g.spawnEnemyAt(p.x + 450, p.y + 100, 1)) as { hp: number; maxHp: number; stunT?: number };
+  const archer = g.getEnemy(g.spawnEnemyAt(p.x + 500, p.y + 140, 2)) as { hp: number; maxHp: number; stunT?: number };
+  for (const e of [spear, archer]) {
+    e.hp = e.maxHp = 1e6;
+    e.stunT = 99; // 제자리에 묶어 둔다
+  }
+  g.order(a, p.x + 450, p.y + 100, 1 << 0); // 창병을 가리키지만 대상은 그 둘레 무리 전체
+  const o = (g as unknown as { slots: Map<number, { orders: ({ x: number } | null)[] }> }).slots.get(a)!.orders[0]!;
+  assert.ok(o.x > p.x + 450 && o.x < p.x + 500, "지점은 한 마리가 아니라 무리의 중심이다");
   for (let i = 0; i < 6 * 20; i++) g.step();
-  assert.ok(en.hp < hp0, "지시받은 창병을 실제로 들이받았다");
-  assert.ok(Math.hypot(g.getMerc(cav)!.x - (p.x + 450), g.getMerc(cav)!.y - (p.y + 100)) < 120, "그 적 곁에 붙어 있다");
+  assert.ok(archer.hp < 1e6, "무리 안의 궁병(상성이 좋은 쪽)을 쳤다");
 });
 
 test("공격 지시·공격 진형: 검방병 용병도 주인공 곁에 머물지 않고 적에게 달려가 근접 공격한다", () => {
