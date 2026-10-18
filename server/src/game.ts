@@ -2678,6 +2678,32 @@ export class Game {
   /** 검방병: 다른 병종에 붙어서 가장 취약한 아군(궁병·주인공 순)을 지킨다. 그 아군과 위협 사이에 서서 방패 정면으로 막는다. */
   private aiShield(c: AiCtx): void {
     const { m, st } = c;
+    if (c.assault) {
+      // 공격 지시·공격 진형: 지킬 아군을 따라다니지 않고 가까운 적에게 곧장 달려가 친다(방패 정면은 약간 피한다)
+      let target: Target | null = null;
+      let score = Infinity;
+      for (const t of c.targets) {
+        const d = Math.hypot(t.x - m.x, t.y - m.y);
+        if (d > st.reach + t.r + 14 && Math.hypot(t.x - c.home[0], t.y - c.home[1]) > c.leash + st.reach + 30 && !this.threatensHero(c, t)) continue;
+        const sc = d * (this.frontalShield(t, m) ? 1.6 : 1);
+        if (sc < score) {
+          score = sc;
+          target = t;
+        }
+      }
+      if (target) {
+        const d = Math.hypot(target.x - m.x, target.y - m.y);
+        m.face = Math.atan2(target.y - m.y, target.x - m.x);
+        if (d <= st.reach + target.r) {
+          if (m.cd <= 0) this.startAttack(m, st, m.face);
+          return;
+        }
+        this.moveToward(m, target.x, target.y, st.speed, c.dt, st.reach * 0.6);
+        return;
+      }
+      this.aiGoHome(c);
+      return;
+    }
     const ward = this.pickWard(c, [SHIELD]);
     const guardLimit = c.leash * 1.6 + 160; // 진형에서 너무 멀리 떨어진 곳까지 지키러 가지는 않는다
     const near = this.nearestTarget(c, m, st.reach + 14);

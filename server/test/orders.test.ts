@@ -297,3 +297,20 @@ test("공격 지시: 기병은 가리킨 적(창병이라도)에게 곧장 돌�
   assert.ok(en.hp < hp0, "지시받은 창병을 실제로 들이받았다");
   assert.ok(Math.hypot(g.getMerc(cav)!.x - (p.x + 450), g.getMerc(cav)!.y - (p.y + 100)) < 120, "그 적 곁에 붙어 있다");
 });
+
+test("공격 지시·공격 진형: 검방병 용병도 주인공 곁에 머물지 않고 적에게 달려가 근접 공격한다", () => {
+  const g = new Game(() => 0.5);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  for (let i = 0; i < 3; i++) g.addMerc(a, 3, p.x + 40 + i * 15, p.y + (i % 2) * 20);
+  const es: { hp: number; maxHp: number }[] = [];
+  for (let i = 0; i < 3; i++) {
+    const e = g.getEnemy(g.spawnEnemyAt(p.x + 130 + i * 30, p.y + i * 25 - 25, 2)) as { hp: number; maxHp: number };
+    e.hp = e.maxHp = 1e6;
+    es.push(e);
+  }
+  g.order(a, p.x + 200, p.y, 1 << 3);
+  for (let i = 0; i < 6 * 20; i++) g.step();
+  assert.ok(es.reduce((s, e) => s + 1e6 - e.hp, 0) > 0, "검방병이 적에게 피해를 줬다");
+});
