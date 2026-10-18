@@ -2390,7 +2390,7 @@ export class Game {
       return;
     }
     m.hp = 0;
-    m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * (owner ? mstat(owner.mods, m.type, "respawn") : 1);
+    m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * (owner ? mstat(owner.mods, m.type, "respawn") : 1) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
     if (owner) {
       owner.stats.mercDeaths++;
       this.noteDeath(owner);
@@ -2469,7 +2469,7 @@ export class Game {
         const o = sl.orders[t];
         if (!o) continue;
         o.left -= dt;
-        if (o.left <= 0 || sl.state.down) {
+        if (o.left <= 0) {
           sl.orders[t] = null;
           continue;
         }
@@ -2499,7 +2499,7 @@ export class Game {
       const st = this.mercStats(m);
       const ownerSlot = this.slots.get(m.owner);
       if (m.respawn > 0) {
-        if (duel) continue; // 경기 중 쓰러진 용병은 경기가 끝날 때까지 돌아오지 않는다
+        // 토너먼트에서도 쓰러진 용병은 되살아난다(경기 중에는 부활 시간이 TOURNAMENT_RESPAWN_MULT배로 짧다)
         m.respawn = Math.max(0, m.respawn - dt);
         if (m.respawn === 0) {
           m.hp = st.hp;
@@ -2926,6 +2926,10 @@ export class Game {
     const { m, st, dt } = c;
     const owner = c.owner;
     const spears = c.targets.filter((t) => t.type === SPEAR);
+    // 공격 지시(우클릭으로 적을 가리킴): 지시받은 그 적에게 곧장 돌격한다. 우회·창병 회피·치고 빠지기 없이 쓰러뜨릴 때까지 들이받는다.
+    const ordered = owner?.orders[CAVALRY];
+    const direct = m.hp > st.hp * CAV_RETREAT_HP && ordered && ordered.kind === 0 && ordered.targetId ? c.targets.find((t) => t.id === ordered.targetId) ?? null : null;
+    if (direct) m.evadeT = 0;
     if (m.evadeT > 0) {
       // 한 대 치고 빠진다: 대상에서 떨어져 후방으로 돌아 들어가며 속도를 다시 붙인다
       const prey = c.targets.find((t) => t.id === m.runId);
@@ -2963,9 +2967,9 @@ export class Game {
     const anchor: [number, number] = charging ? [ord!.x, ord!.y] : c.home;
     const moveOrder = charging && ord!.kind === 1; // 이동 지시: 그곳까지 싸우지 않고 가서 자리를 지킨다
     const arrived = moveOrder && Math.hypot(m.x - anchor[0], m.y - anchor[1]) <= TUNE.MOVE_ENGAGE_RADIUS + 60;
-    let target: Target | null = null;
+    let target: Target | null = direct;
     let best = Infinity;
-    if (healthy && (!moveOrder || arrived)) {
+    if (!direct && healthy && (!moveOrder || arrived)) {
       const radius = charging ? (moveOrder ? TUNE.MOVE_ENGAGE_RADIUS : CHARGE_TARGET_RADIUS) : c.leash;
       for (const t of c.targets) {
         if (Math.hypot(t.x - anchor[0], t.y - anchor[1]) > radius) continue;
@@ -2990,7 +2994,7 @@ export class Game {
           m.chargeSnap = chargeBonus(st.speed, m.momentum) * (1 + TIER_CHARGE[CAVALRY]! * m.tier); // 지금까지 붙은 속도가 돌격 피해가 된다(단계마다 배수가 늘어난다)
           m.flankT = 0;
           m.runId = target.id;
-          m.brawl = target.hpFrac <= TUNE.CAV_FINISH_HP || target.ranged; // 상대가 거의 죽었거나 궁병이면 빠지지 않고 끝까지 쫓아 싸운다
+          m.brawl = !!direct || target.hpFrac <= TUNE.CAV_FINISH_HP || target.ranged; // 지시받은 적은 끝까지. 상대가 거의 죽었거나 궁병이면 빠지지 않고 끝까지 쫓아 싸운다
         }
         return;
       }
@@ -2998,14 +3002,14 @@ export class Game {
       let gx = target.x;
       let gy = target.y;
       const theta = angleDiff(Math.atan2(m.y - target.y, m.x - target.x), target.face);
-      if (d > 70 && target.hpFrac > TUNE.CAV_FINISH_HP && !target.ranged && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
+      if (!direct && d > 70 && target.hpFrac > TUNE.CAV_FINISH_HP && !target.ranged && Math.abs(theta) < (Math.PI * 100) / 180 && m.flankT < CAV_FLANK_MAX_SEC) {
         m.flankT += dt;
         const phi = target.face + (theta >= 0 ? 1 : -1) * Math.min(Math.PI, Math.abs(theta) + 0.7);
         const radius = Math.min(220, Math.max(reachNow + 40, d));
         gx = target.x + Math.cos(phi) * radius;
         gy = target.y + Math.sin(phi) * radius;
       }
-      this.updateMomentum(m, this.steer(m, gx, gy, speed, dt, spears, target, 0), dt);
+      this.updateMomentum(m, this.steer(m, gx, gy, speed, dt, direct ? [] : spears, target, 0), dt);
       return;
     }
     m.flankT = 0;
@@ -3469,6 +3473,15 @@ export class Game {
   /** 되돌려받은 피해(방패·방어와 무관하게 몸에 직접 들어간다) */
   private reflectToEnemy(e: Enemy, amount: number, ownerId: number, src?: Merc): void {
     this.pushDamage(EVT_REFLECT, e.id, e.x, e.y, amount, ownerId);
+    // 반사로 준 피해도 흡혈(카드·전설)을 받는다
+    const owner = this.slots.get(ownerId);
+    if (owner) {
+      const scope: LegendScope = src ? src.type : "hero";
+      const steal = (src ? mstat(owner.mods, src.type, "lifesteal") : owner.mods.heroLifesteal) + (hasLegend(owner.mods, "bloodthirst", scope) ? LEGEND_CONST.bloodthirstFrac : 0);
+      const dealt = Math.min(amount, Math.max(0, e.hp));
+      if (steal > 0 && dealt > 0) this.lifesteal(owner, src, dealt * steal);
+      owner.stats.dealt += dealt;
+    }
     if (src) this.gainMercXp(src, amount * MERC_XP_PER_DAMAGE);
     e.hp -= amount;
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
@@ -3480,7 +3493,9 @@ export class Game {
     const flat = src ? mstat(owner.mods, src.type, "thorns") : owner.mods.heroThorns;
     if (flat <= 0) return;
     const attacker = h.src as Enemy;
-    if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, flat, owner.state.id, src);
+    // 반사 피해도 공격력(%)·단계 배율을 받는다
+    const dmgMult = src ? mstat(owner.mods, src.type, "dmg") * TIER_DMG[src.tier]! : owner.mods.heroDmg;
+    if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, flat * dmgMult, owner.state.id, src);
   }
 
   private killEnemy(e: Enemy, ownerId: number, src?: Merc): void {

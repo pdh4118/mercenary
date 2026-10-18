@@ -937,6 +937,20 @@ async function main() {
   let myId = -1;
   let toastLeft = 0;
   let lastTourIn = 0;
+  /** 맞는 소리는 피격이 많아질수록 드문드문 낸다: 최근 1초 동안의 피격 수에 비례해 소리 사이 간격을 늘린다(최대 0.9초) */
+  const hitLog = new Map<string, { times: number[]; last: number }>();
+  const hitSound = (name: "melee_hit" | "ally_hurt" | "arrow_hit_enemy" | "shield_block", x: number, y: number) => {
+    const now = performance.now();
+    let h = hitLog.get(name);
+    if (!h) hitLog.set(name, (h = { times: [], last: 0 }));
+    h.times.push(now);
+    while (h.times.length > 0 && now - h.times[0]! > 1000) h.times.shift();
+    const gap = Math.min(900, 70 + 70 * Math.max(0, h.times.length - 1));
+    if (now - h.last < gap) return;
+    h.last = now;
+    if (name === "arrow_hit_enemy") audio.play("arrow_hit", { x, y, vol: 0.7 });
+    else audio.play(name, { x, y });
+  };
   let lastSquads = 0;
   // 소리용: 이전 프레임 값을 기억해 변화 순간에 소리를 낸다
   const snd = { gold: -1, down: false, shaken: 0, rage: 0, near: -1, phase: "", status: "playing", mercTier: new Map<number, number>(), mercSeen: false, downPlayers: new Set<number>() };
@@ -1084,8 +1098,8 @@ async function main() {
         for (const [kind, x, y, ang, val, owner] of msg.ev ?? []) {
           // 서버가 알려 준 순간에 맞춰 소리를 낸다
           if (kind === EVT_ARROW_HIT) audio.play("arrow_hit", { x, y });
-          else if (kind === EVT_ENEMY_ARROW_HIT) audio.play("arrow_hit", { x, y, vol: 0.7 });
-          else if (kind === EVT_SHIELD_BLOCK) audio.play("shield_block", { x, y });
+          else if (kind === EVT_ENEMY_ARROW_HIT) hitSound("arrow_hit_enemy", x, y);
+          else if (kind === EVT_SHIELD_BLOCK) hitSound("shield_block", x, y);
           else if (kind === EVT_SHIELD_BREAK) audio.play("shield_break", { x, y });
           else if (kind === EVT_CRIT) audio.play("crit_hit", { x, y });
           else if (kind === EVT_BACKSTAB) audio.play("backstab", { x, y });
@@ -1105,8 +1119,8 @@ async function main() {
           }
           else if (kind === EVT_DODGE) audio.play("dodge", { x, y });
           else if (kind === EVT_REVIVE) audio.play("revive_done", { x, y });
-          else if ((kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) && !arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14)) audio.play("melee_hit", { x, y }); // 화살이 아닌 근접 타격
-          else if (kind === EVT_DMG_ALLY && owner === myId) audio.play("ally_hurt", { x, y });
+          else if ((kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) && !arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14)) hitSound("melee_hit", x, y); // 화살이 아닌 근접 타격
+          else if (kind === EVT_DMG_ALLY && owner === myId) hitSound("ally_hurt", x, y);
           // 피해 숫자는 내 유닛(주인공·용병)이 관련된 것만 띄운다
           if (owner === myId && kind === EVT_DMG_ENEMY) spawnFloat(numFmt(val), x, y, { fill: 0xffffff, fontSize: 15, fontWeight: "600", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_ENEMY_CRIT) spawnFloat(`${numFmt(val)}!`, x, y, { fill: 0xffd45d, fontSize: 25, fontWeight: "900", stroke: { color: 0x7a2e00, width: 5 } }, 1.1, 0.5);
@@ -1941,11 +1955,16 @@ async function main() {
       if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
         // 철퇴 준비 동작: 범위가 점점 진하게 차오른다(맞기 직전까지 피하라는 신호가 아니라 휘두르는 타이밍 표시)
         const prog = Math.max(0, Math.min(1, 1 - p.wind / w.windup));
-        fxLayer
-          .moveTo(v.x, v.y)
-          .arc(v.x, v.y, reachNow * (0.4 + 0.6 * prog), p.aim - arcNow, p.aim + arcNow)
-          .closePath()
-          .fill({ color: 0xffc27a, alpha: 0.12 + 0.3 * prog });
+        if (usesBox(w.type)) {
+          // 창·기마는 부채꼴이 아니라 앞으로 뻗은 직사각형만 보인다
+          drawSpearBox(v.x, v.y, p.aim, reachNow * (0.4 + 0.6 * prog), p.hs?.[6] || 1, 0xffc27a, 0.12 + 0.3 * prog, w.type === 0);
+        } else {
+          fxLayer
+            .moveTo(v.x, v.y)
+            .arc(v.x, v.y, reachNow * (0.4 + 0.6 * prog), p.aim - arcNow, p.aim + arcNow)
+            .closePath()
+            .fill({ color: 0xffc27a, alpha: 0.12 + 0.3 * prog });
+        }
       }
       if (!v || p.swing <= 0 || w.ranged || w.type === MAGE_TYPE) continue;
       if (usesBox(w.type)) {

@@ -263,3 +263,20 @@ test("토너먼트 예고: 보스를 잡아도 바로 시작하지 않고 예고
   assert.equal(g.info().phase, "tournament", "예고가 끝나면 시작한다");
   assert.equal(g.info().tourIn, 0);
 });
+
+test("토너먼트 경기 중 쓰러진 용병도 되살아난다(부활 시간 절반)", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.addPlayer("b");
+  const m = g.addMerc(a, 4, 0, 0);
+  g.jumpToStage(3);
+  bossDownAndWait(g);
+  run(g, TUNE.TOURNAMENT_INTRO_SEC + 0.5);
+  assert.equal(g.info().tour!.step, "fight");
+  (g as unknown as { hurtMerc(m: unknown, n: number): void }).hurtMerc(g.getMerc(m), 1e6);
+  const live = g.getMerc(m)!;
+  assert.ok(live.respawn > 0, "쓰러졌다");
+  assert.ok(live.respawn < 20, `경기 중 부활 시간이 짧다: ${live.respawn}`);
+  run(g, live.respawn + 0.5);
+  assert.ok(g.getMerc(m)!.respawn === 0 && g.getMerc(m)!.hp > 0, "경기 중에 돌아왔다");
+});

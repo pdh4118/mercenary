@@ -118,7 +118,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 };
 /** 병종 전용 일반 카드 한 장의 효과량. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.00125, lifesteal: 0.003, pierce: 1, multi: 1, poison: 0.5, armor: 2, respawn: -0.25, knock: 30, thorns: 1, xp: 0.3, cast: -0.15,
+  hp: 0.25, dmg: 0.25, atkSpeed: 0.15, speed: 0.12, range: 0.15, area: 0.2, crit: 0.1, critMult: 0.4, defense: 0.1, dodge: 0.08, regen: 0.005, lifesteal: 0.003, pierce: 1, multi: 1, poison: 0.5, armor: 2, respawn: -0.25, knock: 30, thorns: 2, xp: 0.3, cast: -0.15,
 };
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
@@ -216,10 +216,10 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroCritMult", label: "치명타 피해", base: 0.3, weight: 4, minLevel: 3, fmt: "pct" },
   { k: "heroArea", label: "범위", base: 0.15, weight: 4, fmt: "pct" },
   { k: "heroKnock", label: "넉백", base: 30, weight: 5, fmt: "flat" },
-  { k: "heroThorns", label: "근접 반사", base: 1, weight: 4, minLevel: 3, fmt: "int" },
+  { k: "heroThorns", label: "근접 반사", base: 2, weight: 4, minLevel: 3, fmt: "int" },
   { k: "heroDefense", label: "방어력", base: 0.08, weight: 7, fmt: "pct" },
   { k: "heroDodge", label: "회피율", base: 0.06, weight: 5, fmt: "pct" },
-  { k: "heroRegen", label: "체력 재생", base: 0.06, weight: 9, fmt: "regen" },
+  { k: "heroRegen", label: "체력 재생", base: 0.12, weight: 9, fmt: "regen" },
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
   { k: "heroCast", label: "시전 시간", base: -0.15, weight: 4, fmt: "cut" },
   { k: "heroShield", label: "방패 체력", base: 80, weight: 5, fmt: "flat" },

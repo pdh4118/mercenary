@@ -15,7 +15,7 @@ test("흡혈·체력 재생 카드: 효과는 낮추고 뽑힐 확률은 높였�
   const common = CARDS.filter((c) => c.effect.k === "heroSpeed" && c.rarity === 0)[0]!;
   assert.ok(regen[0]!.weight > common.weight, "체력 재생이 더 자주 나온다");
   assert.ok(steal[0]!.weight > common.weight, "흡혈이 더 자주 나온다");
-  assert.ok(regen[0]!.effect.k === "heroRegen" && regen[0]!.effect.v <= 0.06 + 1e-9, "재생 한 장의 효과는 너프");
+  assert.ok(regen[0]!.effect.k === "heroRegen" && regen[0]!.effect.v <= 0.12 + 1e-9, "재생 한 장의 효과");
   assert.ok(steal[0]!.effect.k === "heroLifesteal" && steal[0]!.effect.v < 0.005);
   assert.equal(LEGEND_CONST.bloodthirstFrac, 0.00625);
   const otherLegend = CARDS.find((c) => c.effect.k === "legend" && c.effect.id !== "bloodthirst")!;

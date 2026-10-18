@@ -280,3 +280,20 @@ test("쓰러져 있어도 우클릭 지시(절대 좌표)를 줄 수 있고, 주
   assert.ok(Math.abs(p.chargeX - (p.x + 1500)) < 1, "주인공과 1500px 떨어진 지점도 그대로 지정된다");
   void cav;
 });
+
+test("공격 지시: 기병은 가리킨 적(창병이라도)에게 곧장 돌격해 들이받는다", () => {
+  const g = new Game(() => 0.999);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const cav = g.addMerc(a, 0, p.x, p.y + 100);
+  const e = g.spawnEnemyAt(p.x + 450, p.y + 100, 1); // 창병: 평소 기병은 피해 간다
+  const en = g.getEnemy(e) as { hp: number; maxHp: number; stunT?: number };
+  en.hp = en.maxHp = 1e6;
+  en.stunT = 99; // 제자리에 묶어 둔다
+  const hp0 = en.hp;
+  g.order(a, p.x + 450, p.y + 100, 1 << 0); // 적을 가리킨다
+  for (let i = 0; i < 6 * 20; i++) g.step();
+  assert.ok(en.hp < hp0, "지시받은 창병을 실제로 들이받았다");
+  assert.ok(Math.hypot(g.getMerc(cav)!.x - (p.x + 450), g.getMerc(cav)!.y - (p.y + 100)) < 120, "그 적 곁에 붙어 있다");
+});

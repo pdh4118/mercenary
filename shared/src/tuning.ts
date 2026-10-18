@@ -65,6 +65,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   STAGE_CLEAR_XP: ["스테이지 클리어 경험치 기본", G.boss, 0, 500, 5],
   CHEST_LIFETIME_SEC: ["보스 상자가 남아 있는 시간(초)", G.boss, 10, 1800, 10],
   CHEST_LUCK_BONUS: ["상자 카드의 행운 보너스", G.boss, 0, 5, 0.1],
+  TOURNAMENT_RESPAWN_MULT: ["토너먼트 용병 부활 시간 배율", G.tour, 0.1, 3, 0.05],
   TOURNAMENT_NOTICE_SEC: ["토너먼트 시작 전 예고 시간(초)", G.tour, 0, 60, 1],
   TOURNAMENT_INTRO_SEC: ["토너먼트 경기 전 소개 시간(초)", G.tour, 1, 30, 1],
   TOURNAMENT_MATCH_SEC: ["토너먼트 경기 제한 시간(초)", G.tour, 10, 300, 5],

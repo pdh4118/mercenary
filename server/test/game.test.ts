@@ -740,7 +740,7 @@ test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
   forceCard(g, a, "heroRegen");
   g.getPlayer(a)!.hp = 50;
   run(g, 10);
-  assert.ok(Math.abs(g.getPlayer(a)!.hp - 50.6) < 0.01); // 초당 0.06(너프 후)
+  assert.ok(Math.abs(g.getPlayer(a)!.hp - 51.2) < 0.01); // 초당 0.12(재생 카드 2배)
 });
 
 test("카드 효과: 용병 부활 시간 단축", () => {

@@ -49,6 +49,7 @@ export const TUNE = {
   ARMY_UNITS_PER_STAGE: 6,
   SQUAD_INTERVAL_BASE: 42, // 소대 간격(초). 스테이지가 오를수록 짧아진다
   SQUAD_BASE_SIZE: 4,
+  TOURNAMENT_RESPAWN_MULT: 0.5, // 토너먼트 경기 중 용병 부활 시간 배율(쓰러진 용병도 경기 중에 돌아온다)
   TOURNAMENT_MATCH_SEC: 60, // 한 경기 제한 시간
   TOURNAMENT_NOTICE_SEC: 15, // 보스를 잡은 뒤 토너먼트가 시작되기까지 알려 주는 시간(이 동안 보상을 받고 준비할 수 있다)
   TOURNAMENT_INTRO_SEC: 5, // 대진 소개(움직일 수 없다)

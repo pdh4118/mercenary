@@ -635,3 +635,28 @@ test("통솔력 % 카드: 쌓인 통솔력 전체에 비율로 곱해지고 고�
   g.applyCardForTest(a, { k: "leadership", v: 3 }); // 고정 증가도 비율이 곱해진다
   assert.equal(p.leadership, 29, "23 x 1.26 = 28.98");
 });
+
+test("근접 반사는 공격력(%)과 흡혈도 받는다", () => {
+  const dealt = (dmgCard: boolean, steal: boolean) => {
+    const g = new Game(() => 0.999);
+    g.autoSpawn = false;
+    const a = g.addPlayer("a")!;
+    g.applyCardForTest(a, { k: "heroThorns", v: 4 });
+    if (dmgCard) g.applyCardForTest(a, { k: "heroDmg", v: 1 }); // 공격력 x2
+    if (steal) g.applyCardForTest(a, { k: "heroLifesteal", v: 0.5 });
+    const p = g.getPlayer(a)!;
+    p.hp = 10;
+    const e = g.spawnEnemyAt(p.x + 20, p.y, 4);
+    const en = g.getEnemy(e) as { hp: number; maxHp: number };
+    en.hp = en.maxHp = 1e6;
+    const hp0 = en.hp;
+    for (let i = 0; i < 40; i++) g.step();
+    return { reflected: hp0 - en.hp, healed: p.hp };
+  };
+  const base = dealt(false, false);
+  const boosted = dealt(true, false);
+  assert.ok(base.reflected > 0);
+  assert.ok(boosted.reflected > base.reflected * 1.5, `공격력 카드가 반사 피해를 키운다: ${base.reflected} → ${boosted.reflected}`);
+  const withSteal = dealt(false, true);
+  assert.ok(withSteal.healed > base.healed, "반사로 준 피해만큼 흡혈한다");
+});
