@@ -1824,33 +1824,6 @@ async function main() {
       }
     }
 
-    // 기병이 속도를 낼수록 뒤에 속도선이 길어진다
-    const streak = (x: number, y: number, dir: number, mom: number) => {
-      if (mom < 0.4) return;
-      // 8방위 그림이 향한 방향의 반대쪽(뒤)으로, 몸 높이에서 평행한 세 줄
-      const ang = ((dir - 2) * Math.PI) / 4 + Math.PI;
-      const c = Math.cos(ang);
-      const s = Math.sin(ang);
-      for (const off of [-8, 0, 8]) {
-        const ox = x - s * off;
-        const oy = y - 8 + c * off;
-        fxLayer
-          .moveTo(ox + c * 16, oy + s * 16)
-          .lineTo(ox + c * (16 + 34 * mom), oy + s * (16 + 34 * mom))
-          .stroke({ width: 2, color: 0xffffff, alpha: 0.12 + 0.3 * mom });
-      }
-    };
-    for (const w of latest.enemies) {
-      if (w[4] !== 0) continue;
-      const v = enemies.views.get(w[0]);
-      if (v) streak(v.x, v.y, v.dir, w[9]);
-    }
-    for (const w of latest.mercs) {
-      if (w[4] !== 0 || w[8] > 0) continue;
-      const v = mercs.views.get(w[0]);
-      if (v) streak(v.x, v.y, v.dir, w[13]);
-    }
-
     // 병종 선택 표시: 범례를 노랗게, 일부만 선택했을 때는 그 병종 용병 발밑에 고리를 그린다
     for (const it of legendLabels) it.label.style.fill = it.mask === selMask ? 0xffe08a : 0xcfd3dc;
     if (selMask !== ALL_MASK) {
