@@ -50,6 +50,7 @@ export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | 
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
+  | { k: "leadershipPct"; v: number } // 통솔력 +v(비율, 지금까지 쌓인 통솔력 전체에 곱한다)
   | { k: "priceMult"; v: number } // 고용 가격에 v를 곱한다
   | { k: "goldMult"; v: number } // 금화 획득 +v(비율)
   | { k: "xpMult"; v: number } // 주인공 경험치 획득 +v(비율)
@@ -201,7 +202,7 @@ const statCards = (): CardDef[] => {
 };
 
 /** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용) */
-const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
+const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "leadershipPct" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
   { k: "heroMaxHp", label: "최대 체력", base: 25, weight: 8, fmt: "flat" },
   { k: "heroSpeed", label: "이동 속도", base: 0.12, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.25, weight: 8, fmt: "pct" },
@@ -252,6 +253,7 @@ const scaleCards = (): CardDef[] =>
     const gold = round3(0.25 * m.mult);
     return [
       { name: `통솔력 +${lead}`, desc: `더 많은 용병을 거느린다 (통솔력 +${lead})`, category: 0, rarity: rr, weight: 40 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "leadership", v: lead } },
+      { name: `통솔력 +${Math.round(10 * m.mult)}%`, desc: `거느릴 수 있는 통솔력이 ${Math.round(10 * m.mult)}% 늘어난다 (통솔력이 클수록 효과가 크다)`, category: 0, rarity: rr, weight: 14 * m.weight, stars: r + 1, minLevel: m.minLevel + 2, effect: { k: "leadershipPct", v: round3(0.1 * m.mult) } },
       { name: `고용 비용 -${Math.round((1 - price) * 100)}%`, desc: `캠프 고용 가격이 ${Math.round((1 - price) * 100)}% 내려간다`, category: 0, rarity: rr, weight: 5 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "priceMult", v: price } },
       { name: `경험치 +${Math.round(15 * m.mult)}%`, desc: `주인공이 얻는 경험치가 ${Math.round(15 * m.mult)}% 늘어난다 (더 빨리 레벨업)`, category: 0, rarity: rr, weight: 6 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "xpMult", v: round3(0.15 * m.mult) } },
       { name: `행운 +${Math.round(20 * m.mult)}%`, desc: `희귀·영웅·전설 카드가 나올 확률이 올라간다 (행운 +${Math.round(20 * m.mult)}%)`, category: 0, rarity: rr, weight: 4 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "luck", v: round3(0.2 * m.mult) } },

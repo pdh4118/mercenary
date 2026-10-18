@@ -243,7 +243,7 @@ export interface PlayerInput {
 
 /** 난이도: 플레이어(주인공·용병)가 적에게 받는 피해를 줄이는 비율. 인덱스로 고른다. */
 export const DIFFICULTY_REDUCTION = [0.75, 0.5, 0.25, 0] as const;
-export const DIFFICULTY_NAMES = ["매우 쉬움", "쉬움", "보통", "어려움"] as const;
+export const DIFFICULTY_NAMES = ["쉬움", "보통", "어려움", "매우 어려움"] as const;
 export const DEFAULT_DIFFICULTY = 3;
 /** 랭크(ELO 등) 게임에서 강제되는 난이도: 피해 감소 없음. 랭크 방에서는 난이도를 바꿀 수 없다. */
 export const RANKED_DIFFICULTY = 3;

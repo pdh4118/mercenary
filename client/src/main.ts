@@ -771,7 +771,7 @@ async function main() {
       default: return -1;
     }
   };
-  const GLYPHS: Record<string, string> = { leadership: "+", priceMult: "%", goldMult: "G", xpMult: "XP", luck: "LUCK", bounty: "G+", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", heroCrit: "CRIT", heroCritMult: "x1.5+" };
+  const GLYPHS: Record<string, string> = { leadership: "+", leadershipPct: "L%", priceMult: "%", goldMult: "G", xpMult: "XP", luck: "LUCK", bounty: "G+", heroMaxHp: "HP", heroSpeed: "»", heroRegen: "♥", heroCrit: "CRIT", heroCritMult: "x1.5+" };
   /** 뽑힐 확률이 낮을수록 별이 많다 */
   const starsOf = (weight: number) => (weight >= 8 ? 1 : weight >= 5 ? 2 : 3);
   const cardPanel = new Container();

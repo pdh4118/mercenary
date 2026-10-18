@@ -618,3 +618,20 @@ test("단계 특화: 창병은 카운터 피해, 기병은 돌격 피해, 마법
   assert.equal(g.mercStatsForTest(mage).reach, MERC_STATS[MAGE]!.reach, "마법사 사거리는 늘지 않는다");
   assert.ok(TIER_COUNTER[SPEAR]! > 0 && TIER_CHARGE[0]! > 0);
 });
+
+test("통솔력 % 카드: 쌓인 통솔력 전체에 비율로 곱해지고 고정 증가와 함께 쓴다", () => {
+  const pct = CARDS.filter((c) => c.effect.k === "leadershipPct");
+  assert.deepEqual(pct.map((c) => c.rarity), [0, 1, 2]);
+  const g = new Game(() => 0.999);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  assert.equal(p.leadership, TUNE.START_LEADERSHIP);
+  g.addLeadership(a, 15); // 20
+  g.applyCardForTest(a, { k: "leadershipPct", v: 0.1 });
+  assert.equal(p.leadership, 22, "20 x 1.1");
+  g.applyCardForTest(a, { k: "leadershipPct", v: 0.16 });
+  assert.equal(p.leadership, 25, "20 x 1.26 = 25.2");
+  g.applyCardForTest(a, { k: "leadership", v: 3 }); // 고정 증가도 비율이 곱해진다
+  assert.equal(p.leadership, 29, "23 x 1.26 = 28.98");
+});

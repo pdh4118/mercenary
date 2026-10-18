@@ -249,7 +249,6 @@ export const MERC_BASE_PRICE = [70, 40, 45, 50, 60, 90] as const;
 /** 통솔력 비용: 보유 용병의 비용 합이 통솔력(최대 병력 규모)을 넘을 수 없다. 기병만 2. */
 export const UNIT_COST = [2, 1, 1, 1, 1, 2] as const;
 /** 통솔력과 별개로 개체 수를 묶어 두는 안전 한도 */
-export const MAX_MERCS_PER_PLAYER = 16;
 /** 쓰러진 뒤 부활까지(초). 기병은 유지 부담으로 더 오래 걸린다. */
 export const MERC_RESPAWN_SEC = [40, 30, 30, 30, 30, 40] as const;
 

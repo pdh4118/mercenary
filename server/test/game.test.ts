@@ -23,7 +23,6 @@ import {
   ENEMY_SPAWN_DISTANCE,
   ENEMY_STATS,
   FIRE_COOLDOWN_SEC,
-  MAX_MERCS_PER_PLAYER,
   MAX_PLAYERS,
   MERC_RESPAWN_SEC,
   MERC_STATS,
@@ -317,10 +316,10 @@ test("고용 검증: 금화 부족·거리·잘못된 선택·보유 한도", ()
   for (let i = 0; i < TUNE.START_LEADERSHIP; i++) assert.equal(g.buy(a, near, 1).ok, true);
   const refused = g.buy(a, near, 1);
   assert.equal(refused.ok, false);
-  // 통솔력을 늘리면 더 고용할 수 있고, 개체 수 안전 한도는 그대로 지킨다
+  // 통솔력을 늘리면 더 고용할 수 있고, 용병 수에는 따로 상한이 없다(통솔력만 따른다)
   g.addLeadership(a, 100);
-  for (let i = TUNE.START_LEADERSHIP; i < MAX_MERCS_PER_PLAYER; i++) assert.equal(g.buy(a, near, 1).ok, true);
-  assert.equal(g.buy(a, near, 1).ok, false);
+  for (let i = TUNE.START_LEADERSHIP; i < TUNE.START_LEADERSHIP + 100; i++) assert.equal(g.buy(a, near, 1).ok, true);
+  assert.equal(g.buy(a, near, 1).ok, false, "통솔력이 다하면 더 못 산다");
 });
 
 test("통솔력 비용: 기병과 마법사만 2, 나머지는 1", () => {

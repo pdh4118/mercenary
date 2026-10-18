@@ -93,7 +93,6 @@ import {
   ENEMY_BOX_WIDTH_MULT,
   FIRE_COOLDOWN_SEC,
   FORMATION_TURN_RATE,
-  MAX_MERCS_PER_PLAYER,
   MAX_PLAYERS,
   MERC_ARROW_SPEED,
   MERC_RESPAWN_SEC,
@@ -308,6 +307,8 @@ interface Slot {
   orders: ({ kind: number; x: number; y: number; left: number; targetId: number } | null)[]; // 병종별 이동(1)/공격(0) 지시
   deaths: number[]; // 최근 용병이 쓰러진 시각(사기 저하 판정)
   shakenGrace: number; // 사기 저하가 다시 걸리지 않는 남은 시간
+  leadFlat: number; // 카드로 얻은 통솔력(고정)
+  leadPct: number; // 통솔력 비율 카드의 합
   haste: Record<string, number>; // 전장의 함성 중첩(대상별: hero 또는 병종 번호)
   hasteT: Record<string, number>;
   zones: number[]; // 진형: 병종별 구역
@@ -740,6 +741,8 @@ export class Game {
       orders: UNIT_TYPES.map(() => null),
       deaths: [],
       shakenGrace: 0,
+      leadFlat: 0,
+      leadPct: 0,
       haste: {},
       hasteT: {},
       zones: [...DEFAULT_PRESETS[0]!.zones],
@@ -788,7 +791,6 @@ export class Game {
     if (code === undefined) return { ok: false, reason: "잘못된 선택입니다" };
     const { type, tier } = decodeOffer(code);
     const owned = this.countMercs(playerId);
-    if (owned >= MAX_MERCS_PER_PLAYER) return { ok: false, reason: `용병은 최대 ${MAX_MERCS_PER_PLAYER}명입니다` };
     const need = unitCost(type, tier);
     if (this.leadershipUsed(playerId) + need > s.state.leadership) {
       return { ok: false, reason: `통솔력이 부족합니다 (${need} 필요)` };
@@ -869,7 +871,14 @@ export class Game {
   /** 통솔력 증가(레벨업 선택지 등에서 호출) */
   addLeadership(playerId: number, amount: number): void {
     const s = this.slots.get(playerId);
-    if (s) s.state.leadership += amount;
+    if (!s) return;
+    s.leadFlat += amount;
+    this.recalcLeadership(s);
+  }
+
+  /** 통솔력 = (시작값 + 카드로 얻은 고정 증가) x (1 + 비율 카드 합), 반올림 */
+  private recalcLeadership(s: Slot): void {
+    s.state.leadership = Math.round((TUNE.START_LEADERSHIP + s.leadFlat) * (1 + s.leadPct));
   }
 
   step(): void {
@@ -3571,7 +3580,7 @@ export class Game {
     // 통솔력이 거의 다 찼으면 통솔력 카드가 더 자주 나온다(자리가 없어 용병을 못 사는 일이 없도록)
     const leadFull = this.leadershipUsed(s.state.id) >= s.state.leadership - 1 ? 2.5 : 1;
     const weightOf = (c: (typeof CARDS)[number]) =>
-      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck + (s.state.box > 0 ? TUNE.CHEST_LUCK_BONUS : 0)) * (c.effect.k === "leadership" ? leadFull : 1); // 행운이 높을수록 높은 등급이 잘 뜬다
+      (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck + (s.state.box > 0 ? TUNE.CHEST_LUCK_BONUS : 0)) * (c.effect.k === "leadership" || c.effect.k === "leadershipPct" ? leadFull : 1); // 행운이 높을수록 높은 등급이 잘 뜬다
     let best: number[] = [];
     for (let attempt = 0; attempt < 8; attempt++) {
       const pool = [...eligible];
@@ -3595,7 +3604,8 @@ export class Game {
     const before = new Map<number, number>();
     for (const merc of this.mercs.values()) if (merc.owner === p.id) before.set(merc.id, this.mercStats(merc).hp);
     switch (e.k) {
-      case "leadership": p.leadership += e.v; break;
+      case "leadership": s.leadFlat += e.v; this.recalcLeadership(s); break;
+      case "leadershipPct": s.leadPct += e.v; this.recalcLeadership(s); break;
       case "priceMult": p.priceMult *= e.v; break;
       case "goldMult": m.goldMult += e.v; break;
       case "xpMult": m.xpMult += e.v; break;
