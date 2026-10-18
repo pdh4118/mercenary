@@ -137,6 +137,8 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   CAV_HALF_WIDTH: ["기병 찌르기 폭(반폭 px)", G.combat, 2, 150, 1],
   PLAYER_MAX_HP: ["주인공 기본 체력", G.hero, 10, 2000, 5],
   PLAYER_SPEED: ["주인공 이동 속도", G.hero, 50, 800, 5],
+  BOW_FIRE_SLOW: ["활 연사 중 이동 속도 감소 비율", G.hero, 0, 0.9, 0.05],
+  MACE_MIN_CHARGE: ["철퇴 최소 피해 비율(모으지 않고 뗐을 때)", G.hero, 0, 1, 0.05],
   ASSAULT_ADVANCE: ["돌격 진형: 대열이 앞으로 나가는 거리(px)", G.ai, 0, 800, 10],
   ASSAULT_LEASH_MULT: ["돌격 진형: 추격 범위 배율", G.ai, 1, 8, 0.1],
   GUARD_MID_FRAC: ["검방병·창병이 아군~위협 선에서 서는 위치(0.5=중간)", G.ai, 0, 1, 0.05],

@@ -297,7 +297,8 @@ interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
-  windT: number; // 공격 준비 동작이 남은 시간(철퇴). 0이면 준비 중이 아니다
+  windT: number; // 주문(지팡이)을 외우는 남은 시간. 0이면 외우는 중이 아니다
+  chargeT: number; // 철퇴를 꾹 누르고 모은 시간(초). 0이면 모으는 중이 아니다
   mom: number; // 기마 주인공의 속도(0~1). 달리면 오르고 멈추면 줄어든다
   stances: number[]; // 병종별 진형 모드
   holdPts: [number, number][]; // 병종별 지점 방어 지점
@@ -732,6 +733,7 @@ export class Game {
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
       windT: 0,
+      chargeT: 0,
       mom: 0,
       stances: UNIT_TYPES.map(() => STANCE_DEFEND),
       holdPts: UNIT_TYPES.map(() => [0, 0] as [number, number]),
@@ -1562,6 +1564,7 @@ export class Game {
     p.chargeLeft = 0;
     p.shaken = 0;
     s.windT = 0;
+    s.chargeT = 0;
     s.fireCd = 0;
     const slotsOf = this.formationSlots(p.id);
     for (const m of this.mercs.values()) {
@@ -1986,7 +1989,8 @@ export class Game {
       const casting = s.windT > 0 && WEAPONS[p.weapon]!.type === MAGE; // 주문을 외우는 동안은 움직일 수 없다
       const moving = !frozen && !casting && (s.input.dx !== 0 || s.input.dy !== 0);
       s.mom = mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
-      const speed = this.heroSpeedNow(s);
+      const bowFiring = WEAPONS[p.weapon]!.ranged && WEAPONS[p.weapon]!.type === ARCHER && s.input.fire && !frozen; // 활을 쏘는 동안은 느려진다
+      const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1);
       if (!frozen && !casting) {
         p.x = clampToWorld(p.x + s.input.dx * speed * dt, PLAYER_RADIUS);
         p.y = clampToWorld(p.y + s.input.dy * speed * dt, PLAYER_RADIUS);
@@ -2024,6 +2028,8 @@ export class Game {
           p.wind = 0;
           this.strikeHero(s);
         }
+      } else if (WEAPONS[p.weapon]!.type === BLUNT) {
+        this.stepMaceCharge(s, dt, s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight")));
       } else if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight"))) this.useWeapon(s);
     }
     if (this.phase !== "tournament") this.stepRevive(dt);
@@ -2079,26 +2085,47 @@ export class Game {
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
     const rate = s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0));
-    if (!w.ranged && w.windup > 0) {
-      // 준비 동작: 이 동안은 움직일 수 있지만 공격은 나가지 않고, 끝나는 순간 조준 방향으로 휘두른다
-      s.windT = (w.windup * (w.type === MAGE ? Math.max(CAST_TIME_MIN_MULT, s.mods.heroCast) : 1)) / rate;
+    if (w.type === MAGE) {
+      // 주문: 외우는 동안 움직일 수 없고, 끝나는 순간 지정한 곳에 운석이 떨어진다
+      s.windT = (w.windup * Math.max(CAST_TIME_MIN_MULT, s.mods.heroCast)) / rate;
       p.wind = s.windT;
       s.fireCd = s.windT + w.cooldown / rate;
-      if (w.type === MAGE) {
-        const [x, y] = this.heroSpot(s, w);
-        this.casts.set(-p.id, { x, y, total: s.windT, radius: w.splash * s.mods.heroArea });
-      }
+      const [x, y] = this.heroSpot(s, w);
+      this.casts.set(-p.id, { x, y, total: s.windT, radius: w.splash * s.mods.heroArea });
       return;
     }
     this.strikeHero(s);
   }
 
+  /**
+   * 철퇴: 공격 키를 꾹 누르는 동안 힘을 모으고(움직일 수 있다), 떼는 순간 모은 시간에 비례한 피해로 휘두른다.
+   * 준비 시간(공격 속도 반영)만큼 모으면 최대 피해이고, 더 눌러도 늘지 않는다. 쿨타임 중에는 모이지 않는다.
+   */
+  private stepMaceCharge(s: Slot, dt: number, canFire: boolean): void {
+    const p = s.state;
+    const w = WEAPONS[p.weapon]!;
+    const rate = s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0));
+    const need = w.windup / rate;
+    if (canFire && s.input.fire && s.fireCd <= 0) {
+      s.chargeT = Math.min(need, s.chargeT + dt);
+      p.wind = Math.max(0.001, w.windup * (1 - s.chargeT / need)); // 화면 표시용: 모을수록 줄어든다(다 모으면 0.001)
+      return;
+    }
+    if (s.chargeT <= 0) return;
+    const frac = Math.max(TUNE.MACE_MIN_CHARGE, s.chargeT / need);
+    s.chargeT = 0;
+    p.wind = 0;
+    if (!canFire) return; // 경기가 끝났거나 무기를 바꾸는 중이면 취소
+    s.fireCd = w.cooldown / rate;
+    this.strikeHero(s, frac);
+  }
+
   /** 주인공 공격이 실제로 나가는 순간 */
-  private strikeHero(s: Slot): void {
+  private strikeHero(s: Slot, power = 1): void {
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
     const crit = this.rollCrit(s.mods.heroCrit);
-    const damage = w.damage * s.mods.heroDmg * (crit ? s.mods.heroCritMult : 1);
+    const damage = w.damage * power * s.mods.heroDmg * (crit ? s.mods.heroCritMult : 1);
     const reach = meleeReach(w.type, w.reach * s.mods.heroRange, s.mods.heroArea);
     if (w.windup <= 0 || w.ranged) s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
     if (crit && hasLegend(s.mods, "stormfire", "hero")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
@@ -2202,6 +2229,7 @@ export class Game {
     s.state.weapon = index;
     s.switchCd = WEAPON_SWITCH_DELAY_SEC;
     s.windT = 0;
+    s.chargeT = 0;
     s.state.wind = 0;
     s.fireCd = Math.min(s.fireCd, WEAPON_SWITCH_DELAY_SEC);
     return true;

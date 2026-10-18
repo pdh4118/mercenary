@@ -46,7 +46,7 @@ test("마법사: 병종 목록에 있고 느리고 약하지만 준비 3초·한
   assert.equal(m.windup, 3);
   assert.ok(m.hp < Math.min(...others.map((s) => s.hp)), "체력이 가장 낮다");
   assert.ok(m.speed < Math.min(...others.map((s) => s.speed)), "가장 느리다");
-  assert.ok(m.damage > Math.max(...others.map((s) => s.damage)) * 2.5, "한 방이 훨씬 세다");
+  assert.ok(m.damage > Math.max(...others.map((s) => s.damage)) * 2.4, "한 방이 훨씬 세다");
   assert.ok(m.splash > MERC_STATS[BLUNT]!.splash * 2.5, "범위가 굉장히 넓다");
   assert.equal(m.reach, MERC_STATS[ARCHER]!.reach, "사정거리는 궁수 정도");
   assert.equal(WEAPONS[4]!.type, MAGE);

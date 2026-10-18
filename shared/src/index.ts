@@ -27,11 +27,11 @@ export const RECONNECT_GRACE_SEC = 30; // 접속이 끊겨도 이 시간 안에 
 export const PLAYER_RADIUS = 16;
 
 // 주인공 기본 공격(투사체). 병종이 없으므로 상성 배율은 적용되지 않는다.
-export const FIRE_COOLDOWN_SEC = 0.3;
+export const FIRE_COOLDOWN_SEC = 0.5;
 export const BULLET_SPEED = 600;
 export const BULLET_RANGE = 400;
 export const BULLET_RADIUS = 5;
-export const BULLET_DAMAGE = 6; // 주인공 무기 피해는 용병을 키우려고 낮췄다(이전 7)
+export const BULLET_DAMAGE = 8; // 쿨타임을 0.3에서 0.5초로 늘리는 대신 피해를 6에서 8로 올렸다
 
 /**
  * 주인공 무기. 무기마다 병종 속성이 있어 병종과 같은 규칙이 적용된다(방패에 주는 피해 배율, 창의 돌격 카운터, 철퇴의 범위 공격 등).
@@ -53,10 +53,10 @@ const rad = (d: number) => (d * Math.PI) / 180;
 export const WEAPONS: readonly WeaponDef[] = [
   { name: "활", type: ARCHER, ranged: true, reach: BULLET_RANGE, arc: 0, damage: BULLET_DAMAGE, cooldown: FIRE_COOLDOWN_SEC, windup: 0, splash: 0, note: "원거리 · 방패 정면에는 약함(25%)" },
   { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 11, cooldown: 0.55, windup: 0, splash: 0, note: "기병 돌격 무효 · 달려오는 기병을 먼저 찌르면 속도를 잃고 카운터 · 아주 긴 사거리" },
-  { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 7, cooldown: 0.35, windup: 0, splash: 0, note: "방패 체력이 정면 공격을 먼저 받아 냄 · 빠른 공격" },
-  { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 24.3, cooldown: 1.2, windup: 0.5, splash: 46, note: "방패 파괴(300%) · 범위 공격 · 휘두르기 전 준비 동작이 길다" },
-  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 120, cooldown: 1.5, windup: 2.5, splash: 130, note: "마우스 위치에 운석 · 2.5초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
-  { name: "기마", type: CAVALRY, ranged: false, reach: 65, arc: rad(80), damage: 11, cooldown: 0.65, windup: 0.12, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창에 먼저 맞으면 속도를 잃고 카운터" },
+  { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 8, cooldown: 0.35, windup: 0, splash: 0, note: "방패 체력이 정면 공격을 먼저 받아 냄 · 빠른 공격" },
+  { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 30, cooldown: 1.2, windup: 1, splash: 46, note: "방패 파괴(300%) · 범위 공격 · 꾹 누르면 1초간 힘을 모으고, 떼는 순간 모은 만큼 피해" },
+  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 100, cooldown: 1.5, windup: 2.5, splash: 130, note: "마우스 위치에 운석 · 2.5초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
+  { name: "기마", type: CAVALRY, ranged: false, reach: 80, arc: rad(80), damage: 11, cooldown: 0.65, windup: 0, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창에 먼저 맞으면 속도를 잃고 카운터" },
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
 export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간

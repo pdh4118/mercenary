@@ -37,7 +37,7 @@ test("창은 철퇴·검보다 길고 좁다, 창병 용병도 다른 근접 병
   assert.ok(MERC_STATS[SPEAR]!.arc < MERC_STATS[SHIELD]!.arc / 3);
 });
 
-test("철퇴는 한 방이 가장 세지만 휘두르기 전에 준비 동작이 있다", () => {
+test("철퇴는 한 방이 가장 세지만 꾹 눌러 모은 뒤 떼야 휘두른다", () => {
   assert.ok(WEAPONS[3]!.damage > WEAPONS[1]!.damage * 2);
   assert.ok(WEAPONS[3]!.windup >= 0.4);
   assert.ok(MERC_STATS[BLUNT]!.windup > MERC_STATS[SHIELD]!.windup * 2);
@@ -50,10 +50,13 @@ test("철퇴는 한 방이 가장 세지만 휘두르기 전에 준비 동작이
   (g.getEnemy(e) as { hp: number }).hp = 500;
   g.setInput(a, { ...idle, fire: true });
   run(g, 0.3);
-  assert.equal(g.getEnemy(e)!.hp, 500, "준비 중에는 아직 맞지 않는다");
-  assert.ok(g.getPlayer(a)!.wind > 0, "준비 동작이 클라이언트에 전달된다");
-  run(g, 0.4);
-  assert.ok(g.getEnemy(e)!.hp < 500, "준비가 끝나면 휘두른다");
+  assert.equal(g.getEnemy(e)!.hp, 500, "모으는 중에는 아직 맞지 않는다");
+  assert.ok(g.getPlayer(a)!.wind > 0, "모으는 동작이 클라이언트에 전달된다");
+  run(g, 1.0);
+  assert.equal(g.getEnemy(e)!.hp, 500, "다 모아도 누르고 있는 동안은 나가지 않는다");
+  g.setInput(a, { ...idle, fire: false });
+  run(g, 0.1);
+  assert.ok(g.getEnemy(e)!.hp < 500, "떼는 순간 휘두른다");
 });
 
 test("궁병 용병은 근접 적이 다가오면 뒤로 물러난다", () => {

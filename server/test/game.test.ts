@@ -806,6 +806,7 @@ test("무기와 방패: 철퇴는 방패를 단번에 깨고, 창은 60%·활은
     const e = g.spawnEnemyAt(p.x + dist, p.y, SHIELD); // 방패는 주인공을 향해 있다(정면)
     g.setInput(a, { ...idle, fire: true });
     for (let i = 0; i < 40; i++) {
+      if (weapon === 3 && i === 22) g.setInput(a, { ...idle, fire: false }); // 철퇴는 1초 넘게 모은 뒤 뗀다
       g.step();
       const cur = g.getEnemy(e)!;
       if (cur.shield < ENEMY_STATS[SHIELD]!.shield) return { shield: cur.shield, hp: cur.hp, regen: cur.regenT };
@@ -892,10 +893,14 @@ test("철퇴는 맞힌 대상 주변의 다른 적에게 절반 피해(범위 �
   const main = g.spawnEnemyAt(p.x + 28, p.y + 10, SPEAR);
   const near = g.spawnEnemyAt(p.x - 10, p.y + 30, SPEAR); // 부채꼴(반각 100도) 밖이지만 대상 가까이(주인공과 겹치면 밀려나므로 몸 밖에 둔다)
   const far = g.spawnEnemyAt(p.x + 30, p.y + 160, SPEAR); // 멀리 떨어진 적은 안 맞는다
+  (g.getEnemy(main) as { hp: number }).hp = 500; // 한 방에 쓰러져 밀려나지 않게 한다
+  for (const id of [main, near, far]) (g.getEnemy(id) as { stunT: number }).stunT = 5; // 모으는 1초 동안 창병이 거리를 벌리지 못하게 한다
   g.setInput(a, { ...idle, fire: true });
-  run(g, WEAPONS[3]!.windup + 0.2); // 준비 동작이 끝나야 휘두른다
+  run(g, WEAPONS[3]!.windup + 0.2); // 꾹 눌러 다 모아야 한다
+  g.setInput(a, { ...idle, fire: false }); // 떼는 순간 휘두른다
+  run(g, 0.1);
   const dmg = WEAPONS[3]!.damage;
-  assert.equal(g.getEnemy(main)?.hp ?? 0, Math.max(0, ENEMY_STATS[SPEAR]!.hp - dmg), "정면의 대상은 전부 맞는다");
+  assert.equal(g.getEnemy(main)?.hp ?? 0, 500 - dmg, "정면의 대상은 전부 맞는다");
   assert.ok(Math.abs(g.getEnemy(near)!.hp - (ENEMY_STATS[SPEAR]!.hp - dmg * TUNE.SPLASH_FACTOR)) < 1e-6, "주변 적은 절반만 맞는다");
   assert.equal(g.getEnemy(far)!.hp, ENEMY_STATS[SPEAR]!.hp);
 });

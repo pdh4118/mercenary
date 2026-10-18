@@ -107,6 +107,8 @@ export const TUNE = {
   CAV_HALF_WIDTH: 15, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
   PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s
+  BOW_FIRE_SLOW: 0.15, // 활을 쏘는 동안(공격 키를 누르고 있는 동안) 줄어드는 이동 속도 비율
+  MACE_MIN_CHARGE: 0.2, // 철퇴를 모으지 않고 바로 뗐을 때에도 들어가는 최소 피해 비율(0이면 모은 만큼만)
   ENEMY_SPAWN_BASE_PER_SEC: 1.1, // 플레이어 1명당
   ENEMY_SPAWN_GROWTH_PER_SEC: 0.012, // 시간이 지날수록 초당 늘어나는 양
 };
@@ -226,7 +228,7 @@ export const MERC_STATS: readonly UnitStats[] = [
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 225, speed: 75, reach: 40, damage: 32.4, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
   // 마법사: 느리고 약하지만 2초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
-  { hp: 88, speed: 65, reach: 280, damage: 90, windup: 3, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 120 },
+  { hp: 88, speed: 65, reach: 280, damage: 80, windup: 3, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 120 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
