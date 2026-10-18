@@ -169,11 +169,12 @@ test("기병·창병은 아군·적 모두 전체 폭 30(반폭 15)의 직사각
 });
 
 import { WEAPONS as WPN, BULLET_RANGE as BR } from "@mercenary/shared";
-test("주인공 기마·활·창병 사거리 조정: 기마 65, 활 400, 창병 용병 90, 적 마법사 260", () => {
+test("사거리 조정: 주인공 기마 65, 활 400, 적 창병 90(용병 100 유지), 적 마법사 260", () => {
   const cav = WPN.find((w) => w.type === CAV_T)!;
   assert.equal(cav.reach, 65);
   assert.equal(BR, 400);
-  assert.equal(MS[SPEAR_T]!.reach, 90);
+  assert.equal(MS[SPEAR_T]!.reach, 100);
+  assert.equal(ES[SPEAR_T]!.reach, 90);
   assert.equal(ES[5]!.reach, 260);
   // 기마도 전체 폭 30 직사각형
   assert.ok(inBox(CAV_T, 0, 0, 0, 60, 22, 10, cav.reach));
