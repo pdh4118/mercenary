@@ -3846,8 +3846,8 @@ export class Game {
   }
 
   private enemyMove(e: Enemy, st: UnitStats, dt: number, foes: Foe[], archers: Enemy[], target: Foe, td: number, speed: number): void {
-    // 접근을 멈추는 거리: 사거리의 절반. 적 창병은 사거리가 늘어도 예전 거리(58 기준)까지는 붙어서, 근접 용병이 쫓아가도 닿지 못하는 일이 없게 한다.
-    const stopR = (e.type === SPEAR ? Math.min(st.reach, 58) : st.reach) * 0.5 + target.r;
+    // 접근을 멈추는 거리: 사거리의 절반. 적 창병은 사거리가 길어서 이 거리를 유지하며 찌르는(카이팅) 습성이 있다.
+    const stopR = st.reach * 0.5 + target.r;
     e.face = Math.atan2(target.y - e.y, target.x - e.x);
     switch (e.type) {
       case CAVALRY:

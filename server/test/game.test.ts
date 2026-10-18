@@ -418,7 +418,8 @@ test("용병이 처치하면 주인이 금화를 얻는다", () => {
   const a = g.addPlayer("a")!;
   const p = me(g, a);
   g.addMerc(a, BLUNT, p.x + 60, p.y);
-  g.spawnEnemyAt(p.x + 60 + 30, p.y, SPEAR); // 둔기병 피해 36 ≥ 창병 체력 28(적 궁병은 물러나며 쏘므로 다른 병종으로)
+  const sp = g.spawnEnemyAt(p.x + 60 + 30, p.y, SPEAR); // 둔기병 피해 ≥ 창병 체력 28(적 궁병은 물러나며 쏘므로 다른 병종으로)
+  (g.getEnemy(sp) as { stunT?: number }).stunT = 5; // 적 창병은 거리를 유지하며 뒤로 빠지므로(카이팅) 움직이지 못하게 묶어 둔다
   run(g, 1.5);
   assert.equal(g.enemyCount, 0);
   assert.equal(me(g, a).gold, TUNE.START_GOLD + ENEMY_GOLD[SPEAR]!);
@@ -614,7 +615,8 @@ test("경험치: 용병이 처치해도 주인에게 개인 몫이 간다", () =
   const b = g.addPlayer("b")!;
   const p = me(g, a);
   g.addMerc(a, BLUNT, p.x + 60, p.y);
-  g.spawnEnemyAt(p.x + 90, p.y, SPEAR);
+  const sp = g.spawnEnemyAt(p.x + 90, p.y, SPEAR);
+  (g.getEnemy(sp) as { stunT?: number }).stunT = 5; // 적 창병은 카이팅하므로 움직이지 못하게 묶어 둔다
   run(g, 1.5);
   assert.equal(g.enemyCount, 0);
   assert.ok(g.getPlayer(a)!.xp > g.getPlayer(b)!.xp);
