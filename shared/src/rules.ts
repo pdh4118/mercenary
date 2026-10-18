@@ -217,13 +217,13 @@ export const MERC_STATS: readonly UnitStats[] = [
   { hp: 200, speed: 300, reach: 53, damage: 15, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
   // 창병: 사거리가 가장 길고 폭이 좁다(찌르기)
   { hp: 181, speed: 95, reach: 100, damage: 19, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
-  { hp: 119, speed: 95, reach: 280, damage: 15, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
+  { hp: 119, speed: 85, reach: 280, damage: 15, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
   // 검방병: 몸 체력과 별개로 방패 체력이 있다
-  { hp: 200, speed: 90, reach: 32, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 150, splash: 0 },
+  { hp: 200, speed: 80, reach: 32, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 150, splash: 0 },
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 225, speed: 75, reach: 40, damage: 32.4, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
   // 마법사: 느리고 약하지만 2초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
-  { hp: 88, speed: 60, reach: 280, damage: 150.0, windup: 2, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
+  { hp: 88, speed: 65, reach: 280, damage: 150.0, windup: 2, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 140 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
