@@ -2116,8 +2116,8 @@ export class Game {
       const foes = this.duelFoes(p.id);
       const hitFoes: Friendly[] = [];
       for (const f of foes) {
-        if (w.type === SPEAR) {
-          if (!inSpearBox(p.x, p.y, p.aim, f.x, f.y, f.radius, reach, s.mods.heroArea)) continue;
+        if (usesBox(w.type)) {
+          if (!inBox(w.type, p.x, p.y, p.aim, f.x, f.y, f.radius, reach, s.mods.heroArea)) continue;
         } else {
           if (Math.hypot(f.x - p.x, f.y - p.y) > reach + f.radius) continue;
           if (Math.abs(angleDiff(Math.atan2(f.y - p.y, f.x - p.x), p.aim)) > arc) continue;
@@ -2137,9 +2137,9 @@ export class Game {
     }
     const struck: Enemy[] = [];
     for (const e of this.enemies.values()) {
-      if (w.type === SPEAR) {
-        // 창: 앞으로 뻗은 직사각형(가까운 쪽이 넓고 끝이 좁다)
-        if (!inSpearBox(p.x, p.y, p.aim, e.x, e.y, radiusOf(e), reach, s.mods.heroArea)) continue;
+      if (usesBox(w.type)) {
+        // 창·기마: 앞으로 뻗은 직사각형(전체 폭 30). 범위 카드는 폭을 넓힌다.
+        if (!inBox(w.type, p.x, p.y, p.aim, e.x, e.y, radiusOf(e), reach, s.mods.heroArea)) continue;
       } else {
         if (Math.hypot(e.x - p.x, e.y - p.y) > reach + radiusOf(e)) continue;
         if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > arc) continue;

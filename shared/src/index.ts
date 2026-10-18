@@ -29,7 +29,7 @@ export const PLAYER_RADIUS = 16;
 // 주인공 기본 공격(투사체). 병종이 없으므로 상성 배율은 적용되지 않는다.
 export const FIRE_COOLDOWN_SEC = 0.3;
 export const BULLET_SPEED = 600;
-export const BULLET_RANGE = 520;
+export const BULLET_RANGE = 400;
 export const BULLET_RADIUS = 5;
 export const BULLET_DAMAGE = 6; // 주인공 무기 피해는 용병을 키우려고 낮췄다(이전 7)
 
@@ -56,7 +56,7 @@ export const WEAPONS: readonly WeaponDef[] = [
   { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 7, cooldown: 0.35, windup: 0, splash: 0, note: "방패 체력이 정면 공격을 먼저 받아 냄 · 빠른 공격" },
   { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 24.3, cooldown: 1.2, windup: 0.5, splash: 46, note: "방패 파괴(300%) · 범위 공격 · 휘두르기 전 준비 동작이 길다" },
   { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 120, cooldown: 1.5, windup: 2, splash: 140, note: "마우스 위치에 운석 · 2초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
-  { name: "기마", type: CAVALRY, ranged: false, reach: 54, arc: rad(80), damage: 11, cooldown: 0.65, windup: 0.12, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창에 먼저 맞으면 속도를 잃고 카운터" },
+  { name: "기마", type: CAVALRY, ranged: false, reach: 65, arc: rad(80), damage: 11, cooldown: 0.65, windup: 0.12, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창에 먼저 맞으면 속도를 잃고 카운터" },
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
 export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간

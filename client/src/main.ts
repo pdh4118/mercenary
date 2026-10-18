@@ -1974,8 +1974,8 @@ async function main() {
           .fill({ color: 0xffc27a, alpha: 0.12 + 0.3 * prog });
       }
       if (!v || p.swing <= 0 || w.ranged || w.type === MAGE_TYPE) continue;
-      if (w.type === SPEAR_TYPE) {
-        drawSpearBox(v.x, v.y, p.aim, reachNow, p.hs?.[6] || 1, TYPE_COLORS[w.type]!, 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC));
+      if (usesBox(w.type)) {
+        drawSpearBox(v.x, v.y, p.aim, reachNow, p.hs?.[6] || 1, TYPE_COLORS[w.type]!, 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC), w.type === 0);
         continue;
       }
       fxLayer
