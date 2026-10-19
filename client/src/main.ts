@@ -1245,6 +1245,7 @@ async function main() {
   );
   let spectating = false; // 쓰러진 동안 동료를 따라가며 구경한다
   let specIndex = 0;
+  let specCount = 0; // 지금 구경할 수 있는 살아 있는 동료 수(관전 중에 매 프레임 갱신)
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (pickingHold) endPickHold();
@@ -1275,10 +1276,14 @@ async function main() {
     // 쓰러져 있을 때 스페이스: 관전 시작/끝, 관전 중 Tab(또는 ←/→): 다음 동료 보기
     if (!e.repeat && latest?.players.find((p) => p.id === myId)?.down) {
       if (e.key === " ") {
-        spectating = !spectating;
+        // 첫 스페이스는 관전 시작, 이어서 누를 때마다 다음 동료, 마지막 동료 다음에는 관전이 끝난다
+        if (!spectating) {
+          spectating = true;
+          specIndex = 0;
+        } else specIndex++;
         e.preventDefault();
       } else if (spectating && (e.key === "Tab" || e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        specIndex += e.key === "ArrowLeft" ? -1 : 1;
+        specIndex = specCount > 0 ? (specIndex + (e.key === "ArrowLeft" ? -1 : 1) + specCount) % specCount : 0;
         e.preventDefault();
       }
     }
@@ -2096,8 +2101,11 @@ async function main() {
     let specName = "";
     if (spectating) {
       const alive = latest.players.filter((q) => q.id !== myId && !q.down);
-      if (alive.length === 0) spectating = false;
-      else {
+      specCount = alive.length;
+      if (alive.length === 0 || specIndex >= alive.length) {
+        spectating = false; // 볼 동료가 없거나 마지막 동료까지 다 봤다
+        specIndex = 0;
+      } else {
         specIndex = ((specIndex % alive.length) + alive.length) % alive.length;
         const t = alive[specIndex]!;
         camTarget = players.views.get(t.id) ?? me;
@@ -2204,7 +2212,7 @@ async function main() {
         ? meState.revive > 0
           ? `동료가 일으켜 세우는 중... ${Math.round(meState.revive * 100)}%`
           : spectating
-            ? `${specName} 관전 중 · Tab/←→ 다음 동료 · 스페이스 끝내기`
+            ? `${specName} 관전 중 · 스페이스 다음 동료(마지막 다음엔 끝) · Tab/←→ 이동`
             : "쓰러졌습니다 - 동료가 일으켜 주기를 기다리는 중 (스페이스: 관전)"
         : fallen
           ? `${fallen.name} 부활: E 누르고 있기${fallen.revive > 0 ? ` (${Math.round(fallen.revive * 100)}%)` : ""}`
