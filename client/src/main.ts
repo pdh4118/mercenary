@@ -234,6 +234,8 @@ async function main() {
   const maceHitTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_hit_${i}.png`).catch(() => null)));
   // 기마 가속 속도 이펙트(바람 궤적 6컷 반복). 없으면 이펙트 없이 달린다.
   const boostTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_${i}.png`).catch(() => null)));
+  // 기마 가속 시작 폭발(6컷, 달리기 시작하는 순간 한 번). 없으면 생략.
+  const boostStartTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_start_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
   const wallTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_${i}.png`).catch(() => null)));
   // 수정 조각 3종(상태별 하나씩): 방벽 선을 따라 쌓아 가로·세로·대각선 벽을 만든다. 번갈아 좌우를 뒤집어 반복감을 줄인다.
@@ -987,7 +989,7 @@ async function main() {
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
-  const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
+  const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
   const maceHits: { sp: Sprite; age: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean }[]>(); // 방벽 번호 -> 수정 조각들
   const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
@@ -2216,9 +2218,35 @@ async function main() {
           bf.sp.texture = boostTex[Math.floor(performance.now() / 50) % 6]!;
           bf.sp.width = 150;
           bf.sp.height = (150 * bf.sp.texture.height) / bf.sp.texture.width;
+          // 시작 폭발: 달리기 시작한 첫 순간 그 자리에서 한 번 터지고, 달리는 방향 기준으로 돌려 놓는다
+          if (moving && !bf.burstDone && boostStartTex.every((t) => t !== null)) {
+            bf.burstDone = true;
+            bf.burstT = performance.now();
+            const b = new Sprite(boostStartTex[0]!);
+            b.anchor.set(0.5, 0.5);
+            b.position.set(v.x, v.y);
+            b.rotation = bf.ang;
+            groundFx.addChild(b);
+            bf.burst = b;
+          }
         } else if (bf) {
           bf.sp.destroy();
+          bf.burst?.destroy();
           boostFx.delete(p.id);
+        }
+      }
+      const bfx = boostFx.get(p.id);
+      if (bfx?.burst) {
+        const f = Math.floor((performance.now() - bfx.burstT!) / 70);
+        if (f >= 6) {
+          bfx.burst.destroy();
+          bfx.burst = undefined;
+        } else {
+          const t = boostStartTex[f]!;
+          if (v) bfx.burst.position.set(v.x, v.y); // 달리는 몸을 따라다니며 터진다
+          bfx.burst.texture = t;
+          bfx.burst.width = 150;
+          bfx.burst.height = (150 * t.height) / t.width;
         }
       }
       if (v && p.invuln > 0 && !p.down) fxLayer.circle(v.x, v.y, 27 + 2 * Math.sin(performance.now() / 90)).stroke({ width: 3, color: 0x9be8ff, alpha: 0.85 }).circle(v.x, v.y, 24).fill({ color: 0x9be8ff, alpha: 0.12 }); // 무적
