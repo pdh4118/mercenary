@@ -66,7 +66,7 @@ export interface SkillDef {
 export const SKILLS: readonly SkillDef[] = [
   { name: "후퇴", note: "뒤로 살짝 물러난다" }, // 활
   { name: "돌진", note: "조준한 방향으로 돌진해 찌른다" }, // 창
-  { name: "무적", note: "1초간 피해를 받지 않는다" }, // 검
+  { name: "무적", note: "1.5초간 피해를 받지 않는다" }, // 검
   { name: "투척", note: "커서 방향으로 철퇴를 던져, 적에게 닿으면 그 자리에 광역 피해" }, // 철퇴
   { name: "방벽", note: "사거리 안 커서 위치에 얇은 벽을 세운다" }, // 지팡이
   { name: "가속", note: "2초간 최고 속도로 달린다(공격하면 속도를 잃는다)" }, // 기마

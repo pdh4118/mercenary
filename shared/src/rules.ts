@@ -120,7 +120,7 @@ export const TUNE = {
   SKILL_DASH_SEC: 0.18, // 돌진에 걸리는 시간
   SKILL_BACKSTEP_DIST: 130, // 활 후퇴 거리(px)
   SKILL_BACKSTEP_SEC: 0.14,
-  SKILL_INVULN_SEC: 1, // 검 무적 지속(초)
+  SKILL_INVULN_SEC: 1.5, // 검 무적 지속(초)
   SKILL_MACE_RANGE: 420, // 철퇴 투척 비행 거리(px). 커서 방향으로 이만큼 날아가고, 적에게 닿으면 그 자리에 광역 피해(못 맞히면 그냥 사라진다)
   SKILL_MACE_SPEED: 560, // 던진 철퇴의 속도(px/s)
   SKILL_MACE_DAMAGE: 1.5, // 던진 철퇴의 피해(철퇴 피해 대비)
