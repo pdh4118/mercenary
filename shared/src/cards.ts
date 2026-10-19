@@ -231,7 +231,7 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroRegen", label: "체력 재생", base: 0.12, weight: 9, fmt: "regen" },
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
   { k: "heroCast", label: "시전 속도", base: 0.05, weight: 4, fmt: "pct" },
-  { k: "heroSkill", label: "스킬 회복 속도", base: 0.04, weight: 5, fmt: "pct" }, // 일반 +4%(희귀 x1.6, 영웅 x2.4), 쿨타임 1/(1+합)배
+  { k: "heroSkill", label: "스킬 가속", base: 0.04, weight: 5, fmt: "pct" }, // 일반 +4%(희귀 x1.6, 영웅 x2.4), 쿨타임 1/(1+합)배
   { k: "heroShield", label: "방패 체력", base: 40, weight: 5, fmt: "flat" },
   { k: "heroShieldRegen", label: "방패 재생 속도", base: 0.2, weight: 5, fmt: "pct" },
 ];
