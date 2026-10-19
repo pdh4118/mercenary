@@ -172,15 +172,13 @@ test("스킬 쿨타임은 모두 10초로 같다", () => {
   assert.ok(TUNE.SKILL_WALL_SEC < 10, "방벽은 쿨타임보다 짧게 남는다");
 });
 
-test("지팡이 스킬: 커서 위치에 수직으로 벽이 서고, 내구도는 주인공 체력에 비례하며, 적을 막고 시간이 지나면 사라진다", () => {
+test("지팡이 스킬: 커서 위치에 수직으로 벽이 서고, 적을 막고 시간이 지나면 사라진다", () => {
   const { g, a, p } = start(4);
   g.setInput(a, { ...idle, aim: 0, dist: 200 });
   g.useSkill(a);
   const w = g.snapshotWalls();
   assert.equal(w.length, 1);
   assert.ok(Math.abs(w[0]![1] - (p.x + 200)) < 1 && Math.abs(w[0]![3] - Math.PI / 2) < 0.02, "커서 위치, 조준선에 수직");
-  const wall = (g as unknown as { walls: { hp: number; maxHp: number }[] }).walls[0]!;
-  assert.ok(Math.abs(wall.maxHp - p.maxHp * TUNE.SKILL_WALL_HP_MULT) < 1e-6, "주인공 체력에 비례");
   // 벽 너머 적이 주인공을 향해 와도 통과하지 못한다
   const e = g.spawnEnemyAt(p.x + 330, p.y, SHIELD);
   (g.getEnemy(e) as { stunT?: number }).stunT = 0;
@@ -198,11 +196,10 @@ test("지팡이 스킬: 커서 위치에 수직으로 벽이 서고, 내구도�
   assert.equal(g.snapshotWalls().length, 0, "시간이 지나면 사라진다");
 });
 
-test("방벽은 적의 화살을 막고 피해만큼 부서진다", () => {
+test("방벽은 적의 화살을 막고, 아무리 맞아도 부서지지 않는다(시간이 되면 사라진다)", () => {
   const { g, a, p } = start(4);
   g.setInput(a, { ...idle, aim: 0, dist: 200 });
   g.useSkill(a);
-  const wall = (g as unknown as { walls: { hp: number; maxHp: number }[] }).walls[0]!;
   // 적 화살을 벽 뒤에서 쏜다
   (g as unknown as { bullets: unknown[] }).bullets.push({
     id: 9999, x: p.x + 300, y: p.y, vx: -400, vy: 0, left: 600, hostile: true, damage: 10, srcType: 2, owner: 0, radius: 5, pierce: 0, crit: false, hitIds: new Set(),
@@ -210,7 +207,8 @@ test("방벽은 적의 화살을 막고 피해만큼 부서진다", () => {
   const hp0 = g.getPlayer(a)!.hp;
   run(g, 1);
   assert.equal(g.getPlayer(a)!.hp, hp0, "주인공은 맞지 않는다");
-  assert.ok(wall.hp < wall.maxHp, "벽이 대신 맞았다");
+  assert.equal(g.snapshotWalls().length, 1, "화살을 맞아도 벽은 그대로 서 있다");
+  assert.ok(g.snapshotWalls()[0]![6] > 70, "남은 시간 비율은 시간만 따라 줄어든다");
 });
 
 test("스킬 회복 속도 카드: 일반 +4%, 쌓을수록 쿨타임이 1/(1+합)배로 줄고 효율은 같다", async () => {

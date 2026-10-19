@@ -246,8 +246,8 @@ export interface ResultPlayer {
 }
 
 export type BulletWire = [id: number, x: number, y: number, team: 0 | 1, kind: number]; // team 1 = 적 투사체, kind 0 = 화살, 1 = 던진 철퇴
-/** 마법사 방벽: id, x, y, 각도(라디안), 반길이, 반두께, 남은 내구도 비율 0..100, 주인 번호 */
-export type WallWire = [id: number, x: number, y: number, ang: number, hl: number, ht: number, hp: number, owner: number];
+/** 마법사 방벽: id, x, y, 각도(라디안), 반길이, 반두께, 남은 시간 비율 0..100(벽은 부서지지 않고 시간이 되면 사라진다), 주인 번호 */
+export type WallWire = [id: number, x: number, y: number, ang: number, hl: number, ht: number, left: number, owner: number];
 /** 보스 보상 상자: id, x, y, 주인 번호, 남은 초 */
 /** 마법사가 주문을 외우는 중인 운석: 시전자 키(용병 번호, 주인공은 -번호), x, y, 진행도(0~100), 반경, 주인 번호(0이면 적), 전체 주문 시간(0.1초 단위) */
 export type MeteorWire = [key: number, x: number, y: number, progress: number, radius: number, owner: number, total: number];

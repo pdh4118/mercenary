@@ -126,7 +126,6 @@ export const TUNE = {
   SKILL_MACE_SPLASH: 80, // 던진 철퇴가 적에게 닿은 자리의 광역 피해 반경(px)
   SKILL_WALL_LEN: 170, // 방벽 전체 길이(px)
   SKILL_WALL_THICK: 22, // 방벽 두께(px)
-  SKILL_WALL_HP_MULT: 1.2, // 방벽 내구도 = 주인공 최대 체력 x 이 값(낮은 내구성)
   SKILL_WALL_SEC: 5, // 방벽이 남아 있는 시간(초). 쿨타임 10초의 절반이라 계속 세워 둘 수는 없다
   BOW_FIRE_SLOW: 0.15, // 활을 쏘는 동안(공격 키를 누르고 있는 동안) 줄어드는 이동 속도 비율
   MACE_MIN_CHARGE: 0.2, // 철퇴를 모으지 않고 바로 뗐을 때에도 들어가는 최소 피해 비율(0이면 모은 만큼만)

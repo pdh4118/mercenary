@@ -735,6 +735,53 @@ python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_dash
 
 **참고**: 잔상 실루엣은 코드가 주인공 그림을 반투명하게 복사해 남기는 방식으로도 만들 수 있습니다(그림 불필요). 위 그림을 받으면 그림을, 못 받으면 코드 방식으로 대신하겠습니다.
 
+#### 11-1-6. 활 후퇴 이펙트 (스킬 `후퇴`)
+
+활 스킬 **후퇴**는 조준 반대 방향으로 **130px을 0.14초에 뒤로 훌쩍 물러나는** 동작입니다. 돌진 잔상(주인공 모습을 복사해 남김)은 코드가 따로 만들 수 있으니, 그림은 **물러나는 순간의 발치 효과**만 필요합니다: ① 출발한 자리에서 **발로 땅을 박차며 튀는 흙먼지**, ② 물러나는 길에 남는 **짧고 가벼운 바람선**. 창 돌진보다 **작고 가볍고 날렵한** 느낌(무게감 없이 휙)으로 그려 주세요.
+
+**방향 규칙**: 기병·창 이펙트와 같이 **왼쪽(←)으로 물러날 때 기준**으로 그립니다(주인공은 오른쪽을 바라보고 뒤로 물러남). 게임이 실제 후퇴 방향에 맞춰 돌립니다. 그림의 **오른쪽이 출발 지점(주인공이 있던 곳)**, 왼쪽이 도착 방향입니다.
+**그림체**: 게임 유닛과 같게. 면이 단순한 평평한 색, 얇은 어두운 윤곽선(2px 느낌), 그라데이션·사실적인 연기 금지. 색은 **따뜻한 흙색(먼지)**과 **흰색~연한 하늘색(바람선)**만. 네거티브: `realistic smoke, photo, 3d render, text, characters, bow, arrow, background scenery`. 투명 배경 또는 단색 회색 배경(지우는 건 제가 합니다).
+
+각 프롬프트 앞에 **시트 요청 머리말**을 붙입니다.
+
+**A. 박차는 흙먼지 4컷 (한 줄)** - 출발한 자리에서 한 번 터짐
+```
+<시트 요청 머리말>
+4 frames of a quick dust kick-off effect, one row, each frame a square, no characters. A small
+burst of warm brown dust and 3 to 4 tiny pebbles kicked up at the bottom RIGHT of the frame
+(the start point) and flying a little to the LEFT. Ground line along the bottom edge.
+frame 1: a tight small puff right at the start point with 2 pebbles
+frame 2: the puff grows and stretches to the left, pebbles fly out
+frame 3: the dust is widest and starts to thin, pebbles falling
+frame 4: only a few faint dust wisps left
+Flat colors, thin dark outline, light and snappy feel (smaller than a galloping cavalry dust).
+Captions: skill_back_dust_0, skill_back_dust_1, skill_back_dust_2, skill_back_dust_3
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_back_dust_0,skill_back_dust_1,skill_back_dust_2,skill_back_dust_3 --rows 1 --scale 0.16
+```
+- 화면에서 약 **72x56px**, 출발한 자리에 두고 0.3초 재생. **바닥선이 이미지 맨 아래**, **터지는 중심이 오른쪽 아래**에 오게 해 주세요.
+
+**B. 후퇴 바람선 3컷 (한 줄)** - 물러나는 길에 남음
+```
+<시트 요청 머리말>
+3 frames of a light backstep wind streak effect, one row, each frame a wide rectangle (about
+3:1), no characters. Thin white and pale-cyan curved speed lines flowing horizontally, starting
+sharp at the RIGHT edge (where the character was) and stretching to the LEFT, thinning and
+fading, 3 to 4 lines of different lengths with one or two tiny sparkles.
+frame 1: lines short and bright near the right edge
+frame 2: lines at full length, brightest
+frame 3: lines thin and faded, shifted left
+Same size and placement in every frame. Flat colors, thin dark outline.
+Captions: skill_back_wind_0, skill_back_wind_1, skill_back_wind_2
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_back_wind_0,skill_back_wind_1,skill_back_wind_2 --rows 1 --scale 0.16
+```
+- 화면에서 길이 약 **150px**(후퇴 거리 130px + 여유), 높이 약 **50px**. 가운데 높이에 선이 모이게 해 주세요.
+
+**참고**: 후퇴 중 남는 **잔상**은 창 돌진처럼 코드로 주인공 모습을 복사해 만들 수 있어 그림이 필요 없습니다. 후퇴 시작 소리는 11-3의 `skill_backstep`을 쓰세요.
+
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
 화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.
@@ -768,7 +815,7 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 | `skill_mace_throw` | 철퇴 던질 때 | `heavy mace thrown, deep spinning whoosh that fades away` | 0.5초, 2종 |
 | `skill_mace_hit` | 던진 철퇴가 적에게 닿을 때 | `heavy mace crashing into armor, big dull impact with a short rumbling shockwave` | 0.6초, 2종 |
 | `skill_wall_up` | 방벽이 설 때 | `crystal barrier rising from the ground, glassy chime and a low stone rumble` | 0.6초, 1종 |
-| `skill_wall_hit` | 방벽이 공격을 맞을 때 | `dull hit on a crystal wall, short thud with a tiny glassy crack` | 0.15초, 3종 |
+| `skill_wall_hit` | 방벽이 공격을 맞을 때(방벽이 이제 부서지지 않으므로 `skill_wall_break`는 "시간이 되어 사라질 때"로 쓴다) | `dull hit on a crystal wall, short thud with a tiny glassy crack` | 0.15초, 3종 |
 | `skill_wall_break` | 방벽이 부서질 때 | `crystal wall shattering into pieces, short bright shatter and falling shards` | 0.7초, 1종 |
 | `skill_boost` | 기마 가속 | `horse bursting into a gallop, hoof drum roll and a short whinny with a rush of wind` | 0.8초, 1종 |
 | `skill_ready` | 쿨타임이 끝났을 때(작게) | `very soft ready chime, single short low bell, subtle` | 0.3초, 1종 |

@@ -430,9 +430,7 @@ interface Wall {
   ang: number; // 벽이 뻗은 방향(라디안)
   hl: number; // 반길이
   ht: number; // 반두께
-  hp: number;
-  maxHp: number;
-  t: number; // 남은 시간
+  t: number; // 남은 시간(부서지지 않고 시간이 되면 사라진다)
 }
 
 interface Camp {
@@ -1084,7 +1082,7 @@ export class Game {
   }
 
   snapshotWalls(): WallWire[] {
-    return this.walls.map((w) => [w.id, round(w.x), round(w.y), round(w.ang, 100), w.hl, w.ht, Math.max(1, Math.round((w.hp / w.maxHp) * 100)), w.owner]);
+    return this.walls.map((w) => [w.id, round(w.x), round(w.y), round(w.ang, 100), w.hl, w.ht, Math.max(1, Math.round((w.t / TUNE.SKILL_WALL_SEC) * 100)), w.owner]);
   }
 
   snapshotCamps(): CampWire[] {
@@ -2354,8 +2352,7 @@ export class Game {
         const [x, y] = this.heroSpot(s, w); // 사거리 안의 커서 위치
         const toward = Math.atan2(y - p.y, x - p.x);
         this.walls = this.walls.filter((q) => q.owner !== playerId); // 한 사람에 하나
-        const maxHp = Math.max(1, p.maxHp * TUNE.SKILL_WALL_HP_MULT);
-        this.walls.push({ id: this.nextEntityId++, owner: playerId, x, y, ang: toward + Math.PI / 2, hl: TUNE.SKILL_WALL_LEN / 2, ht: TUNE.SKILL_WALL_THICK / 2, hp: maxHp, maxHp, t: TUNE.SKILL_WALL_SEC });
+        this.walls.push({ id: this.nextEntityId++, owner: playerId, x, y, ang: toward + Math.PI / 2, hl: TUNE.SKILL_WALL_LEN / 2, ht: TUNE.SKILL_WALL_THICK / 2, t: TUNE.SKILL_WALL_SEC });
         break;
       }
       case CAVALRY: // 가속: 최고 속도로 달리지만 공격하면 그 속도를 잃는다
@@ -2392,7 +2389,7 @@ export class Game {
       w.t -= dt;
       const c = Math.cos(w.ang);
       const sn = Math.sin(w.ang);
-      const push = (o: { x: number; y: number }, r: number, dps: number): void => {
+      const push = (o: { x: number; y: number }, r: number): void => {
         const loc = this.wallLocal(w, o.x, o.y, r);
         if (!loc) return;
         const [u, v] = loc;
@@ -2404,27 +2401,20 @@ export class Game {
         else du = (u >= 0 ? 1 : -1) * (penU + 0.5);
         o.x += du * c - dv * sn;
         o.y += du * sn + dv * c;
-        w.hp -= dps * dt; // 막힌 채 공격하는 것으로 본다
       };
       if (!duel) {
         for (const e of this.enemies.values()) {
-          const st = ENEMY_STATS[e.type]!;
-          push(e, radiusOf(e), e.stunT && e.stunT > 0 ? 0 : (st.damage * e.dmgMult) / Math.max(0.1, st.cooldown));
+          push(e, radiusOf(e));
         }
       } else {
         for (const m of this.mercs.values()) {
           if (m.owner === w.owner || m.respawn > 0) continue;
-          const st = this.mercStats(m);
-          push(m, MERC_STATS[m.type]!.radius, st.damage / Math.max(0.1, st.cooldown));
+          push(m, MERC_STATS[m.type]!.radius);
         }
-        for (const s of this.slots.values()) if (s.state.id !== w.owner && !s.state.down) push(s.state, PLAYER_RADIUS, 14);
-      }
-      if (w.hp <= 0) {
-        this.pushEvent(EVT_SKILL, w.x, w.y, 4, 2, w.owner);
-        w.t = 0;
+        for (const s of this.slots.values()) if (s.state.id !== w.owner && !s.state.down) push(s.state, PLAYER_RADIUS);
       }
     }
-    this.walls = this.walls.filter((w) => w.t > 0 && w.hp > 0);
+    this.walls = this.walls.filter((w) => w.t > 0);
   }
 
   /** 던진 철퇴가 적에게 닿았다: 그 자리 주변의 적(토너먼트에서는 상대 쪽)이 광역 피해를 입는다 */
@@ -4608,11 +4598,10 @@ export class Game {
           hit = true; // 바위·폐허에 막힌다
           break;
         }
-        // 마법사 방벽: 주인 쪽이 아닌 투사체를 막고 피해만큼 부서진다
+        // 마법사 방벽: 주인 쪽이 아닌 투사체를 막는다(부서지지 않는다)
         if (this.walls.length > 0) {
           const wall = this.walls.find((q) => q.owner !== b.owner && this.wallLocal(q, px, py, b.radius) !== null);
           if (wall) {
-            wall.hp -= b.damage;
             hit = true;
             b.x = px;
             b.y = py;

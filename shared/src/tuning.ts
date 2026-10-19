@@ -157,7 +157,6 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   SKILL_MACE_SPLASH: ["던진 철퇴 폭발 반경", G.hero, 10, 400, 5],
   SKILL_WALL_LEN: ["방벽 길이", G.hero, 40, 600, 10],
   SKILL_WALL_THICK: ["방벽 두께", G.hero, 6, 100, 2],
-  SKILL_WALL_HP_MULT: ["방벽 내구도 배율(주인공 최대 체력 대비)", G.hero, 0.1, 20, 0.1],
   SKILL_WALL_SEC: ["방벽 지속(초)", G.hero, 1, 60, 1],
   MACE_MIN_CHARGE: ["철퇴 최소 피해 비율(모으지 않고 뗐을 때)", G.hero, 0, 1, 0.05],
   ASSAULT_ADVANCE: ["돌격 진형: 대열이 앞으로 나가는 거리(px)", G.ai, 0, 800, 10],
