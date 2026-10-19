@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
+import { EVT_INVULN, EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -72,6 +72,10 @@ test("검 스킬: 1초간 피해를 받지 않는다", () => {
   const hp0 = g.getPlayer(a)!.hp;
   hero.hit({ damage: 30, charge: 0, srcType: 1, fromAngle: 0 });
   assert.equal(g.getPlayer(a)!.hp, hp0, "무적 중에는 맞아도 피해가 없다");
+  const pops = () => g.takeEvents().filter((e) => e[0] === EVT_INVULN && e[5] === a);
+  assert.equal(pops().length, 1, "무적으로 막으면 \"무적!\" 표시 이벤트가 한 번 나간다");
+  hero.hit({ damage: 30, charge: 0, srcType: 1, fromAngle: 0 });
+  assert.equal(pops().length, 0, "연속 피격은 0.4초에 한 번만 표시한다");
   run(g, TUNE.SKILL_INVULN_SEC + 0.2);
   assert.equal(g.getPlayer(a)!.invuln, 0);
   const hero2 = (g as unknown as { collectFriendlies(): { ownerId: number; hit(h: unknown): number }[] }).collectFriendlies().find((f) => f.ownerId === a)!;

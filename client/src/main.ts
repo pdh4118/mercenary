@@ -28,6 +28,7 @@ import {
   EVT_REVIVE,
   EVT_CRIT,
   EVT_DODGE,
+  EVT_INVULN,
   EVT_BACKSTAB,
   EVT_DMG_ALLY,
   EVT_DMG_ENEMY,
@@ -1238,7 +1239,8 @@ async function main() {
           else if (owner === myId && kind === EVT_DMG_POISON_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xc77dff, fontSize: 16, fontWeight: "700", stroke: { color: 0x2a0a40, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DMG_SHIELD) spawnFloat(numFmt(val), x, y, { fill: 0x9fdcff, fontSize: 13, fontWeight: "600", stroke: { color: 0x0a1a2a, width: 3 } }, 0.6, 0);
           else if (owner === myId && kind === EVT_DMG_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xff5a5a, fontSize: 17, fontWeight: "700", stroke: { color: 0x2a0000, width: 4 } }, 0.9, 0.15);
-          else if (owner === myId && kind === EVT_DODGE) spawnFloat("회피", x, y, { fill: 0xd8e0ee, fontSize: 14, fontStyle: "italic", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);
+          else if (owner === myId && kind === EVT_DODGE) spawnFloat("회피!", x, y, { fill: 0xd8e0ee, fontSize: 18, fontWeight: "800", fontStyle: "italic", stroke: { color: 0x000000, width: 4 } }, 0.9, 0.15);
+          else if (owner === myId && kind === EVT_INVULN) spawnFloat("무적!", x, y, { fill: 0x9be8ff, fontSize: 18, fontWeight: "800", stroke: { color: 0x0a2a3a, width: 4 } }, 0.9, 0.15);
           if (kind === EVT_ARROW_HIT || kind === EVT_ENEMY_ARROW_HIT) {
             const fx = new Sprite((kind === EVT_ENEMY_ARROW_HIT ? enemyArrow : allyArrow)[4]!);
             fx.anchor.set(0.85, 0.5);

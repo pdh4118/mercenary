@@ -26,6 +26,7 @@ import {
   DIFFICULTY_REDUCTION,
   dodgeChanceOf,
   EVT_DODGE,
+  EVT_INVULN,
   critDamageMult,
   castTimeMult,
   EVT_SKILL,
@@ -537,6 +538,7 @@ export class Game {
   /** 테스트에서 적·캠프 자동 생성을 끌 때 쓴다 */
   autoSpawn = true;
   private slots = new Map<number, Slot>();
+  private invulnPop = new Map<number, number>(); // 무적 표시를 마지막으로 띄운 틱(주인공별)
   private enemies = new Map<number, Enemy>();
   private mercs = new Map<number, Merc>();
   private camps = new Map<number, Camp>();
@@ -2541,7 +2543,14 @@ export class Game {
         radius: PLAYER_RADIUS,
         ownerId: p.id,
         hit: (h) => {
-          if (p.invuln > 0) return 0; // 부활 직후 잠깐 무적
+          if (p.invuln > 0) {
+            // 부활 직후·스킬 무적: 맞아도 피해가 없고, "무적!"만 띄운다(연속 피격은 0.4초에 한 번만)
+            if (this.tick - (this.invulnPop.get(p.id) ?? -99) >= 8) {
+              this.invulnPop.set(p.id, this.tick);
+              this.pushEvent(EVT_INVULN, p.x, p.y, 0, 0, p.id);
+            }
+            return 0;
+          }
           if (!h.dot && !h.pierceGuard && this.dodged(s.mods.heroDodge, p.x, p.y, p.id)) return 0;
           // 창을 들면 창병처럼 돌격을 반사하고, 검을 들면 정면 피해를 절반으로 막는다
           const w = WEAPONS[p.weapon]!;
