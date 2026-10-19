@@ -227,6 +227,9 @@ async function main() {
     Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/arrow_enemy_${i}.png`))),
   ]);
 
+  // 스페이스 스킬 아이콘(무기 순서: 활, 창, 검, 철퇴, 지팡이, 기마). 파일이 없으면 아이콘 없이 글자만 보인다.
+  const skillIconTex = await Promise.all(["bow", "spear", "sword", "mace", "staff", "mount"].map((n) => Assets.load<Texture>(`assets/ui/skill_icon_${n}.png`).catch(() => null)));
+
   // 운석 이펙트: 낙하(작은 것부터 큰 것 6컷), 폭발 5컷, 바닥에 남는 그을음 5컷
   const [meteorTex, boomTex, scorchTex] = await Promise.all([
     Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/meteor_${i}.png`))),
@@ -900,18 +903,30 @@ async function main() {
   const weaponHint = new Text({ text: "", style: { fill: 0xcfd3dc, fontSize: 12 } });
   weaponHint.position.set(0, 70);
   const weaponTitle = new Text({ text: "무기 전환: Q / 마우스 휠", style: { fill: 0x9aa1b0, fontSize: 11 } });
-  const skillText = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 12, fontWeight: "bold" } });
-  skillText.position.set(0, -26); // 무기 칸 위에 둔다(아래쪽은 도움말 줄과 겹친다)
+  const skillText = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 12, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+  const SKILL_ICON = 34;
+  const SKILL_TEXT_X = SKILL_ICON + 6;
+  skillText.position.set(SKILL_TEXT_X, -41); // 무기 칸 위에 둔다(아래쪽은 도움말 줄과 겹친다)
   const skillBarG = new Graphics();
-  skillBarG.position.set(0, -8);
-  const SKILL_BAR_W = WEAPONS.length * (SLOT_W + 4) - 4;
-  weaponBar.addChild(weaponTitle, weaponHint, skillText, skillBarG);
+  skillBarG.position.set(SKILL_TEXT_X, -12);
+  const skillIcon = new Sprite();
+  skillIcon.width = skillIcon.height = SKILL_ICON;
+  skillIcon.position.set(0, -SKILL_ICON - 4);
+  const SKILL_BAR_W = WEAPONS.length * (SLOT_W + 4) - 4 - SKILL_TEXT_X;
+  weaponBar.addChild(weaponTitle, weaponHint, skillIcon, skillText, skillBarG);
   /** 스페이스 스킬: 이름·설명과 쿨타임 막대(쿨타임은 모든 무기가 공유한다) */
   const drawSkill = (weapon: number, cd: number, cdMax: number) => {
     const def = SKILLS[weapon]!;
     const ready = cd <= 0;
-    skillText.text = ready ? `[스페이스] ${def.name} - ${def.note}` : `[스페이스] ${def.name} - 재사용까지 ${cd.toFixed(1)}초 (무기를 바꿔도 이어집니다)`;
+    skillText.text = ready ? `[스페이스] ${def.name} - ${def.note}` : `[스페이스] ${def.name} - 재사용까지 ${cd.toFixed(1)}초 (무기를 바꿔도 공유)`;
     skillText.style.fill = ready ? 0xffe08a : 0x9aa1b0;
+    const tex = skillIconTex[weapon];
+    skillIcon.visible = !!tex;
+    if (tex) {
+      skillIcon.texture = tex;
+      skillIcon.width = skillIcon.height = SKILL_ICON;
+      skillIcon.alpha = ready ? 1 : 0.4; // 쿨타임 중에는 어둡게
+    }
     skillBarG
       .clear()
       .roundRect(0, 0, SKILL_BAR_W, 6, 3)
