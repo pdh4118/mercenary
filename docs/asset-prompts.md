@@ -846,6 +846,54 @@ python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_guar
 
 **참고**: ① 막은 **몸을 따라다니고**(무적 중 이동해도 따라감) 무적 시간에 맞춰 반복/종료를 재생합니다. ② 스킬 효과 카드로 무적 시간이 길어져도 B(반복)만 더 오래 돌면 되므로 **반복 세트의 이음새**가 중요합니다. ③ 소리는 11-3의 `skill_guard`를 쓰세요. ④ 무적 중 맞으면 "무적!" 글자가 이미 뜹니다. 그림에 글자는 넣지 마세요.
 
+#### 11-1-8. 방벽 생성·소멸 이펙트 (스킬 `방벽`, 복사용 완성본)
+
+방벽은 **수정 조각(`skill_wall_seg_0`)을 선을 따라 38px 간격으로 쌓은 것**이라, 이펙트도 **조각 하나 기준**으로 만들어 조각마다 순서대로 재생합니다(길이 170px이면 5~6개). 방벽은 이제 **부서지지 않고 5초 뒤에 사라지므로**, ① 땅에서 솟아오르는 생성 5컷 ② 시간이 되어 사라지는 소멸 4컷이 필요합니다. **이미 적용된 수정 조각 그림(`assets/fx/skill_wall_seg_0.png`)과 유닛 시트를 참고 이미지로 같이 첨부**하세요. 아래는 머리말을 앞에 붙인 **그대로 복사해서 쓰는 프롬프트**입니다.
+
+**A. 생성 5컷 (한 줄)**
+```
+Reference: match the art style of the attached unit sheet exactly (side view, chibi proportions, thick dark outline, painterly flat colors with subtle texture). The crystal itself must look exactly like the attached crystal cluster piece (same blue crystals, same outline).
+Output a sprite sheet on a fully transparent background, items arranged in a clean grid with generous empty space between them, nothing touching or overlapping, each item large and fully visible, a small caption with the file name under each item.
+
+5 frames of a crystal wall piece rising out of the ground, one row, each frame a wide rectangle (about 2:1), a ground line along the bottom edge, the crystal cluster centered and its base always on the same ground line, no characters.
+frame 1: the ground cracks, a few small blue light sparks and tiny dust, the tip of one crystal barely poking out
+frame 2: the crystals thrust up about halfway with a burst of dust on both sides of the base
+frame 3: the crystals nearly at full height with their tips overshooting slightly, sparkles flying off
+frame 4: the crystals settle to full height, a bright flash running up the crystal surfaces, dust drifting outward
+frame 5: the full intact crystal cluster, calm, only two or three tiny sparkles
+Flat colors, thick dark outline on the crystals, light and snappy feel.
+Captions: skill_wall_rise_0, skill_wall_rise_1, skill_wall_rise_2, skill_wall_rise_3, skill_wall_rise_4
+
+Negative: realistic crystal, photo, 3d render, text, characters, background scenery, perspective, blurry, cropped, overlapping items
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_rise_0,skill_wall_rise_1,skill_wall_rise_2,skill_wall_rise_3,skill_wall_rise_4 --rows 1 --scale 0.16
+```
+- 화면에서 조각 하나가 **약 104px 너비**가 되게 쓰므로, 컷 하나를 **너비 380px 이상**으로 크게 뽑아 주세요. **바닥선이 컷 맨 아래**, 마지막 컷(5번)의 수정 크기가 기존 조각과 같게.
+
+**B. 소멸 4컷 (한 줄)** - 5초가 지나 사라질 때
+```
+Reference: match the art style of the attached unit sheet exactly (side view, chibi proportions, thick dark outline, painterly flat colors with subtle texture). The crystal itself must look exactly like the attached crystal cluster piece (same blue crystals, same outline).
+Output a sprite sheet on a fully transparent background, items arranged in a clean grid with generous empty space between them, nothing touching or overlapping, each item large and fully visible, a small caption with the file name under each item.
+
+4 frames of a crystal wall piece fading away after its time is up, one row, each frame a wide rectangle (about 2:1), a ground line along the bottom edge, the crystal cluster centered and its base on the same ground line, no characters.
+frame 1: the crystals flicker, going pale and slightly transparent, faint cracks of light
+frame 2: the crystals turn to glowing blue particles starting from the tips, the lower half still solid
+frame 3: only the base remains, the rest drifting upward as small blue sparkles
+frame 4: a few tiny sparkles floating up and a faint dust ring on the ground
+Flat colors, thick dark outline on the crystals, gentle and quiet feel (no explosion, no shards flying).
+Captions: skill_wall_fade_0, skill_wall_fade_1, skill_wall_fade_2, skill_wall_fade_3
+
+Negative: realistic crystal, photo, 3d render, text, characters, background scenery, perspective, blurry, cropped, overlapping items, explosion
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_fade_0,skill_wall_fade_1,skill_wall_fade_2,skill_wall_fade_3 --rows 1 --scale 0.16
+```
+- 크기·바닥선은 A와 같습니다. **소멸은 폭발이 아니라 조용히 사라지는** 느낌입니다(방벽이 부서지는 게 아니라 시간이 다 된 것).
+- 소리는 11-3의 `skill_wall_up`(생성)과 `skill_wall_break`(소멸 때)를 씁니다.
+
+**팁**: A를 먼저 만들고, A 결과(5번째 컷)를 B의 참고 이미지로 같이 첨부하면 수정 모양이 맞습니다. 투명 배경이 안 되면 **단색 회색 배경**으로 받아도 되지만, **체크무늬 배경은 지우기 어려우니** 단색 배경으로 부탁합니다.
+
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
 화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.
