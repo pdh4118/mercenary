@@ -16,6 +16,7 @@
 | 레벨업 카드 아이콘 19종 | 이 문서 7번 |
 | 무기·HUD 아이콘 | 이 문서 8번 |
 | 효과음·음악 | 이 문서 10번 |
+| 스페이스 스킬 이펙트·아이콘·소리 | 이 문서 11번. 아직 에셋이 없어 도형과 고리로 대신 그리는 중 |
 
 ### 이미지 생성 도구가 투명 배경을 주지 않을 때
 
@@ -334,3 +335,71 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 3. 배경 음악은 마지막에.
 
 넘겨 주시면 코드에서 소리를 틀어 주는 부분도 같이 만듭니다(같은 소리가 너무 자주 겹치지 않게 간격 제한, 화면 밖이나 먼 소리는 작게, 종류별 볼륨, 음소거·볼륨 설정 포함).
+
+## 11. 스페이스 스킬 에셋 (주인공 무기별 스킬)
+
+스페이스를 누르면 지금 든 무기의 스킬이 나갑니다(쿨타임은 모든 무기가 공유, 기본 10초). 지금은 **그림·소리 파일이 없어서** 던진 철퇴는 도형이 돌고, 방벽은 파란 반투명 막대, 나머지는 무기 색 고리로 표시합니다. 아래 파일을 `client/public/assets/` 아래 지정한 위치에 넣어 주시면 코드를 연결합니다(파일이 없으면 지금처럼 도형으로 그립니다). 그림체·투명 배경·시트 형식은 위 **0번**을 그대로 따릅니다.
+
+| 무기 | 스킬 | 무슨 일이 일어나나 |
+| --- | --- | --- |
+| 활 | 후퇴 | 조준 반대쪽으로 130px를 0.14초 만에 물러남 |
+| 창 | 돌진 | 조준 방향으로 240px를 0.18초 만에 돌진, 끝에 앞을 찌름 |
+| 검 | 무적 | 1초 동안 피해를 받지 않음 |
+| 철퇴 | 투척 | 커서 방향으로 철퇴가 420px 날아가다 적에게 닿으면 그 자리에 반경 80 광역 피해 |
+| 지팡이 | 방벽 | 사거리 안 커서 위치에 조준선과 수직인 벽(길이 170 x 두께 22)이 5초 동안 섬. 부서지면 사라짐 |
+| 기마 | 가속 | 2초 동안 최고 속도로 달림(공격하면 가속이 끝남) |
+
+### 11-1. 그림 (이펙트) - `assets/fx/`
+
+모두 **투명 PNG**, 시트로 한 번에 받아 주시면 `tools/slice_sheet.py`로 제가 자릅니다. 방향이 있는 것은 **오른쪽(→)을 향하게** 그려 주세요(코드가 돌립니다). 색은 흰색~밝은 회색 위주로 그려 주시면 무기 색으로 물들일 수 있습니다(아래 표에 "색 입힘"이라고 적은 것).
+
+| 파일 이름 | 어디에 쓰이나 | 크기 | 컷 수 | 문구 (영어) |
+| --- | --- | --- | --- | --- |
+| `skill_mace_thrown` | 던진 철퇴(날아가는 동안 빙글빙글 돈다) | 64x64 | 1 | `a spiked iron mace seen from above, flying, wooden handle and a heavy spiked steel head, same thick-outline painterly style, transparent background` |
+| `skill_mace_hit_0~4` | 철퇴가 적에게 닿은 자리의 충격(반경 80 = 지름 160) | 160x160 | 5 | `ground-shock impact burst, dust and cracked earth ring expanding outward, top-down, 5-frame sequence`, 기존 `boom_*`와 같은 결 |
+| `skill_wall_0~2` | 마법사 방벽의 상태: 온전함 / 금이 감 / 거의 부서짐 | 170x22 (가로로 긴 띠) | 3 | `thin magical barrier wall made of translucent blue crystal and light, horizontal strip seen from above, glowing edge, (0 intact) (1 cracked) (2 almost shattered)`, 가로 길이는 게임에서 조절 가능(`SKILL_WALL_LEN`) |
+| `skill_wall_break_0~3` | 방벽이 부서질 때 | 128x128 | 4 | `crystal wall shattering into glowing shards that fade, top-down, 4-frame sequence` |
+| `skill_wall_rise_0~3` | 방벽이 서는 순간 | 170x64 | 4 | `magical barrier rising from the ground with sparkles, strip seen from above, 4-frame sequence` |
+| `skill_dash_0~2` | 창 돌진의 속도선(몸 뒤로 길게 남음) | 160x64 | 3 | `speed streak trail pointing right, soft white motion lines and a faint afterimage, transparent, 3 frames`, 색 입힘 |
+| `skill_dust_0~2` | 활 후퇴·창 돌진 시작의 먼지 | 96x64 | 3 | `small dust puff kicked up by sliding feet, 3-frame sequence`, 색 입힘 |
+| `skill_guard_0~3` | 검 무적 중 주인공 몸을 감싼 막(1초 동안 반복) | 96x96 | 4 | `shimmering round energy ward around a hero, translucent pale cyan, gently pulsing, 4-frame loop` |
+| `skill_boost_0~3` | 기마 가속 중 바람·속도 효과(몸 뒤) | 128x64 | 4 | `wind and speed aura trailing behind a galloping horse, white swirling lines with a few sparks, 4-frame loop, pointing right` |
+| `skill_cast_0~3` | 스킬을 쓰는 순간의 신호(모든 스킬 공통, 발 밑) | 96x96 | 4 | `quick circular rune flash expanding under a hero, thin glowing ring, 4-frame sequence`, 색 입힘 |
+
+### 11-2. 아이콘 (화면) - `assets/hud/`
+
+화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그림). 투명 PNG, **48x48**, 한 줄 시트(6칸)로 받아 주세요. 위 **8-1** 무기 아이콘과 같은 그림체입니다.
+
+| 파일 이름 | 그림 |
+| --- | --- |
+| `skill_icon_bow` | `a bow with a small backward arrow, retreat` |
+| `skill_icon_spear` | `a spear with forward motion streaks, dash` |
+| `skill_icon_sword` | `a sword with a glowing round ward, invulnerability` |
+| `skill_icon_mace` | `a thrown spiked mace with a trail` |
+| `skill_icon_staff` | `a magic staff with a small crystal wall` |
+| `skill_icon_mount` | `a galloping horse head with wind lines` |
+
+### 11-3. 소리 - `assets/audio/` (형식·길이 규칙은 **10-0**과 같음)
+
+| 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
+| --- | --- | --- | --- |
+| `skill_backstep` | 활 후퇴 | `quick backward skid on dirt, short scuff and a small cloth rustle` | 0.2초, 2종 |
+| `skill_dash` | 창 돌진 | `fast forward dash, sharp air whoosh ending in a light spear tip whistle` | 0.3초, 2종 |
+| `skill_guard` | 검 무적 시작 | `bright protective ward activating, short shimmer and a soft metallic ring` | 0.5초, 1종 |
+| `skill_mace_throw` | 철퇴 던질 때 | `heavy mace thrown, deep spinning whoosh that fades away` | 0.5초, 2종 |
+| `skill_mace_hit` | 던진 철퇴가 적에게 닿을 때 | `heavy mace crashing into armor, big dull impact with a short rumbling shockwave` | 0.6초, 2종 |
+| `skill_wall_up` | 방벽이 설 때 | `crystal barrier rising from the ground, glassy chime and a low stone rumble` | 0.6초, 1종 |
+| `skill_wall_hit` | 방벽이 공격을 맞을 때 | `dull hit on a crystal wall, short thud with a tiny glassy crack` | 0.15초, 3종 |
+| `skill_wall_break` | 방벽이 부서질 때 | `crystal wall shattering into pieces, short bright shatter and falling shards` | 0.7초, 1종 |
+| `skill_boost` | 기마 가속 | `horse bursting into a gallop, hoof drum roll and a short whinny with a rush of wind` | 0.8초, 1종 |
+| `skill_ready` | 쿨타임이 끝났을 때(작게) | `very soft ready chime, single short low bell, subtle` | 0.3초, 1종 |
+
+### 11-4. 우선순위
+
+1. **스킬 아이콘 6종**(11-2)과 **던진 철퇴·철퇴 충격**(`skill_mace_thrown`, `skill_mace_hit`): 눈에 가장 자주 보입니다.
+2. **방벽 3상태와 부서짐**(`skill_wall_0~2`, `skill_wall_break`): 지금은 파란 막대라 가장 임시처럼 보입니다.
+3. **돌진·후퇴·가속 이펙트**(`skill_dash`, `skill_dust`, `skill_boost`), **무적 막**(`skill_guard`).
+4. 소리 10종: `skill_mace_hit`, `skill_wall_up`, `skill_guard`, `skill_dash`부터.
+5. 시전 신호(`skill_cast`)와 방벽 생성(`skill_wall_rise`)은 나중에.
+
+넘겨 주신 파일은 이름이 위 표와 같으면 바로 연결하고, 다르면 제가 이름을 맞춰 옮기겠습니다. 소리는 `shared/src/audio.ts`의 `SOUNDS`에 항목(음량, 겹침 제한)을 추가하고, 이펙트는 서버가 보내는 `EVT_SKILL` 이벤트(무기 번호, 발동/적중/부서짐 구분)에 연결합니다.
