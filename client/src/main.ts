@@ -239,6 +239,8 @@ async function main() {
   const boostTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_${i}.png`).catch(() => null)));
   // 기마 가속 시작 폭발(6컷, 달리기 시작하는 순간 한 번). 없으면 생략.
   const boostStartTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_start_${i}.png`).catch(() => null)));
+  // 활 후퇴 시작의 흙먼지(4컷). 없으면 생략.
+  const backDustTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_back_dust_${i}.png`).catch(() => null)));
   // 기마 가속이 풀리는 순간의 이펙트(6컷). 없으면 생략.
   const boostEndTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_end_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
@@ -995,6 +997,7 @@ async function main() {
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
   const dashFx = new Map<number, { t0: number; lx: number; ly: number }>(); // 돌진 중인 주인공(마지막 잔상을 남긴 자리)
+  const backDusts: { sp: Sprite; t0: number }[] = []; // 활 후퇴를 시작한 자리의 흙먼지
   const dashGhosts: { sp: Sprite; age: number }[] = []; // 돌진 길에 남은 잔상
   const DASH_TINT = 0x14162a; // 잔상 색(주인공 그림에 곱해 어둡게)
   const DASH_GHOST_GAP = 36; // 잔상 사이 간격(px)
@@ -1226,8 +1229,18 @@ async function main() {
             groundFx.addChild(sp);
             maceHits.push({ sp, age: 0 });
           }
-          else if (kind === EVT_SKILL && val === 0 && WEAPONS[Math.round(ang)]?.type === SPEAR_TYPE && latest.players.some((q) => q.id === owner)) {
-            // 창 돌진: 돌진하는 동안 주인공 그림을 어둡게 복사한 잔상이 지나온 길에 남는다(무적이라 링은 그리지 않는다)
+          else if (kind === EVT_SKILL && val === 0 && (WEAPONS[Math.round(ang)]?.type === SPEAR_TYPE || WEAPONS[Math.round(ang)]?.type === ARCHER_TYPE) && latest.players.some((q) => q.id === owner)) {
+            // 창 돌진·활 후퇴: 움직이는 동안 주인공 그림을 어둡게 복사한 잔상이 지나온 길에 남는다(창은 무적이라 링은 그리지 않는다)
+            if (WEAPONS[Math.round(ang)]!.type === ARCHER_TYPE && backDustTex.every((t) => t !== null)) {
+              // 후퇴 시작 자리의 흙먼지: 그림은 왼쪽 위로 튀는 모양이라 후퇴 방향에 맞춰 돌린다
+              const q = latest.players.find((r) => r.id === owner)!;
+              const sp = new Sprite(backDustTex[0]!);
+              sp.anchor.set(0.9, 0.9); // 터지는 중심(그림 오른쪽 아래)이 출발한 자리
+              sp.position.set(x, y);
+              sp.rotation = q.aim + Math.PI + 2.3;
+              groundFx.addChild(sp);
+              backDusts.push({ sp, t0: performance.now() });
+            }
             dashFx.set(owner, { t0: performance.now(), lx: x, ly: y });
             spawnDashGhost(owner, x, y);
           }
@@ -2110,6 +2123,20 @@ async function main() {
       } else b.boom.visible = false;
     }
 
+    // 후퇴 흙먼지: 4컷을 0.3초 동안 재생
+    for (let i = backDusts.length - 1; i >= 0; i--) {
+      const bd = backDusts[i]!;
+      const f = Math.floor((performance.now() - bd.t0) / 75);
+      if (f >= 4) {
+        bd.sp.destroy();
+        backDusts.splice(i, 1);
+      } else {
+        const t = backDustTex[f]!;
+        bd.sp.texture = t;
+        bd.sp.width = 120;
+        bd.sp.height = (120 * t.height) / t.width;
+      }
+    }
     // 돌진 잔상: 시간이 갈수록 옅어지며 사라진다
     for (let i = dashGhosts.length - 1; i >= 0; i--) {
       const g = dashGhosts[i]!;
