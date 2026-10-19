@@ -368,55 +368,80 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 | `skill_boost_0~3` | 기마 가속 중 바람·속도 효과(몸 뒤) | 128x64 | 4 | `wind and speed aura trailing behind a galloping horse, white swirling lines with a few sparks, 4-frame loop, pointing right` |
 | `skill_cast_0~3` | 스킬을 쓰는 순간의 신호(모든 스킬 공통, 발 밑) | 96x96 | 4 | `quick circular rune flash expanding under a hero, thin glowing ring, 4-frame sequence`, 색 입힘 |
 
-#### 11-1-1. 방벽 이펙트 시트 프롬프트 (지팡이 스킬, 3장)
+#### 11-1-1. 방벽 이펙트 시트 프롬프트 (지팡이 스킬) - 수정 군락 "조각" 방식
 
-방벽은 **조준선과 수직**으로 서고 코드가 **어느 각도로든 돌려서** 그립니다. 그래서 그림은 **위에서 내려다본 가로 띠**(좌우 대칭, 방향 없음)로 그려야 돌려도 어색하지 않습니다. 색은 마법사 지팡이와 같은 **파란 수정(연한 하늘색~파랑)**, 가장자리는 은은하게 빛나게 합니다. 네거티브에 `side view, perspective, character, text`를 넣어 주세요. 각 장은 위 **시트 요청 머리말**을 앞에 붙입니다. 가로 띠는 시트 안에서 **가로 1360px 이상**으로 크게 뽑아야 자를 때 높이 기준(100px)을 넘습니다.
+방벽은 조준선과 수직으로 서고 **화면에서 가로·세로·대각선 어느 방향으로도** 놓입니다. 위로 솟은 그림을 통째로 돌리면 눕거나 뒤집혀 보이므로, 그림을 **작은 "조각"으로 만들어 방벽 선을 따라 일렬로 세워 놓는** 방식으로 그립니다(조각은 절대 회전하지 않고 항상 위가 위). 그래서 **조각 하나**를 아래 규칙으로 그려 주세요.
 
-**A. 방벽 상태 3컷** (온전함 → 금이 감 → 거의 부서짐, 위에서 아래로 한 줄씩, 3행 1열)
+- **시점**: 유닛 시트와 같은 **옆에서 본(아주 약간 위에서 내려다본) 시점**. 수정이 **위로 솟아** 있고 면마다 명암이 있어 입체적으로. 위에서 수직으로 내려다본 평면 그림은 금지.
+- **바닥선**: 그림 **맨 아래 가장자리**가 땅에 닿는 선(수정 밑동과 작은 돌조각이 그 선에 놓임). 밑동 아래에 얇은 그림자. 이 아래 선이 게임의 충돌 선이 됩니다.
+- **좌우 이음**: 조각을 **옆으로 붙여 놓아도 이어지게**, 왼쪽·오른쪽 가장자리는 키 낮은 수정으로 끝나고 **캔버스 밖으로 삐져나가지 않게**. 좌우 가장자리 높이와 밑동 위치가 모든 조각에서 같아야 합니다.
+- **크기**: 조각 하나는 대략 정사각형에서 약간 세로로 긴 비율(가로 : 세로 = 1 : 1.1), 게임에서는 가로 약 64px로 줄입니다. 시트에서는 **조각 하나를 높이 300px 이상**으로 크게 뽑아야 자를 때 높이 기준(100px)을 넘습니다.
+- **색**: 마법사 지팡이와 같은 파란 수정(연한 하늘색~선명한 파랑), 안쪽에서 은은한 빛. 굵은 어두운 윤곽선은 약하게(이미 받은 수정 그림 정도).
+- 배경은 투명(또는 단색 회색)이어도 됩니다. 제가 지우겠습니다. 이미 받은 군락 시안(skill_wall_0~2)을 **참고 이미지로 같이 첨부**해 주세요.
+- 네거티브: `top-down view, flat strip, floating, shadow cast far away, perspective distortion, text, characters`
+
+각 프롬프트 앞에 위 **시트 요청 머리말**을 붙입니다.
+
+**A. 방벽 조각 상태 3단계 x 변형 3개 (9조각, 3행 x 3열)**
+행 = 상태(온전함 → 금이 감 → 거의 부서짐), 열 = 서로 다른 모양 3가지(같은 줄에서 번갈아 써서 반복감을 줄입니다).
 ```
 <시트 요청 머리말>
-3 horizontal barrier wall strips stacked vertically (3 rows, 1 column), each a long thin
-magical wall seen from directly above (top-down), made of translucent pale-blue crystal
-with a softly glowing bright edge, left-right symmetric, about 8 times longer than it is
-thick, thick dark outline, painterly flat colors with subtle texture. All three have the
-same length and thickness and are centered the same way:
-row 1: intact, smooth glowing crystal
-row 2: damaged, several cracks across it and a few chipped corners, glow dimmer
-row 3: almost shattered, deep cracks everywhere, missing chunks, faint flickering glow
-Captions: skill_wall_0, skill_wall_1, skill_wall_2
+A set of 9 modular crystal wall segments, 3 rows x 3 columns, each a small upright cluster of
+translucent blue crystals seen from the side (very slightly from above), crystals pointing up,
+flat ground line along the bottom edge with tiny rubble and a thin shadow, left and right ends
+taper to low crystals so segments can be placed side by side and join seamlessly, same width,
+same height and same base line in every segment, painterly style with soft glow inside the crystals.
+row 1 (intact): clean sharp tall crystals, three different arrangements
+row 2 (damaged): the same crystals with visible cracks and a few chipped tips, small shards on
+  the ground, glow dimmer, three different arrangements
+row 3 (almost shattered): mostly broken stumps and rubble with a few crystals left, bright blue
+  light leaking from the cracks, scattered shards on the ground, three different arrangements
+Captions, in order left to right then top to bottom:
+skill_wall_0_a, skill_wall_0_b, skill_wall_0_c,
+skill_wall_1_a, skill_wall_1_b, skill_wall_1_c,
+skill_wall_2_a, skill_wall_2_b, skill_wall_2_c
 ```
-`python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_0,skill_wall_1,skill_wall_2 --rows 3 --scale 0.125`
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_0_a,skill_wall_0_b,skill_wall_0_c,skill_wall_1_a,skill_wall_1_b,skill_wall_1_c,skill_wall_2_a,skill_wall_2_b,skill_wall_2_c --rows 3 --scale 0.2
+```
 
-**B. 부서질 때 4컷** (2행 x 2열, 순서대로: 왼쪽 위 → 오른쪽 위 → 왼쪽 아래 → 오른쪽 아래)
+**B. 부서질 때 4컷 (조각 하나가 부서지는 순서, 2행 x 2열)**
+방벽의 모든 조각이 동시에 이 모션을 재생합니다.
 ```
 <시트 요청 머리말>
-4 frames of a crystal barrier wall shattering, arranged 2 rows x 2 columns, top-down view,
-each frame a square with the same center. Pale-blue translucent crystal, thick dark outline.
-frame 1: the wall with a bright crack flash across its middle
-frame 2: the wall bursting into large shards flying outward, bright glow
-frame 3: smaller shards and glowing dust scattering, glow fading
-frame 4: only a few tiny sparkles and faint dust left
+4 frames of one upright crystal wall segment shattering, arranged 2 rows x 2 columns, seen from
+the side (very slightly from above), each frame the same size with the same ground line along
+the bottom edge, translucent blue crystals, painterly style.
+frame 1: the intact segment with a bright crack of light across it
+frame 2: the crystals bursting apart into large shards flying outward and up, bright glow
+frame 3: smaller shards and glowing dust falling back down, glow fading
+frame 4: only a few tiny shards and faint blue dust on the ground line
 Captions: skill_wall_break_0, skill_wall_break_1, skill_wall_break_2, skill_wall_break_3
 ```
-`python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_break_0,skill_wall_break_1,skill_wall_break_2,skill_wall_break_3 --rows 2 --scale 0.125`
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_break_0,skill_wall_break_1,skill_wall_break_2,skill_wall_break_3 --rows 2 --scale 0.2
+```
 
-**C. 서는 순간 4컷** (위에서 아래로 한 줄씩, 4행 1열, 가로 띠)
+**C. 서는 순간 4컷 (조각 하나가 솟아오르는 순서, 2행 x 2열)**
 ```
 <시트 요청 머리말>
-4 frames of a magical crystal barrier wall rising out of the ground, stacked vertically
-(4 rows, 1 column), each a long thin horizontal strip seen from directly above, all the
-same size and center. Pale-blue translucent crystal, glowing edge, thick dark outline.
-row 1: a thin glowing line on the ground with sparkles
-row 2: jagged crystal tips pushing up along the line, dust puffs at both ends
-row 3: the wall about three quarters formed, bright glow burst
-row 4: the finished intact wall, glow settling (matches the intact wall strip)
+4 frames of one upright crystal wall segment growing out of the ground, arranged 2 rows x 2
+columns, seen from the side (very slightly from above), each frame the same size with the same
+ground line along the bottom edge, translucent blue crystals, painterly style.
+frame 1: a glowing crack on the ground with a few sparkles and a small dust puff
+frame 2: small sharp crystal tips pushing up out of the ground, glow
+frame 3: the crystals mostly grown, about three quarters of the final height, bright glow burst
+frame 4: the finished intact segment (same look as the intact segments), glow settling
 Captions: skill_wall_rise_0, skill_wall_rise_1, skill_wall_rise_2, skill_wall_rise_3
 ```
-`python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_rise_0,skill_wall_rise_1,skill_wall_rise_2,skill_wall_rise_3 --rows 4 --scale 0.125`
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_rise_0,skill_wall_rise_1,skill_wall_rise_2,skill_wall_rise_3 --rows 2 --scale 0.2
+```
 
-- 방벽 길이(`SKILL_WALL_LEN`)와 두께는 게임에서 조절하는 값이라 그림은 **가로세로 비율(약 8:1)** 만 맞으면 됩니다. 크기는 제가 늘리고 줄입니다.
-- A를 먼저 만들어 주세요. B·C의 마지막/첫 컷이 A의 온전한 벽과 같은 색·질감이어야 이어 붙여도 튀지 않습니다(B·C를 만들 때 A 이미지를 참고 이미지로 같이 첨부하세요).
-- 그림이 없어도 지금은 파란 반투명 막대로 그려집니다.
+- **만드는 순서**: A를 먼저. B·C를 뽑을 때 A의 온전한 조각(skill_wall_0_a)을 참고 이미지로 같이 첨부하면 색·질감이 이어집니다.
+- **게임에서 쓰는 방식**: 방벽 길이(`SKILL_WALL_LEN`)만큼 조각 3~4개를 선을 따라 세우고(조각마다 a·b·c 변형을 번갈아), 유닛과 같은 y 기준으로 앞뒤 가림을 맞춥니다. 판정(두께 22의 선)은 조각의 **아래쪽 바닥선**에 둡니다.
+- **이전 시안 보관**: 이미 받아서 적용한 평면 띠 그림(`skill_wall_0~2.png`)은 지우지 않고 보관하며, 조각 그림이 들어오기 전까지는 그대로 쓰입니다.
+- 위 11-1 표의 `skill_wall_*` 행은 이 조각 방식으로 대체됩니다(크기: 조각 하나 약 64x70px).
 
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
