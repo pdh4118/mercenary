@@ -83,7 +83,7 @@ export function nextTierBonus(type: number, tier: number): string[] {
   if (type === ARCHER) out.push(`사거리 ${step(TIER_REACH)}`);
   if (type === SHIELD) out.push(`방패 ${step(TIER_SHIELD)}`);
   if (type === MAGE) {
-    out.push(`시전 시간 -${Math.round(TIER_CAST[type]! * 100)}%p`);
+    out.push(`시전 속도 +${Math.round(TIER_CAST[type]! * 100)}%p`);
     out.push(`폭발 범위 ${step(TIER_AREA)}`);
   }
   if (type === BLUNT) {

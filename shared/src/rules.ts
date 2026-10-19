@@ -397,16 +397,17 @@ export const CRIT_MAX_CHANCE = 0.75; // 치명타 확률 상한
 /**
  * 방어력·회피율·부활 속도는 카드로 쌓은 값 x가 커져도 한 장의 효율(체력으로 환산한 값)이 늘 같도록 x/(1+x) 꼴로 바꾼다(상한 없음).
  * 받는 피해는 1/(1+x)배(= 체력이 (1+x)배인 것과 같다), 회피 확률은 x/(1+x)(맞을 확률이 1/(1+x)이므로 역시 체력 (1+x)배와 같다),
- * 부활 시간은 1/(1+x)배다.
+ * 부활 시간과 주문 시간은 1/(1+x)배다.
  */
 export const defenseTakenMult = (x: number): number => 1 / (1 + Math.max(0, x));
 export const dodgeChanceOf = (x: number): number => (x > 0 ? x / (1 + x) : 0);
 export const respawnTimeMult = (x: number): number => 1 / (1 + Math.max(0, x));
+/** 시전 속도 합계 x → 주문 시간 배율(상한 없음) */
+export const castTimeMult = (x: number): number => 1 / (1 + Math.max(0, x));
 // 배후 공격: 방어하는 쪽의 등 뒤에서 오는 공격은 피해가 늘어난다(기병의 우회가 빛난다). 적·아군 모두에게 적용된다.
 export const BACKSTAB_ARC = rad(60); // 등 뒤 반각(전체 120도)
 export const KNOCK_BOSS_FACTOR = 0.25; // 보스는 넉백이 이만큼만 먹힌다
 export const KNOCK_STUN_SEC = 0.4; // 밀려난 적이 공격하지 못하는 시간
-export const CAST_TIME_MIN_MULT = 0.3; // 시전 시간 감소 카드를 아무리 모아도 원래 시간의 이 비율 밑으로는 줄지 않는다
 /**
  * 근접 공격이 범위 증가를 받았을 때의 부채꼴 반각. 철퇴(둔기)·검은 몸을 두르듯 퍼지는 대신 앞으로 길어지므로(깔때기) 각도는 그대로 둔다.
  * 같은 범위 배율이 철퇴에서는 meleeReach로 사거리에 곱해진다.

@@ -602,7 +602,7 @@ test("강화 시 늘어나는 능력치 문구: 병종 보너스와 둔기병 �
   assert.ok(nextTierBonus(1, 1).some((t) => t.startsWith("카운터 피해")));
   assert.ok(nextTierBonus(0, 0).some((t) => t.startsWith("돌격 피해")));
   assert.ok(nextTierBonus(2, 0).some((t) => t.startsWith("사거리")));
-  assert.ok(nextTierBonus(5, 0).some((t) => t.startsWith("시전 시간")));
+  assert.ok(nextTierBonus(5, 0).some((t) => t.startsWith("시전 속도")));
   assert.deepEqual(nextTierBonus(2, 4), []);
 });
 
