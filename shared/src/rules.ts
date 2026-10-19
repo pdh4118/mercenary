@@ -394,8 +394,14 @@ export const REVIVE_INVULN_SEC = 2;
 
 // 공격 능력치(레벨업 카드)
 export const CRIT_MAX_CHANCE = 0.75; // 치명타 확률 상한
-export const DEFENSE_MAX = 0.6; // 방어력(피해 감소) 상한
-export const DODGE_MAX = 0.5; // 회피율 상한
+/**
+ * 방어력·회피율·부활 속도는 카드로 쌓은 값 x가 커져도 한 장의 효율(체력으로 환산한 값)이 늘 같도록 x/(1+x) 꼴로 바꾼다(상한 없음).
+ * 받는 피해는 1/(1+x)배(= 체력이 (1+x)배인 것과 같다), 회피 확률은 x/(1+x)(맞을 확률이 1/(1+x)이므로 역시 체력 (1+x)배와 같다),
+ * 부활 시간은 1/(1+x)배다.
+ */
+export const defenseTakenMult = (x: number): number => 1 / (1 + Math.max(0, x));
+export const dodgeChanceOf = (x: number): number => (x > 0 ? x / (1 + x) : 0);
+export const respawnTimeMult = (x: number): number => 1 / (1 + Math.max(0, x));
 // 배후 공격: 방어하는 쪽의 등 뒤에서 오는 공격은 피해가 늘어난다(기병의 우회가 빛난다). 적·아군 모두에게 적용된다.
 export const BACKSTAB_ARC = rad(60); // 등 뒤 반각(전체 120도)
 export const KNOCK_BOSS_FACTOR = 0.25; // 보스는 넉백이 이만큼만 먹힌다

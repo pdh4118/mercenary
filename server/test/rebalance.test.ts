@@ -344,7 +344,7 @@ test("주인공 능력치(hs)가 지금 무기와 카드를 반영해 내려간�
   const hs1 = g.snapshotPlayers()[0]!.hs;
   assert.ok(Math.abs(hs1[0]! - WEAPONS[3]!.damage * 1.5) < 0.01, "공격력 +50%");
   assert.equal(hs1[3], 0.2);
-  assert.equal(hs1[8], 0.1);
+  assert.equal(hs1[8], Math.round((1 - 1 / 1.1) * 100) / 100, "화면에는 실제로 줄어드는 비율로 보인다");
   assert.ok(hs1[1]! < hs0[1]!, "철퇴는 활보다 초당 공격이 적다");
   assert.equal(hs1[11], TUNE.PLAYER_SPEED);
 });

@@ -1166,7 +1166,7 @@ test("용병 능력치 카드: 사거리·범위가 용병 능력치에 반영�
   assert.ok(Math.abs(g.mercStatsForTest(mace).splash - sp0 * 1.5) < 1e-9);
 });
 
-test("방어력: 받는 피해가 비율만큼 줄어든다", () => {
+test("방어력: 받는 피해가 1/(1+방어력)배로 줄어든다", () => {
   const dealt = (def: number) => {
     const g = quiet();
     const a = g.addPlayer("a")!;
@@ -1178,10 +1178,11 @@ test("방어력: 받는 피해가 비율만큼 줄어든다", () => {
   };
   const base = dealt(0);
   assert.ok(base > 0);
-  assert.ok(Math.abs(dealt(0.5) - base * 0.5) < 1e-6);
+  assert.ok(Math.abs(dealt(1) - base * 0.5) < 1e-6, "방어력 합 1이면 체력이 2배인 것과 같다");
+  assert.ok(Math.abs(dealt(3) - base * 0.25) < 1e-6, "상한 없이 계속 줄어든다");
 });
 
-test("회피율: 확률 100%(상한 50%)에 rng가 0이면 공격을 완전히 피하고 이벤트가 나온다", () => {
+test("회피율: 합 1이면 회피 확률 50%이고 rng가 0이면 공격을 완전히 피하고 이벤트가 나온다", () => {
   const g = new Game(() => 0);
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;

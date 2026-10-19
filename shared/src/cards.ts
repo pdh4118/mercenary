@@ -45,7 +45,7 @@ export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: rea
 };
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
-/** 용병 능력치 종류. 배율 계열(hp~area, respawn)은 곱해지고, 나머지는 더해진다. */
+/** 용병 능력치 종류. 배율 계열(hp~area, xp, cast)은 곱해지고, 나머지는 더해진다. 방어력·회피율·부활 속도는 더한 값 x를 x/(1+x) 꼴로 환산한다(상한 없음). */
 export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "lifesteal" | "pierce" | "multi" | "poison" | "armor" | "respawn" | "knock" | "thorns" | "xp" | "cast";
 
 export type CardEffect =
@@ -110,7 +110,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
   multi: "발사 수",
   poison: "독 화살",
   armor: "피해 감소",
-  respawn: "부활 시간",
+  respawn: "부활 속도",
   knock: "넉백",
   thorns: "근접 반사",
   xp: "경험치 획득",
@@ -118,7 +118,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 };
 /** 병종 전용 일반 카드 한 장의 효과량(이전의 1.5배: 후반에는 용병술이 더 중요하도록). 관통·발사 수는 개수라 그대로다. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.375, dmg: 0.375, atkSpeed: 0.225, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.6, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: -0.375, knock: 45, thorns: 3, xp: 0.45, cast: -0.15,
+  hp: 0.375, dmg: 0.375, atkSpeed: 0.225, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.6, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.375, knock: 45, thorns: 3, xp: 0.45, cast: -0.15,
 };
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
@@ -149,6 +149,12 @@ export function describeStat(stat: MercStat, v: number): string {
   return `${v < 0 ? "-" : "+"}${text}%`;
 }
 
+/** 방어력·회피율·부활 속도: 몇 장을 쌓아도 한 장의 효율이 같다(체력 증가로 환산) */
+const EFFICIENCY_NOTE: Partial<Record<string, string>> = {
+  defense: " (받는 피해가 1/(1+합)배 — 쌓아도 체력 증가와 같은 효율, 상한 없음)",
+  dodge: " (회피 확률 합/(1+합) — 쌓아도 체력 증가와 같은 효율, 상한 없음)",
+  respawn: " (부활 시간 1/(1+합)배 — 상한 없음)",
+};
 const statDesc = (t: number, stat: MercStat, v: number): string =>
   stat === "poison"
     ? `${UNIT_NAMES[t]}만: 맞은 적이 ${describeStat(stat, v)}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)`
@@ -156,7 +162,7 @@ const statDesc = (t: number, stat: MercStat, v: number): string =>
       ? `${UNIT_NAMES[t]}만: 근접 공격을 받으면 ${describeStat(stat, v)}의 피해를 공격자에게 되돌린다 (맞을 때마다 고정 피해, 방어력·방패와 무관, 화살·마법은 해당 없음)`
       : stat === "armor"
       ? `${UNIT_NAMES[t]}만: 맞을 때마다 받는 피해 ${describeStat(stat, v)} (방어력과 별개의 고정 감소)`
-      : `${UNIT_NAMES[t]}만: ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`;
+      : `${UNIT_NAMES[t]}만: ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""}`;
 
 /** 잘 나오게 하고 싶은 능력치의 뽑힐 확률 가중치(일반 5). 체력 재생·흡혈은 한 장의 효과를 낮추는 대신 자주 나온다. */
 const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 };
@@ -188,7 +194,7 @@ const statCards = (): CardDef[] => {
       const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR);
       out.push({
         name: `용병 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`,
-        desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)} (병종 전용 카드의 ${GLOBAL_CARD_FACTOR * 100}%)`,
+        desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""} (병종 전용 카드의 ${GLOBAL_CARD_FACTOR * 100}%)`,
         category: 1,
         rarity: r as 0 | 1 | 2,
         weight: 3 * RARITY[r]!.weight,
@@ -232,7 +238,7 @@ const heroCards = (): CardDef[] =>
       const text = h.k === "heroArmor" ? `-${v}` : h.k === "heroThorns" ? `${v}` : h.k === "heroPoison" ? `화살 피해의 ${Math.round(v * 100)}%` : h.fmt === "cut" ? `-${Math.round(Math.abs(v) * 1000) / 10}%` : h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 +${Math.round(v * 10) / 10}` : `+${v}`;
       return {
         name: `${h.label} ${text}`,
-        desc: h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroThorns" ? `주인공만: 근접 공격을 받으면 ${text}의 피해를 공격자에게 되돌린다 (맞을 때마다 고정 피해, 방어력·방패와 무관, 화살·마법은 해당 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : h.k === "heroCast" ? `주인공이 지팡이를 들었을 때: 주문을 외우는 시간 ${text}` : h.k === "heroShield" ? `주인공이 검을 들었을 때: 방패 체력 ${text}` : h.k === "heroShieldRegen" ? `주인공이 검을 들었을 때: 방패가 차오르는 속도 ${text} (맞지 않고 기다리는 시간은 그대로)` : `주인공만: ${h.label} ${text}`,
+        desc: h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroThorns" ? `주인공만: 근접 공격을 받으면 ${text}의 피해를 공격자에게 되돌린다 (맞을 때마다 고정 피해, 방어력·방패와 무관, 화살·마법은 해당 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : h.k === "heroCast" ? `주인공이 지팡이를 들었을 때: 주문을 외우는 시간 ${text}` : h.k === "heroShield" ? `주인공이 검을 들었을 때: 방패 체력 ${text}` : h.k === "heroShieldRegen" ? `주인공이 검을 들었을 때: 방패가 차오르는 속도 ${text} (맞지 않고 기다리는 시간은 그대로)` : `주인공만: ${h.label} ${text}${h.k === "heroDefense" ? EFFICIENCY_NOTE.defense : h.k === "heroDodge" ? EFFICIENCY_NOTE.dodge : ""}`,
         category: 2,
         rarity: r as 0 | 1 | 2,
         weight: h.weight * RARITY[r]!.weight,

@@ -20,10 +20,11 @@ import {
   ARMY_SPAWN_DISTANCE,
   KNOCK_BOSS_FACTOR,
   KNOCK_STUN_SEC,
-  DEFENSE_MAX,
+  defenseTakenMult,
+  respawnTimeMult,
   DEFAULT_DIFFICULTY,
   DIFFICULTY_REDUCTION,
-  DODGE_MAX,
+  dodgeChanceOf,
   EVT_DODGE,
   CRIT_MAX_CHANCE,
   CAST_TIME_MIN_MULT,
@@ -223,9 +224,9 @@ const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mod
 
 /** 용병 능력치 강화 묶음(전체용 하나, 병종별 다섯). 배율 계열은 1에서, 가산 계열은 0에서 시작한다. */
 type MercMods = Record<MercStat, number>;
-const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "respawn", "xp", "cast"];
+const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "xp", "cast"];
 const newMercMods = (): MercMods => ({
-  hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 1, cast: 1,
+  hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 0, cast: 1,
   crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, thorns: 0, xp: 1,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
@@ -986,8 +987,8 @@ export class Game {
       m.heroPierce,
       r2(m.heroArea),
       Math.round(m.heroKnock),
-      r2(Math.min(DEFENSE_MAX, m.heroDefense)),
-      r2(Math.min(DODGE_MAX, m.heroDodge)),
+      r2(1 - defenseTakenMult(m.heroDefense)), // 화면에는 실제로 줄어드는 비율로 보여 준다
+      r2(dodgeChanceOf(m.heroDodge)),
       r2(m.heroRegen),
       Math.round(TUNE.PLAYER_SPEED * m.heroSpeed * (WEAPONS[s.state.weapon]!.type === CAVALRY ? TUNE.MOUNT_SPEED_MAX : 1)),
       1 + m.heroMulti,
@@ -2208,7 +2209,7 @@ export class Game {
 
   /** 회피 판정: 피했으면 true(효과 표시를 띄운다) */
   private dodged(chance: number, x: number, y: number, owner = 0): boolean {
-    if (chance <= 0 || this.rng() >= Math.min(DODGE_MAX, chance)) return false;
+    if (chance <= 0 || this.rng() >= dodgeChanceOf(chance)) return false;
     this.pushEvent(EVT_DODGE, x, y, 0, 0, owner);
     return true;
   }
@@ -2346,7 +2347,7 @@ export class Game {
             s.shieldDelay = p.shield <= 0 ? TUNE.HERO_SHIELD_BROKEN_DELAY : TUNE.HERO_SHIELD_REGEN_DELAY;
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(-p.id, h.poison); // 토너먼트: 몸에 맞은 독 화살
-          const taken = this.armorCut(r.body, s.mods.heroArmor) * (1 - Math.min(DEFENSE_MAX, s.mods.heroDefense)) * this.damageTakenMult(p.id); // 고정 감소가 먼저, 방어력(%)은 그다음
+          const taken = this.armorCut(r.body, s.mods.heroArmor) * defenseTakenMult(s.mods.heroDefense) * this.damageTakenMult(p.id); // 고정 감소가 먼저, 방어력(%)은 그다음
           p.hp -= taken;
           s.stats.taken += taken;
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
@@ -2388,7 +2389,7 @@ export class Game {
             }
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
-          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * (1 - Math.min(DEFENSE_MAX, mods ? mstat(mods, m.type, "defense") : 0)) * this.damageTakenMult(m.owner);
+          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner);
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner); // 독 틱(dot, 병종 없음)은 보라색 숫자
@@ -2435,7 +2436,7 @@ export class Game {
       return;
     }
     m.hp = 0;
-    m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * (owner ? mstat(owner.mods, m.type, "respawn") : 1) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
+    m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * respawnTimeMult(owner ? mstat(owner.mods, m.type, "respawn") : 0) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
     if (owner) {
       owner.stats.mercDeaths++;
       this.noteDeath(owner);
@@ -3703,7 +3704,7 @@ export class Game {
       case "luck": p.luck += e.v; break;
       case "mercStat": {
         const target = e.type === undefined ? m.all : m.type[e.type]!;
-        if (e.stat === "respawn" || e.stat === "cast") target[e.stat] *= 1 + e.v;
+        if (e.stat === "cast") target[e.stat] *= 1 + e.v;
         else target[e.stat] += e.v;
         break;
       }
