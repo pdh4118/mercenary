@@ -110,7 +110,7 @@ test("철퇴 스킬: 날아가다 적에게 닿으면 그 자리의 주변 적�
   assert.ok(dealt >= WEAPONS[3]!.damage * TUNE.SKILL_MACE_DAMAGE * 0.9, `피해 ${dealt}`);
   assert.ok(g.getEnemy(near2)!.hp < 5000, "폭발 반경 안의 적도 맞는다");
   assert.equal(g.getEnemy(far)!.hp, 5000, "먼 적은 맞지 않는다");
-  assert.ok(g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] === 1), "적에게 닿은 이벤트");
+  assert.ok(g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] >= 10), "적에게 닿은 이벤트");
 });
 
 test("철퇴 스킬: 커서까지의 거리와 상관없이 정해진 거리를 날아간다", () => {
@@ -134,7 +134,7 @@ test("철퇴 스킬: 아무것도 못 맞히면 폭발 없이 사라진다", () 
   run(g, 1.5);
   assert.equal(g.snapshotBullets().length, 0, "다 날아가면 사라진다");
   assert.equal(g.getEnemy(far)!.hp, 5000, "아무 피해도 없다");
-  assert.ok(!g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] === 1), "폭발 이벤트가 없다");
+  assert.ok(!g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] >= 10), "폭발 이벤트가 없다");
 });
 
 test("기마 스킬: 2초간 최고 속도로 달리고, 공격하면 그 속도를 잃는다", () => {
@@ -248,7 +248,7 @@ test("기마 가속 중에는 상태에 남은 시간(bst)이 실려 속도 이�
   assert.equal(s2.g.getPlayer(s2.a)!.bst, 0);
 });
 
-test("스킬 효과 카드: 돌진 거리·무적 시간·방벽 길이가 늘어난다", () => {
+test("스킬 효과 카드: 돌진 거리·무적 시간·방벽 길이가 늘고, 가속은 속도가 오른다", () => {
   const dash = (pow: number) => {
     const { g, a, p } = start(1);
     (g as unknown as { slots: Map<number, { mods: { heroSkillPow: number } }> }).slots.get(a)!.mods.heroSkillPow = pow;
@@ -274,4 +274,21 @@ test("스킬 효과 카드: 돌진 거리·무적 시간·방벽 길이가 늘�
     return g.snapshotWalls()[0]![4];
   };
   assert.ok(Math.abs(wallLen(1) - wallLen(0) * 2) < 1e-6, "방벽 길이가 2배로");
+  const wallLife = (pow: number) => {
+    const { g, a } = start(4);
+    (g as unknown as { slots: Map<number, { mods: { heroSkillPow: number } }> }).slots.get(a)!.mods.heroSkillPow = pow;
+    g.setInput(a, { ...idle, aim: 0, dist: 200 });
+    g.useSkill(a);
+    return (g as unknown as { walls: { t: number }[] }).walls[0]!.t;
+  };
+  assert.equal(wallLife(1), wallLife(0), "방벽 지속 시간은 그대로");
+  const boost = (pow: number) => {
+    const { g, a } = start(5);
+    (g as unknown as { slots: Map<number, { mods: { heroSkillPow: number }; boostT: number }> }).slots.get(a)!.mods.heroSkillPow = pow;
+    g.useSkill(a);
+    const s = (g as unknown as { slots: Map<number, { boostT: number }>; heroSpeedNow(s: unknown): number });
+    return { t: s.slots.get(a)!.boostT, v: s.heroSpeedNow(s.slots.get(a)) };
+  };
+  assert.equal(boost(1).t, boost(0).t, "가속 시간은 그대로");
+  assert.ok(boost(1).v > boost(0).v * 1.1, "가속 속도가 더 빠르다");
 });

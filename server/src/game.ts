@@ -2103,7 +2103,7 @@ export class Game {
   /** 지금 주인공의 이동 속도(기마면 달린 만큼 빨라진다) */
   private heroSpeedNow(s: Slot): number {
     const base = TUNE.PLAYER_SPEED * s.mods.heroSpeed;
-    return WEAPONS[s.state.weapon]!.type === CAVALRY ? base * (1 + (TUNE.MOUNT_SPEED_MAX - 1) * s.mom) * (s.boostT > 0 ? TUNE.SKILL_BOOST_MULT : 1) : base;
+    return WEAPONS[s.state.weapon]!.type === CAVALRY ? base * (1 + (TUNE.MOUNT_SPEED_MAX - 1) * s.mom) * (s.boostT > 0 ? 1 + (TUNE.SKILL_BOOST_MULT - 1) * (1 + Math.max(0, s.mods.heroSkillPow)) : 1) : base;
   }
 
   /** 되돌려받은 피해(창병에게 돌격하면 자신에게 돌아온다)를 주인공이 입는다 */
@@ -2357,11 +2357,11 @@ export class Game {
         const [x, y] = this.heroSpot(s, w); // 사거리 안의 커서 위치
         const toward = Math.atan2(y - p.y, x - p.x);
         this.walls = this.walls.filter((q) => q.owner !== playerId); // 한 사람에 하나
-        this.walls.push({ id: this.nextEntityId++, owner: playerId, x, y, ang: toward + Math.PI / 2, hl: (TUNE.SKILL_WALL_LEN * pow) / 2, ht: TUNE.SKILL_WALL_THICK / 2, t: TUNE.SKILL_WALL_SEC * pow, life: TUNE.SKILL_WALL_SEC * pow });
+        this.walls.push({ id: this.nextEntityId++, owner: playerId, x, y, ang: toward + Math.PI / 2, hl: (TUNE.SKILL_WALL_LEN * pow) / 2, ht: TUNE.SKILL_WALL_THICK / 2, t: TUNE.SKILL_WALL_SEC, life: TUNE.SKILL_WALL_SEC });
         break;
       }
       case CAVALRY: // 가속: 최고 속도로 달리지만 공격하면 그 속도를 잃는다
-        s.boostT = TUNE.SKILL_BOOST_SEC * pow;
+        s.boostT = TUNE.SKILL_BOOST_SEC;
         s.mom = 1;
         break;
       default:
@@ -2425,7 +2425,7 @@ export class Game {
   /** 던진 철퇴가 적에게 닿았다: 그 자리 주변의 적(토너먼트에서는 상대 쪽)이 광역 피해를 입는다 */
   private maceLand(b: Bullet): void {
     const r = TUNE.SKILL_MACE_SPLASH * (1 + Math.max(0, this.slots.get(b.owner)?.mods.heroSkillPow ?? 0)); // 스킬 효과 카드
-    this.pushEvent(EVT_SKILL, b.x, b.y, 3, 1, b.owner);
+    this.pushEvent(EVT_SKILL, b.x, b.y, 3, Math.round(r), b.owner); // val = 폭발 반경(10 이상이면 철퇴가 닿은 것)
     if (this.phase === "tournament") {
       const opp = this.opponentOf(b.owner);
       for (const f of this.collectFriendlies()) {

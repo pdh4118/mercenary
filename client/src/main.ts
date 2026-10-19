@@ -1020,7 +1020,7 @@ async function main() {
   };
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
-  const maceHits: { sp: Sprite; age: number }[] = []; // 던진 철퇴 적중 충격
+  const maceHits: { sp: Sprite; age: number; r: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean }[]>(); // 방벽 번호 -> 수정 조각들
   const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
   const WALL_SEG3_STEP = 38; // 새 조각(상태별 1종)의 간격
@@ -1223,14 +1223,14 @@ async function main() {
           else if (kind === EVT_METEOR) {
             blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
           }
-          else if (kind === EVT_SKILL && val === 1 && maceHitTex.every((t) => t !== null)) {
+          else if (kind === EVT_SKILL && val >= 10 && maceHitTex.every((t) => t !== null)) {
             // 던진 철퇴가 적에게 닿음: 갈라진 땅과 흙먼지 4컷(지름 약 반경 x 2.3)
             audio.play("melee_hit", { x, y });
             const sp = new Sprite(maceHitTex[0]!);
             sp.anchor.set(0.5);
             sp.position.set(x, y);
             groundFx.addChild(sp);
-            maceHits.push({ sp, age: 0 });
+            maceHits.push({ sp, age: 0, r: val });
           }
           else if (kind === EVT_SKILL && val === 0 && (WEAPONS[Math.round(ang)]?.type === SPEAR_TYPE || WEAPONS[Math.round(ang)]?.type === ARCHER_TYPE) && latest.players.some((q) => q.id === owner)) {
             // 창 돌진·활 후퇴: 움직이는 동안 주인공 그림을 어둡게 복사한 잔상이 지나온 길에 남는다(창은 무적이라 링은 그리지 않는다)
@@ -1260,12 +1260,12 @@ async function main() {
           else if (kind === EVT_SKILL) {
             // 주인공 스킬: 무기 색의 고리. 던진 철퇴가 터지면 폭발 반경만큼 크게, 벽이 부서지면 작게
             const col = TYPE_COLORS[WEAPONS[Math.round(ang)]?.type ?? 0]!;
-            const rad = val === 1 ? TUNE.SKILL_MACE_SPLASH : val === 2 ? 30 : 18;
-            const fx = new Graphics().circle(0, 0, rad).stroke({ width: val === 1 ? 5 : 3, color: col, alpha: 0.95 });
-            if (val === 1) fx.circle(0, 0, rad).fill({ color: col, alpha: 0.25 });
+            const rad = val >= 10 ? val : val === 2 ? 30 : 18;
+            const fx = new Graphics().circle(0, 0, rad).stroke({ width: val >= 10 ? 5 : 3, color: col, alpha: 0.95 });
+            if (val >= 10) fx.circle(0, 0, rad).fill({ color: col, alpha: 0.25 });
             fx.position.set(x, y);
             bulletLayer.addChild(fx);
-            hitFx.push({ node: fx, age: 0, grow: val === 0 ? 2.4 : 0.6, life: val === 1 ? 0.4 : 0.5 });
+            hitFx.push({ node: fx, age: 0, grow: val === 0 ? 2.4 : 0.6, life: val >= 10 ? 0.4 : 0.5 });
           }
           else if (kind === EVT_REFLECT || kind === EVT_COUNTER) {
             // 가시 갑옷의 반사(주황)와 창병의 카운터(붉은 주황, 더 크게): 맞은 자리에 충격 고리와 금속음. 내 유닛과 관련되면 피해 숫자도 띄운다.
@@ -2181,7 +2181,7 @@ async function main() {
       const k = Math.min(3, Math.floor(mh.age / 0.1));
       const tex = maceHitTex[k]!;
       mh.sp.texture = tex;
-      mh.sp.width = TUNE.SKILL_MACE_SPLASH * 2.3;
+      mh.sp.width = mh.r * 2.3; // 폭발 반경(스킬 효과 카드 반영)에 맞춘다
       mh.sp.height = (mh.sp.width * tex.height) / tex.width;
       mh.sp.alpha = mh.age < 0.3 ? 1 : Math.max(0, 1 - (mh.age - 0.3) / 0.2);
       if (mh.age >= 0.5) {
