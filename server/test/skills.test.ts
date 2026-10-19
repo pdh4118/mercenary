@@ -195,3 +195,24 @@ test("방벽은 적의 화살을 막고 피해만큼 부서진다", () => {
   assert.equal(g.getPlayer(a)!.hp, hp0, "주인공은 맞지 않는다");
   assert.ok(wall.hp < wall.maxHp, "벽이 대신 맞았다");
 });
+
+test("스킬 회복 속도 카드: 일반 +4%, 쌓을수록 쿨타임이 1/(1+합)배로 줄고 효율은 같다", async () => {
+  const { CARDS } = await import("@mercenary/shared");
+  const cards = CARDS.filter((c) => c.effect.k === "heroSkill");
+  assert.equal(cards.length, 3, "일반·희귀·영웅");
+  assert.ok(cards[0]!.effect.k === "heroSkill" && Math.abs(cards[0]!.effect.v - 0.04) < 1e-9, "일반 +4%");
+  assert.equal(cards[0]!.minLevel, 1, "1레벨부터 나온다");
+  assert.ok(cards[0]!.effect.k === "heroSkill" && cards[1]!.effect.k === "heroSkill" && Math.abs(cards[1]!.effect.v / cards[0]!.effect.v - 1.6) < 1e-6, "희귀는 x1.6");
+  const cooldownAfter = (n: number) => {
+    const { g, a } = start(0);
+    for (let i = 0; i < n; i++) g.applyCardForTest(a, { k: "heroSkill", v: 0.04 });
+    g.useSkill(a);
+    return g.getPlayer(a)!.skMax;
+  };
+  assert.ok(Math.abs(cooldownAfter(0) - 10) < 1e-9);
+  assert.ok(Math.abs(cooldownAfter(1) - 10 / 1.04) < 1e-9);
+  assert.ok(Math.abs(cooldownAfter(25) - 5) < 1e-9, "합이 1이면 쿨타임이 절반");
+  // 한 장 더 얹을 때 늘어나는 '스킬 사용 횟수(초당)'는 쌓인 양과 상관없이 같다
+  const rate = (n: number) => 1 / cooldownAfter(n);
+  assert.ok(Math.abs(rate(1) - rate(0) - (rate(26) - rate(25))) < 1e-9);
+});

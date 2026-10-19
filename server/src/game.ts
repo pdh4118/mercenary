@@ -263,6 +263,7 @@ interface Mods {
   heroShield: number; // 방패 체력 최대치 추가
   heroShieldRegen: number; // 방패 재생 속도 추가 비율
   heroCast: number; // 지팡이 시전 속도 합계(주문 시간 = 1/(1+합)배)
+  heroSkill: number; // 스페이스 스킬 회복 속도 합계(쿨타임 = 1/(1+합)배)
 }
 
 const newMods = (): Mods => ({
@@ -292,6 +293,7 @@ const newMods = (): Mods => ({
   heroShield: 0,
   heroShieldRegen: 0,
   heroCast: 0,
+  heroSkill: 0,
 });
 
 interface Slot {
@@ -2358,7 +2360,7 @@ export class Game {
       default:
         return false;
     }
-    s.skillCd = s.skillMax = this.skillCooldownOf(widx);
+    s.skillCd = s.skillMax = this.skillCooldownOf(widx) / (1 + Math.max(0, s.mods.heroSkill)); // 회복 속도 카드: 쌓은 합 x면 쿨타임 1/(1+x)배
     p.sk = s.skillCd;
     p.skMax = s.skillMax;
     this.pushEvent(EVT_SKILL, p.x, p.y, widx, 0, playerId);
@@ -3954,6 +3956,7 @@ export class Game {
       case "heroShield": m.heroShield += e.v; p.shield += e.v; p.shieldMax += e.v; break;
       case "heroShieldRegen": m.heroShieldRegen += e.v; break;
       case "heroCast": m.heroCast += e.v; break;
+      case "heroSkill": m.heroSkill += e.v; break;
       case "heroLifesteal": m.heroLifesteal += e.v; break;
     }
     for (const merc of this.mercs.values()) {
