@@ -247,3 +247,31 @@ test("기마 가속 중에는 상태에 남은 시간(bst)이 실려 속도 이�
   run(s2.g, 0.3);
   assert.equal(s2.g.getPlayer(s2.a)!.bst, 0);
 });
+
+test("스킬 효과 카드: 돌진 거리·무적 시간·방벽 길이가 늘어난다", () => {
+  const dash = (pow: number) => {
+    const { g, a, p } = start(1);
+    (g as unknown as { slots: Map<number, { mods: { heroSkillPow: number } }> }).slots.get(a)!.mods.heroSkillPow = pow;
+    const x0 = p.x;
+    g.setInput(a, { ...idle, aim: 0 });
+    g.useSkill(a);
+    run(g, TUNE.SKILL_DASH_SEC + 0.1);
+    return g.getPlayer(a)!.x - x0;
+  };
+  assert.ok(dash(0.5) > dash(0) * 1.4, "돌진 거리가 1.5배로");
+  const guard = (pow: number) => {
+    const { g, a } = start(2);
+    (g as unknown as { slots: Map<number, { mods: { heroSkillPow: number } }> }).slots.get(a)!.mods.heroSkillPow = pow;
+    g.useSkill(a);
+    return g.getPlayer(a)!.invuln;
+  };
+  assert.ok(Math.abs(guard(1) - TUNE.SKILL_INVULN_SEC * 2) < 1e-6, "무적 시간이 2배로");
+  const wallLen = (pow: number) => {
+    const { g, a } = start(4);
+    (g as unknown as { slots: Map<number, { mods: { heroSkillPow: number } }> }).slots.get(a)!.mods.heroSkillPow = pow;
+    g.setInput(a, { ...idle, aim: 0, dist: 200 });
+    g.useSkill(a);
+    return g.snapshotWalls()[0]![4];
+  };
+  assert.ok(Math.abs(wallLen(1) - wallLen(0) * 2) < 1e-6, "방벽 길이가 2배로");
+});

@@ -72,6 +72,8 @@ test("새로고침: 제시된 카드를 다시 뽑고(겹치지 않게) 횟수�
   assert.equal(p.rerolls, REROLL_START - 1);
   assert.equal(p.offer.length, OFFER_SIZE);
   assert.ok(p.offer.every((i) => !first.includes(i)), "방금 본 카드는 빠진다");
+  for (let i = 1; i < REROLL_START; i++) assert.equal(g.reroll(a), true, "시작 횟수만큼 더 할 수 있다");
+  assert.equal(p.rerolls, 0);
   assert.equal(g.reroll(a), false, "횟수가 없다");
   assert.equal(p.pending, 1, "선택 횟수는 그대로");
 });

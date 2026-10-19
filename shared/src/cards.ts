@@ -78,6 +78,7 @@ export type CardEffect =
   | { k: "heroRegen"; v: number } // 초당 체력 회복
   | { k: "heroShield"; v: number } // 검 방패 체력 최대치 +v
   | { k: "heroShieldRegen"; v: number }
+  | { k: "heroSkillPow"; v: number } // 스페이스 스킬 효과(거리·시간·피해·크기) +v(비율, 합 x면 1+x배)
   | { k: "heroSkill"; v: number } // 스페이스 스킬 회복 속도 +v(합이 x면 쿨타임 1/(1+x)배)
   | { k: "heroCast"; v: number }; // 지팡이 시전 속도 +v(합이 x면 주문 시간 1/(1+x)배) // 검 방패 재생 속도 +v(비율)
 
@@ -232,6 +233,7 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
   { k: "heroCast", label: "시전 속도", base: 0.05, weight: 4, fmt: "pct" },
   { k: "heroSkill", label: "스킬 가속", base: 0.04, weight: 5, fmt: "pct" }, // 일반 +4%(희귀 x1.6, 영웅 x2.4), 쿨타임 1/(1+합)배
+  { k: "heroSkillPow", label: "스킬 효과", base: 0.08, weight: 5, fmt: "pct" }, // 일반 +8%(희귀 x1.6, 영웅 x2.4)
   { k: "heroShield", label: "방패 체력", base: 40, weight: 5, fmt: "flat" },
   { k: "heroShieldRegen", label: "방패 재생 속도", base: 0.2, weight: 5, fmt: "pct" },
 ];
@@ -242,7 +244,7 @@ const heroCards = (): CardDef[] =>
       const text = h.k === "heroArmor" ? `-${v}` : h.k === "heroThorns" ? `${v}` : h.k === "heroPoison" ? `화살 피해의 ${Math.round(v * 100)}%` : h.fmt === "cut" ? `-${Math.round(Math.abs(v) * 1000) / 10}%` : h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 +${Math.round(v * 10) / 10}` : `+${v}`;
       return {
         name: `${h.label} ${text}`,
-        desc: h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroThorns" ? `주인공만: 근접 공격을 받으면 ${text}의 피해를 공격자에게 되돌린다 (맞을 때마다 고정 피해, 방어력·방패와 무관, 화살·마법은 해당 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : h.k === "heroCast" ? `주인공이 지팡이를 들었을 때: 시전 속도 ${text}${EFFICIENCY_NOTE.cast}` : h.k === "heroShield" ? `주인공이 검을 들었을 때: 방패 체력 ${text}` : h.k === "heroShieldRegen" ? `주인공이 검을 들었을 때: 방패가 차오르는 속도 ${text} (맞지 않고 기다리는 시간은 그대로)` : `주인공만: ${h.label} ${text}${h.k === "heroDefense" ? EFFICIENCY_NOTE.defense : h.k === "heroDodge" ? EFFICIENCY_NOTE.dodge : h.k === "heroSkill" ? EFFICIENCY_NOTE.skill : ""}`,
+        desc: h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroThorns" ? `주인공만: 근접 공격을 받으면 ${text}의 피해를 공격자에게 되돌린다 (맞을 때마다 고정 피해, 방어력·방패와 무관, 화살·마법은 해당 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : h.k === "heroSkillPow" ? `주인공만: 스페이스 스킬 효과 ${text} (후퇴·돌진 거리, 검 무적·기마 가속·방벽 지속 시간, 철퇴 투척 피해·폭발 반경, 방벽 길이)` : h.k === "heroCast" ? `주인공이 지팡이를 들었을 때: 시전 속도 ${text}${EFFICIENCY_NOTE.cast}` : h.k === "heroShield" ? `주인공이 검을 들었을 때: 방패 체력 ${text}` : h.k === "heroShieldRegen" ? `주인공이 검을 들었을 때: 방패가 차오르는 속도 ${text} (맞지 않고 기다리는 시간은 그대로)` : `주인공만: ${h.label} ${text}${h.k === "heroDefense" ? EFFICIENCY_NOTE.defense : h.k === "heroDodge" ? EFFICIENCY_NOTE.dodge : h.k === "heroSkill" ? EFFICIENCY_NOTE.skill : ""}`,
         category: 2,
         rarity: r as 0 | 1 | 2,
         weight: h.weight * RARITY[r]!.weight,
@@ -301,6 +303,6 @@ export const LUCK_RARITY_BOOST = [0, 3, 6, 8] as const;
 export const LUCK_MAX = 3;
 export const luckWeight = (rarity: number, luck: number): number => 1 + Math.min(LUCK_MAX, Math.max(0, luck)) * (LUCK_RARITY_BOOST[rarity] ?? 0);
 /** 카드를 고를 때마다 얻는 새로고침(제시된 카드 3장을 다시 뽑는다) 수와 보유 상한 */
-export const REROLL_START = 1;
+export const REROLL_START = 2; // 카드 종류가 늘어난 만큼 처음부터 두 번(하나 추가)
 export const REROLL_PER_PICK = 1;
 export const REROLL_MAX = 5;

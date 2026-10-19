@@ -265,6 +265,7 @@ interface Mods {
   heroShield: number; // 방패 체력 최대치 추가
   heroShieldRegen: number; // 방패 재생 속도 추가 비율
   heroCast: number; // 지팡이 시전 속도 합계(주문 시간 = 1/(1+합)배)
+  heroSkillPow: number; // 스페이스 스킬 효과 합계(거리·시간·피해·크기 = 1+합배)
   heroSkill: number; // 스페이스 스킬 회복 속도 합계(쿨타임 = 1/(1+합)배)
 }
 
@@ -295,6 +296,7 @@ const newMods = (): Mods => ({
   heroShield: 0,
   heroShieldRegen: 0,
   heroCast: 0,
+  heroSkillPow: 0,
   heroSkill: 0,
 });
 
@@ -432,6 +434,7 @@ interface Wall {
   hl: number; // 반길이
   ht: number; // 반두께
   t: number; // 남은 시간(부서지지 않고 시간이 되면 사라진다)
+  life: number; // 처음 시간(남은 시간 비율을 구할 때 쓴다)
 }
 
 interface Camp {
@@ -1083,7 +1086,7 @@ export class Game {
   }
 
   snapshotWalls(): WallWire[] {
-    return this.walls.map((w) => [w.id, round(w.x), round(w.y), round(w.ang, 100), w.hl, w.ht, Math.max(1, Math.round((w.t / TUNE.SKILL_WALL_SEC) * 100)), w.owner]);
+    return this.walls.map((w) => [w.id, round(w.x), round(w.y), round(w.ang, 100), w.hl, w.ht, Math.max(1, Math.round((w.t / w.life) * 100)), w.owner]);
   }
 
   snapshotCamps(): CampWire[] {
@@ -2310,11 +2313,12 @@ export class Game {
     const p = s.state;
     const widx = p.weapon;
     const w = WEAPONS[widx]!;
+    const pow = 1 + Math.max(0, s.mods.heroSkillPow); // 스킬 효과 카드
     switch (w.type) {
       case ARCHER:
       case SPEAR: {
         const back = w.type === ARCHER;
-        const dist = back ? TUNE.SKILL_BACKSTEP_DIST : TUNE.SKILL_DASH_DIST;
+        const dist = (back ? TUNE.SKILL_BACKSTEP_DIST : TUNE.SKILL_DASH_DIST) * pow;
         const sec = back ? TUNE.SKILL_BACKSTEP_SEC : TUNE.SKILL_DASH_SEC;
         const ang = back ? s.input.aim + Math.PI : s.input.aim;
         s.dashT = sec;
@@ -2324,7 +2328,7 @@ export class Game {
         break;
       }
       case SHIELD:
-        p.invuln = Math.max(p.invuln, TUNE.SKILL_INVULN_SEC);
+        p.invuln = Math.max(p.invuln, TUNE.SKILL_INVULN_SEC * pow);
         break;
       case BLUNT: {
         const crit = this.rollCrit(s.mods.heroCrit);
@@ -2338,7 +2342,7 @@ export class Game {
           vy: Math.sin(ang) * TUNE.SKILL_MACE_SPEED,
           left: d,
           hostile: false,
-          damage: w.damage * TUNE.SKILL_MACE_DAMAGE * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1),
+          damage: w.damage * TUNE.SKILL_MACE_DAMAGE * pow * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1),
           srcType: BLUNT,
           owner: playerId,
           radius: 16,
@@ -2353,11 +2357,11 @@ export class Game {
         const [x, y] = this.heroSpot(s, w); // 사거리 안의 커서 위치
         const toward = Math.atan2(y - p.y, x - p.x);
         this.walls = this.walls.filter((q) => q.owner !== playerId); // 한 사람에 하나
-        this.walls.push({ id: this.nextEntityId++, owner: playerId, x, y, ang: toward + Math.PI / 2, hl: TUNE.SKILL_WALL_LEN / 2, ht: TUNE.SKILL_WALL_THICK / 2, t: TUNE.SKILL_WALL_SEC });
+        this.walls.push({ id: this.nextEntityId++, owner: playerId, x, y, ang: toward + Math.PI / 2, hl: (TUNE.SKILL_WALL_LEN * pow) / 2, ht: TUNE.SKILL_WALL_THICK / 2, t: TUNE.SKILL_WALL_SEC * pow, life: TUNE.SKILL_WALL_SEC * pow });
         break;
       }
       case CAVALRY: // 가속: 최고 속도로 달리지만 공격하면 그 속도를 잃는다
-        s.boostT = TUNE.SKILL_BOOST_SEC;
+        s.boostT = TUNE.SKILL_BOOST_SEC * pow;
         s.mom = 1;
         break;
       default:
@@ -2420,7 +2424,7 @@ export class Game {
 
   /** 던진 철퇴가 적에게 닿았다: 그 자리 주변의 적(토너먼트에서는 상대 쪽)이 광역 피해를 입는다 */
   private maceLand(b: Bullet): void {
-    const r = TUNE.SKILL_MACE_SPLASH;
+    const r = TUNE.SKILL_MACE_SPLASH * (1 + Math.max(0, this.slots.get(b.owner)?.mods.heroSkillPow ?? 0)); // 스킬 효과 카드
     this.pushEvent(EVT_SKILL, b.x, b.y, 3, 1, b.owner);
     if (this.phase === "tournament") {
       const opp = this.opponentOf(b.owner);
@@ -3968,6 +3972,7 @@ export class Game {
       case "heroShield": m.heroShield += e.v; p.shield += e.v; p.shieldMax += e.v; break;
       case "heroShieldRegen": m.heroShieldRegen += e.v; break;
       case "heroCast": m.heroCast += e.v; break;
+      case "heroSkillPow": m.heroSkillPow += e.v; break;
       case "heroSkill": m.heroSkill += e.v; break;
       case "heroLifesteal": m.heroLifesteal += e.v; break;
     }
