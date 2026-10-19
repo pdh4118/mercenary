@@ -2444,6 +2444,13 @@ export class Game {
   }
 
   /** 무기를 바꾼다. 바꾼 직후에는 잠깐 공격할 수 없다. */
+  /** 주인공 외형(0 기본 · 1 여성). 능력에는 영향이 없고 다른 플레이어 화면에 보이는 모습만 바뀐다. */
+  setLook(playerId: number, look: unknown): void {
+    const s = this.slots.get(playerId);
+    if (!s) return;
+    s.state.lk = look === 1 ? 1 : 0;
+  }
+
   setWeapon(playerId: number, index: unknown): boolean {
     const s = this.slots.get(playerId);
     if (!s || typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= WEAPONS.length) return false;

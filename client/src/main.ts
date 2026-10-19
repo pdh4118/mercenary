@@ -219,6 +219,8 @@ async function main() {
   const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5;
   const CAV_ANCHOR: [number, number] = [0.483, 0.72];
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
+  // 여성 주인공 그림(없으면 기본 그림으로 대신한다)
+  const heroTexF = await Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_f_${f}.png`).catch(() => null)));
   const [heroTex, campTex, groundTex, allyArrow, enemyArrow] = await Promise.all([
     Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_${f}.png`))),
     Assets.load<Texture>("assets/camp/camp.png"),
@@ -1822,7 +1824,7 @@ async function main() {
       // 쓰러지면 흐리게, 부활 직후 무적일 때는 깜빡인다
       v.node.alpha = dead ? 0.4 : p.invuln > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 90)) : 1;
       // 들고 있는 무기에 맞는 모습으로 바꾸고, 조준한 쪽을 바라보게 좌우 반전한다
-      const tex = heroTex[p.weapon] ?? heroTex[0]!;
+      const tex = (p.lk === 1 ? heroTexF[p.weapon] : null) ?? heroTex[p.weapon] ?? heroTex[0]!;
       if (v.sprite.texture !== tex) v.sprite.texture = tex;
       v.sprite.scale.set(HERO_SCALE * (Math.cos(p.aim) >= 0 ? 1 : -1), HERO_SCALE);
       setPoison(v.sprite, !!p.poisoned);

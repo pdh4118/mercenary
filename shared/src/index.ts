@@ -120,6 +120,7 @@ export interface PlayerState {
   invuln: number; // 부활 직후·스킬 무적 남은 시간(초)
   sk: number; // 스페이스 스킬 쿨타임이 남은 시간(초, 무기를 바꿔도 공유)
   skMax: number; // 마지막으로 쓴 스킬의 전체 쿨타임(초)
+  lk?: number; // 주인공 외형(0 = 기본, 1 = 여성). 처음 들어갈 때 고른다
   bst: number; // 기마 가속이 남은 시간(초). 0이면 가속 중이 아니다(속도 이펙트 표시용)
   shield: number; // 검을 들었을 때의 방패 체력(무기를 바꿔도 값은 유지, 검일 때만 막는다)
   shieldMax: number;
@@ -290,6 +291,7 @@ export type ClientMsg =
   | { t: "active" } // 키·마우스 입력이 있었다는 신호(자리 비움 판정용). 클라이언트가 가끔 보낸다
   | { t: "list" }
   | { t: "create"; name: string; room?: string; private?: boolean } // 비공개 방은 목록에 안 나오고 코드로만 입장
+  | { t: "look"; look: number } // 주인공 외형 선택(0 기본 · 1 여성)
   | { t: "join"; name: string; code: string }
   | { t: "quick"; name: string }
   | { t: "rejoin"; token: string }

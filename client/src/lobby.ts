@@ -3,6 +3,7 @@ import { DIFFICULTY_NAMES, DIFFICULTY_REDUCTION, STAGE_COUNT, type ClientMsg, ty
 type ResultMsg = Extract<ServerMsg, { t: "result" }>;
 
 const NAME_KEY = "mercenary.name";
+const LOOK_KEY = "mercenary.look";
 const RECORDS_KEY = "mercenary.records";
 const RECORDS_MAX = 20;
 
@@ -47,6 +48,8 @@ export interface Lobby {
   /** 서버 메시지 중 방 관련(rooms/welcome/room/left/error)을 처리한다. 처리했으면 true. */
   handle(msg: ServerMsg): boolean;
   playerName(): string;
+  /** 고른 주인공 모습(0 기본 · 1 여성) */
+  look(): number;
   roomCode(): string;
   inRoom(): boolean;
   /** 로비나 방 메뉴가 열려 있어 게임 입력을 받으면 안 되는 상태 */
@@ -70,6 +73,27 @@ export function createLobby(opts: Options): Lobby {
   const lobbyEl = $("lobby");
   const roomEl = $("roomPanel");
   const nameInput = $<HTMLInputElement>("lobbyName");
+  // 주인공 모습 고르기: 여성 그림이 있을 때만 보인다(없으면 선택지 자체를 숨긴다)
+  let lookValue = safe.get(LOOK_KEY) === "1" ? 1 : 0;
+  const look = () => lookValue;
+  const lookBox = $("lookBox");
+  const paintLook = () => lookBox.querySelectorAll<HTMLElement>(".lookBtn").forEach((b) => b.classList.toggle("sel", Number(b.dataset.look) === lookValue));
+  lookBox.querySelectorAll<HTMLElement>(".lookBtn").forEach((b) =>
+    b.addEventListener("click", () => {
+      lookValue = Number(b.dataset.look) === 1 ? 1 : 0;
+      safe.set(LOOK_KEY, String(lookValue));
+      paintLook();
+    }),
+  );
+  const probe = new Image();
+  probe.onload = () => {
+    lookBox.style.display = "";
+    paintLook();
+  };
+  probe.onerror = () => {
+    lookValue = 0; // 그림이 없으면 기본 모습만
+  };
+  probe.src = "assets/hero/hero_f_sword.png";
   const roomNameInput = $<HTMLInputElement>("lobbyRoomName");
   const codeInput = $<HTMLInputElement>("lobbyCode");
   const privateInput = $<HTMLInputElement>("lobbyPrivate");
@@ -477,6 +501,7 @@ export function createLobby(opts: Options): Lobby {
           myId = msg.id;
           safe.set(TOKEN_KEY, msg.token, sessionStorage); // 같은 탭에서 새로고침해도 이어서 하도록
           hideLobby();
+          opts.send({ t: "look", look: look() });
           opts.onEnter(msg.id);
           return true;
         case "room":
@@ -542,6 +567,7 @@ export function createLobby(opts: Options): Lobby {
       }
     },
     playerName: () => nameInput.value.trim(),
+    look,
     roomCode: () => code,
     inRoom: () => inRoom,
     blocksGameInput: () => lobbyEl.classList.contains("open") || roomEl.classList.contains("open") || waitEl.classList.contains("open") || resultEl.classList.contains("open"),

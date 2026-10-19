@@ -19,6 +19,9 @@
       #lobby { background: #0f1015; } /* 로비는 게임 화면이 비치지 않게 불투명하게 */
       .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
       .row > input { flex: 1; min-width: 0; }
+      .lookBtn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 14px; min-width: 84px; }
+      .lookBtn img { height: 56px; image-rendering: auto; }
+      .lookBtn.sel { background: #3a3320; border-color: #d7a24d; color: #ffe08a; }
       input { box-sizing: border-box; padding: 9px 10px; font-size: 15px; color: #e6e9f0; background: #12141a; border: 1px solid #3a4052; border-radius: 8px; outline: none; }
       input:focus { border-color: #e0c05d; }
       button { white-space: nowrap; padding: 9px 14px; font-size: 14px; color: #e6e9f0; background: #2c3140; border: 1px solid #3f4659; border-radius: 8px; cursor: pointer; }
@@ -143,6 +146,14 @@
 
         <h2>이름</h2>
         <div class="row"><input id="lobbyName" maxlength="12" placeholder="이름" autocomplete="off" /></div>
+
+        <div id="lookBox" style="display: none">
+          <h2>주인공 모습</h2>
+          <div class="row" id="lookRow" style="gap: 10px">
+            <button type="button" class="lookBtn" data-look="0"><img src="assets/hero/hero_sword.png" alt="" /><span>남성</span></button>
+            <button type="button" class="lookBtn" data-look="1"><img src="assets/hero/hero_f_sword.png" alt="" /><span>여성</span></button>
+          </div>
+        </div>
 
         <h2>바로 시작</h2>
         <div class="row">

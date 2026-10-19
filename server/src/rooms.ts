@@ -193,6 +193,9 @@ export class RoomManager {
       case "weapon":
         room.game.setWeapon(id, msg.index);
         return;
+      case "look":
+        room.game.setLook(id, msg.look);
+        return;
       case "skill":
         room.game.useSkill(id);
         return;
