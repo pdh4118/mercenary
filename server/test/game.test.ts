@@ -1239,11 +1239,12 @@ test("배후 공격: 등 뒤에서 용병이 찌르면 같은 공격이 1.5배 �
     // 적(둔기병)은 가장 가까운 아군(주인공)을 바라본다. 주인공이 반대편에 있으면 용병에게 등을 보인 셈이다.
     const e = g.spawnEnemyAt(300 + 0, 0, BLUNT);
     const en = g.getEnemy(e)!;
+    (en as { hp: number }).hp = 5000; // 한 방에 죽지 않게
     p.x = en.x + heroSide * 20;
     const m = g.addMerc(a, SPEAR, en.x - 45, 0);
     void m;
     run(g, 0.4);
-    return ENEMY_STATS[BLUNT]!.hp - g.getEnemy(e)!.hp;
+    return 5000 - g.getEnemy(e)!.hp;
   };
   const back = dealt(+1); // 주인공은 동쪽, 용병은 서쪽 → 용병이 등 뒤
   const front = dealt(-1); // 주인공도 서쪽 → 적이 서쪽을 보고 있다

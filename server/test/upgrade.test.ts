@@ -332,7 +332,7 @@ test("전설 효과: 전장의 함성은 적용 대상(병종)이 처치할 때�
     const m = g.getMerc(sp)!;
     const e = g.spawnEnemyAt(m.x + 30, m.y, 0);
     (g.getEnemy(e) as { hp: number }).hp = 0.1;
-    run(g, 1.2);
+    run(g, 1.8);
   }
   assert.ok(g.mercStatsForTest(sp).cooldown < base * 0.9, "창병 공격 대기시간이 줄었다");
   assert.equal(g.mercStatsForTest(sh).cooldown, shBase);

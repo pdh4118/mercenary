@@ -245,7 +245,7 @@ export const MERC_STATS: readonly UnitStats[] = [
   // 기병: speed는 최대 속도. 평소엔 느리게 출발해 점점 빨라진다. 피해는 기본 + 속도에 비례한 돌격 피해.
   { hp: 200, speed: 300, reach: 53, damage: 15, windup: 0.25, cooldown: 0.9, arc: deg(60), ranged: false, radius: 14, leash: 360, shield: 0, splash: 0 },
   // 창병: 사거리가 가장 길고 폭이 좁다(찌르기)
-  { hp: 181, speed: 95, reach: 100, damage: 19, windup: 0.3, cooldown: 0.8, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
+  { hp: 181, speed: 95, reach: 100, damage: 28.5, windup: 0.3, cooldown: 1.2, arc: deg(13), ranged: false, radius: 13, leash: 95, shield: 0, splash: 0 },
   { hp: 119, speed: 85, reach: 280, damage: 15, windup: 0.25, cooldown: 0.9, arc: 0, ranged: true, radius: 12, leash: 0, shield: 0, splash: 0 },
   // 검방병: 몸 체력과 별개로 방패 체력이 있다
   { hp: 200, speed: 80, reach: 32, damage: 10, windup: 0.3, cooldown: 0.8, arc: deg(70), ranged: false, radius: 15, leash: 80, shield: 150, splash: 0 },
