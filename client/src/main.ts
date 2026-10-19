@@ -250,6 +250,9 @@ async function main() {
   const guardReady = guardTex.every((set) => set.every((t) => t !== null));
   // 기마 가속이 풀리는 순간의 이펙트(6컷). 없으면 생략.
   const boostEndTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_end_${i}.png`).catch(() => null)));
+  // 방벽 조각이 솟는 5컷과 사라지는 4컷. 없으면 애니메이션 없이 바로 서고 바로 사라진다.
+  const wallRiseTex = await Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_rise_${i}.png`).catch(() => null)));
+  const wallFadeTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_fade_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
   const wallTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_${i}.png`).catch(() => null)));
   // 수정 조각 3종(상태별 하나씩): 방벽 선을 따라 쌓아 가로·세로·대각선 벽을 만든다. 번갈아 좌우를 뒤집어 반복감을 줄인다.
@@ -1027,8 +1030,13 @@ async function main() {
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
   const maceHits: { sp: Sprite; age: number; r: number }[] = []; // 던진 철퇴 적중 충격
-  const wallPieces = new Map<number, { sp: Sprite; high: boolean }[]>(); // 방벽 번호 -> 수정 조각들
+  const wallPieces = new Map<number, { sp: Sprite; high: boolean; t0: number }[]>(); // 방벽 번호 -> 수정 조각들
   const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
+  const WALL_RISE_STEP_MS = 45; // 조각이 차례로 솟는 간격
+  const WALL_RISE_FRAME_MS = 70;
+  const WALL_FADE_FRAME_MS = 90;
+  const WALL_ANIM_GROUND = 257 / 290; // 솟음·사라짐 그림에서 바닥선의 세로 위치(비율)
+  const wallFades: { sp: Sprite; t0: number }[] = []; // 사라지는 중인 조각
   const WALL_SEG3_STEP = 38; // 새 조각(상태별 1종)의 간격
   const WALL_SEG3_SCALE = 0.55; // 새 조각 그림(188px 캔버스)을 화면에서 줄이는 비율
   const WALL_PIECE_STEP = 34; // 조각 사이 간격(px). 너비보다 좁아 서로 겹쳐 이어진다
@@ -2219,18 +2227,30 @@ async function main() {
           const py = wy + u * sn;
           let pc = pcs[k];
           if (!pc) {
-            pc = { sp: new Sprite(wallSegTex[0]![0]!), high: false };
+            pc = { sp: new Sprite(wallSegTex[0]![0]!), high: false, t0: performance.now() + k * WALL_RISE_STEP_MS };
             pc.sp.anchor.set(0.5, 0.94); // 바닥선이 판정 위치
             terrainLow.addChild(pc.sp);
             pcs[k] = pc;
           }
-          const tex = seg3 ? wallSeg3Tex[state]! : wallSegTex[state]![(k + wid) % 3]!;
-          pc.sp.texture = tex;
-          const pw = seg3 ? tex.width * WALL_SEG3_SCALE : WALL_PIECE_W;
-          pc.sp.width = pw;
-          pc.sp.height = (pw * tex.height) / tex.width;
-          if (seg3 && (k + wid) % 2 === 1) pc.sp.scale.x = -Math.abs(pc.sp.scale.x); // 좌우를 번갈아 뒤집는다(매 프레임 부호를 새로 정함)
-          else pc.sp.scale.x = Math.abs(pc.sp.scale.x);
+          const rel = performance.now() - pc.t0;
+          const riseF = Math.floor(rel / WALL_RISE_FRAME_MS);
+          pc.sp.visible = rel >= 0 || !wallRiseTex.every((t) => t !== null); // 아직 솟을 차례가 아니면 숨긴다
+          if (seg3 && wallRiseTex.every((t) => t !== null) && riseF < 5) {
+            // 땅에서 솟는 5컷(그림 너비 중 수정이 약 200px라 조각 너비 약 104px에 맞게 줄인다)
+            const rt = wallRiseTex[Math.max(0, riseF)]!;
+            pc.sp.texture = rt;
+            pc.sp.anchor.set(0.5, WALL_ANIM_GROUND);
+            pc.sp.scale.set(0.52);
+          } else {
+            const tex = seg3 ? wallSeg3Tex[state]! : wallSegTex[state]![(k + wid) % 3]!;
+            pc.sp.texture = tex;
+            pc.sp.anchor.set(0.5, 0.94);
+            const pw = seg3 ? tex.width * WALL_SEG3_SCALE : WALL_PIECE_W;
+            pc.sp.width = pw;
+            pc.sp.height = (pw * tex.height) / tex.width;
+            if (seg3 && (k + wid) % 2 === 1) pc.sp.scale.x = -Math.abs(pc.sp.scale.x); // 좌우를 번갈아 뒤집는다(매 프레임 부호를 새로 정함)
+            else pc.sp.scale.x = Math.abs(pc.sp.scale.x);
+          }
           pc.sp.position.set(px, py);
           pc.sp.zIndex = py;
           // 유닛이 조각 뒤에 서 있으면 조각을 유닛 위에 그린다(바위·나무와 같은 규칙)
@@ -2286,8 +2306,34 @@ async function main() {
     }
     for (const [id, pcs] of wallPieces) {
       if (!wallSeen.has(id)) {
-        for (const pc of pcs) pc.sp.destroy();
+        // 시간이 다 된 방벽: 조각마다 그 자리에서 조용히 사라지는 4컷을 재생한다(그림이 없으면 바로 지운다)
+        const fadeOk = wallFadeTex.every((t) => t !== null);
+        const now = performance.now();
+        pcs.forEach((pc, k) => {
+          if (fadeOk && pc.sp.visible) {
+            const sp = new Sprite(wallFadeTex[0]!);
+            sp.anchor.set(0.5, WALL_ANIM_GROUND);
+            sp.scale.set(0.42);
+            sp.position.copyFrom(pc.sp.position);
+            sp.zIndex = pc.sp.zIndex;
+            terrainLow.addChild(sp);
+            wallFades.push({ sp, t0: now + k * 40 });
+          }
+          pc.sp.destroy();
+        });
         wallPieces.delete(id);
+      }
+    }
+    for (let i = wallFades.length - 1; i >= 0; i--) {
+      const wf = wallFades[i]!;
+      const el = performance.now() - wf.t0;
+      const f = Math.floor(el / WALL_FADE_FRAME_MS);
+      if (f >= 4) {
+        wf.sp.destroy();
+        wallFades.splice(i, 1);
+      } else {
+        wf.sp.visible = el >= 0;
+        wf.sp.texture = wallFadeTex[Math.max(0, f)]!;
       }
     }
     // 근접 무기 휘두르기 이펙트와 레벨업 밀어내기 고리
