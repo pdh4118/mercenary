@@ -193,6 +193,9 @@ export class RoomManager {
       case "weapon":
         room.game.setWeapon(id, msg.index);
         return;
+      case "skill":
+        room.game.useSkill(id);
+        return;
       case "formation":
         room.game.setFormation(id, msg);
         return;
@@ -487,6 +490,7 @@ export class RoomManager {
         camps: room.game.snapshotCamps(),
         chests: room.game.snapshotChests(),
         meteors: room.game.snapshotMeteors(),
+        walls: room.game.snapshotWalls(),
         enemies: room.game.snapshotEnemies(),
         bullets: room.game.snapshotBullets(),
         g: room.game.info(),

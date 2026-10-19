@@ -28,6 +28,8 @@ import {
   EVT_DODGE,
   critDamageMult,
   castTimeMult,
+  EVT_SKILL,
+  type WallWire,
   meleeArc,
   meleeReach,
   EVT_CRIT,
@@ -301,6 +303,13 @@ interface Slot {
   fireCd: number;
   stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
   windT: number; // 주문(지팡이)을 외우는 남은 시간. 0이면 외우는 중이 아니다
+  skillCd: number; // 스페이스 스킬 쿨타임이 남은 시간(무기를 바꿔도 공유)
+  skillMax: number; // 마지막으로 쓴 스킬의 전체 쿨타임
+  boostT: number; // 기마 가속이 남은 시간
+  dashT: number; // 돌진·후퇴가 남은 시간
+  dashVx: number;
+  dashVy: number;
+  dashStrike: boolean; // 돌진이 끝나면 찌른다(창)
   chargeT: number; // 철퇴를 꾹 누르고 모은 시간(초). 0이면 모으는 중이 아니다
   mom: number; // 기마 주인공의 속도(0~1). 달리면 오르고 멈추면 줄어든다
   stances: number[]; // 병종별 진형 모드
@@ -406,6 +415,21 @@ interface Bullet {
   hitIds: Set<number>; // 이미 맞힌 적(관통 중 중복 피해 방지)
   poison?: number; // 독 피해 비율(화살 피해 대비, 지속 POISON_SEC초)
   merc?: Merc; // 쏜 용병(경험치를 받는다)
+  kind?: number; // 1이면 던진 철퇴(맞거나 다 날아가면 터진다)
+}
+
+/** 마법사 방벽: 적(토너먼트에서는 상대 쪽)이 지나갈 수 없고 화살을 막는다. 부서지거나 시간이 다 되면 사라진다. */
+interface Wall {
+  id: number;
+  owner: number;
+  x: number;
+  y: number;
+  ang: number; // 벽이 뻗은 방향(라디안)
+  hl: number; // 반길이
+  ht: number; // 반두께
+  hp: number;
+  maxHp: number;
+  t: number; // 남은 시간
 }
 
 interface Camp {
@@ -728,6 +752,8 @@ export class Game {
         down: false,
         revive: 0,
         invuln: 0,
+        sk: 0,
+        skMax: 0,
         shield: TUNE.HERO_SHIELD_MAX,
         shieldMax: TUNE.HERO_SHIELD_MAX,
       },
@@ -737,6 +763,13 @@ export class Game {
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
       windT: 0,
+      skillCd: 0,
+      skillMax: 0,
+      boostT: 0,
+      dashT: 0,
+      dashVx: 0,
+      dashVy: 0,
+      dashStrike: false,
       chargeT: 0,
       mom: 0,
       stances: UNIT_TYPES.map(() => STANCE_DEFEND),
@@ -960,6 +993,7 @@ export class Game {
       this.separateCross(dt);
     }
     this.terrainEnd();
+    this.stepWalls(dt);
     this.stepBullets(dt, friendlies);
     this.clampUnits();
     this.pruneCasts();
@@ -1041,7 +1075,11 @@ export class Game {
   }
 
   snapshotBullets(): BulletWire[] {
-    return this.bullets.map((b) => [b.id, round(b.x), round(b.y), b.hostile ? 1 : 0]);
+    return this.bullets.map((b) => [b.id, round(b.x), round(b.y), b.hostile ? 1 : 0, b.kind ?? 0]);
+  }
+
+  snapshotWalls(): WallWire[] {
+    return this.walls.map((w) => [w.id, round(w.x), round(w.y), round(w.ang, 100), w.hl, w.ht, Math.max(1, Math.round((w.hp / w.maxHp) * 100)), w.owner]);
   }
 
   snapshotCamps(): CampWire[] {
@@ -1979,6 +2017,9 @@ export class Game {
         continue;
       }
       p.invuln = Math.max(0, p.invuln - dt);
+      s.skillCd = Math.max(0, s.skillCd - dt);
+      p.sk = Math.round(s.skillCd * 10) / 10;
+      p.skMax = s.skillMax;
       s.fireCd = Math.max(0, s.fireCd - dt);
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
@@ -1992,10 +2033,22 @@ export class Game {
       const frozen = fighter && this.tour?.step !== "fight";
       const casting = s.windT > 0 && WEAPONS[p.weapon]!.type === MAGE; // 주문을 외우는 동안은 움직일 수 없다
       const moving = !frozen && !casting && (s.input.dx !== 0 || s.input.dy !== 0);
-      s.mom = mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
+      if (s.boostT > 0) s.boostT = Math.max(0, s.boostT - dt);
+      s.mom = mounted && s.boostT > 0 ? 1 : mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
       const bowFiring = WEAPONS[p.weapon]!.ranged && WEAPONS[p.weapon]!.type === ARCHER && s.input.fire && !frozen; // 활을 쏘는 동안은 느려진다
       const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1);
-      if (!frozen && !casting) {
+      if (frozen) s.dashT = 0;
+      if (!frozen && s.dashT > 0) {
+        // 돌진·후퇴: 입력과 상관없이 정해진 방향으로 빠르게 움직인다
+        const step = Math.min(dt, s.dashT);
+        p.x = clampToWorld(p.x + s.dashVx * step, PLAYER_RADIUS);
+        p.y = clampToWorld(p.y + s.dashVy * step, PLAYER_RADIUS);
+        s.dashT -= dt;
+        if (s.dashT <= 0 && s.dashStrike) {
+          s.dashStrike = false;
+          if (WEAPONS[p.weapon]!.type === SPEAR && !p.down) this.strikeHero(s); // 돌진 끝에 찌른다
+        }
+      } else if (!frozen && !casting) {
         p.x = clampToWorld(p.x + s.input.dx * speed * dt, PLAYER_RADIUS);
         p.y = clampToWorld(p.y + s.input.dy * speed * dt, PLAYER_RADIUS);
       }
@@ -2042,7 +2095,7 @@ export class Game {
   /** 지금 주인공의 이동 속도(기마면 달린 만큼 빨라진다) */
   private heroSpeedNow(s: Slot): number {
     const base = TUNE.PLAYER_SPEED * s.mods.heroSpeed;
-    return WEAPONS[s.state.weapon]!.type === CAVALRY ? base * (1 + (TUNE.MOUNT_SPEED_MAX - 1) * s.mom) : base;
+    return WEAPONS[s.state.weapon]!.type === CAVALRY ? base * (1 + (TUNE.MOUNT_SPEED_MAX - 1) * s.mom) * (s.boostT > 0 ? TUNE.SKILL_BOOST_MULT : 1) : base;
   }
 
   /** 되돌려받은 피해(창병에게 돌격하면 자신에게 돌아온다)를 주인공이 입는다 */
@@ -2171,7 +2224,7 @@ export class Game {
     const arc = meleeArc(w.type, w.arc, s.mods.heroArea);
     // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
     const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) : 0;
-    if (w.type === CAVALRY) s.mom *= CAV_MOMENTUM_AFTER_HIT;
+    if (w.type === CAVALRY && s.boostT <= 0) s.mom *= CAV_MOMENTUM_AFTER_HIT; // 가속 중에는 속도를 잃지 않는다
     let reflected = 0;
     if (this.phase === "tournament") {
       // 토너먼트: 상대 선수의 주인공과 용병이 대상이다
@@ -2227,6 +2280,158 @@ export class Game {
   /** 치명타 판정(공격 한 번에 한 번) */
   private rollCrit(chance: number): boolean {
     return chance > 0 && (chance >= 1 || this.rng() < chance);
+  }
+
+  // --- 스페이스 스킬 ---------------------------------------------------------------
+  private walls: Wall[] = [];
+
+  private skillCooldownOf(weapon: number): number {
+    return [TUNE.SKILL_CD_BOW, TUNE.SKILL_CD_SPEAR, TUNE.SKILL_CD_SWORD, TUNE.SKILL_CD_MACE, TUNE.SKILL_CD_STAFF, TUNE.SKILL_CD_MOUNT][weapon] ?? 10;
+  }
+
+  /**
+   * 스페이스: 지금 든 무기의 스킬을 쓴다. 쿨타임은 모든 무기가 공유한다(무기를 바꿔도 남은 시간이 이어진다).
+   * 활 후퇴 / 창 돌진 / 검 무적 / 철퇴 투척 / 지팡이 방벽 / 기마 가속.
+   */
+  useSkill(playerId: number): boolean {
+    const s = this.slots.get(playerId);
+    if (!s || s.away || s.state.down || s.skillCd > 0) return false;
+    const duel = this.phase === "tournament";
+    if (duel && !(this.isFighter(playerId) && this.tour?.step === "fight")) return false;
+    const p = s.state;
+    const widx = p.weapon;
+    const w = WEAPONS[widx]!;
+    switch (w.type) {
+      case ARCHER:
+      case SPEAR: {
+        const back = w.type === ARCHER;
+        const dist = back ? TUNE.SKILL_BACKSTEP_DIST : TUNE.SKILL_DASH_DIST;
+        const sec = back ? TUNE.SKILL_BACKSTEP_SEC : TUNE.SKILL_DASH_SEC;
+        const ang = back ? s.input.aim + Math.PI : s.input.aim;
+        s.dashT = sec;
+        s.dashVx = (Math.cos(ang) * dist) / sec;
+        s.dashVy = (Math.sin(ang) * dist) / sec;
+        s.dashStrike = !back;
+        break;
+      }
+      case SHIELD:
+        p.invuln = Math.max(p.invuln, TUNE.SKILL_INVULN_SEC);
+        break;
+      case BLUNT: {
+        const crit = this.rollCrit(s.mods.heroCrit);
+        const d = Math.max(120, Math.min(TUNE.SKILL_MACE_RANGE, s.input.dist && s.input.dist > 0 ? s.input.dist : TUNE.SKILL_MACE_RANGE * 0.7));
+        const ang = s.input.aim;
+        this.bullets.push({
+          id: this.nextEntityId++,
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(ang) * TUNE.SKILL_MACE_SPEED,
+          vy: Math.sin(ang) * TUNE.SKILL_MACE_SPEED,
+          left: d,
+          hostile: false,
+          damage: w.damage * TUNE.SKILL_MACE_DAMAGE * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1),
+          srcType: BLUNT,
+          owner: playerId,
+          radius: 16,
+          pierce: 0,
+          crit,
+          hitIds: new Set(),
+          kind: 1,
+        });
+        break;
+      }
+      case MAGE: {
+        const [x, y] = this.heroSpot(s, w); // 사거리 안의 커서 위치
+        const toward = Math.atan2(y - p.y, x - p.x);
+        this.walls = this.walls.filter((q) => q.owner !== playerId); // 한 사람에 하나
+        const maxHp = Math.max(1, p.maxHp * TUNE.SKILL_WALL_HP_MULT);
+        this.walls.push({ id: this.nextEntityId++, owner: playerId, x, y, ang: toward + Math.PI / 2, hl: TUNE.SKILL_WALL_LEN / 2, ht: TUNE.SKILL_WALL_THICK / 2, hp: maxHp, maxHp, t: TUNE.SKILL_WALL_SEC });
+        break;
+      }
+      case CAVALRY:
+        s.boostT = TUNE.SKILL_BOOST_SEC;
+        s.mom = 1;
+        break;
+      default:
+        return false;
+    }
+    s.skillCd = s.skillMax = this.skillCooldownOf(widx);
+    p.sk = s.skillCd;
+    p.skMax = s.skillMax;
+    this.pushEvent(EVT_SKILL, p.x, p.y, widx, 0, playerId);
+    return true;
+  }
+
+  /** 점이 벽 안(반경 r만큼 부풀린)에 있는가. 있으면 벽 좌표계의 (u, v)를 돌려준다. */
+  private wallLocal(w: Wall, x: number, y: number, r: number): [number, number] | null {
+    const dx = x - w.x;
+    const dy = y - w.y;
+    const c = Math.cos(w.ang);
+    const sn = Math.sin(w.ang);
+    const u = dx * c + dy * sn;
+    const v = -dx * sn + dy * c;
+    return Math.abs(u) <= w.hl + r && Math.abs(v) <= w.ht + r ? [u, v] : null;
+  }
+
+  /** 벽을 지나갈 수 없는 쪽(적, 토너먼트에서는 벽 주인이 아닌 쪽)을 벽 밖으로 밀어내고, 맞닿은 적이 벽을 갉는다 */
+  private stepWalls(dt: number): void {
+    if (this.walls.length === 0) return;
+    const duel = this.phase === "tournament";
+    for (const w of this.walls) {
+      w.t -= dt;
+      const c = Math.cos(w.ang);
+      const sn = Math.sin(w.ang);
+      const push = (o: { x: number; y: number }, r: number, dps: number): void => {
+        const loc = this.wallLocal(w, o.x, o.y, r);
+        if (!loc) return;
+        const [u, v] = loc;
+        const penU = w.hl + r - Math.abs(u);
+        const penV = w.ht + r - Math.abs(v);
+        let du = 0;
+        let dv = 0;
+        if (penV <= penU) dv = (v >= 0 ? 1 : -1) * (penV + 0.5);
+        else du = (u >= 0 ? 1 : -1) * (penU + 0.5);
+        o.x += du * c - dv * sn;
+        o.y += du * sn + dv * c;
+        w.hp -= dps * dt; // 막힌 채 공격하는 것으로 본다
+      };
+      if (!duel) {
+        for (const e of this.enemies.values()) {
+          const st = ENEMY_STATS[e.type]!;
+          push(e, radiusOf(e), e.stunT && e.stunT > 0 ? 0 : (st.damage * e.dmgMult) / Math.max(0.1, st.cooldown));
+        }
+      } else {
+        for (const m of this.mercs.values()) {
+          if (m.owner === w.owner || m.respawn > 0) continue;
+          const st = this.mercStats(m);
+          push(m, MERC_STATS[m.type]!.radius, st.damage / Math.max(0.1, st.cooldown));
+        }
+        for (const s of this.slots.values()) if (s.state.id !== w.owner && !s.state.down) push(s.state, PLAYER_RADIUS, 14);
+      }
+      if (w.hp <= 0) {
+        this.pushEvent(EVT_SKILL, w.x, w.y, 4, 2, w.owner);
+        w.t = 0;
+      }
+    }
+    this.walls = this.walls.filter((w) => w.t > 0 && w.hp > 0);
+  }
+
+  /** 던진 철퇴가 맞았거나 다 날아가 터진다: 주변의 적(토너먼트에서는 상대 쪽)이 피해를 입는다 */
+  private maceLand(b: Bullet): void {
+    const r = TUNE.SKILL_MACE_SPLASH;
+    this.pushEvent(EVT_SKILL, b.x, b.y, 3, 1, b.owner);
+    if (this.phase === "tournament") {
+      const opp = this.opponentOf(b.owner);
+      for (const f of this.collectFriendlies()) {
+        if (f.ownerId !== opp || Math.hypot(f.x - b.x, f.y - b.y) > r + f.radius) continue;
+        f.hit({ damage: b.damage, charge: 0, srcType: BLUNT, fromAngle: Math.atan2(b.y - f.y, b.x - f.x), crit: b.crit });
+      }
+      return;
+    }
+    for (const e of [...this.enemies.values()]) {
+      if (Math.hypot(e.x - b.x, e.y - b.y) > r + radiusOf(e)) continue;
+      this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: BLUNT, fromAngle: Math.atan2(b.y - e.y, b.x - e.x), crit: b.crit }, b.owner);
+    }
   }
 
   /** 무기를 바꾼다. 바꾼 직후에는 잠깐 공격할 수 없다. */
@@ -4375,6 +4580,30 @@ export class Game {
           hit = true; // 바위·폐허에 막힌다
           break;
         }
+        // 마법사 방벽: 주인 쪽이 아닌 투사체를 막고 피해만큼 부서진다
+        if (this.walls.length > 0) {
+          const wall = this.walls.find((q) => q.owner !== b.owner && this.wallLocal(q, px, py, b.radius) !== null);
+          if (wall) {
+            wall.hp -= b.damage;
+            hit = true;
+            b.x = px;
+            b.y = py;
+            break;
+          }
+        }
+        if (b.kind === 1) {
+          // 던진 철퇴: 맞히려는 대상에 닿으면 멈춰서 터진다(피해는 터질 때 한 번에)
+          const touch = this.phase === "tournament"
+            ? this.collectFriendlies().some((f) => f.ownerId === this.opponentOf(b.owner) && Math.hypot(f.x - px, f.y - py) <= b.radius + f.radius)
+            : [...this.enemies.values()].some((e) => Math.hypot(e.x - px, e.y - py) <= b.radius + radiusOf(e));
+          if (touch) {
+            hit = true;
+            b.x = px;
+            b.y = py;
+            break;
+          }
+          continue;
+        }
         if (b.hostile) {
           for (const f of friendlies) {
             if (Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
@@ -4416,6 +4645,18 @@ export class Game {
             break;
           }
         }
+      }
+      if (b.kind === 1) {
+        // 던진 철퇴는 닿았거나 목표까지 다 날아가면 그 자리에서 터진다
+        if (!hit) {
+          b.x += mx;
+          b.y += my;
+          b.left -= Math.hypot(mx, my);
+          if (b.left <= 0) hit = true;
+        }
+        if (hit) this.maceLand(b);
+        else remaining.push(b);
+        continue;
       }
       b.x += mx;
       b.y += my;

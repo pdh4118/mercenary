@@ -14,6 +14,8 @@ import {
   ARCHER as ARCHER_TYPE,
   MAGE as MAGE_TYPE,
   EVT_METEOR,
+  EVT_SKILL,
+  SKILLS,
   BLUNT as BLUNT_TYPE,
   SPEAR as SPEAR_TYPE,
   LEVELUP_PUSH_RADIUS,
@@ -382,6 +384,7 @@ async function main() {
     ready: boolean;
     x0: number; // 이전 프레임 위치(방향 계산용)
     y0: number;
+    mace?: boolean; // 던진 철퇴(빙글빙글 돈다)
   }
   // 같은 순간에 나간 화살이 많으면 하나씩 소리 내는 대신 '화살 연사' 소리 하나로 낸다
   const shotBuf: { x: number; y: number; hostile: boolean }[] = [];
@@ -398,6 +401,13 @@ async function main() {
   const bullets = new Pool<BulletView, BulletWire>(
     (w) => {
       const hostile = w[3] === 1;
+      if (w[4] === 1) {
+        // 던진 철퇴(스페이스 스킬): 에셋이 들어오기 전까지는 도형으로 그린다
+        const m = new Graphics().rect(-3, -4, 6, 30).fill({ color: 0x6b4a2b }).circle(0, -8, 12).fill({ color: 0x9096a3 }).stroke({ width: 2, color: 0x2a2d36 });
+        for (let i = 0; i < 6; i++) m.moveTo(Math.cos((i * Math.PI) / 3) * 12, -8 + Math.sin((i * Math.PI) / 3) * 12).lineTo(Math.cos((i * Math.PI) / 3) * 18, -8 + Math.sin((i * Math.PI) / 3) * 18).stroke({ width: 3, color: 0xcfd3dc });
+        bulletLayer.addChild(m);
+        return { node: m, x: 0, y: 0, hostile: false, angle: 0, ready: true, x0: w[1], y0: w[2], mace: true };
+      }
       const sprite = new Sprite((hostile ? enemyArrow : allyArrow)[2]!); // 속도선이 중간 정도인 컷
       sprite.anchor.set(0.82, 0.5); // 화살촉이 위치에 오도록
       sprite.scale.set(ARROW_SCALE);
@@ -658,7 +668,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 주인공 호위 · F2 위치 고수 · F3 돌격(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 주인공 호위 · F2 위치 고수 · F3 돌격(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -890,7 +900,25 @@ async function main() {
   const weaponHint = new Text({ text: "", style: { fill: 0xcfd3dc, fontSize: 12 } });
   weaponHint.position.set(0, 70);
   const weaponTitle = new Text({ text: "무기 전환: Q / 마우스 휠", style: { fill: 0x9aa1b0, fontSize: 11 } });
-  weaponBar.addChild(weaponTitle, weaponHint);
+  const skillText = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 12, fontWeight: "bold" } });
+  skillText.position.set(0, -26); // 무기 칸 위에 둔다(아래쪽은 도움말 줄과 겹친다)
+  const skillBarG = new Graphics();
+  skillBarG.position.set(0, -8);
+  const SKILL_BAR_W = WEAPONS.length * (SLOT_W + 4) - 4;
+  weaponBar.addChild(weaponTitle, weaponHint, skillText, skillBarG);
+  /** 스페이스 스킬: 이름·설명과 쿨타임 막대(쿨타임은 모든 무기가 공유한다) */
+  const drawSkill = (weapon: number, cd: number, cdMax: number) => {
+    const def = SKILLS[weapon]!;
+    const ready = cd <= 0;
+    skillText.text = ready ? `[스페이스] ${def.name} - ${def.note}` : `[스페이스] ${def.name} - 재사용까지 ${cd.toFixed(1)}초 (무기를 바꿔도 이어집니다)`;
+    skillText.style.fill = ready ? 0xffe08a : 0x9aa1b0;
+    skillBarG
+      .clear()
+      .roundRect(0, 0, SKILL_BAR_W, 6, 3)
+      .fill({ color: 0x000000, alpha: 0.55 })
+      .roundRect(0, 0, Math.max(6, SKILL_BAR_W * (ready ? 1 : 1 - cd / Math.max(0.1, cdMax))), 6, 3)
+      .fill({ color: ready ? 0x7be08f : 0x6a7388 });
+  };
   let shownWeapon = -1;
   const drawWeaponBar = (active: number) => {
     if (active === shownWeapon) return;
@@ -1107,6 +1135,16 @@ async function main() {
           else if (kind === EVT_METEOR) {
             blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
           }
+          else if (kind === EVT_SKILL) {
+            // 주인공 스킬: 무기 색의 고리. 던진 철퇴가 터지면 폭발 반경만큼 크게, 벽이 부서지면 작게
+            const col = TYPE_COLORS[WEAPONS[Math.round(ang)]?.type ?? 0]!;
+            const rad = val === 1 ? TUNE.SKILL_MACE_SPLASH : val === 2 ? 30 : 18;
+            const fx = new Graphics().circle(0, 0, rad).stroke({ width: val === 1 ? 5 : 3, color: col, alpha: 0.95 });
+            if (val === 1) fx.circle(0, 0, rad).fill({ color: col, alpha: 0.25 });
+            fx.position.set(x, y);
+            bulletLayer.addChild(fx);
+            hitFx.push({ node: fx, age: 0, grow: val === 0 ? 2.4 : 0.6, life: val === 1 ? 0.4 : 0.5 });
+          }
           else if (kind === EVT_REFLECT || kind === EVT_COUNTER) {
             // 가시 갑옷의 반사(주황)와 창병의 카운터(붉은 주황, 더 크게): 맞은 자리에 충격 고리와 금속음. 내 유닛과 관련되면 피해 숫자도 띄운다.
             const counter = kind === EVT_COUNTER;
@@ -1157,7 +1195,7 @@ async function main() {
   setLoading(null); // 처음 그림을 모두 불러왔다
   connect();
 
-  // 입력: WASD/방향키 이동, 마우스 조준, 마우스 버튼(또는 스페이스) 누르고 있으면 발사, 캠프 근처에서 1~3 키로 고용
+  // 입력: WASD/방향키 이동, 마우스 조준, 마우스 버튼을 누르고 있으면 발사, 스페이스는 무기별 스킬, 캠프 근처에서 1~3 키로 고용
   const cycleWeapon = (dir: number) => {
     const cur = latest?.players.find((p) => p.id === myId)?.weapon;
     if (cur === undefined) return;
@@ -1172,7 +1210,7 @@ async function main() {
   const pushInput = (force = false) => {
     const dx = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
     const dy = (keys.has("s") || keys.has("arrowdown") ? 1 : 0) - (keys.has("w") || keys.has("arrowup") ? 1 : 0);
-    const fire = firing || keys.has(" ");
+    const fire = firing; // 스페이스는 스킬이다(마우스 버튼으로만 공격한다)
     const aim = Math.round(readAim() * 100) / 100;
     const revive = keys.has("e");
     const dist = Math.round(Math.hypot(mouseX - app.screen.width / 2, mouseY - app.screen.height / 2) / 8) * 8; // 마법사 지팡이가 운석을 떨어뜨릴 거리
@@ -1226,6 +1264,12 @@ async function main() {
       else if (e.key === "F2") {
         if (me) send({ t: "hold", x: me.x, y: me.y, types: typesField() });
       } else if (e.key === "F3") setStance(1);
+      return;
+    }
+    // 스페이스: 살아 있으면 지금 든 무기의 스킬(쿨타임은 무기를 바꿔도 공유). 쓰러져 있으면 아래의 관전 전환.
+    if (e.key === " " && !latest?.players.find((p) => p.id === myId)?.down) {
+      e.preventDefault();
+      if (!e.repeat) send({ t: "skill" });
       return;
     }
     // 쓰러져 있을 때 스페이스: 관전 시작/끝, 관전 중 Tab(또는 ←/→): 다음 동료 보기
@@ -1581,6 +1625,11 @@ async function main() {
       setPoison(v.sprite, w[12] === 1);
     });
     bullets.update(latest.bullets, k, (v, w) => {
+      if (v.mace) {
+        v.node.rotation += 0.4; // 빙글빙글 돈다
+        v.node.visible = true;
+        return;
+      }
       // 이동한 방향으로 화살을 돌린다
       const dx = w[1] - v.x0;
       const dy = w[2] - v.y0;
@@ -1946,10 +1995,21 @@ async function main() {
       } else b.boom.visible = false;
     }
 
+    // 마법사 방벽(스페이스 스킬): 얇은 벽. 내구도가 줄면 투명해지고 금이 간다
+    for (const wl of latest.walls ?? []) {
+      const [, wx, wy, wa, hl, ht, hpPct, wowner] = wl;
+      const cs = Math.cos(wa);
+      const sn = Math.sin(wa);
+      const pts = ([[-hl, -ht], [hl, -ht], [hl, ht], [-hl, ht]] as const).flatMap(([u, vv]) => [wx + u * cs - vv * sn, wy + u * sn + vv * cs]);
+      const frac = hpPct / 100;
+      fxLayer.poly(pts).fill({ color: 0xa9c7ff, alpha: 0.25 + 0.4 * frac }).stroke({ width: 3, color: wowner === myId ? 0xffe08a : 0xe8f0ff, alpha: 0.9 });
+      if (frac < 0.6) fxLayer.moveTo(wx - sn * 0 - cs * hl * 0.4, wy - sn * hl * 0.4).lineTo(wx + cs * hl * 0.1 - sn * ht, wy + sn * hl * 0.1 + cs * ht).stroke({ width: 2, color: 0x1a2336, alpha: 0.8 });
+    }
     // 근접 무기 휘두르기 이펙트와 레벨업 밀어내기 고리
     for (const p of latest.players) {
       const w = WEAPONS[p.weapon]!;
       const v = players.views.get(p.id);
+      if (v && p.invuln > 0 && !p.down) fxLayer.circle(v.x, v.y, 27 + 2 * Math.sin(performance.now() / 90)).stroke({ width: 3, color: 0x9be8ff, alpha: 0.85 }).circle(v.x, v.y, 24).fill({ color: 0x9be8ff, alpha: 0.12 }); // 무적
       const reachNow = p.hs?.[2] || w.reach; // 사거리·범위 카드가 반영된 값(철퇴는 범위가 사거리로 간다)
       const arcNow = meleeArc(w.type, w.arc, p.hs?.[6] || 1);
       if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
@@ -2102,6 +2162,7 @@ async function main() {
       showOffer(meState.offer, meState.pending, meState.rerolls, meState.box ?? 0);
       weaponBar.visible = true;
       drawWeaponBar(meState.weapon);
+      drawSkill(meState.weapon, meState.sk ?? 0, meState.skMax ?? 0);
       if (lastLevel > 0 && meState.level > lastLevel) {
         levelToast.text = `레벨 ${meState.level}!`;
         levelToastLeft = 2;
@@ -2258,7 +2319,7 @@ async function main() {
     levelToastLeft = Math.max(0, levelToastLeft - ticker.deltaMS / 1000);
     levelToast.visible = levelToastLeft > 0;
     levelToast.position.set(app.screen.width / 2, 100);
-    weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 100);
+    weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 118);
     // 캠프 고용창은 오른쪽 위에 뜨고, 레벨업 카드가 함께 떠 있으면 카드를 그 아래로 내린다
     const campBottom = campPanel.visible ? 52 + campPanel.height + 10 : 0;
     cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(90, campBottom, app.screen.height / 2 - 230));

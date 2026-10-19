@@ -58,6 +58,19 @@ export const WEAPONS: readonly WeaponDef[] = [
   { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 100, cooldown: 1.5, windup: 2.5, splash: 130, note: "마우스 위치에 운석 · 2.5초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
   { name: "기마", type: CAVALRY, ranged: false, reach: 80, arc: rad(80), damage: 11, cooldown: 0.65, windup: 0, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창에 먼저 맞으면 속도를 잃고 카운터" },
 ];
+/** 스페이스 스킬(WEAPONS와 같은 순서). 쿨타임은 모든 무기가 공유해서, 무기를 바꿔도 남은 시간이 이어진다. */
+export interface SkillDef {
+  name: string;
+  note: string;
+}
+export const SKILLS: readonly SkillDef[] = [
+  { name: "후퇴", note: "뒤로 살짝 물러난다" }, // 활
+  { name: "돌진", note: "조준한 방향으로 돌진해 찌른다" }, // 창
+  { name: "무적", note: "1초간 피해를 받지 않는다" }, // 검
+  { name: "투척", note: "커서 위치로 철퇴를 던져 폭발시킨다" }, // 철퇴
+  { name: "방벽", note: "사거리 안 커서 위치에 얇은 벽을 세운다" }, // 지팡이
+  { name: "가속", note: "2초간 최고 속도로 달린다" }, // 기마
+];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
 export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간
 
@@ -104,7 +117,9 @@ export interface PlayerState {
   chargeY: number;
   down: boolean; // 쓰러짐(스스로 일어나지 못하고, 동료가 부활시켜야 한다)
   revive: number; // 부활 진행도 0..1
-  invuln: number; // 부활 직후 무적 남은 시간(초)
+  invuln: number; // 부활 직후·스킬 무적 남은 시간(초)
+  sk: number; // 스페이스 스킬 쿨타임이 남은 시간(초, 무기를 바꿔도 공유)
+  skMax: number; // 마지막으로 쓴 스킬의 전체 쿨타임(초)
   shield: number; // 검을 들었을 때의 방패 체력(무기를 바꿔도 값은 유지, 검일 때만 막는다)
   shieldMax: number;
 }
@@ -164,6 +179,7 @@ export const EVT_DMG_POISON = 16; // 독이 적에게 준 피해(보라색 숫�
 export const EVT_DMG_POISON_ALLY = 17; // 독이 아군(주인공·용병)에게 준 피해(보라색 숫자)
 export const EVT_COUNTER = 15; // 달려오던 기병이 창에 먼저 맞아 속도를 잃고 카운터를 입음(val = 카운터 피해)
 export const EVT_METEOR = 13; // 운석이 떨어져 폭발함(val = 반경)
+export const EVT_SKILL = 18; // 주인공 스킬을 씀(ang = 무기 번호, val = 0 발동 / 1 철퇴가 떨어져 터짐 / 2 벽이 부서짐)
 // 피해 숫자: val은 피해량, owner는 때린 쪽(적에게 준 피해) 또는 맞은 쪽(받은 피해) 플레이어. 같은 대상에게 한 틱에 들어간 피해는 합쳐서 보낸다.
 export const EVT_DMG_ENEMY = 8; // 아군이 적의 몸에 준 피해
 export const EVT_DMG_ENEMY_CRIT = 9; // 같은데 치명타
@@ -226,7 +242,9 @@ export interface ResultPlayer {
   champion: number; // 토너먼트 우승 횟수
 }
 
-export type BulletWire = [id: number, x: number, y: number, team: 0 | 1]; // team 1 = 적 투사체
+export type BulletWire = [id: number, x: number, y: number, team: 0 | 1, kind: number]; // team 1 = 적 투사체, kind 0 = 화살, 1 = 던진 철퇴
+/** 마법사 방벽: id, x, y, 각도(라디안), 반길이, 반두께, 남은 내구도 비율 0..100, 주인 번호 */
+export type WallWire = [id: number, x: number, y: number, ang: number, hl: number, ht: number, hp: number, owner: number];
 /** 보스 보상 상자: id, x, y, 주인 번호, 남은 초 */
 /** 마법사가 주문을 외우는 중인 운석: 시전자 키(용병 번호, 주인공은 -번호), x, y, 진행도(0~100), 반경, 주인 번호(0이면 적), 전체 주문 시간(0.1초 단위) */
 export type MeteorWire = [key: number, x: number, y: number, progress: number, radius: number, owner: number, total: number];
@@ -284,6 +302,7 @@ export type ClientMsg =
   | { t: "input"; dx: number; dy: number; aim: number; fire: boolean; revive?: boolean; dist?: number }
   | { t: "buy"; camp: number; slot: number }
   | { t: "weapon"; index: number } // 무기 변경(WEAPONS 인덱스)
+  | { t: "skill" } // 스페이스: 지금 든 무기의 스킬
   | { t: "formation"; zones: number[]; spacing: number } // 진형 변경(병종별 구역 + 간격)
   | { t: "pick"; index: number } // 레벨업 카드 선택(0..2)
   | { t: "reroll" } // 지금 제시된 카드를 새로 뽑는다(새로고침 1회 소모)
@@ -318,6 +337,7 @@ export type ServerMsg =
       camps: CampWire[];
       chests: ChestWire[];
       meteors?: MeteorWire[];
+      walls?: WallWire[];
     };
 
 /** 클라이언트 입력은 신뢰하지 않는다: 범위를 자르고, 대각선 속도가 빨라지지 않게 정규화한다. */

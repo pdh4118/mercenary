@@ -1,0 +1,166 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
+import { Game } from "../src/game.js";
+
+const run = (g: Game, sec: number) => {
+  for (let i = 0; i < Math.round(sec * TICK_RATE); i++) g.step();
+};
+const quiet = () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  return g;
+};
+const idle = { dx: 0, dy: 0, aim: 0, fire: false };
+type E = { hp: number; maxHp: number; x: number; y: number };
+const dummy = (g: Game, x: number, y: number, type = 1): number => {
+  const id = g.spawnEnemyAt(x, y, type);
+  const e = (g as unknown as { enemies: Map<number, E> }).enemies.get(id)!;
+  e.hp = e.maxHp = 5000;
+  return id;
+};
+const start = (weapon: number) => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.setWeapon(a, weapon);
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  return { g, a, p: g.getPlayer(a)! };
+};
+
+test("스킬 쿨타임은 무기를 바꿔도 공유된다", () => {
+  const { g, a } = start(0);
+  assert.equal(g.useSkill(a), true);
+  assert.ok(g.getPlayer(a)!.sk > 5 && g.getPlayer(a)!.skMax === TUNE.SKILL_CD_BOW);
+  g.setWeapon(a, 2);
+  run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+  assert.equal(g.useSkill(a), false, "다른 무기로 바꿔도 쿨타임이 남아 있다");
+  run(g, TUNE.SKILL_CD_BOW);
+  assert.equal(g.useSkill(a), true, "쿨타임이 끝나면 다른 무기의 스킬을 쓴다");
+  assert.equal(g.getPlayer(a)!.skMax, TUNE.SKILL_CD_SWORD, "쓴 스킬의 쿨타임으로 바뀐다");
+});
+
+test("쓰러져 있으면 스킬을 쓸 수 없다", () => {
+  const { g, a } = start(1);
+  g.getPlayer(a)!.down = true;
+  assert.equal(g.useSkill(a), false);
+});
+
+test("활 스킬: 조준 반대쪽으로 살짝 물러난다", () => {
+  const { g, a, p } = start(0);
+  const x0 = p.x;
+  g.setInput(a, { ...idle, aim: 0 });
+  g.useSkill(a);
+  run(g, 0.4);
+  assert.ok(Math.abs(x0 - g.getPlayer(a)!.x - TUNE.SKILL_BACKSTEP_DIST) < 3, `${x0 - g.getPlayer(a)!.x}`);
+});
+
+test("창 스킬: 조준 방향으로 일정 거리 돌진하고 끝에 찌른다", () => {
+  const { g, a, p } = start(1);
+  const x0 = p.x;
+  const e = dummy(g, x0 + TUNE.SKILL_DASH_DIST + 60, p.y);
+  g.setInput(a, { ...idle, aim: 0 });
+  g.useSkill(a);
+  run(g, 0.5);
+  assert.ok(Math.abs(g.getPlayer(a)!.x - x0 - TUNE.SKILL_DASH_DIST) < 3);
+  assert.ok(g.getEnemy(e)!.hp < 5000, "돌진이 끝나면 앞의 적을 찌른다");
+});
+
+test("검 스킬: 1초간 피해를 받지 않는다", () => {
+  const { g, a } = start(2);
+  g.useSkill(a);
+  const hero = (g as unknown as { collectFriendlies(): { ownerId: number; hit(h: unknown): number }[] }).collectFriendlies().find((f) => f.ownerId === a)!;
+  const hp0 = g.getPlayer(a)!.hp;
+  hero.hit({ damage: 30, charge: 0, srcType: 1, fromAngle: 0 });
+  assert.equal(g.getPlayer(a)!.hp, hp0, "무적 중에는 맞아도 피해가 없다");
+  run(g, TUNE.SKILL_INVULN_SEC + 0.2);
+  assert.equal(g.getPlayer(a)!.invuln, 0);
+  const hero2 = (g as unknown as { collectFriendlies(): { ownerId: number; hit(h: unknown): number }[] }).collectFriendlies().find((f) => f.ownerId === a)!;
+  hero2.hit({ damage: 30, charge: 0, srcType: 1, fromAngle: 3 });
+  assert.ok(g.getPlayer(a)!.hp < hp0, "끝나면 다시 맞는다");
+  assert.equal(WEAPONS[2]!.type, SHIELD);
+});
+
+test("철퇴 스킬: 커서 위치로 던져 터지면 주변 적이 함께 피해를 입는다", () => {
+  const { g, a, p } = start(3);
+  const near = dummy(g, p.x + 300, p.y);
+  const near2 = dummy(g, p.x + 300, p.y + 50);
+  const far = dummy(g, p.x + 300, p.y + 300);
+  g.setInput(a, { ...idle, aim: 0, dist: 300 });
+  g.useSkill(a);
+  assert.equal(g.getEnemy(near)!.hp, 5000, "던진 직후에는 맞지 않았다");
+  run(g, 1.2);
+  const dealt = 5000 - g.getEnemy(near)!.hp;
+  assert.ok(dealt >= WEAPONS[3]!.damage * TUNE.SKILL_MACE_DAMAGE * 0.9, `피해 ${dealt}`);
+  assert.ok(g.getEnemy(near2)!.hp < 5000, "폭발 반경 안의 적도 맞는다");
+  assert.equal(g.getEnemy(far)!.hp, 5000, "먼 적은 맞지 않는다");
+  assert.ok(g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] === 1), "터지는 이벤트");
+});
+
+test("철퇴 스킬: 맞는 것이 없으면 커서 거리에서 터진다", () => {
+  const { g, a } = start(3);
+  g.setInput(a, { ...idle, aim: 0, dist: 200 });
+  g.useSkill(a);
+  assert.equal(g.snapshotBullets().length, 1);
+  assert.equal(g.snapshotBullets()[0]![4], 1, "던진 철퇴로 구분된다");
+  run(g, 1);
+  assert.equal(g.snapshotBullets().length, 0);
+});
+
+test("기마 스킬: 2초간 최고 속도로 달리고 속도를 잃지 않는다", () => {
+  const dist = (skill: boolean) => {
+    const { g, a, p } = start(5);
+    const x0 = p.x;
+    if (skill) g.useSkill(a);
+    g.setInput(a, { ...idle, dx: 1 });
+    run(g, 0.6);
+    return g.getPlayer(a)!.x - x0;
+  };
+  assert.ok(dist(true) > dist(false) * 1.3, "가속하지 않을 때보다 훨씬 멀리 간다");
+  const { g, a } = start(5);
+  g.useSkill(a);
+  g.setInput(a, { ...idle, dx: 1 });
+  run(g, TUNE.SKILL_BOOST_SEC + 0.3);
+  const slot = (g as unknown as { slots: Map<number, { boostT: number }> }).slots.get(a)!;
+  assert.equal(slot.boostT, 0, "2초가 지나면 끝난다");
+});
+
+test("지팡이 스킬: 커서 위치에 수직으로 벽이 서고, 내구도는 주인공 체력에 비례하며, 적을 막고 시간이 지나면 사라진다", () => {
+  const { g, a, p } = start(4);
+  g.setInput(a, { ...idle, aim: 0, dist: 200 });
+  g.useSkill(a);
+  const w = g.snapshotWalls();
+  assert.equal(w.length, 1);
+  assert.ok(Math.abs(w[0]![1] - (p.x + 200)) < 1 && Math.abs(w[0]![3] - Math.PI / 2) < 0.02, "커서 위치, 조준선에 수직");
+  const wall = (g as unknown as { walls: { hp: number; maxHp: number }[] }).walls[0]!;
+  assert.ok(Math.abs(wall.maxHp - p.maxHp * TUNE.SKILL_WALL_HP_MULT) < 1e-6, "주인공 체력에 비례");
+  // 벽 너머 적이 주인공을 향해 와도 통과하지 못한다
+  const e = g.spawnEnemyAt(p.x + 330, p.y, SHIELD);
+  (g.getEnemy(e) as { stunT?: number }).stunT = 0;
+  let inside = 0;
+  let blocked = 0;
+  for (let i = 0; i < 3 * TICK_RATE; i++) {
+    g.step();
+    const en = g.getEnemy(e)!;
+    if (Math.abs(en.x - (p.x + 200)) < w[0]![5] && Math.abs(en.y - p.y) < w[0]![4]) inside++; // 몸 중심이 벽 안에 들어갔다
+    if (Math.abs(en.x - (p.x + 200)) < w[0]![5] + 20 && Math.abs(en.y - p.y) < w[0]![4]) blocked++; // 벽에 바짝 붙어 있었다
+  }
+  assert.equal(inside, 0, "벽을 통과하지 못한다(옆으로 돌아간다)");
+  assert.ok(blocked > 0, "벽에 막혀 붙어 있던 때가 있다");
+  run(g, TUNE.SKILL_WALL_SEC);
+  assert.equal(g.snapshotWalls().length, 0, "시간이 지나면 사라진다");
+});
+
+test("방벽은 적의 화살을 막고 피해만큼 부서진다", () => {
+  const { g, a, p } = start(4);
+  g.setInput(a, { ...idle, aim: 0, dist: 200 });
+  g.useSkill(a);
+  const wall = (g as unknown as { walls: { hp: number; maxHp: number }[] }).walls[0]!;
+  // 적 화살을 벽 뒤에서 쏜다
+  (g as unknown as { bullets: unknown[] }).bullets.push({
+    id: 9999, x: p.x + 300, y: p.y, vx: -400, vy: 0, left: 600, hostile: true, damage: 10, srcType: 2, owner: 0, radius: 5, pierce: 0, crit: false, hitIds: new Set(),
+  });
+  const hp0 = g.getPlayer(a)!.hp;
+  run(g, 1);
+  assert.equal(g.getPlayer(a)!.hp, hp0, "주인공은 맞지 않는다");
+  assert.ok(wall.hp < wall.maxHp, "벽이 대신 맞았다");
+});
