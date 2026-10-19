@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>머서너리 변경사항 총정리</title>
+    <style>
+      :root { --bg: #14161c; --panel: #1d2029; --line: #343949; --text: #e6e9f0; --muted: #9aa1b0; --gold: #e0c05d; --up: #8fd39a; --down: #ff9b8f; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 14px; }
+      header { position: sticky; top: 0; z-index: 5; background: #0f1015; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      header h1 { margin: 0; font-size: 18px; color: var(--gold); margin-right: 8px; }
+      header a { color: var(--muted); font-size: 13px; text-decoration: none; }
+      header a:hover { color: var(--text); }
+      main { max-width: 900px; margin: 0 auto; padding: 16px; }
+      .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+      .controls label { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+      input[type="date"] { padding: 6px 8px; font-size: 14px; color: var(--text); background: #12141a; border: 1px solid #3a4052; border-radius: 6px; color-scheme: dark; }
+      button { white-space: nowrap; padding: 6px 12px; font-size: 13px; color: var(--text); background: #2c3140; border: 1px solid #3f4659; border-radius: 8px; cursor: pointer; }
+      button:hover { background: #384056; }
+      .summary { margin: 14px 2px 6px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+      .summary b { color: var(--text); }
+      section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 14px; overflow: hidden; }
+      section > h2 { margin: 0; padding: 10px 14px; font-size: 15px; background: #232838; display: flex; justify-content: space-between; gap: 8px; }
+      section > h2 .cnt { color: var(--muted); font-weight: 400; font-size: 12px; }
+      ul { list-style: none; margin: 0; padding: 0; }
+      li { padding: 8px 14px; border-top: 1px solid #262a37; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+      li .k { flex: 1 1 220px; min-width: 0; }
+      li .v { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+      li .v .arrow { color: var(--muted); margin: 0 6px; font-weight: 400; }
+      li .v .to { color: var(--gold); }
+      li .n { color: var(--muted); font-size: 11px; }
+      li.text { color: #cfd3dc; }
+      .empty { padding: 24px; text-align: center; color: var(--muted); }
+      .vlist { margin-top: 14px; font-size: 12px; color: var(--muted); line-height: 1.8; }
+      .vlist span { display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 6px; background: #232838; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>변경사항 총정리</h1>
+      <a href="/">← 게임으로</a>
+    </header>
+    <main>
+      <div class="controls">
+        <label>시작 <input type="date" id="from" /></label>
+        <label>끝 <input type="date" id="to" /></label>
+        <button id="all">전체</button>
+        <button id="d3">최근 3일</button>
+        <button id="d7">최근 7일</button>
+      </div>
+      <div class="summary" id="summary"></div>
+      <div id="out"></div>
+      <div class="vlist" id="vlist"></div>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const CATS = ["밸런스", "신규", "개선", "수정", "그래픽", "소리", "시스템"]; // 수치 변경(밸런스)을 먼저
+      let versions = []; // 오래된 것부터
+      const fmt = (v, u) => (typeof v === "number" ? String(Math.round(v * 1000) / 1000) + u : String(v));
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+      /** 기간 안의 변경을 합친다: 같은 항목(k)은 처음 값 → 마지막 값 하나로, 문장은 그대로 */
+      function summarize(list) {
+        const nums = new Map(); // `${분류}|${항목}` -> {c, k, f, to, u, n, first, last}
+        const texts = [];
+        for (const v of list) {
+          for (const ch of v.changes) {
+            if (ch.k !== undefined) {
+              const key = ch.c + "|" + ch.k;
+              const cur = nums.get(key);
+              if (!cur) nums.set(key, { c: ch.c, k: ch.k, f: ch.f, to: ch.to, u: ch.u || "", n: 1, first: v.version, last: v.version });
+              else {
+                cur.to = ch.to;
+                cur.n++;
+                cur.last = v.version;
+              }
+            } else texts.push({ c: ch.c, t: ch.t, version: v.version });
+          }
+        }
+        return { nums: [...nums.values()], texts };
+      }
+
+      function render() {
+        const from = $("from").value;
+        const to = $("to").value;
+        const list = versions.filter((v) => (!from || v.date >= from) && (!to || v.date <= to));
+        const { nums, texts } = summarize(list);
+        const kept = nums.filter((n) => !(n.f === n.to)); // 오르내리다 제자리면 변화 없음
+        const total = kept.length + texts.length;
+        $("summary").innerHTML = list.length
+          ? `<b>${esc(list[0].version)}</b> ~ <b>${esc(list[list.length - 1].version)}</b> (${list.length}개 업데이트, ${esc(list[0].date)} ~ ${esc(list[list.length - 1].date)}) · 수치 변경 <b>${kept.length}</b>건, 그 밖의 변경 <b>${texts.length}</b>건`
+          : "";
+        const out = [];
+        for (const c of CATS) {
+          const ns = kept.filter((n) => n.c === c);
+          const ts = texts.filter((t) => t.c === c);
+          if (!ns.length && !ts.length) continue;
+          const rows = [];
+          for (const n of ns) {
+            rows.push(`<li><span class="k">${esc(n.k)}${n.n > 1 ? ` <span class="n">(${n.n}번 조정)</span>` : ""}</span><span class="v"><span>${esc(fmt(n.f, n.u))}</span><span class="arrow">→</span><span class="to">${esc(fmt(n.to, n.u))}</span></span></li>`);
+          }
+          for (const t of ts) rows.push(`<li class="text"><span class="k">${esc(t.t)} <span class="n">${esc(t.version)}</span></span></li>`);
+          out.push(`<section><h2>${esc(c)} <span class="cnt">${ns.length + ts.length}건</span></h2><ul>${rows.join("")}</ul></section>`);
+        }
+        $("out").innerHTML = total ? out.join("") : `<div class="empty">이 기간에는 변경사항이 없습니다.</div>`;
+        $("vlist").innerHTML = list.length ? "포함된 버전: " + list.map((v) => `<span>${esc(v.version)}</span>`).join("") : "";
+      }
+
+      const ymd = (d) => d.toISOString().slice(0, 10);
+      function setRange(days) {
+        const last = versions[versions.length - 1].date;
+        const end = new Date(last + "T00:00:00Z");
+        const start = new Date(end.getTime() - (days - 1) * 86400000);
+        $("from").value = days ? ymd(start) : versions[0].date;
+        $("to").value = last;
+        render();
+      }
+      fetch("changelog.json")
+        .then((r) => r.json())
+        .then((d) => {
+          versions = [...d.versions].reverse(); // 파일은 최신이 위, 여기서는 오래된 순
+          $("all").onclick = () => setRange(0);
+          $("d3").onclick = () => setRange(3);
+          $("d7").onclick = () => setRange(7);
+          $("from").onchange = $("to").onchange = render;
+          setRange(7);
+        })
+        .catch(() => ($("out").innerHTML = `<div class="empty">변경 기록을 불러오지 못했습니다.</div>`));
+    </script>
+  </body>
+</html>

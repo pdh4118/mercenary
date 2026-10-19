@@ -293,6 +293,60 @@ export function createLobby(opts: Options): Lobby {
             : "방장이 다시 시작하기를 기다리는 중입니다.";
   }
 
+  /** 업데이트 내역: changelog.json(최신이 위)을 불러와 로비에 버전을 표시하고 내역 창을 채운다 */
+  interface ChangelogItem { c: string; t: string; k?: string; f?: number | string; to?: number | string; u?: string }
+  interface ChangelogVersion { version: string; date: string; title: string; changes: ChangelogItem[] }
+  function initChangelog(): void {
+    fetch("changelog.json")
+      .then((r) => r.json())
+      .then((d: { versions: ChangelogVersion[] }) => {
+        const vs = d.versions;
+        if (vs.length === 0) return;
+        $("verTag").textContent = vs[0]!.version;
+        $("clVer").textContent = vs[0]!.version;
+        const box = $("clList");
+        box.replaceChildren();
+        const fmtV = (v: number | string | undefined, u: string): string => (typeof v === "number" ? `${Math.round(v * 1000) / 1000}${u}` : String(v ?? ""));
+        for (const v of vs) {
+          const el = document.createElement("div");
+          el.className = "ver";
+          const head = document.createElement("div");
+          head.className = "vh";
+          const b = document.createElement("b");
+          b.textContent = v.version;
+          const date = document.createElement("span");
+          date.className = "date";
+          date.textContent = v.date;
+          head.append(b, date);
+          const title = document.createElement("div");
+          title.className = "vt";
+          title.textContent = v.title;
+          const ul = document.createElement("ul");
+          for (const ch of v.changes) {
+            const li = document.createElement("li");
+            const cat = document.createElement("span");
+            cat.className = `cat c${ch.c}`;
+            cat.textContent = ch.c;
+            const text = document.createElement("span");
+            if (ch.k !== undefined) {
+              text.append(`${ch.k} `);
+              const num = document.createElement("span");
+              num.className = "num";
+              num.textContent = `${fmtV(ch.f, ch.u ?? "")} → ${fmtV(ch.to, ch.u ?? "")}`;
+              text.append(num);
+            } else text.textContent = ch.t;
+            li.append(cat, text);
+            ul.append(li);
+          }
+          el.append(head, title, ul);
+          box.append(el);
+        }
+      })
+      .catch(() => {
+        $("verTag").textContent = "";
+      });
+  }
+
   function renderRecords(): void {
     const box = $("recordList");
     box.replaceChildren();
@@ -369,6 +423,9 @@ export function createLobby(opts: Options): Lobby {
     else openRecords();
   };
   $("lobbyRecords").onclick = openRecords;
+  initChangelog();
+  $("lobbyChangelog").onclick = () => $("changelogPanel").classList.add("open");
+  $("clClose").onclick = () => $("changelogPanel").classList.remove("open");
   $("recordClose").onclick = () => recordEl.classList.remove("open");
   $("recordClear").onclick = () => {
     if (confirm("저장된 기록을 모두 지울까요?")) {

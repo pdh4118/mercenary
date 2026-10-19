@@ -42,6 +42,19 @@
       .check { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; font-size: 14px; cursor: pointer; }
       .check input { width: 16px; height: 16px; accent-color: #d7a24d; align-self: center; }
       .tag.ready { background: #1f3a26; color: #7be08f; }
+      #clList .ver { padding: 10px 12px; border-bottom: 1px solid #262a37; }
+      #clList .ver:last-child { border-bottom: none; }
+      #clList .vh { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+      #clList .vh b { color: #e0c05d; font-size: 14px; }
+      #clList .vh .date { color: #7d8496; font-size: 11px; }
+      #clList .vt { margin-top: 2px; font-size: 13px; color: #e6e9f0; }
+      #clList ul { margin: 6px 0 0; padding: 0; list-style: none; }
+      #clList li { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: #b8bdc9; padding: 2px 0; line-height: 1.5; }
+      #clList li .cat { flex: none; min-width: 34px; text-align: center; font-size: 10px; padding: 0 5px; border-radius: 5px; background: #2a2f3d; color: #9aa1b0; }
+      #clList li .cat.c신규 { background: #1f3a26; color: #7be08f; }
+      #clList li .cat.c밸런스 { background: #3a3320; color: #e0c05d; }
+      #clList li .cat.c수정 { background: #3a2a2a; color: #ff9b8f; }
+      #clList li .num { white-space: nowrap; font-variant-numeric: tabular-nums; color: #e0c05d; }
       .stat { color: #9aa1b0; font-size: 12px; white-space: nowrap; }
       #resultPanel { z-index: 12; } /* 저장된 기록을 볼 때 기록 목록 위에 뜬다 */
       #tourBanner { position: fixed; top: 6px; left: 50%; transform: translateX(-50%); z-index: 7; display: none; min-width: 420px; max-width: calc(100vw - 420px); padding: 8px 16px 10px; text-align: center; background: rgba(10,11,15,.86); border: 2px solid #e0c05d; border-radius: 12px; color: #e6e9f0; pointer-events: none; }
@@ -125,7 +138,7 @@
 
     <div id="lobby" class="overlay open">
       <div class="panel">
-        <h1>머서너리</h1>
+        <h1>머서너리 <span id="verTag" class="tag" style="vertical-align: middle; font-size: 12px"></span></h1>
         <p class="sub">용병을 고용해 몰려오는 적에 맞서는 협동 서바이벌 (최대 8명)</p>
 
         <h2>이름</h2>
@@ -152,7 +165,7 @@
 
         <h2>열려 있는 방</h2>
         <div id="lobbyList" class="list"></div>
-        <div class="row" style="margin-top: 14px"><button id="lobbyRecords">최근 기록 보기</button></div>
+        <div class="row" style="margin-top: 14px"><button id="lobbyRecords">최근 기록 보기</button><button id="lobbyChangelog">업데이트 내역</button></div>
         <div id="lobbyError" class="error"></div>
       </div>
     </div>
@@ -187,6 +200,18 @@
           <button id="resultClose">계속하기</button>
           <button id="resultLeave" class="danger">방 나가기</button>
           <button id="resultRematch" class="primary">다시 하기</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="changelogPanel" class="overlay">
+      <div class="panel" style="width: min(640px, calc(100vw - 32px))">
+        <h1>업데이트 내역 <span id="clVer" class="tag" style="vertical-align: middle; font-size: 12px"></span></h1>
+        <p class="sub">최신 업데이트가 위에 있습니다. 수치는 '이전 → 이후'로 표시합니다.</p>
+        <div id="clList" class="list" style="max-height: 440px"></div>
+        <div class="row" style="justify-content: space-between; margin-top: 12px">
+          <a id="clSummary" href="changelog.html" target="_blank" rel="noopener" style="color: #e0c05d; font-size: 13px">기간별 변경사항 총정리 보기 →</a>
+          <button id="clClose" class="primary">닫기</button>
         </div>
       </div>
     </div>

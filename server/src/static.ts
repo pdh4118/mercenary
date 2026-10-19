@@ -56,7 +56,7 @@ export function serveStatic(root: string, req: IncomingMessage, res: ServerRespo
   const hashed = file.includes(`${sep}assets${sep}`) && /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/.test(file);
   res.writeHead(200, {
     "Content-Type": TYPES[ext] ?? "application/octet-stream",
-    "Cache-Control": hashed ? "public, max-age=31536000, immutable" : ext === ".html" ? "no-cache" : "public, max-age=3600",
+    "Cache-Control": hashed ? "public, max-age=31536000, immutable" : ext === ".html" || ext === ".json" ? "no-cache" : "public, max-age=3600",
     "X-Content-Type-Options": "nosniff",
   });
   if (req.method === "HEAD") {
