@@ -497,6 +497,84 @@ python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_mace
 
 **만드는 순서**: A의 철퇴 → B의 충격 → 소리 → A의 궤적(없어도 됨). 철퇴는 이미 만든 스킬 아이콘(`skill_icon_mace`)과 모양(가시 쇠공 + 나무 자루)이 같아야 어울리니 **아이콘도 참고 이미지로 첨부**하세요.
 
+#### 11-1-3. 기마 가속 속도 이펙트 (애니메이션 4세트)
+
+이전의 **속도선 세 줄**(기병 뒤 선)은 속도감이 없어서 없앴고, 그 자리를 **여러 장면으로 움직이는 이펙트**로 대신합니다. 기마 스킬 **가속**(2초 동안 최고 속도, 공격하면 해제)을 쓰는 동안 **말 뒤에 바람 궤적이 흐르고, 발굽에서 흙먼지가 튀며**, 시작할 때 폭발하듯 퍼지고, 공격으로 풀릴 때 가속이 빠지는 느낌을 줍니다.
+
+**방향 규칙(중요)**: 기병은 8방향으로 달리므로, 이펙트는 모두 **오른쪽(→)으로 달릴 때를 기준**으로 그려 주세요. **효과가 몸 왼쪽(뒤)으로 길게 늘어지게** 그립니다. 게임이 달리는 방향의 반대쪽으로 돌려서 붙입니다(그래서 위쪽·아래쪽이 대칭에 가깝고 방향성 없는 소용돌이가 좋습니다).
+**움직임 규칙**: 반복(루프) 세트는 **마지막 컷에서 첫 컷으로 이어질 때 튀지 않게** 같은 위치·같은 크기에서 모양만 흘러가듯 바뀌게 그려 주세요(각 컷이 앞 컷에서 조금씩 뒤로 밀려난 모양).
+**그림체**: 게임 유닛과 같게. 굵지 않은 어두운 윤곽선(2px 느낌) 또는 윤곽 없이 흰색 중심, 면이 단순한 평평한 색, 사실적인 연기·그라데이션 금지. 색은 **흰색~연한 하늘색**(바람)과 **따뜻한 흙색**(먼지)만 씁니다. 유닛 시트를 스타일 기준 이미지로 첨부하고, 투명 배경 또는 단색 회색 배경으로 받습니다(지우는 건 제가 합니다). 네거티브: `realistic smoke, photo, 3d render, text, characters, horse, rider, background scenery`.
+
+각 프롬프트 앞에 **시트 요청 머리말**을 붙입니다.
+
+**A. 바람 궤적 반복 6컷 (3행 x 2열)** - 말 뒤에 흐르는 바람
+```
+<시트 요청 머리말>
+6 frames of a looping speed wind trail effect, arranged 3 rows x 2 columns, each frame a wide
+rectangle (about 2:1), no horse and no rider. The trail flows horizontally: it starts thick and
+bright at the RIGHT edge (the front, near the horse) and stretches out to the LEFT, thinning and
+fading with swirling curved wind ribbons, 4 to 5 white and pale-cyan ribbons of different
+lengths, a few small spiral curls and tiny sparkles. Same size and same placement in every
+frame, the ribbons shifting backward (to the left) a little more in each frame so the 6 frames
+loop smoothly, the last frame flowing back into the first. Flat colors, thin dark outline.
+Captions in order left to right, top to bottom: skill_boost_0, skill_boost_1, skill_boost_2,
+skill_boost_3, skill_boost_4, skill_boost_5
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_boost_0,skill_boost_1,skill_boost_2,skill_boost_3,skill_boost_4,skill_boost_5 --rows 3 --scale 0.16
+```
+- 화면에서 길이 약 **190px**, 높이 약 **95px**로 씁니다. 시트에서 컷 하나를 높이 300px 이상으로 크게 뽑아 주세요.
+
+**B. 발굽 흙먼지 반복 4컷 (한 줄)** - 달리는 동안 땅에서 튀는 먼지
+```
+<시트 요청 머리말>
+4 frames of a looping hoof dust effect for a galloping horse, one row, no horse. Small puffs of
+warm brown dust and a few pebbles kicked up behind (to the LEFT of) a point at the bottom right
+of each frame, rising a little and drifting left. Each frame has 3 to 4 puffs of different
+sizes at slightly different positions so the 4 frames loop smoothly, last frame back into the
+first. Ground line along the bottom edge. Flat colors, thin dark outline.
+Captions: skill_boost_dust_0, skill_boost_dust_1, skill_boost_dust_2, skill_boost_dust_3
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_boost_dust_0,skill_boost_dust_1,skill_boost_dust_2,skill_boost_dust_3 --rows 1 --scale 0.16
+```
+- 화면에서 약 **96x64px**. 말 발밑에 붙여 쓰므로 **바닥선이 이미지 맨 아래**에 오게 해 주세요.
+
+**C. 가속 시작 폭발 5컷 (한 줄)** - 스킬을 쓰는 순간
+```
+<시트 요청 머리말>
+5 frames of a sudden speed-burst effect, one row, no horse, centered, each frame a square.
+frame 1: a small bright white flash with a few short speed lines
+frame 2: a ring-shaped shockwave of white and pale-cyan wind bursting outward, dust at the bottom
+frame 3: the ring at its widest, long thin speed lines streaking toward the LEFT, dust puffs
+frame 4: the ring thin and fading, speed lines shorter, dust drifting
+frame 5: only a few faint streaks and dust wisps
+Flat colors, thin dark outline.
+Captions: skill_boost_start_0, skill_boost_start_1, skill_boost_start_2, skill_boost_start_3, skill_boost_start_4
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_boost_start_0,skill_boost_start_1,skill_boost_start_2,skill_boost_start_3,skill_boost_start_4 --rows 1 --scale 0.16
+```
+- 화면에서 약 **128px**, 0.4초 동안 재생합니다.
+
+**D. 가속이 풀릴 때 3컷 (한 줄, 없어도 됨)** - 공격으로 속도를 잃는 순간
+```
+<시트 요청 머리말>
+3 frames of a speed-loss effect, one row, no horse, centered, each frame a square.
+frame 1: the wind ribbons snapping and bursting into a few short pieces, a small white flash
+frame 2: the pieces scattering backward (to the LEFT), a small dust cloud
+frame 3: only faint wisps fading away
+Flat colors, thin dark outline.
+Captions: skill_boost_end_0, skill_boost_end_1, skill_boost_end_2
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_boost_end_0,skill_boost_end_1,skill_boost_end_2 --rows 1 --scale 0.16
+```
+
+- **만드는 순서**: A(바람 궤적)가 가장 중요하고, 다음 B(흙먼지), C(시작 폭발), D 순서입니다. A만 있어도 속도감이 크게 달라집니다.
+- **게임에서 쓰는 방식**: 가속 중에는 A를 말 뒤에 붙여 **0.05초마다 한 컷씩 반복**하고, B를 발밑에 같이 반복하며, 시작할 때 C를 한 번, 공격으로 풀릴 때 D를 한 번 재생합니다. 이펙트는 달리는 방향의 반대쪽으로 돌려 붙입니다.
+- 위 11-1 표의 `skill_boost_0~3`(4컷)과 `skill_dust`(기마 가속 쪽) 행은 이 4세트로 대체됩니다.
+
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
 화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.
