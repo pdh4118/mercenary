@@ -236,6 +236,8 @@ async function main() {
   const boostTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
   const wallTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_${i}.png`).catch(() => null)));
+  // 수정 조각 3종(상태별 하나씩): 방벽 선을 따라 쌓아 가로·세로·대각선 벽을 만든다. 번갈아 좌우를 뒤집어 반복감을 줄인다.
+  const wallSeg3Tex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_seg_${i}.png`).catch(() => null)));
   // 수정 군락 조각(상태 3단계 x 모양 3개): 방벽 선을 따라 일렬로 세운다. 위로 솟은 그림이라 회전하지 않는다.
   const wallSegTex = await Promise.all([0, 1, 2].map((s) => Promise.all(["a", "b", "c"].map((v) => Assets.load<Texture>(`assets/fx/skill_wall_${s}_${v}.png`).catch(() => null)))));
   const skillIconTex = await Promise.all(["bow", "spear", "sword", "mace", "staff", "mount"].map((n) => Assets.load<Texture>(`assets/ui/skill_icon_${n}.png`).catch(() => null)));
@@ -989,6 +991,8 @@ async function main() {
   const maceHits: { sp: Sprite; age: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean }[]>(); // 방벽 번호 -> 수정 조각들
   const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
+  const WALL_SEG3_STEP = 38; // 새 조각(상태별 1종)의 간격
+  const WALL_SEG3_SCALE = 0.55; // 새 조각 그림(188px 캔버스)을 화면에서 줄이는 비율
   const WALL_PIECE_STEP = 34; // 조각 사이 간격(px). 너비보다 좁아 서로 겹쳐 이어진다
   /** 떠오르는 피해 숫자. 내가 준 피해(흰색, 치명타는 굵은 금색), 방패가 막은 피해(하늘색), 내가 입은 피해(빨강)를 구분한다. */
   interface FloatText {
@@ -2093,11 +2097,13 @@ async function main() {
     const wallSeen = new Set<number>();
     for (const wl of latest.walls ?? []) {
       const [wid, wx, wy, wa, hl, ht, hpPct, wowner] = wl;
-      if (wallSegTex.every((row) => row.every((t) => t !== null))) {
+      const seg3 = wallSeg3Tex.every((t) => t !== null);
+      if (seg3 || wallSegTex.every((row) => row.every((t) => t !== null))) {
         // 수정 조각을 방벽 선을 따라 세운다(회전 없음). 내구도에 따라 온전함 / 금이 감 / 거의 부서짐 조각으로 바뀐다.
         wallSeen.add(wid);
         const state = hpPct > 60 ? 0 : hpPct > 25 ? 1 : 2;
-        const n = Math.max(2, Math.ceil((2 * hl) / WALL_PIECE_STEP) + 1);
+        const step = seg3 ? WALL_SEG3_STEP : WALL_PIECE_STEP;
+        const n = Math.max(2, Math.ceil((2 * hl) / step) + 1);
         let pcs = wallPieces.get(wid);
         if (!pcs) {
           pcs = [];
@@ -2116,15 +2122,17 @@ async function main() {
             terrainLow.addChild(pc.sp);
             pcs[k] = pc;
           }
-          const tex = wallSegTex[state]![(k + wid) % 3]!;
+          const tex = seg3 ? wallSeg3Tex[state]! : wallSegTex[state]![(k + wid) % 3]!;
           pc.sp.texture = tex;
-          pc.sp.width = WALL_PIECE_W;
-          pc.sp.height = (WALL_PIECE_W * tex.height) / tex.width;
+          const pw = seg3 ? tex.width * WALL_SEG3_SCALE : WALL_PIECE_W;
+          pc.sp.width = pw;
+          pc.sp.height = (pw * tex.height) / tex.width;
+          if (seg3 && (k + wid) % 2 === 1) pc.sp.scale.x *= -1; // 좌우를 번갈아 뒤집는다
           pc.sp.position.set(px, py);
           pc.sp.zIndex = py;
           // 유닛이 조각 뒤에 서 있으면 조각을 유닛 위에 그린다(바위·나무와 같은 규칙)
           let behind = false;
-          const half = WALL_PIECE_W / 2;
+          const half = (seg3 ? 64 : WALL_PIECE_W) / 2;
           const top = py - pc.sp.height;
           const check = (v: { x: number; y: number }) => {
             if (!behind && Math.abs(v.x - px) < half && v.y < py && v.y > top) behind = true;
