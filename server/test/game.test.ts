@@ -1146,7 +1146,7 @@ test("둔기병 경직: 맞은 적이 잠깐 멈추고, 단계가 오를수록 �
   assert.equal(e.x, x, "경직 중에는 움직이지 않는다");
 });
 
-test("피해 감소 카드: 고정 수치로 줄고 상한은 없지만 최소 1은 들어온다", () => {
+test("피해 감소 카드: 고정 수치로 줄고 상한이 없어 피해가 아예 안 들어올 수 있다(약한 독도 막힌다)", () => {
   const cards = CARDS.filter((c) => c.effect.k === "heroArmor");
   assert.deepEqual(cards.map((c) => c.rarity), [1, 2], "희귀 이상만");
   const mercArmor = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.stat === "armor");
@@ -1155,9 +1155,9 @@ test("피해 감소 카드: 고정 수치로 줄고 상한은 없지만 최소 1
   const a = g.addPlayer("a")!;
   const armorCut = (x: number, f: number) => (g as any).armorCut(x, f);
   assert.equal(armorCut(10, 4), 6);
-  assert.equal(armorCut(10, 50), TUNE.ARMOR_MIN_DAMAGE, "아무리 쌓아도 최소 피해는 들어온다");
-  assert.equal(armorCut(10, 9.5), 1, "비율 상한은 없다(70%를 넘게도 줄어든다)");
-  assert.equal(armorCut(0.5, 50), 0.5, "원래 피해가 최소값보다 작으면 그 값");
+  assert.equal(armorCut(10, 50), 0, "피해가 아예 안 들어온다");
+  assert.equal(armorCut(10, 9.5), 0.5, "비율 상한은 없다(70%를 넘게도 줄어든다)");
+  assert.equal(armorCut(0.8, 3), 0, "독 한 틱처럼 약한 피해도 막는다");
   assert.equal(armorCut(10, 0), 10);
   g.applyCardForTest(a, { k: "heroArmor", v: 4 });
   assert.equal((g as any).slots.get(a).mods.heroArmor, 4);

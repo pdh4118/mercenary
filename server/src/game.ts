@@ -3518,7 +3518,7 @@ export class Game {
     return false;
   }
 
-  /** 고정 피해 감소: 한 번에 받는 피해에서 flat을 뺀다(상한 없음). 다만 최소 ARMOR_MIN_DAMAGE는 들어간다. */
+  /** 고정 피해 감소: 한 번에 받는 피해에서 flat을 뺀다(상한 없음). 기본은 0까지 줄어 피해가 아예 안 들어올 수 있다(독도 막는다). */
   private armorCut(body: number, flat: number): number {
     if (body <= 0 || flat <= 0) return body;
     return Math.max(Math.min(body, TUNE.ARMOR_MIN_DAMAGE), body - flat);

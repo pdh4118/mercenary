@@ -99,7 +99,7 @@ export const TUNE = {
   BLUNT_STAGGER_SEC: 0.3, // 둔기병이 때린 적이 경직되는 시간(0단계)
   BLUNT_STAGGER_PER_TIER: 0.1, // 강화 단계마다 늘어나는 경직 시간
   BLUNT_STAGGER_BOSS_FRAC: 0.3, // 보스는 이 비율만큼만 경직된다
-  ARMOR_MIN_DAMAGE: 1, // 피해 감소(고정치)를 아무리 쌓아도 한 번 맞을 때 최소로 들어가는 피해(원래 피해가 이보다 작으면 그 값)
+  ARMOR_MIN_DAMAGE: 0, // 피해 감소(고정치)를 쌓은 뒤 한 번 맞을 때 최소로 들어가는 피해. 0이면 피해가 아예 안 들어올 수 있다(독 같은 약한 피해도 막는다)
   MULTISHOT_DAMAGE: 0.7, // 발사 수 카드로 늘어난 화살의 피해 비율
   MULTISHOT_SPREAD: 0.14, // 화살 사이 각도(라디안)
   SPEAR_HALF_WIDTH_NEAR: 15, // 몸 바로 앞의 반폭(px)
