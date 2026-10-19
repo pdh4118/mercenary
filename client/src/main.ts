@@ -243,6 +243,11 @@ async function main() {
   const backDustTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_back_dust_${i}.png`).catch(() => null)));
   // 활 후퇴 바람선(3컷). 없으면 생략.
   const backWindTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_back_wind_${i}.png`).catch(() => null)));
+  // 검 무적(수호 막): 켜질 때 4컷, 유지 6컷 반복, 끝날 때 4컷. 하나라도 없으면 도형 고리로 대신한다.
+  const guardTex = await Promise.all(
+    (["start", "loop", "end"] as const).map((k) => Promise.all(Array.from({ length: k === "loop" ? 6 : 4 }, (_, i) => Assets.load<Texture>(`assets/fx/skill_guard_${k}_${i}.png`).catch(() => null)))),
+  );
+  const guardReady = guardTex.every((set) => set.every((t) => t !== null));
   // 기마 가속이 풀리는 순간의 이펙트(6컷). 없으면 생략.
   const boostEndTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_end_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
@@ -998,6 +1003,7 @@ async function main() {
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
+  const guardFx = new Map<number, { sp: Sprite; phase: 0 | 1 | 2; t0: number }>(); // 무적 막(주인공별): 0 켜짐, 1 유지, 2 끝남
   const dashFx = new Map<number, { t0: number; lx: number; ly: number }>(); // 돌진 중인 주인공(마지막 잔상을 남긴 자리)
   const backWinds: { sp: Sprite; t0: number }[] = []; // 활 후퇴 바람선
   const backDusts: { sp: Sprite; t0: number }[] = []; // 활 후퇴를 시작한 자리의 흙먼지
@@ -2353,6 +2359,51 @@ async function main() {
           }
         }
       }
+      if (guardReady) {
+        // 무적 막: 몸을 따라다니며 켜짐 → 반복 → (무적이 끝나면) 흩어짐 순서로 재생한다. 막은 주인공 아래에 깔려 몸이 보인다.
+        const inv = !!v && p.invuln > 0 && !p.down;
+        let gf = guardFx.get(p.id);
+        if (inv && !gf) {
+          const sp = new Sprite(guardTex[0]![0]!);
+          sp.anchor.set(0.5, 0.5);
+          groundFx.addChild(sp);
+          gf = { sp, phase: 0, t0: performance.now() };
+          guardFx.set(p.id, gf);
+        }
+        if (gf) {
+          if (!inv && gf.phase !== 2) {
+            gf.phase = 2;
+            gf.t0 = performance.now();
+          }
+          const el = performance.now() - gf.t0;
+          let tex: Texture;
+          let wpx = 126;
+          if (gf.phase === 0) {
+            const f = Math.floor(el / 50);
+            if (f >= 4) {
+              gf.phase = 1;
+              gf.t0 = performance.now();
+              tex = guardTex[1]![0]!;
+            } else tex = guardTex[0]![f]!;
+          } else if (gf.phase === 1) tex = guardTex[1]![Math.floor(el / 60) % 6]!;
+          else {
+            const f = Math.floor(el / 60);
+            tex = guardTex[2]![Math.min(3, f)]!;
+            wpx = 140;
+            if (f >= 4) {
+              gf.sp.destroy();
+              guardFx.delete(p.id);
+              tex = null as unknown as Texture;
+            }
+          }
+          if (tex && v) {
+            gf.sp.texture = tex;
+            gf.sp.width = wpx;
+            gf.sp.height = (wpx * tex.height) / tex.width;
+            gf.sp.position.set(v.x, v.y - 6);
+          }
+        }
+      }
       const be = boostEnds.get(p.id);
       if (be) {
         const f = Math.floor((performance.now() - be.t0) / 70);
@@ -2381,7 +2432,7 @@ async function main() {
           bfx.burst.height = (150 * t.height) / t.width;
         }
       }
-      if (v && p.invuln > 0 && !p.down) fxLayer.circle(v.x, v.y, 27 + 2 * Math.sin(performance.now() / 90)).stroke({ width: 3, color: 0x9be8ff, alpha: 0.85 }).circle(v.x, v.y, 24).fill({ color: 0x9be8ff, alpha: 0.12 }); // 무적
+      if (!guardReady && v && p.invuln > 0 && !p.down) fxLayer.circle(v.x, v.y, 27 + 2 * Math.sin(performance.now() / 90)).stroke({ width: 3, color: 0x9be8ff, alpha: 0.85 }).circle(v.x, v.y, 24).fill({ color: 0x9be8ff, alpha: 0.12 }); // 무적
       const reachNow = p.hs?.[2] || w.reach; // 사거리·범위 카드가 반영된 값(철퇴는 범위가 사거리로 간다)
       const arcNow = meleeArc(w.type, w.arc, p.hs?.[6] || 1);
       if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
