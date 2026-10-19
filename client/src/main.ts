@@ -236,6 +236,8 @@ async function main() {
   const boostTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_${i}.png`).catch(() => null)));
   // 기마 가속 시작 폭발(6컷, 달리기 시작하는 순간 한 번). 없으면 생략.
   const boostStartTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_start_${i}.png`).catch(() => null)));
+  // 기마 가속이 풀리는 순간의 이펙트(6컷). 없으면 생략.
+  const boostEndTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_end_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
   const wallTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_${i}.png`).catch(() => null)));
   // 수정 조각 3종(상태별 하나씩): 방벽 선을 따라 쌓아 가로·세로·대각선 벽을 만든다. 번갈아 좌우를 뒤집어 반복감을 줄인다.
@@ -989,6 +991,7 @@ async function main() {
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
+  const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
   const maceHits: { sp: Sprite; age: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean }[]>(); // 방벽 번호 -> 수정 조각들
@@ -2230,9 +2233,32 @@ async function main() {
             bf.burst = b;
           }
         } else if (bf) {
+          // 달리다가 가속이 끝난 경우에만 마무리 이펙트(죽거나 무기를 바꾼 경우도 포함해 몸 위치에서 터진다)
+          if (v && bf.burstDone && boostEndTex.every((t) => t !== null) && !boostEnds.has(p.id)) {
+            const e = new Sprite(boostEndTex[0]!);
+            e.anchor.set(0.5, 0.5);
+            e.rotation = bf.ang;
+            e.position.set(v.x, v.y);
+            groundFx.addChild(e);
+            boostEnds.set(p.id, { sp: e, t0: performance.now(), ang: bf.ang });
+          }
           bf.sp.destroy();
           bf.burst?.destroy();
           boostFx.delete(p.id);
+        }
+      }
+      const be = boostEnds.get(p.id);
+      if (be) {
+        const f = Math.floor((performance.now() - be.t0) / 70);
+        if (f >= 6 || !v) {
+          be.sp.destroy();
+          boostEnds.delete(p.id);
+        } else {
+          const t = boostEndTex[f]!;
+          be.sp.texture = t;
+          be.sp.width = 150;
+          be.sp.height = (150 * t.height) / t.width;
+          be.sp.position.set(v.x, v.y);
         }
       }
       const bfx = boostFx.get(p.id);
