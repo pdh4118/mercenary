@@ -366,18 +366,28 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 | `skill_boost_0~3` | 기마 가속 중 바람·속도 효과(몸 뒤) | 128x64 | 4 | `wind and speed aura trailing behind a galloping horse, white swirling lines with a few sparks, 4-frame loop, pointing right` |
 | `skill_cast_0~3` | 스킬을 쓰는 순간의 신호(모든 스킬 공통, 발 밑) | 96x96 | 4 | `quick circular rune flash expanding under a hero, thin glowing ring, 4-frame sequence`, 색 입힘 |
 
-### 11-2. 아이콘 (화면) - `assets/hud/`
+### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
-화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그림). 투명 PNG, **48x48**, 한 줄 시트(6칸)로 받아 주세요. 위 **8-1** 무기 아이콘과 같은 그림체입니다.
+화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.
 
-| 파일 이름 | 그림 |
-| --- | --- |
-| `skill_icon_bow` | `a bow with a small backward arrow, retreat` |
-| `skill_icon_spear` | `a spear with forward motion streaks, dash` |
-| `skill_icon_sword` | `a sword with a glowing round ward, invulnerability` |
-| `skill_icon_mace` | `a thrown spiked mace with a trail` |
-| `skill_icon_staff` | `a magic staff with a small crystal wall` |
-| `skill_icon_mount` | `a galloping horse head with wind lines` |
+```
+<시트 요청 머리말>
+6 skill icons in one row, each centered in a rounded-square badge, thick dark outline,
+no text, each icon is one bold readable symbol that reads clearly even at 48 pixels.
+Silver-steel, wood and a little warm gold; the badge fill is a dark slate color.
+1. a longbow with a small curved arrow pointing backward (retreat / back-step),
+   a few short dust lines behind it
+2. a long spear thrusting forward with three bold motion streaks behind the blade (dash)
+3. a sword with a small round shield, a thin glowing pale-cyan ring around the shield (invulnerability)
+4. a spiked iron mace tilted as if thrown, with a curved spin trail behind it
+5. a magic wooden staff with a blue crystal, a small translucent blue crystal wall rising next to it
+6. a galloping horse head seen from the side with white wind lines streaming behind it (speed boost)
+Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, skill_icon_staff, skill_icon_mount
+```
+`python3 tools/slice_sheet.py <시트> client/public/assets/ui --names skill_icon_bow,skill_icon_spear,skill_icon_sword,skill_icon_mace,skill_icon_staff,skill_icon_mount --rows 1 --scale 0.3`
+
+- 한 번에 6개가 안 맞으면 3개씩 두 장으로 나눠 뽑아도 됩니다(순서는 위와 같게).
+- 배지 색을 무기별로 다르게 하고 싶으면 문구 끝에 `badge colors: green, orange, cyan, purple, blue, brown (in the same order)`를 붙이세요(무기 칸의 병종 색과 같은 순서: 활 초록, 창 주황, 검 하늘색, 철퇴 보라, 지팡이 파랑, 기마 갈색).
 
 ### 11-3. 소리 - `assets/audio/` (형식·길이 규칙은 **10-0**과 같음)
 
