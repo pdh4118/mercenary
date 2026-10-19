@@ -834,7 +834,7 @@ async function main() {
       v.glyph.style.fontSize = 26;
       const ef = card.effect;
       v.glyph.text =
-        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x1.5+", regen: "♥", respawn: "↺", pierce: "»", multi: "⇶", poison: "☠", armor: "▣", thorns: "↩", xp: "XP" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
+        ef.k === "leadership" ? `+${ef.v}` : ef.k === "mercStat" ? ({ crit: "CRIT", critMult: "x+", regen: "♥", respawn: "↺", pierce: "»", multi: "⇶", poison: "☠", armor: "▣", thorns: "↩", xp: "XP" } as Record<string, string>)[ef.stat] ?? "★" : (GLYPHS[ef.k] ?? "★");
       v.tag.text = CARD_CATEGORY_NAMES[card.category];
       v.tag.style.fill = color;
       v.rar.text = card.rarity < 3 ? `· ${RARITY_NAMES[card.rarity]}` : ""; // 전설은 분류 이름이 곧 등급

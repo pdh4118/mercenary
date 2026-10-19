@@ -118,7 +118,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 };
 /** 병종 전용 일반 카드 한 장의 효과량(이전의 1.5배: 후반에는 용병술이 더 중요하도록). 관통·발사 수는 개수라 그대로다. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.375, dmg: 0.375, atkSpeed: 0.225, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.6, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.375, knock: 45, thorns: 3, xp: 0.45, cast: 0.1,
+  hp: 0.375, dmg: 0.375, atkSpeed: 0.225, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.375, knock: 45, thorns: 3, xp: 0.45, cast: 0.1,
 };
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
@@ -220,7 +220,7 @@ const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leaders
   { k: "heroPoison", label: "독 화살", base: 0.25, weight: 3, minLevel: 3, fmt: "pct" },
   { k: "heroArmor", label: "피해 감소", base: 1, weight: 2.5, minLevel: 4, fmt: "int" },
   { k: "heroCrit", label: "치명타 확률", base: 0.04, weight: 6, fmt: "pct" },
-  { k: "heroCritMult", label: "치명타 피해", base: 0.15, weight: 4, minLevel: 3, fmt: "pct" },
+  { k: "heroCritMult", label: "치명타 피해", base: 0.1, weight: 4, minLevel: 3, fmt: "pct" },
   { k: "heroArea", label: "범위", base: 0.075, weight: 4, fmt: "pct" },
   { k: "heroKnock", label: "넉백", base: 15, weight: 5, fmt: "flat" },
   { k: "heroThorns", label: "근접 반사", base: 2, weight: 4, minLevel: 3, fmt: "int" },

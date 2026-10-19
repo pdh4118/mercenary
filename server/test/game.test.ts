@@ -1017,7 +1017,7 @@ test("검방병 용병의 방패는 정면의 화살을 막는다(화살은 방�
   assert.ok(cur.shield > MERC_STATS[SHIELD]!.shield - ENEMY_STATS[ARCHER]!.damage * 4, "화살 피해의 일부만 들어갔다");
 });
 
-test("치명타: 확률이 100%면 기본 피해의 1.5배가 들어가고 이벤트가 나온다", () => {
+test("치명타: 확률이 100%면 기본 배율(1.3)이 들어가고 이벤트가 나온다", () => {
   const g = new Game(() => 0); // rng가 항상 0이면 치명타가 반드시 난다
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;
@@ -1031,8 +1031,31 @@ test("치명타: 확률이 100%면 기본 피해의 1.5배가 들어가고 이�
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
   g.step();
   const dealt = base - g.getEnemy(id)!.hp;
-  assert.ok(Math.abs(dealt - WEAPONS[2]!.damage * 1.5) < 1e-6, `${dealt}`);
+  assert.ok(Math.abs(dealt - WEAPONS[2]!.damage * TUNE.CRIT_BASE_MULT) < 1e-6, `${dealt}`);
   assert.ok(g.takeEvents().some((e) => e[0] === 5));
+});
+
+test("치명타 확률은 상한이 없고, 100%를 넘은 몫은 치명타 피해로 넘어간다", () => {
+  const dealtWith = (chance: number) => {
+    const g = new Game(() => 0.999); // 확률이 100% 미만이면 치명타가 나지 않는 주사위
+    g.autoSpawn = false;
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    g.jumpToStage(10);
+    g.applyCardForTest(a, { k: "heroCrit", v: chance });
+    g.setWeapon(a, 2);
+    run(g, WEAPON_SWITCH_DELAY_SEC + 0.1);
+    const id = g.spawnEnemyAt(p.x + 40, p.y, 4);
+    const base = g.getEnemy(id)!.hp;
+    g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+    g.step();
+    return base - g.getEnemy(id)!.hp;
+  };
+  const w = WEAPONS[2]!.damage;
+  const m = TUNE.CRIT_BASE_MULT;
+  assert.ok(Math.abs(dealtWith(0.9) - w) < 1e-6, "100% 미만이면 주사위에 달렸다");
+  assert.ok(Math.abs(dealtWith(1) - w * m) < 1e-6);
+  assert.ok(Math.abs(dealtWith(2) - w * (1 + 2 * (m - 1))) < 1e-6, "초과분은 배율로 넘어간다(75% 상한 없음)");
 });
 
 test("관통: 화살이 지정한 수만큼 더 많은 적을 맞힌다", () => {
@@ -1123,7 +1146,7 @@ test("둔기병 경직: 맞은 적이 잠깐 멈추고, 단계가 오를수록 �
   assert.equal(e.x, x, "경직 중에는 움직이지 않는다");
 });
 
-test("피해 감소 카드: 고정 수치로 줄고 최소 30%는 들어온다", () => {
+test("피해 감소 카드: 고정 수치로 줄고 상한은 없지만 최소 1은 들어온다", () => {
   const cards = CARDS.filter((c) => c.effect.k === "heroArmor");
   assert.deepEqual(cards.map((c) => c.rarity), [1, 2], "희귀 이상만");
   const mercArmor = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.stat === "armor");
@@ -1132,7 +1155,9 @@ test("피해 감소 카드: 고정 수치로 줄고 최소 30%는 들어온다",
   const a = g.addPlayer("a")!;
   const armorCut = (x: number, f: number) => (g as any).armorCut(x, f);
   assert.equal(armorCut(10, 4), 6);
-  assert.ok(Math.abs(armorCut(10, 50) - 3) < 1e-9);
+  assert.equal(armorCut(10, 50), TUNE.ARMOR_MIN_DAMAGE, "아무리 쌓아도 최소 피해는 들어온다");
+  assert.equal(armorCut(10, 9.5), 1, "비율 상한은 없다(70%를 넘게도 줄어든다)");
+  assert.equal(armorCut(0.5, 50), 0.5, "원래 피해가 최소값보다 작으면 그 값");
   assert.equal(armorCut(10, 0), 10);
   g.applyCardForTest(a, { k: "heroArmor", v: 4 });
   assert.equal((g as any).slots.get(a).mods.heroArmor, 4);

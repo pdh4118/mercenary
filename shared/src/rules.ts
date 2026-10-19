@@ -38,7 +38,7 @@ export const TUNE = {
   BOSS_RAGE_SPEED: 0.02, // 단계마다 늘어나는 이동 속도 비율
   BOSS_RAGE_MAX: 12, // 격노 최대 단계
   REVIVE_SEC: 5, // 한 명이 눌러서 가득 채우는 데 걸리는 시간
-  CRIT_BASE_MULT: 1.5, // 치명타 기본 피해 배율
+  CRIT_BASE_MULT: 1.3, // 치명타 기본 피해 배율(이전 1.5)
   BACKSTAB_MULT: 1.5,
   SHIELD_REGEN_SEC: 8, // 방패가 깨진 뒤 재생될 때까지
   SPLASH_FACTOR: 0.5,
@@ -99,7 +99,7 @@ export const TUNE = {
   BLUNT_STAGGER_SEC: 0.3, // 둔기병이 때린 적이 경직되는 시간(0단계)
   BLUNT_STAGGER_PER_TIER: 0.1, // 강화 단계마다 늘어나는 경직 시간
   BLUNT_STAGGER_BOSS_FRAC: 0.3, // 보스는 이 비율만큼만 경직된다
-  ARMOR_MAX_FRAC: 0.7, // 피해 감소(고정치)로 한 번의 피해를 줄일 수 있는 최대 비율
+  ARMOR_MIN_DAMAGE: 1, // 피해 감소(고정치)를 아무리 쌓아도 한 번 맞을 때 최소로 들어가는 피해(원래 피해가 이보다 작으면 그 값)
   MULTISHOT_DAMAGE: 0.7, // 발사 수 카드로 늘어난 화살의 피해 비율
   MULTISHOT_SPREAD: 0.14, // 화살 사이 각도(라디안)
   SPEAR_HALF_WIDTH_NEAR: 15, // 몸 바로 앞의 반폭(px)
@@ -393,7 +393,11 @@ export const REVIVE_HP_FRAC = 0.5;
 export const REVIVE_INVULN_SEC = 2;
 
 // 공격 능력치(레벨업 카드)
-export const CRIT_MAX_CHANCE = 0.75; // 치명타 확률 상한
+/**
+ * 치명타 확률에는 상한이 없다. 100%를 넘은 몫은 버려지지 않고 치명타 피해로 넘어가서, 확률 1%p의 가치가 늘 같다
+ * (기대 피해 배율 = 1 + 확률 x (치명타 배율 - 1)이 100%를 넘어서도 이어진다).
+ */
+export const critDamageMult = (chance: number, mult: number): number => (chance > 1 ? 1 + chance * (mult - 1) : mult);
 /**
  * 방어력·회피율·부활 속도는 카드로 쌓은 값 x가 커져도 한 장의 효율(체력으로 환산한 값)이 늘 같도록 x/(1+x) 꼴로 바꾼다(상한 없음).
  * 받는 피해는 1/(1+x)배(= 체력이 (1+x)배인 것과 같다), 회피 확률은 x/(1+x)(맞을 확률이 1/(1+x)이므로 역시 체력 (1+x)배와 같다),

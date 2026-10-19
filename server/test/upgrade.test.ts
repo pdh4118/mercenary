@@ -410,7 +410,8 @@ test("전설 효과: 관통 증폭·돌격 가속·광역 증폭·폭풍 연사�
     g2.step();
     hits.push(before - g2.getEnemy(target)!.hp);
   }
-  assert.ok(hits.every((h) => h > 0), `매 틱 공격 ${hits}`);
+  assert.ok(hits[0]! > 0 && hits[1]! > 0, `연속 공격 ${hits}`);
+  assert.ok(hits.some((h) => h === 0), `확률이 100%여도 끝없이 이어지지는 않는다 ${hits}`); // 폭풍 연사는 두 번에 한 번
 });
 
 test("모든 병종은 공격 속도 카드를 가진다(화살이 범위가 없는 궁병은 범위 제외)", () => {

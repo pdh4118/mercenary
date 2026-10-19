@@ -129,7 +129,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   BLUNT_STAGGER_SEC: ["둔기병 경직 시간(초, 0단계)", G.combat, 0, 5, 0.05],
   BLUNT_STAGGER_PER_TIER: ["둔기병 경직 시간 단계당 증가(초)", G.combat, 0, 2, 0.05],
   BLUNT_STAGGER_BOSS_FRAC: ["보스에게 걸리는 경직 비율", G.combat, 0, 1, 0.05],
-  ARMOR_MAX_FRAC: ["피해 감소 카드가 한 번의 피해를 줄이는 최대 비율", G.combat, 0, 0.95, 0.05],
+  ARMOR_MIN_DAMAGE: ["피해 감소를 쌓아도 한 번 맞을 때 최소로 들어가는 피해", G.combat, 0, 10, 0.5],
   MULTISHOT_DAMAGE: ["발사 수 카드로 늘어난 화살 피해 비율", G.combat, 0.1, 1.5, 0.05],
   MULTISHOT_SPREAD: ["발사 수 카드 화살 사이 각도(라디안)", G.combat, 0, 0.6, 0.01],
   SPEAR_HALF_WIDTH_NEAR: ["창 찌르기 폭(몸 앞, 반폭 px)", G.combat, 2, 150, 1],

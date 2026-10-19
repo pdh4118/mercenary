@@ -26,7 +26,7 @@ import {
   DIFFICULTY_REDUCTION,
   dodgeChanceOf,
   EVT_DODGE,
-  CRIT_MAX_CHANCE,
+  critDamageMult,
   castTimeMult,
   meleeArc,
   meleeReach,
@@ -299,6 +299,7 @@ interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
+  stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
   windT: number; // 주문(지팡이)을 외우는 남은 시간. 0이면 외우는 중이 아니다
   chargeT: number; // 철퇴를 꾹 누르고 모은 시간(초). 0이면 모으는 중이 아니다
   mom: number; // 기마 주인공의 속도(0~1). 달리면 오르고 멈추면 줄어든다
@@ -380,6 +381,7 @@ interface Merc extends Fighter {
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   flankT: number; // 기병이 우회 접근에 쓴 시간
   runId?: number; // 기병이 마지막으로 친 대상(그 뒤로 돌아 들어간다)
+  stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
   brawl?: boolean; // 기병이 마무리 싸움 중(대상 체력이 얼마 안 남아 치고 빠지지 않는다)
   tier: number; // 강화 단계 0~4
   nameId: number;
@@ -982,7 +984,7 @@ export class Game {
       r2(w.damage * m.heroDmg),
       r2(rate / (w.cooldown + w.windup)),
       Math.round(meleeReach(w.type, w.reach * m.heroRange, m.heroArea)),
-      r2(Math.min(CRIT_MAX_CHANCE, m.heroCrit)),
+      r2(Math.max(0, m.heroCrit)),
       r2(m.heroCritMult),
       m.heroPierce,
       r2(m.heroArea),
@@ -2127,10 +2129,14 @@ export class Game {
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
     const crit = this.rollCrit(s.mods.heroCrit);
-    const damage = w.damage * power * s.mods.heroDmg * (crit ? s.mods.heroCritMult : 1);
+    const damage = w.damage * power * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1);
     const reach = meleeReach(w.type, w.reach * s.mods.heroRange, s.mods.heroArea);
     if (w.windup <= 0 || w.ranged) s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
-    if (crit && hasLegend(s.mods, "stormfire", "hero")) s.fireCd = 0; // 폭풍 연사: 치명타면 곧바로 다음 공격
+    // 폭풍 연사: 치명타면 곧바로 다음 공격. 치명타 확률에 상한이 없으므로 연속으로 이어지지는 않는다(두 번에 한 번).
+    if (crit && hasLegend(s.mods, "stormfire", "hero") && !s.stormBurst) {
+      s.fireCd = 0;
+      s.stormBurst = true;
+    } else s.stormBurst = false;
     if (w.type === MAGE) {
       const cast = this.casts.get(-p.id);
       this.casts.delete(-p.id);
@@ -2220,7 +2226,7 @@ export class Game {
 
   /** 치명타 판정(공격 한 번에 한 번) */
   private rollCrit(chance: number): boolean {
-    return chance > 0 && this.rng() < Math.min(CRIT_MAX_CHANCE, chance);
+    return chance > 0 && (chance >= 1 || this.rng() < chance);
   }
 
   /** 무기를 바꾼다. 바꾼 직후에는 잠깐 공격할 수 없다. */
@@ -3138,9 +3144,13 @@ export class Game {
   private resolveMercAttack(m: Merc, st: UnitStats): void {
     const mods = this.slots.get(m.owner)?.mods ?? newMods();
     const crit = this.rollCrit(mstat(mods, m.type, "crit"));
-    const critMult = TUNE.CRIT_BASE_MULT + mstat(mods, m.type, "critMult");
+    const critChance = mstat(mods, m.type, "crit");
+    const critMult = critDamageMult(critChance, TUNE.CRIT_BASE_MULT + mstat(mods, m.type, "critMult"));
     const dmg = st.damage * (crit ? critMult : 1);
-    if (crit && hasLegend(mods, "stormfire", m.type)) m.cd = 0;
+    if (crit && hasLegend(mods, "stormfire", m.type) && !m.stormBurst) {
+      m.cd = 0;
+      m.stormBurst = true;
+    } else m.stormBurst = false;
     if (m.type === MAGE) {
       const cast = this.casts.get(m.id);
       this.casts.delete(m.id);
@@ -3508,10 +3518,10 @@ export class Game {
     return false;
   }
 
-  /** 고정 피해 감소: 한 번에 받는 피해에서 flat을 빼되, 최대 ARMOR_MAX_FRAC까지만 줄어든다 */
+  /** 고정 피해 감소: 한 번에 받는 피해에서 flat을 뺀다(상한 없음). 다만 최소 ARMOR_MIN_DAMAGE는 들어간다. */
   private armorCut(body: number, flat: number): number {
     if (body <= 0 || flat <= 0) return body;
-    return Math.max(body * (1 - TUNE.ARMOR_MAX_FRAC), body - flat);
+    return Math.max(Math.min(body, TUNE.ARMOR_MIN_DAMAGE), body - flat);
   }
 
   /** 넉백: 맞은 적이 공격해 온 쪽 반대로 밀려나고, 하던 공격 동작이 끊기며 잠깐 공격하지 못한다. 보스는 덜 밀린다. */
