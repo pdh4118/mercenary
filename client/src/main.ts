@@ -2127,7 +2127,8 @@ async function main() {
           const pw = seg3 ? tex.width * WALL_SEG3_SCALE : WALL_PIECE_W;
           pc.sp.width = pw;
           pc.sp.height = (pw * tex.height) / tex.width;
-          if (seg3 && (k + wid) % 2 === 1) pc.sp.scale.x *= -1; // 좌우를 번갈아 뒤집는다
+          if (seg3 && (k + wid) % 2 === 1) pc.sp.scale.x = -Math.abs(pc.sp.scale.x); // 좌우를 번갈아 뒤집는다(매 프레임 부호를 새로 정함)
+          else pc.sp.scale.x = Math.abs(pc.sp.scale.x);
           pc.sp.position.set(px, py);
           pc.sp.zIndex = py;
           // 유닛이 조각 뒤에 서 있으면 조각을 유닛 위에 그린다(바위·나무와 같은 규칙)
