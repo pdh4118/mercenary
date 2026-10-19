@@ -782,6 +782,70 @@ python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_back
 
 **참고**: 후퇴 중 남는 **잔상**은 창 돌진처럼 코드로 주인공 모습을 복사해 만들 수 있어 그림이 필요 없습니다. 후퇴 시작 소리는 11-3의 `skill_backstep`을 쓰세요.
 
+#### 11-1-7. 검 무적 이펙트 (스킬 `무적`)
+
+검 스킬 **무적**(1초 동안 피해를 받지 않음)을 쓰는 동안 **주인공 몸을 감싸는 수호 막(방어 결계)** 이 보이게 합니다. 지금은 하늘색 고리 도형으로 대신 표시하고 있습니다. 세 세트가 필요합니다: ① 발동 순간 막이 켜짐(1회), ② 유지하는 동안 도는 막(반복), ③ 끝나며 흩어짐(1회).
+
+**방향·위치 규칙**: 몸 **정중앙**을 기준으로 한 **정사각형 컷**이고, 방향성 없는 **둥근 막**으로 그려 주세요(좌우 반전·회전 없이 그대로 씁니다). 가운데는 **비워 두거나 아주 옅게**(주인공이 그 위로 보여야 함), 막 가장자리에 힘이 모이게. 막의 지름이 컷 너비의 약 **80%**가 되게.
+**그림체**: 게임 유닛과 같게. 굵지 않은 어두운 윤곽선(2px 느낌) 또는 윤곽 없이 밝은 선, 면이 단순한 평평한 색, 그라데이션·번짐·사실적인 유리 질감 금지. 색은 **검방병 방패 색인 파랑·금색**(연한 하늘색 막 + 금색 테두리 무늬/반짝임)만 씁니다. 육각형·방패 문양을 막 표면에 살짝 넣으면 방어 느낌이 납니다. 유닛 시트를 스타일 기준 이미지로 첨부하고, 투명 배경 또는 단색 회색 배경(지우는 건 제가 합니다). 네거티브: `realistic glass bubble, photo, 3d render, text, characters, weapon, background scenery`.
+
+각 프롬프트 앞에 **시트 요청 머리말**을 붙입니다.
+
+**A. 발동 4컷 (한 줄)** - 막이 켜지는 순간(0.2초)
+```
+<시트 요청 머리말>
+4 frames of a protective ward activating, one row, each frame a square, centered, no characters.
+A round magical shield barrier in pale sky blue with golden edge patterns and a faint hexagon
+shield motif.
+frame 1: a small bright white-gold flash at the center with a few short sparks
+frame 2: a thin ring of light bursting outward, golden sparkles
+frame 3: the full round barrier forming, edge bright gold, inside nearly transparent
+frame 4: the barrier settled at full size with a soft glowing edge, the center clear
+Flat colors, thin outline.
+Captions: skill_guard_start_0, skill_guard_start_1, skill_guard_start_2, skill_guard_start_3
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_guard_start_0,skill_guard_start_1,skill_guard_start_2,skill_guard_start_3 --rows 1 --scale 0.16
+```
+- 화면에서 약 **120x120px**, 몸 중앙에 0.2초 재생.
+
+**B. 유지 반복 6컷 (3행 x 2열)** - 무적인 1초 동안 몸을 감싸고 계속 도는 막
+```
+<시트 요청 머리말>
+6 frames of a looping protective shield aura, arranged 3 rows x 2 columns, each frame a square,
+centered, no characters. A round barrier of pale sky blue with golden edge and a faint hexagon
+shield motif, the center almost transparent so a character can be seen through it. Same size and
+same placement in every frame; only the pattern moves: the golden highlights travel clockwise
+around the edge a little more in each frame, the hexagon motif shimmers softly, 2 to 3 small
+sparkles twinkle in different places. The last frame flows back into the first so the loop is
+seamless. Flat colors, thin outline.
+Captions in order left to right, top to bottom: skill_guard_loop_0, skill_guard_loop_1,
+skill_guard_loop_2, skill_guard_loop_3, skill_guard_loop_4, skill_guard_loop_5
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_guard_loop_0,skill_guard_loop_1,skill_guard_loop_2,skill_guard_loop_3,skill_guard_loop_4,skill_guard_loop_5 --rows 3 --scale 0.16
+```
+- 화면에서 약 **110x110px**, 몸 중앙에 0.06초마다 한 컷씩 반복(무적 시간 동안).
+
+**C. 끝나며 흩어짐 4컷 (한 줄)** - 무적이 끝나는 순간(0.25초)
+```
+<시트 요청 머리말>
+4 frames of a protective shield barrier fading away, one row, each frame a square, centered, no
+characters. The same round pale-blue barrier with golden edge as in the loop.
+frame 1: the barrier flickers, edge slightly cracked into a few golden lines
+frame 2: the barrier breaks into about 8 curved shards drifting outward
+frame 3: the shards smaller and fading, golden sparkles floating up
+frame 4: only a few faint sparkles left
+Flat colors, thin outline.
+Captions: skill_guard_end_0, skill_guard_end_1, skill_guard_end_2, skill_guard_end_3
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_guard_end_0,skill_guard_end_1,skill_guard_end_2,skill_guard_end_3 --rows 1 --scale 0.16
+```
+- 화면에서 약 **130x130px**, 무적이 끝난 자리에서 0.25초 재생.
+
+**참고**: ① 막은 **몸을 따라다니고**(무적 중 이동해도 따라감) 무적 시간에 맞춰 반복/종료를 재생합니다. ② 스킬 효과 카드로 무적 시간이 길어져도 B(반복)만 더 오래 돌면 되므로 **반복 세트의 이음새**가 중요합니다. ③ 소리는 11-3의 `skill_guard`를 쓰세요. ④ 무적 중 맞으면 "무적!" 글자가 이미 뜹니다. 그림에 글자는 넣지 마세요.
+
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
 화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.
