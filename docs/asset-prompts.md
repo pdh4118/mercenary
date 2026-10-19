@@ -367,6 +367,56 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 | `skill_boost_0~3` | 기마 가속 중 바람·속도 효과(몸 뒤) | 128x64 | 4 | `wind and speed aura trailing behind a galloping horse, white swirling lines with a few sparks, 4-frame loop, pointing right` |
 | `skill_cast_0~3` | 스킬을 쓰는 순간의 신호(모든 스킬 공통, 발 밑) | 96x96 | 4 | `quick circular rune flash expanding under a hero, thin glowing ring, 4-frame sequence`, 색 입힘 |
 
+#### 11-1-1. 방벽 이펙트 시트 프롬프트 (지팡이 스킬, 3장)
+
+방벽은 **조준선과 수직**으로 서고 코드가 **어느 각도로든 돌려서** 그립니다. 그래서 그림은 **위에서 내려다본 가로 띠**(좌우 대칭, 방향 없음)로 그려야 돌려도 어색하지 않습니다. 색은 마법사 지팡이와 같은 **파란 수정(연한 하늘색~파랑)**, 가장자리는 은은하게 빛나게 합니다. 네거티브에 `side view, perspective, character, text`를 넣어 주세요. 각 장은 위 **시트 요청 머리말**을 앞에 붙입니다. 가로 띠는 시트 안에서 **가로 1360px 이상**으로 크게 뽑아야 자를 때 높이 기준(100px)을 넘습니다.
+
+**A. 방벽 상태 3컷** (온전함 → 금이 감 → 거의 부서짐, 위에서 아래로 한 줄씩, 3행 1열)
+```
+<시트 요청 머리말>
+3 horizontal barrier wall strips stacked vertically (3 rows, 1 column), each a long thin
+magical wall seen from directly above (top-down), made of translucent pale-blue crystal
+with a softly glowing bright edge, left-right symmetric, about 8 times longer than it is
+thick, thick dark outline, painterly flat colors with subtle texture. All three have the
+same length and thickness and are centered the same way:
+row 1: intact, smooth glowing crystal
+row 2: damaged, several cracks across it and a few chipped corners, glow dimmer
+row 3: almost shattered, deep cracks everywhere, missing chunks, faint flickering glow
+Captions: skill_wall_0, skill_wall_1, skill_wall_2
+```
+`python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_0,skill_wall_1,skill_wall_2 --rows 3 --scale 0.125`
+
+**B. 부서질 때 4컷** (2행 x 2열, 순서대로: 왼쪽 위 → 오른쪽 위 → 왼쪽 아래 → 오른쪽 아래)
+```
+<시트 요청 머리말>
+4 frames of a crystal barrier wall shattering, arranged 2 rows x 2 columns, top-down view,
+each frame a square with the same center. Pale-blue translucent crystal, thick dark outline.
+frame 1: the wall with a bright crack flash across its middle
+frame 2: the wall bursting into large shards flying outward, bright glow
+frame 3: smaller shards and glowing dust scattering, glow fading
+frame 4: only a few tiny sparkles and faint dust left
+Captions: skill_wall_break_0, skill_wall_break_1, skill_wall_break_2, skill_wall_break_3
+```
+`python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_break_0,skill_wall_break_1,skill_wall_break_2,skill_wall_break_3 --rows 2 --scale 0.125`
+
+**C. 서는 순간 4컷** (위에서 아래로 한 줄씩, 4행 1열, 가로 띠)
+```
+<시트 요청 머리말>
+4 frames of a magical crystal barrier wall rising out of the ground, stacked vertically
+(4 rows, 1 column), each a long thin horizontal strip seen from directly above, all the
+same size and center. Pale-blue translucent crystal, glowing edge, thick dark outline.
+row 1: a thin glowing line on the ground with sparkles
+row 2: jagged crystal tips pushing up along the line, dust puffs at both ends
+row 3: the wall about three quarters formed, bright glow burst
+row 4: the finished intact wall, glow settling (matches the intact wall strip)
+Captions: skill_wall_rise_0, skill_wall_rise_1, skill_wall_rise_2, skill_wall_rise_3
+```
+`python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall_rise_0,skill_wall_rise_1,skill_wall_rise_2,skill_wall_rise_3 --rows 4 --scale 0.125`
+
+- 방벽 길이(`SKILL_WALL_LEN`)와 두께는 게임에서 조절하는 값이라 그림은 **가로세로 비율(약 8:1)** 만 맞으면 됩니다. 크기는 제가 늘리고 줄입니다.
+- A를 먼저 만들어 주세요. B·C의 마지막/첫 컷이 A의 온전한 벽과 같은 색·질감이어야 이어 붙여도 튀지 않습니다(B·C를 만들 때 A 이미지를 참고 이미지로 같이 첨부하세요).
+- 그림이 없어도 지금은 파란 반투명 막대로 그려집니다.
+
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
 화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.
