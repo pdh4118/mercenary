@@ -700,6 +700,40 @@ to the LEFT, a small brown dust cloud at the bottom.
 - **크기**: A는 가로로 긴 2:1(화면 약 190x95px), B는 3:2(약 96x64px), C·D는 정사각형(약 128px). 크게 뽑아 주세요(긴 변 1000px 이상).
 - **받은 뒤**: 파일 이름만 위 표시와 같으면 제가 배경을 지우고 크기를 맞춰 연결합니다. 그림이 없으면 이펙트 없이 지금처럼 동작합니다.
 
+#### 11-1-5. 창 돌진 잔상 이펙트 (스킬 `돌진`)
+
+창 스킬 **돌진**(조준한 방향으로 240px, 0.18초)을 쓰는 동안 **주인공은 무적**입니다(무적 표시 이펙트는 쓰지 않습니다). 이펙트는 **무적 막이 아니라, 돌진한 길에 남는 잔상**으로 만듭니다: 주인공이 지나간 자리마다 **반투명한 잔상 실루엣**이 줄지어 남고 뒤로 갈수록 옅어져 사라지는 모습입니다.
+
+**방향 규칙**: 기병 이펙트와 같이 **오른쪽(→)으로 돌진할 때 기준**으로 그립니다. 게임이 실제 돌진 방향에 맞춰 돌립니다. **가장 오른쪽(앞)이 주인공 위치**이고, 잔상은 **왼쪽(뒤)** 으로 늘어섭니다.
+**잔상 모양**: 참고 이미지로 **창병 주인공 그림(`assets/hero/hero_spear.png`)을 첨부**하고, 그 실루엣(창을 앞으로 겨눈 자세, 몸을 앞으로 숙임)을 **그대로 본뜬 단색 반투명 실루엣**으로 그립니다. 얼굴·장비의 세부 묘사는 빼고 **흰색~연한 하늘색 한 가지 색**의 평평한 덩어리 + 가장자리에 얇은 밝은 윤곽만 씁니다.
+**그림체**: 게임 유닛과 같게. 면이 단순한 평평한 색, 그라데이션·번짐·사실적인 모션 블러 금지. 네거티브: `realistic motion blur, photo, 3d render, text, background scenery, horse`. 투명 배경 또는 단색 회색 배경(지우는 건 제가 합니다).
+
+각 프롬프트 앞에 **시트 요청 머리말**을 붙입니다.
+
+**A. 돌진 잔상 5컷 (한 줄)** - 돌진하는 0.18초 동안 재생
+```
+<시트 요청 머리말>
+5 frames of a dash afterimage effect, one row, each frame a wide rectangle (about 2:1), the
+dash direction is to the RIGHT. Use the attached spear soldier as the silhouette reference (leaning
+forward, spear pointing right). Each frame shows 3 to 4 translucent ghost silhouettes of that
+pose in flat pale-cyan-white, lined up horizontally behind each other like afterimages, the
+front-most (rightmost) one at the same place in every frame.
+frame 1: one strong ghost right behind the front position plus two very short speed lines
+frame 2: 2 ghosts, evenly spaced, a few thin white speed lines streaking to the left
+frame 3: 3 ghosts, the rear ones already fading, more speed lines
+frame 4: 3 ghosts, all fading, speed lines getting shorter
+frame 5: only 1 very faint ghost and a few faint streaks
+Flat colors, thin bright outline, no face detail, no characters other than the silhouettes.
+Captions: skill_dash_0, skill_dash_1, skill_dash_2, skill_dash_3, skill_dash_4
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_dash_0,skill_dash_1,skill_dash_2,skill_dash_3,skill_dash_4 --rows 1 --scale 0.16
+```
+- 화면에서 길이 약 **260px**(돌진 거리 240px + 몸 폭), 높이 약 **90px**로 씁니다. **오른쪽 끝의 실루엣 하나가 주인공 크기와 같게** 그려 주세요(시트에서 컷 하나를 가로 600px 이상으로 크게 뽑아 주세요).
+- 이전 표의 `skill_dash_0~2`(속도선 3컷) 행은 이 5컷으로 대체됩니다.
+
+**참고**: 잔상 실루엣은 코드가 주인공 그림을 반투명하게 복사해 남기는 방식으로도 만들 수 있습니다(그림 불필요). 위 그림을 받으면 그림을, 못 받으면 코드 방식으로 대신하겠습니다.
+
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
 화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.

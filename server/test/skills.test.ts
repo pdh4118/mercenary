@@ -84,6 +84,19 @@ test("검 스킬: 1초간 피해를 받지 않는다", () => {
   assert.equal(WEAPONS[2]!.type, SHIELD);
 });
 
+test("창 스킬: 돌진하는 동안 무적이고 끝나면 다시 맞는다(무적 링용 invuln은 쓰지 않는다)", () => {
+  const { g, a } = start(1);
+  g.useSkill(a);
+  const friendly = () => (g as unknown as { collectFriendlies(): { ownerId: number; hit(h: unknown): number }[] }).collectFriendlies().find((f) => f.ownerId === a)!;
+  const hp0 = g.getPlayer(a)!.hp;
+  friendly().hit({ damage: 30, charge: 0, srcType: 1, fromAngle: 0 });
+  assert.equal(g.getPlayer(a)!.hp, hp0, "돌진 중에는 피해가 없다");
+  assert.equal(g.getPlayer(a)!.invuln, 0, "무적 링 표시는 쓰지 않는다");
+  run(g, TUNE.SKILL_DASH_SEC + 0.2);
+  friendly().hit({ damage: 30, charge: 0, srcType: 1, fromAngle: 3 });
+  assert.ok(g.getPlayer(a)!.hp < hp0, "돌진이 끝나면 다시 맞는다");
+});
+
 test("철퇴 스킬: 날아가다 적에게 닿으면 그 자리의 주변 적이 함께 광역 피해를 입는다", () => {
   const { g, a, p } = start(3);
   const near = dummy(g, p.x + 300, p.y);

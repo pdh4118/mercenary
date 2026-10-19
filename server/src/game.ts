@@ -2543,8 +2543,9 @@ export class Game {
         radius: PLAYER_RADIUS,
         ownerId: p.id,
         hit: (h) => {
-          if (p.invuln > 0) {
-            // 부활 직후·스킬 무적: 맞아도 피해가 없고, "무적!"만 띄운다(연속 피격은 0.4초에 한 번만)
+          if (p.invuln > 0 || (s.dashT > 0 && s.dashStrike)) {
+            // 부활 직후·검 스킬·창 돌진 중에는 맞아도 피해가 없고 "무적!"만 띄운다(연속 피격은 0.4초에 한 번만).
+            // 창 돌진은 p.invuln을 쓰지 않아 무적 링이 그려지지 않는다.
             if (this.tick - (this.invulnPop.get(p.id) ?? -99) >= 8) {
               this.invulnPop.set(p.id, this.tick);
               this.pushEvent(EVT_INVULN, p.x, p.y, 0, 0, p.id);
