@@ -80,7 +80,7 @@ test("검 스킬: 1초간 피해를 받지 않는다", () => {
   assert.equal(WEAPONS[2]!.type, SHIELD);
 });
 
-test("철퇴 스킬: 커서 위치로 던져 터지면 주변 적이 함께 피해를 입는다", () => {
+test("철퇴 스킬: 날아가다 적에게 닿으면 그 자리의 주변 적이 함께 광역 피해를 입는다", () => {
   const { g, a, p } = start(3);
   const near = dummy(g, p.x + 300, p.y);
   const near2 = dummy(g, p.x + 300, p.y + 50);
@@ -93,20 +93,34 @@ test("철퇴 스킬: 커서 위치로 던져 터지면 주변 적이 함께 피�
   assert.ok(dealt >= WEAPONS[3]!.damage * TUNE.SKILL_MACE_DAMAGE * 0.9, `피해 ${dealt}`);
   assert.ok(g.getEnemy(near2)!.hp < 5000, "폭발 반경 안의 적도 맞는다");
   assert.equal(g.getEnemy(far)!.hp, 5000, "먼 적은 맞지 않는다");
-  assert.ok(g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] === 1), "터지는 이벤트");
+  assert.ok(g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] === 1), "적에게 닿은 이벤트");
 });
 
-test("철퇴 스킬: 맞는 것이 없으면 커서 거리에서 터진다", () => {
-  const { g, a } = start(3);
+test("철퇴 스킬: 커서까지의 거리와 상관없이 정해진 거리를 날아간다", () => {
+  const { g, a, p } = start(3);
+  const e = dummy(g, p.x + TUNE.SKILL_MACE_RANGE - 60, p.y);
+  (g.getEnemy(e) as { stunT: number }).stunT = 5; // 가만히 서 있게(접근하며 옆으로 비켜 가지 않게)
+  g.setInput(a, { ...idle, aim: 0, dist: 100 }); // 커서는 가까워도
+  g.useSkill(a);
+  run(g, 1.2);
+  assert.ok(g.getEnemy(e)!.hp < 5000, "정해진 거리 안의 적에게 닿는다");
+});
+
+test("철퇴 스킬: 아무것도 못 맞히면 폭발 없이 사라진다", () => {
+  const { g, a, p } = start(3);
+  const far = dummy(g, p.x + TUNE.SKILL_MACE_RANGE + 200, p.y); // 날아가는 거리 밖
   g.setInput(a, { ...idle, aim: 0, dist: 200 });
   g.useSkill(a);
+  g.takeEvents();
   assert.equal(g.snapshotBullets().length, 1);
   assert.equal(g.snapshotBullets()[0]![4], 1, "던진 철퇴로 구분된다");
-  run(g, 1);
-  assert.equal(g.snapshotBullets().length, 0);
+  run(g, 1.5);
+  assert.equal(g.snapshotBullets().length, 0, "다 날아가면 사라진다");
+  assert.equal(g.getEnemy(far)!.hp, 5000, "아무 피해도 없다");
+  assert.ok(!g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] === 1), "폭발 이벤트가 없다");
 });
 
-test("기마 스킬: 2초간 최고 속도로 달리고 속도를 잃지 않는다", () => {
+test("기마 스킬: 2초간 최고 속도로 달리고, 공격하면 그 속도를 잃는다", () => {
   const dist = (skill: boolean) => {
     const { g, a, p } = start(5);
     const x0 = p.x;
@@ -122,6 +136,23 @@ test("기마 스킬: 2초간 최고 속도로 달리고 속도를 잃지 않는�
   run(g, TUNE.SKILL_BOOST_SEC + 0.3);
   const slot = (g as unknown as { slots: Map<number, { boostT: number }> }).slots.get(a)!;
   assert.equal(slot.boostT, 0, "2초가 지나면 끝난다");
+});
+
+test("기마 스킬: 공격하면 가속(최고 속도)이 끝나고 속도를 잃는다", () => {
+  const { g, a, p } = start(5);
+  g.useSkill(a);
+  const slot = (g as unknown as { slots: Map<number, { boostT: number; mom: number }> }).slots.get(a)!;
+  assert.ok(slot.boostT > 1.9 && slot.mom === 1);
+  dummy(g, p.x + 50, p.y);
+  g.setInput(a, { ...idle, aim: 0, fire: true });
+  run(g, 0.3);
+  assert.equal(slot.boostT, 0, "공격으로 가속이 끝났다");
+  assert.ok(slot.mom < 1, "속도를 잃었다");
+});
+
+test("스킬 쿨타임은 모두 10초로 같다", () => {
+  assert.deepEqual([TUNE.SKILL_CD_BOW, TUNE.SKILL_CD_SPEAR, TUNE.SKILL_CD_SWORD, TUNE.SKILL_CD_MACE, TUNE.SKILL_CD_STAFF, TUNE.SKILL_CD_MOUNT], [10, 10, 10, 10, 10, 10]);
+  assert.ok(TUNE.SKILL_WALL_SEC < 10, "방벽은 쿨타임보다 짧게 남는다");
 });
 
 test("지팡이 스킬: 커서 위치에 수직으로 벽이 서고, 내구도는 주인공 체력에 비례하며, 적을 막고 시간이 지나면 사라진다", () => {

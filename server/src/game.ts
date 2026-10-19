@@ -2224,7 +2224,10 @@ export class Game {
     const arc = meleeArc(w.type, w.arc, s.mods.heroArea);
     // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
     const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) : 0;
-    if (w.type === CAVALRY && s.boostT <= 0) s.mom *= CAV_MOMENTUM_AFTER_HIT; // 가속 중에는 속도를 잃지 않는다
+    if (w.type === CAVALRY) {
+      s.boostT = 0; // 공격하면 가속(최고 속도)을 잃는다
+      s.mom *= CAV_MOMENTUM_AFTER_HIT;
+    }
     let reflected = 0;
     if (this.phase === "tournament") {
       // 토너먼트: 상대 선수의 주인공과 용병이 대상이다
@@ -2319,7 +2322,7 @@ export class Game {
         break;
       case BLUNT: {
         const crit = this.rollCrit(s.mods.heroCrit);
-        const d = Math.max(120, Math.min(TUNE.SKILL_MACE_RANGE, s.input.dist && s.input.dist > 0 ? s.input.dist : TUNE.SKILL_MACE_RANGE * 0.7));
+        const d = TUNE.SKILL_MACE_RANGE; // 커서 방향으로 정해진 거리만큼 날아간다(커서까지의 거리와 무관)
         const ang = s.input.aim;
         this.bullets.push({
           id: this.nextEntityId++,
@@ -2348,7 +2351,7 @@ export class Game {
         this.walls.push({ id: this.nextEntityId++, owner: playerId, x, y, ang: toward + Math.PI / 2, hl: TUNE.SKILL_WALL_LEN / 2, ht: TUNE.SKILL_WALL_THICK / 2, hp: maxHp, maxHp, t: TUNE.SKILL_WALL_SEC });
         break;
       }
-      case CAVALRY:
+      case CAVALRY: // 가속: 최고 속도로 달리지만 공격하면 그 속도를 잃는다
         s.boostT = TUNE.SKILL_BOOST_SEC;
         s.mom = 1;
         break;
@@ -2416,7 +2419,7 @@ export class Game {
     this.walls = this.walls.filter((w) => w.t > 0 && w.hp > 0);
   }
 
-  /** 던진 철퇴가 맞았거나 다 날아가 터진다: 주변의 적(토너먼트에서는 상대 쪽)이 피해를 입는다 */
+  /** 던진 철퇴가 적에게 닿았다: 그 자리 주변의 적(토너먼트에서는 상대 쪽)이 광역 피해를 입는다 */
   private maceLand(b: Bullet): void {
     const r = TUNE.SKILL_MACE_SPLASH;
     this.pushEvent(EVT_SKILL, b.x, b.y, 3, 1, b.owner);
@@ -4573,6 +4576,7 @@ export class Game {
       // 빠른 투사체가 대상을 건너뛰지 않도록 이동 구간을 쪼개 검사한다
       const steps = Math.max(1, Math.ceil(Math.hypot(mx, my) / 10));
       let hit = false;
+      let contact = false; // 던진 철퇴가 적에게 닿았다
       for (let i = 1; i <= steps && !hit; i++) {
         const px = b.x + (mx * i) / steps;
         const py = b.y + (my * i) / steps;
@@ -4598,6 +4602,7 @@ export class Game {
             : [...this.enemies.values()].some((e) => Math.hypot(e.x - px, e.y - py) <= b.radius + radiusOf(e));
           if (touch) {
             hit = true;
+            contact = true;
             b.x = px;
             b.y = py;
             break;
@@ -4647,15 +4652,14 @@ export class Game {
         }
       }
       if (b.kind === 1) {
-        // 던진 철퇴는 닿았거나 목표까지 다 날아가면 그 자리에서 터진다
-        if (!hit) {
+        // 던진 철퇴: 적에게 닿으면 그 자리에 광역 피해를 주고, 바위·벽에 막히거나 다 날아가도록 못 맞히면 그냥 사라진다
+        if (contact) this.maceLand(b);
+        else if (!hit) {
           b.x += mx;
           b.y += my;
           b.left -= Math.hypot(mx, my);
-          if (b.left <= 0) hit = true;
+          if (b.left > 0) remaining.push(b);
         }
-        if (hit) this.maceLand(b);
-        else remaining.push(b);
         continue;
       }
       b.x += mx;

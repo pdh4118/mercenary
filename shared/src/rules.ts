@@ -107,12 +107,12 @@ export const TUNE = {
   CAV_HALF_WIDTH: 15, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
   PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s
-  SKILL_CD_BOW: 6, // 스페이스 스킬 쿨타임(초): 활(후퇴)
-  SKILL_CD_SPEAR: 8, // 창(돌진)
-  SKILL_CD_SWORD: 14, // 검(무적)
-  SKILL_CD_MACE: 12, // 철퇴(투척)
-  SKILL_CD_STAFF: 14, // 지팡이(방벽)
-  SKILL_CD_MOUNT: 12, // 기마(가속)
+  SKILL_CD_BOW: 10, // 스페이스 스킬 쿨타임(초, 모두 10초로 통일): 활(후퇴)
+  SKILL_CD_SPEAR: 10, // 창(돌진)
+  SKILL_CD_SWORD: 10, // 검(무적)
+  SKILL_CD_MACE: 10, // 철퇴(투척)
+  SKILL_CD_STAFF: 10, // 지팡이(방벽)
+  SKILL_CD_MOUNT: 10, // 기마(가속)
   SKILL_BOOST_SEC: 2, // 기마 가속 지속(초)
   SKILL_BOOST_MULT: 1.35, // 기마 가속 중 이동 속도 추가 배율(최고 속도에 더해서)
   SKILL_DASH_DIST: 240, // 창 돌진 거리(px)
@@ -120,14 +120,14 @@ export const TUNE = {
   SKILL_BACKSTEP_DIST: 130, // 활 후퇴 거리(px)
   SKILL_BACKSTEP_SEC: 0.14,
   SKILL_INVULN_SEC: 1, // 검 무적 지속(초)
-  SKILL_MACE_RANGE: 480, // 철퇴 투척 최대 거리(px). 커서까지의 거리만큼만 날아간다
+  SKILL_MACE_RANGE: 420, // 철퇴 투척 비행 거리(px). 커서 방향으로 이만큼 날아가고, 적에게 닿으면 그 자리에 광역 피해(못 맞히면 그냥 사라진다)
   SKILL_MACE_SPEED: 560, // 던진 철퇴의 속도(px/s)
-  SKILL_MACE_DAMAGE: 1.6, // 던진 철퇴의 피해(철퇴 피해 대비)
-  SKILL_MACE_SPLASH: 80, // 던진 철퇴가 터지는 반경(px)
+  SKILL_MACE_DAMAGE: 1.5, // 던진 철퇴의 피해(철퇴 피해 대비)
+  SKILL_MACE_SPLASH: 80, // 던진 철퇴가 적에게 닿은 자리의 광역 피해 반경(px)
   SKILL_WALL_LEN: 170, // 방벽 전체 길이(px)
   SKILL_WALL_THICK: 22, // 방벽 두께(px)
   SKILL_WALL_HP_MULT: 1.2, // 방벽 내구도 = 주인공 최대 체력 x 이 값(낮은 내구성)
-  SKILL_WALL_SEC: 8, // 방벽이 남아 있는 시간(초)
+  SKILL_WALL_SEC: 5, // 방벽이 남아 있는 시간(초). 쿨타임 10초의 절반이라 계속 세워 둘 수는 없다
   BOW_FIRE_SLOW: 0.15, // 활을 쏘는 동안(공격 키를 누르고 있는 동안) 줄어드는 이동 속도 비율
   MACE_MIN_CHARGE: 0.2, // 철퇴를 모으지 않고 바로 뗐을 때에도 들어가는 최소 피해 비율(0이면 모은 만큼만)
   ENEMY_SPAWN_BASE_PER_SEC: 1.1, // 플레이어 1명당

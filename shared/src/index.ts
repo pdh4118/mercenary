@@ -67,9 +67,9 @@ export const SKILLS: readonly SkillDef[] = [
   { name: "후퇴", note: "뒤로 살짝 물러난다" }, // 활
   { name: "돌진", note: "조준한 방향으로 돌진해 찌른다" }, // 창
   { name: "무적", note: "1초간 피해를 받지 않는다" }, // 검
-  { name: "투척", note: "커서 위치로 철퇴를 던져 폭발시킨다" }, // 철퇴
+  { name: "투척", note: "커서 방향으로 철퇴를 던져, 적에게 닿으면 그 자리에 광역 피해" }, // 철퇴
   { name: "방벽", note: "사거리 안 커서 위치에 얇은 벽을 세운다" }, // 지팡이
-  { name: "가속", note: "2초간 최고 속도로 달린다" }, // 기마
+  { name: "가속", note: "2초간 최고 속도로 달린다(공격하면 속도를 잃는다)" }, // 기마
 ];
 export const WEAPON_SWITCH_DELAY_SEC = 0.25; // 무기를 바꾼 직후 공격할 수 없는 시간
 export const SWING_VISUAL_SEC = 0.18; // 근접 공격 이펙트가 보이는 시간
@@ -179,7 +179,7 @@ export const EVT_DMG_POISON = 16; // 독이 적에게 준 피해(보라색 숫�
 export const EVT_DMG_POISON_ALLY = 17; // 독이 아군(주인공·용병)에게 준 피해(보라색 숫자)
 export const EVT_COUNTER = 15; // 달려오던 기병이 창에 먼저 맞아 속도를 잃고 카운터를 입음(val = 카운터 피해)
 export const EVT_METEOR = 13; // 운석이 떨어져 폭발함(val = 반경)
-export const EVT_SKILL = 18; // 주인공 스킬을 씀(ang = 무기 번호, val = 0 발동 / 1 철퇴가 떨어져 터짐 / 2 벽이 부서짐)
+export const EVT_SKILL = 18; // 주인공 스킬을 씀(ang = 무기 번호, val = 0 발동 / 1 던진 철퇴가 적에게 닿음 / 2 벽이 부서짐)
 // 피해 숫자: val은 피해량, owner는 때린 쪽(적에게 준 피해) 또는 맞은 쪽(받은 피해) 플레이어. 같은 대상에게 한 틱에 들어간 피해는 합쳐서 보낸다.
 export const EVT_DMG_ENEMY = 8; // 아군이 적의 몸에 준 피해
 export const EVT_DMG_ENEMY_CRIT = 9; // 같은데 치명타
