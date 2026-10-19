@@ -228,6 +228,10 @@ async function main() {
   ]);
 
   // 스페이스 스킬 아이콘(무기 순서: 활, 창, 검, 철퇴, 지팡이, 기마). 파일이 없으면 아이콘 없이 글자만 보인다.
+  // 철퇴 투척: 날아가는 철퇴, 궤적 3컷, 적중 충격 4컷(없으면 도형·고리로 대신한다)
+  const maceThrownTex = await Assets.load<Texture>("assets/fx/skill_mace_thrown.png").catch(() => null);
+  const maceTrailTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_trail_${i}.png`).catch(() => null)));
+  const maceHitTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_hit_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
   const wallTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_${i}.png`).catch(() => null)));
   // 수정 군락 조각(상태 3단계 x 모양 3개): 방벽 선을 따라 일렬로 세운다. 위로 솟은 그림이라 회전하지 않는다.
@@ -392,6 +396,9 @@ async function main() {
     x0: number; // 이전 프레임 위치(방향 계산용)
     y0: number;
     mace?: boolean; // 던진 철퇴(빙글빙글 돈다)
+    trail?: Sprite; // 철퇴 뒤에 깔리는 궤적(그림이 있을 때)
+    maceSpr?: Sprite; // 도는 철퇴 그림
+    spin?: number;
   }
   // 같은 순간에 나간 화살이 많으면 하나씩 소리 내는 대신 '화살 연사' 소리 하나로 낸다
   const shotBuf: { x: number; y: number; hostile: boolean }[] = [];
@@ -408,6 +415,24 @@ async function main() {
   const bullets = new Pool<BulletView, BulletWire>(
     (w) => {
       const hostile = w[3] === 1;
+      if (w[4] === 1 && maceThrownTex) {
+        // 던진 철퇴: 그림 + 뒤에 깔리는 바람 궤적
+        const holder = new Container();
+        let trail: Sprite | undefined;
+        if (maceTrailTex.every((t) => t !== null)) {
+          trail = new Sprite(maceTrailTex[0]!);
+          trail.anchor.set(0.5);
+          trail.width = trail.height = 120;
+          trail.alpha = 0.85;
+          holder.addChild(trail); // 철퇴 뒤에 깔린다(홀더는 돌지 않고 철퇴 그림만 돈다)
+        }
+        const mace = new Sprite(maceThrownTex);
+        mace.anchor.set(0.5);
+        mace.width = mace.height = 64;
+        holder.addChild(mace);
+        bulletLayer.addChild(holder);
+        return { node: holder, x: 0, y: 0, hostile: false, angle: 0, ready: true, x0: w[1], y0: w[2], mace: true, trail, maceSpr: mace, spin: 0 };
+      }
       if (w[4] === 1) {
         // 던진 철퇴(스페이스 스킬): 에셋이 들어오기 전까지는 도형으로 그린다
         const m = new Graphics().rect(-3, -4, 6, 30).fill({ color: 0x6b4a2b }).circle(0, -8, 12).fill({ color: 0x9096a3 }).stroke({ width: 2, color: 0x2a2d36 });
@@ -958,6 +983,7 @@ async function main() {
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
+  const maceHits: { sp: Sprite; age: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean }[]>(); // 방벽 번호 -> 수정 조각들
   const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
   const WALL_PIECE_STEP = 34; // 조각 사이 간격(px). 너비보다 좁아 서로 겹쳐 이어진다
@@ -1157,6 +1183,15 @@ async function main() {
           else if (kind === EVT_KNOCK) audio.play("knockback", { x, y });
           else if (kind === EVT_METEOR) {
             blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
+          }
+          else if (kind === EVT_SKILL && val === 1 && maceHitTex.every((t) => t !== null)) {
+            // 던진 철퇴가 적에게 닿음: 갈라진 땅과 흙먼지 4컷(지름 약 반경 x 2.3)
+            audio.play("melee_hit", { x, y });
+            const sp = new Sprite(maceHitTex[0]!);
+            sp.anchor.set(0.5);
+            sp.position.set(x, y);
+            groundFx.addChild(sp);
+            maceHits.push({ sp, age: 0 });
           }
           else if (kind === EVT_SKILL) {
             // 주인공 스킬: 무기 색의 고리. 던진 철퇴가 터지면 폭발 반경만큼 크게, 벽이 부서지면 작게
@@ -1654,8 +1689,21 @@ async function main() {
     });
     bullets.update(latest.bullets, k, (v, w) => {
       if (v.mace) {
-        v.node.rotation += 0.4; // 빙글빙글 돈다
+        if (v.maceSpr) v.maceSpr.rotation += 0.4;
+        else v.node.rotation += 0.4; // 빙글빙글 돈다(도형일 때는 통째로)
         v.node.visible = true;
+        if (v.trail) {
+          // 궤적: 날아가는 방향의 반대쪽에 두고, 열린 쪽이 앞(진행 방향)을 향하게 한다
+          const dx = w[1] - v.x0;
+          const dy = w[2] - v.y0;
+          if (Math.abs(dx) + Math.abs(dy) > 0.5) v.angle = Math.atan2(dy, dx);
+          v.trail.rotation = v.angle;
+          v.spin = (v.spin ?? 0) + 1;
+          v.trail.texture = maceTrailTex[Math.floor(v.spin / 4) % 3]!;
+          v.trail.position.set(-Math.cos(v.angle) * 26, -Math.sin(v.angle) * 26);
+        }
+        v.x0 = w[1];
+        v.y0 = w[2];
         return;
       }
       // 이동한 방향으로 화살을 돌린다
@@ -2023,6 +2071,21 @@ async function main() {
       } else b.boom.visible = false;
     }
 
+    // 던진 철퇴 충격: 4컷을 0.4초 동안 재생하고 마지막에 서서히 사라진다
+    for (let i = maceHits.length - 1; i >= 0; i--) {
+      const mh = maceHits[i]!;
+      mh.age += ticker.deltaMS / 1000;
+      const k = Math.min(3, Math.floor(mh.age / 0.1));
+      const tex = maceHitTex[k]!;
+      mh.sp.texture = tex;
+      mh.sp.width = TUNE.SKILL_MACE_SPLASH * 2.3;
+      mh.sp.height = (mh.sp.width * tex.height) / tex.width;
+      mh.sp.alpha = mh.age < 0.3 ? 1 : Math.max(0, 1 - (mh.age - 0.3) / 0.2);
+      if (mh.age >= 0.5) {
+        mh.sp.destroy();
+        maceHits.splice(i, 1);
+      }
+    }
     // 마법사 방벽(스페이스 스킬): 얇은 벽. 내구도가 줄면 투명해지고 금이 간다
     const wallSeen = new Set<number>();
     for (const wl of latest.walls ?? []) {
