@@ -444,6 +444,58 @@ python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_wall
 - **이전 시안 보관**: 이미 받아서 적용한 평면 띠 그림(`skill_wall_0~2.png`)은 지우지 않고 보관하며, 조각 그림이 들어오기 전까지는 그대로 쓰입니다.
 - 위 11-1 표의 `skill_wall_*` 행은 이 조각 방식으로 대체됩니다(크기: 조각 하나 약 64x70px).
 
+#### 11-1-2. 철퇴 투척 에셋 전체 (그림 3종 + 소리 2종)
+
+철퇴 스킬은 **커서 방향으로 철퇴를 던지고, 날아가다 적에게 닿으면 그 자리에 반경 80(지름 160)의 광역 피해**를 줍니다. 필요한 에셋은 ① 날아가는 철퇴, ② 날아가는 꼬리(궤적), ③ 적중 충격, ④ 소리 2종입니다(아이콘은 완료). **그림체는 게임 유닛과 같게**: 굵은 어두운 윤곽선, 면을 단순하게 나눈 평평한 색, 치비·만화풍, 사실적인 질감·그라데이션 금지. 각 프롬프트 앞에 **시트 요청 머리말**을 붙이고 **유닛 시트를 스타일 기준 이미지로 같이 첨부**하세요(0장). 네거티브: `realistic, photo, 3d render, gradients, text, characters, background scenery`.
+
+**A. 날아가는 철퇴 + 궤적 (4개, 한 줄)**
+철퇴는 날아가는 동안 **코드가 빙글빙글 돌립니다**. 그래서 철퇴는 **한 장만** 그리고, 돌려도 어색하지 않게 **머리(가시 달린 쇠공)가 중심에 오도록** 비스듬히 놓습니다. 궤적은 철퇴 뒤에 깔리는 **휘어진 바람줄**입니다.
+```
+<시트 요청 머리말>
+4 items in one row on a transparent background, thick dark outline, flat painterly colors:
+1. a spiked iron mace for a projectile, seen from the side, placed diagonally, the spiked steel
+   ball head near the center of the image and the short wooden handle pointing down-left,
+   dull silver-steel head with a few dark rivets, brown wood handle with a leather wrap,
+   a faint motion tint on the spikes, nothing else around it
+2-4. three frames of a curved spin trail (white and pale cyan swoosh lines), a crescent arc
+   of 3 thin streaks curving around a point, frame 2-4 gradually longer and thinner, soft
+   fading tips, no weapon in them
+Captions: skill_mace_thrown, skill_mace_trail_0, skill_mace_trail_1, skill_mace_trail_2
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_mace_thrown,skill_mace_trail_0,skill_mace_trail_1,skill_mace_trail_2 --rows 1 --scale 0.12
+```
+- 철퇴(1번)는 화면에서 약 **64px**, 궤적은 약 **128px**로 줄여 씁니다.
+- 크게 뽑아 주세요(각 항목 시트 기준 높이 300px 이상).
+
+**B. 적에게 닿았을 때 충격 5컷 (한 줄)**
+```
+<시트 요청 머리말>
+5 frames of a heavy mace impact shockwave on the ground, in one row, seen from slightly above
+so the effect reads as a roughly circular burst, thick dark outline, flat painterly colors,
+each frame a square with the same center, dust in warm brown and stone-gray, a few bright
+white impact flashes:
+frame 1: a bright white-yellow flash at the center with a small crack on the ground
+frame 2: a ring of dust and stone chunks bursting outward, cracks spreading, the strongest moment
+frame 3: the ring at its widest, thinner dust, chunks flying and falling, cracks fading
+frame 4: scattered dust clouds and a few small pebbles settling, ring almost gone
+frame 5: only faint dust wisps and two or three tiny pebbles
+Captions: skill_mace_hit_0, skill_mace_hit_1, skill_mace_hit_2, skill_mace_hit_3, skill_mace_hit_4
+```
+```
+python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_mace_hit_0,skill_mace_hit_1,skill_mace_hit_2,skill_mace_hit_3,skill_mace_hit_4 --rows 1 --scale 0.16
+```
+- 충격 그림은 **지름 160px**로 줄여 씁니다(폭발 반경 80). 가장 넓은 2~3번 컷이 반경을 채우게 그려 주세요(반경을 넘으면 실제 판정보다 커 보입니다).
+- 기존 운석 폭발(`boom_*`)과 비슷한 결이면 좋지만, 철퇴는 **불꽃이 아니라 흙먼지와 돌조각**이어야 마법과 구분됩니다.
+
+**C. 소리 2종** (규칙은 10-0과 같음, 문구는 11-3과 같음)
+| 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
+| --- | --- | --- | --- |
+| `skill_mace_throw` | 철퇴를 던질 때 | `heavy mace thrown, deep spinning whoosh that fades away, no voice` | 0.5초, 2종 |
+| `skill_mace_hit` | 던진 철퇴가 적에게 닿을 때 | `heavy mace crashing into armor, big dull impact with a short rumbling shockwave and a few stone chips` | 0.6초, 2종 |
+
+**만드는 순서**: A의 철퇴 → B의 충격 → 소리 → A의 궤적(없어도 됨). 철퇴는 이미 만든 스킬 아이콘(`skill_icon_mace`)과 모양(가시 쇠공 + 나무 자루)이 같아야 어울리니 **아이콘도 참고 이미지로 첨부**하세요.
+
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
 화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.
