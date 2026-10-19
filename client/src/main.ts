@@ -228,6 +228,8 @@ async function main() {
   ]);
 
   // 스페이스 스킬 아이콘(무기 순서: 활, 창, 검, 철퇴, 지팡이, 기마). 파일이 없으면 아이콘 없이 글자만 보인다.
+  // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
+  const wallTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_${i}.png`).catch(() => null)));
   const skillIconTex = await Promise.all(["bow", "spear", "sword", "mace", "staff", "mount"].map((n) => Assets.load<Texture>(`assets/ui/skill_icon_${n}.png`).catch(() => null)));
 
   // 운석 이펙트: 낙하(작은 것부터 큰 것 6컷), 폭발 5컷, 바닥에 남는 그을음 5컷
@@ -953,6 +955,7 @@ async function main() {
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
+  const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림
   /** 떠오르는 피해 숫자. 내가 준 피해(흰색, 치명타는 굵은 금색), 방패가 막은 피해(하늘색), 내가 입은 피해(빨강)를 구분한다. */
   interface FloatText {
     node: Text;
@@ -2016,14 +2019,39 @@ async function main() {
     }
 
     // 마법사 방벽(스페이스 스킬): 얇은 벽. 내구도가 줄면 투명해지고 금이 간다
+    const wallSeen = new Set<number>();
     for (const wl of latest.walls ?? []) {
-      const [, wx, wy, wa, hl, ht, hpPct, wowner] = wl;
+      const [wid, wx, wy, wa, hl, ht, hpPct, wowner] = wl;
+      if (wallTex.every((t) => t !== null)) {
+        // 그림이 있으면 스프라이트로: 내구도에 따라 온전함 / 금이 감 / 거의 부서짐
+        wallSeen.add(wid);
+        let sp = wallSprites.get(wid);
+        if (!sp) {
+          sp = new Sprite(wallTex[0]!);
+          sp.anchor.set(0.5);
+          groundFx.addChild(sp);
+          wallSprites.set(wid, sp);
+        }
+        sp.texture = wallTex[hpPct > 60 ? 0 : hpPct > 25 ? 1 : 2]!;
+        sp.position.set(wx, wy);
+        sp.rotation = wa;
+        sp.width = 2 * hl + 16; // 빛나는 가장자리 몫
+        sp.height = (sp.width * 85) / 660;
+        if (wowner === myId) fxLayer.circle(wx, wy, 4).fill({ color: 0xffe08a, alpha: 0.9 }); // 내 방벽 표시
+        continue;
+      }
       const cs = Math.cos(wa);
       const sn = Math.sin(wa);
       const pts = ([[-hl, -ht], [hl, -ht], [hl, ht], [-hl, ht]] as const).flatMap(([u, vv]) => [wx + u * cs - vv * sn, wy + u * sn + vv * cs]);
       const frac = hpPct / 100;
       fxLayer.poly(pts).fill({ color: 0xa9c7ff, alpha: 0.25 + 0.4 * frac }).stroke({ width: 3, color: wowner === myId ? 0xffe08a : 0xe8f0ff, alpha: 0.9 });
       if (frac < 0.6) fxLayer.moveTo(wx - sn * 0 - cs * hl * 0.4, wy - sn * hl * 0.4).lineTo(wx + cs * hl * 0.1 - sn * ht, wy + sn * hl * 0.1 + cs * ht).stroke({ width: 2, color: 0x1a2336, alpha: 0.8 });
+    }
+    for (const [id, sp] of wallSprites) {
+      if (!wallSeen.has(id)) {
+        sp.destroy();
+        wallSprites.delete(id); // 사라진 방벽
+      }
     }
     // 근접 무기 휘두르기 이펙트와 레벨업 밀어내기 고리
     for (const p of latest.players) {
