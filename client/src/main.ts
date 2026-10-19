@@ -2211,7 +2211,7 @@ async function main() {
       if (seg3 || wallSegTex.every((row) => row.every((t) => t !== null))) {
         // 수정 조각을 방벽 선을 따라 세운다(회전 없음). 내구도에 따라 온전함 / 금이 감 / 거의 부서짐 조각으로 바뀐다.
         wallSeen.add(wid);
-        const state = hpPct > 60 ? 0 : hpPct > 25 ? 1 : 2;
+        const state = wallRiseTex.every((t) => t !== null) && wallFadeTex.every((t) => t !== null) ? 0 : hpPct > 60 ? 0 : hpPct > 25 ? 1 : 2; // 생성·소멸 그림이 있으면 금 간 모습 없이 온전한 조각만 쓴다
         const step = seg3 ? WALL_SEG3_STEP : WALL_PIECE_STEP;
         const n = Math.max(2, Math.ceil((2 * hl) / step) + 1);
         let pcs = wallPieces.get(wid);
