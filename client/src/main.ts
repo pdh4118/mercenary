@@ -230,6 +230,8 @@ async function main() {
   // 스페이스 스킬 아이콘(무기 순서: 활, 창, 검, 철퇴, 지팡이, 기마). 파일이 없으면 아이콘 없이 글자만 보인다.
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
   const wallTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_${i}.png`).catch(() => null)));
+  // 수정 군락 조각(상태 3단계 x 모양 3개): 방벽 선을 따라 일렬로 세운다. 위로 솟은 그림이라 회전하지 않는다.
+  const wallSegTex = await Promise.all([0, 1, 2].map((s) => Promise.all(["a", "b", "c"].map((v) => Assets.load<Texture>(`assets/fx/skill_wall_${s}_${v}.png`).catch(() => null)))));
   const skillIconTex = await Promise.all(["bow", "spear", "sword", "mace", "staff", "mount"].map((n) => Assets.load<Texture>(`assets/ui/skill_icon_${n}.png`).catch(() => null)));
 
   // 운석 이펙트: 낙하(작은 것부터 큰 것 6컷), 폭발 5컷, 바닥에 남는 그을음 5컷
@@ -955,7 +957,10 @@ async function main() {
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
-  const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림
+  const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
+  const wallPieces = new Map<number, { sp: Sprite; high: boolean }[]>(); // 방벽 번호 -> 수정 조각들
+  const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
+  const WALL_PIECE_STEP = 34; // 조각 사이 간격(px). 너비보다 좁아 서로 겹쳐 이어진다
   /** 떠오르는 피해 숫자. 내가 준 피해(흰색, 치명타는 굵은 금색), 방패가 막은 피해(하늘색), 내가 입은 피해(빨강)를 구분한다. */
   interface FloatText {
     node: Text;
@@ -2022,8 +2027,57 @@ async function main() {
     const wallSeen = new Set<number>();
     for (const wl of latest.walls ?? []) {
       const [wid, wx, wy, wa, hl, ht, hpPct, wowner] = wl;
+      if (wallSegTex.every((row) => row.every((t) => t !== null))) {
+        // 수정 조각을 방벽 선을 따라 세운다(회전 없음). 내구도에 따라 온전함 / 금이 감 / 거의 부서짐 조각으로 바뀐다.
+        wallSeen.add(wid);
+        const state = hpPct > 60 ? 0 : hpPct > 25 ? 1 : 2;
+        const n = Math.max(2, Math.ceil((2 * hl) / WALL_PIECE_STEP) + 1);
+        let pcs = wallPieces.get(wid);
+        if (!pcs) {
+          pcs = [];
+          wallPieces.set(wid, pcs);
+        }
+        const cs = Math.cos(wa);
+        const sn = Math.sin(wa);
+        for (let k = 0; k < n; k++) {
+          const u = -hl + ((2 * hl) / (n - 1)) * k;
+          const px = wx + u * cs;
+          const py = wy + u * sn;
+          let pc = pcs[k];
+          if (!pc) {
+            pc = { sp: new Sprite(wallSegTex[0]![0]!), high: false };
+            pc.sp.anchor.set(0.5, 0.94); // 바닥선이 판정 위치
+            terrainLow.addChild(pc.sp);
+            pcs[k] = pc;
+          }
+          const tex = wallSegTex[state]![(k + wid) % 3]!;
+          pc.sp.texture = tex;
+          pc.sp.width = WALL_PIECE_W;
+          pc.sp.height = (WALL_PIECE_W * tex.height) / tex.width;
+          pc.sp.position.set(px, py);
+          pc.sp.zIndex = py;
+          // 유닛이 조각 뒤에 서 있으면 조각을 유닛 위에 그린다(바위·나무와 같은 규칙)
+          let behind = false;
+          const half = WALL_PIECE_W / 2;
+          const top = py - pc.sp.height;
+          const check = (v: { x: number; y: number }) => {
+            if (!behind && Math.abs(v.x - px) < half && v.y < py && v.y > top) behind = true;
+          };
+          for (const v of players.views.values()) check(v);
+          if (!behind) for (const v of mercs.views.values()) check(v);
+          if (!behind) for (const v of enemies.views.values()) check(v);
+          if (behind !== pc.high) {
+            pc.high = behind;
+            (behind ? terrainHigh : terrainLow).addChild(pc.sp);
+          }
+        }
+        for (let k = n; k < pcs.length; k++) pcs[k]!.sp.destroy();
+        pcs.length = n;
+        if (wowner === myId) fxLayer.circle(wx, wy, 4).fill({ color: 0xffe08a, alpha: 0.9 }); // 내 방벽 표시
+        continue;
+      }
       if (wallTex.every((t) => t !== null)) {
-        // 그림이 있으면 스프라이트로: 내구도에 따라 온전함 / 금이 감 / 거의 부서짐
+        // 조각 그림이 없으면 평면 띠 그림(이전 시안)
         wallSeen.add(wid);
         let sp = wallSprites.get(wid);
         if (!sp) {
@@ -2035,9 +2089,9 @@ async function main() {
         sp.texture = wallTex[hpPct > 60 ? 0 : hpPct > 25 ? 1 : 2]!;
         sp.position.set(wx, wy);
         sp.rotation = wa;
-        sp.width = 2 * hl + 16; // 빛나는 가장자리 몫
+        sp.width = 2 * hl + 16;
         sp.height = (sp.width * 85) / 660;
-        if (wowner === myId) fxLayer.circle(wx, wy, 4).fill({ color: 0xffe08a, alpha: 0.9 }); // 내 방벽 표시
+        if (wowner === myId) fxLayer.circle(wx, wy, 4).fill({ color: 0xffe08a, alpha: 0.9 });
         continue;
       }
       const cs = Math.cos(wa);
@@ -2051,6 +2105,12 @@ async function main() {
       if (!wallSeen.has(id)) {
         sp.destroy();
         wallSprites.delete(id); // 사라진 방벽
+      }
+    }
+    for (const [id, pcs] of wallPieces) {
+      if (!wallSeen.has(id)) {
+        for (const pc of pcs) pc.sp.destroy();
+        wallPieces.delete(id);
       }
     }
     // 근접 무기 휘두르기 이펙트와 레벨업 밀어내기 고리
