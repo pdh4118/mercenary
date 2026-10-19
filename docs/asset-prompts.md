@@ -575,6 +575,129 @@ python3 tools/slice_sheet.py <시트> client/public/assets/fx --names skill_boos
 - **게임에서 쓰는 방식**: 가속 중에는 A를 말 뒤에 붙여 **0.05초마다 한 컷씩 반복**하고, B를 발밑에 같이 반복하며, 시작할 때 C를 한 번, 공격으로 풀릴 때 D를 한 번 재생합니다. 이펙트는 달리는 방향의 반대쪽으로 돌려 붙입니다.
 - 위 11-1 표의 `skill_boost_0~3`(4컷)과 `skill_dust`(기마 가속 쪽) 행은 이 4세트로 대체됩니다.
 
+#### 11-1-4. 기마 가속 이펙트 - 낱장(한 장씩) 프롬프트 18개
+
+위 시트 프롬프트 대신 **한 장씩 따로** 뽑을 때 쓰는 프롬프트입니다. 모든 프롬프트는 **공통 머리말(STYLE)** 을 앞에 붙여서 한 줄로 단독 사용하세요. 이어지는 컷은 **바로 앞 컷을 참고 이미지로 같이 첨부**해야 위치·크기·색이 이어집니다(1번 컷만 유닛 시트를 첨부). 받은 파일은 이름 그대로 저장해 주시면 됩니다(배경이 회색·체크무늬여도 제가 지웁니다).
+
+**STYLE (모든 프롬프트 맨 앞)**
+```
+A single game effect sprite, side view, effect only (no horse, no rider, no characters, no text),
+flat painterly colors with a thin dark outline matching the attached style reference,
+white and pale-cyan wind and warm brown dust only, no realistic smoke, no gradients,
+transparent background, the effect drawn for something running to the RIGHT so it trails to the LEFT.
+```
+
+**A. 바람 궤적 반복 6컷** (가로로 긴 2:1 한 장씩, 마지막 컷에서 첫 컷으로 이어짐)
+공통: 오른쪽 끝이 굵고 밝으며(말 쪽), 왼쪽으로 갈수록 가늘고 투명해지는 곡선 바람 띠 4~5개. 컷마다 띠의 소용돌이가 **조금씩 왼쪽으로 흘러간다.**
+1. `skill_boost_0`
+```
+<STYLE> Image format: wide rectangle, 2:1. A wind trail: five curved white and pale-cyan ribbons
+of different lengths flowing from thick and bright at the RIGHT edge to thin and faded at the
+LEFT, three small spiral curls at about 20%, 45% and 75% of the length from the right, a few
+tiny sparkles. This is frame 1 of a 6-frame seamless loop.
+```
+2. `skill_boost_1` (참고: skill_boost_0)
+```
+<STYLE> Same size, same trail, same style as the attached frame. Frame 2 of 6: the curls and
+sparkles moved slightly to the LEFT (about 1/6 of the spacing), the ribbons wave a little
+differently, a new small curl begins to form near the right edge.
+```
+3. `skill_boost_2` (참고: skill_boost_1)
+```
+<STYLE> Same size, same trail, same style as the attached frame. Frame 3 of 6: the curls moved
+a bit further LEFT, the first curl is now larger and looser, ribbons slightly longer, the new
+curl near the right edge is clearer.
+```
+4. `skill_boost_3` (참고: skill_boost_2)
+```
+<STYLE> Same size, same trail, same style as the attached frame. Frame 4 of 6: curls moved
+further LEFT, the oldest curl on the left is thinning and fading out, a second new curl forms
+near the right edge, sparkles in new positions.
+```
+5. `skill_boost_4` (참고: skill_boost_3)
+```
+<STYLE> Same size, same trail, same style as the attached frame. Frame 5 of 6: the oldest curl
+has almost vanished on the left, the middle curls moved further LEFT, the new curls near the
+right edge are fully formed, ribbons longest and thinnest.
+```
+6. `skill_boost_5` (참고: skill_boost_4, 그리고 skill_boost_0)
+```
+<STYLE> Same size, same trail, same style as the attached frame. Frame 6 of 6: arranged so that
+it flows naturally back into the attached first frame: curls positioned about 1/6 of the
+spacing to the RIGHT of where they are in the first frame, ribbons nearly identical to the first
+frame, the loop must look seamless.
+```
+
+**B. 발굽 흙먼지 반복 4컷** (96x64 비율, 바닥선이 맨 아래, 먼지가 오른쪽 아래 점의 왼쪽에서 올라감)
+7. `skill_boost_dust_0`
+```
+<STYLE> Image format: wide rectangle, 3:2, a flat ground line along the bottom edge. Small puffs
+of warm brown dust and two or three pebbles kicked up, drifting to the LEFT from a point at the
+bottom right: three puffs of different sizes, low and small. Frame 1 of a 4-frame seamless loop.
+```
+8. `skill_boost_dust_1` (참고: 7번)
+```
+<STYLE> Same size and style as the attached frame. Frame 2 of 4: the puffs rose a little and
+drifted LEFT, a fourth small new puff appears at the bottom right, pebbles in the air.
+```
+9. `skill_boost_dust_2` (참고: 8번)
+```
+<STYLE> Same size and style as the attached frame. Frame 3 of 4: the older puffs are larger,
+paler and further LEFT, the new puff has grown, one pebble landing.
+```
+10. `skill_boost_dust_3` (참고: 9번과 7번)
+```
+<STYLE> Same size and style as the attached frame. Frame 4 of 4: the oldest puffs are fading,
+the others drifted LEFT, arranged so it flows seamlessly back into the attached first frame.
+```
+
+**C. 가속 시작 폭발 5컷** (정사각형, 가운데 중심)
+11. `skill_boost_start_0`
+```
+<STYLE> Image format: square, centered. A small bright white flash at the center with five
+short thin speed lines radiating out. Frame 1 of 5 of a sudden speed burst.
+```
+12. `skill_boost_start_1` (참고: 11번)
+```
+<STYLE> Same size and style as the attached frame. Frame 2 of 5: a ring-shaped shockwave of
+white and pale-cyan wind bursting outward at about 45% of the image, brown dust puffs along the
+bottom, the flash is smaller.
+```
+13. `skill_boost_start_2` (참고: 12번)
+```
+<STYLE> Same size and style as the attached frame. Frame 3 of 5: the ring at its widest, about
+90% of the image, long thin speed lines streaking toward the LEFT, three dust puffs.
+```
+14. `skill_boost_start_3` (참고: 13번)
+```
+<STYLE> Same size and style as the attached frame. Frame 4 of 5: the ring thin and fading, speed
+lines shorter, dust drifting and spreading.
+```
+15. `skill_boost_start_4` (참고: 14번)
+```
+<STYLE> Same size and style as the attached frame. Frame 5 of 5: only a few faint streaks and
+two small dust wisps left, mostly empty.
+```
+
+**D. 가속이 풀릴 때 3컷** (정사각형, 가운데 중심, 없어도 됨)
+16. `skill_boost_end_0`
+```
+<STYLE> Image format: square, centered. Wind ribbons snapping and bursting into a few short
+pieces with a small white flash in the middle. Frame 1 of 3 of a speed-loss effect.
+```
+17. `skill_boost_end_1` (참고: 16번)
+```
+<STYLE> Same size and style as the attached frame. Frame 2 of 3: the pieces scattering backward
+to the LEFT, a small brown dust cloud at the bottom.
+```
+18. `skill_boost_end_2` (참고: 17번)
+```
+<STYLE> Same size and style as the attached frame. Frame 3 of 3: only faint wisps fading away.
+```
+
+- **크기**: A는 가로로 긴 2:1(화면 약 190x95px), B는 3:2(약 96x64px), C·D는 정사각형(약 128px). 크게 뽑아 주세요(긴 변 1000px 이상).
+- **받은 뒤**: 파일 이름만 위 표시와 같으면 제가 배경을 지우고 크기를 맞춰 연결합니다. 그림이 없으면 이펙트 없이 지금처럼 동작합니다.
+
 ### 11-2. 스킬 아이콘 6개 (화면 오른쪽 아래 스킬 줄용), 한 줄 - `assets/ui/`
 
 화면 오른쪽 아래 무기 칸 위의 **스킬 줄**에 쓰입니다(쿨타임 막대와 숫자는 코드가 그립니다). 위 **8-1** 무기 아이콘과 같은 형식(둥근 사각형 배지 안에 그림 하나)으로 만들어서 한 줄로 어울리게 합니다. 투명 배경, 그림 속에 글자 없음.
