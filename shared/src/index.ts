@@ -120,6 +120,7 @@ export interface PlayerState {
   invuln: number; // 부활 직후·스킬 무적 남은 시간(초)
   sk: number; // 스페이스 스킬 쿨타임이 남은 시간(초, 무기를 바꿔도 공유)
   skMax: number; // 마지막으로 쓴 스킬의 전체 쿨타임(초)
+  bst: number; // 기마 가속이 남은 시간(초). 0이면 가속 중이 아니다(속도 이펙트 표시용)
   shield: number; // 검을 들었을 때의 방패 체력(무기를 바꿔도 값은 유지, 검일 때만 막는다)
   shieldMax: number;
 }

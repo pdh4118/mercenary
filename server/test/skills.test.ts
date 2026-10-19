@@ -216,3 +216,19 @@ test("스킬 회복 속도 카드: 일반 +4%, 쌓을수록 쿨타임이 1/(1+�
   const rate = (n: number) => 1 / cooldownAfter(n);
   assert.ok(Math.abs(rate(1) - rate(0) - (rate(26) - rate(25))) < 1e-9);
 });
+
+test("기마 가속 중에는 상태에 남은 시간(bst)이 실려 속도 이펙트를 그릴 수 있다", () => {
+  const { g, a, p } = start(5);
+  assert.equal(p.bst, 0);
+  g.useSkill(a);
+  assert.ok(g.getPlayer(a)!.bst > 1.9);
+  run(g, TUNE.SKILL_BOOST_SEC + 0.2);
+  assert.equal(g.getPlayer(a)!.bst, 0, "끝나면 0");
+  // 공격으로 풀릴 때도 0
+  const s2 = start(5);
+  s2.g.useSkill(s2.a);
+  dummy(s2.g, s2.p.x + 50, s2.p.y);
+  s2.g.setInput(s2.a, { ...idle, aim: 0, fire: true });
+  run(s2.g, 0.3);
+  assert.equal(s2.g.getPlayer(s2.a)!.bst, 0);
+});

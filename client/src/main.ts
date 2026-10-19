@@ -232,6 +232,8 @@ async function main() {
   const maceThrownTex = await Assets.load<Texture>("assets/fx/skill_mace_thrown.png").catch(() => null);
   const maceTrailTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_trail_${i}.png`).catch(() => null)));
   const maceHitTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_hit_${i}.png`).catch(() => null)));
+  // 기마 가속 속도 이펙트(바람 궤적 6컷 반복). 없으면 이펙트 없이 달린다.
+  const boostTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
   const wallTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_wall_${i}.png`).catch(() => null)));
   // 수정 군락 조각(상태 3단계 x 모양 3개): 방벽 선을 따라 일렬로 세운다. 위로 솟은 그림이라 회전하지 않는다.
@@ -983,6 +985,7 @@ async function main() {
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
+  const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
   const maceHits: { sp: Sprite; age: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean }[]>(); // 방벽 번호 -> 수정 조각들
   const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
@@ -2180,6 +2183,35 @@ async function main() {
     for (const p of latest.players) {
       const w = WEAPONS[p.weapon]!;
       const v = players.views.get(p.id);
+      // 기마 가속: 달리는 동안 몸 뒤로 바람 궤적이 흐른다. 오른쪽 끝의 빛 덩어리는 주인공 몸 아래에 가려지도록 깐다(groundFx는 유닛 아래).
+      if (boostTex.every((t) => t !== null)) {
+        let bf = boostFx.get(p.id);
+        const active = !!v && (p.bst ?? 0) > 0 && !p.down && w.type === 0; // 기마 무기일 때만
+        if (v && active) {
+          if (!bf) {
+            const sp = new Sprite(boostTex[0]!);
+            sp.anchor.set(0.97, 0.5); // 오른쪽 끝(빛 덩어리)이 주인공 위치
+            groundFx.addChild(sp);
+            bf = { sp, px: v.x, py: v.y, ang: 0 };
+            boostFx.set(p.id, bf);
+          }
+          const dx = v.x - bf.px;
+          const dy = v.y - bf.py;
+          const moving = Math.hypot(dx, dy) > 0.6;
+          if (moving) bf.ang = Math.atan2(dy, dx);
+          bf.px = v.x;
+          bf.py = v.y;
+          bf.sp.visible = moving;
+          bf.sp.position.set(v.x, v.y + 4);
+          bf.sp.rotation = bf.ang;
+          bf.sp.texture = boostTex[Math.floor(performance.now() / 50) % 6]!;
+          bf.sp.width = 150;
+          bf.sp.height = (150 * bf.sp.texture.height) / bf.sp.texture.width;
+        } else if (bf) {
+          bf.sp.destroy();
+          boostFx.delete(p.id);
+        }
+      }
       if (v && p.invuln > 0 && !p.down) fxLayer.circle(v.x, v.y, 27 + 2 * Math.sin(performance.now() / 90)).stroke({ width: 3, color: 0x9be8ff, alpha: 0.85 }).circle(v.x, v.y, 24).fill({ color: 0x9be8ff, alpha: 0.12 }); // 무적
       const reachNow = p.hs?.[2] || w.reach; // 사거리·범위 카드가 반영된 값(철퇴는 범위가 사거리로 간다)
       const arcNow = meleeArc(w.type, w.arc, p.hs?.[6] || 1);

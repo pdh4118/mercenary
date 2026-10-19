@@ -756,6 +756,7 @@ export class Game {
         invuln: 0,
         sk: 0,
         skMax: 0,
+        bst: 0,
         shield: TUNE.HERO_SHIELD_MAX,
         shieldMax: TUNE.HERO_SHIELD_MAX,
       },
@@ -2036,6 +2037,7 @@ export class Game {
       const casting = s.windT > 0 && WEAPONS[p.weapon]!.type === MAGE; // 주문을 외우는 동안은 움직일 수 없다
       const moving = !frozen && !casting && (s.input.dx !== 0 || s.input.dy !== 0);
       if (s.boostT > 0) s.boostT = Math.max(0, s.boostT - dt);
+      p.bst = Math.round(s.boostT * 10) / 10;
       s.mom = mounted && s.boostT > 0 ? 1 : mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
       const bowFiring = WEAPONS[p.weapon]!.ranged && WEAPONS[p.weapon]!.type === ARCHER && s.input.fire && !frozen; // 활을 쏘는 동안은 느려진다
       const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1);
@@ -2228,6 +2230,7 @@ export class Game {
     const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) : 0;
     if (w.type === CAVALRY) {
       s.boostT = 0; // 공격하면 가속(최고 속도)을 잃는다
+      p.bst = 0;
       s.mom *= CAV_MOMENTUM_AFTER_HIT;
     }
     let reflected = 0;
@@ -2363,6 +2366,7 @@ export class Game {
     s.skillCd = s.skillMax = this.skillCooldownOf(widx) / (1 + Math.max(0, s.mods.heroSkill)); // 회복 속도 카드: 쌓은 합 x면 쿨타임 1/(1+x)배
     p.sk = s.skillCd;
     p.skMax = s.skillMax;
+    p.bst = Math.round(s.boostT * 10) / 10;
     this.pushEvent(EVT_SKILL, p.x, p.y, widx, 0, playerId);
     return true;
   }
