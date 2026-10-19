@@ -123,6 +123,9 @@ export const UNIT_TYPES = [CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE] as const
 /** 주인공의 기본 공격·피격처럼 병종이 없는 쪽은 상성 계산에서 제외한다 */
 export const NO_TYPE = -1;
 
+/** 용병 흡혈의 최종 효율 배율(병종 순서). 궁병은 절반, 마법사는 1/4 */
+export const MERC_LIFESTEAL_MULT = [1, 1, 0.5, 1, 1, 0.25] as const;
+
 export const UNIT_NAMES = ["기병", "창병", "궁병", "검방병", "둔기병", "마법사"] as const;
 
 /**

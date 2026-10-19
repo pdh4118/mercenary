@@ -45,3 +45,19 @@ test("흡혈 카드: 주인공이 준 피해의 일부만큼 체력을 회복한
   assert.ok(dealt > 0);
   assert.ok(Math.abs(p.hp - (50 + dealt * 0.1)) < 0.5, `회복 ${p.hp - 50} / 기대 ${dealt * 0.1}`);
 });
+
+test("용병 흡혈의 최종 효율: 궁병은 절반, 마법사는 1/4, 나머지는 그대로", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const heal = (type: number): number => {
+    const id = g.addMerc(a, type, 0, 0);
+    const m = (g as unknown as { mercs: Map<number, { hp: number }> }).mercs.get(id)!;
+    m.hp = 1;
+    (g as unknown as { lifesteal(o: unknown, s: unknown, n: number): void }).lifesteal((g as unknown as { slots: Map<number, unknown> }).slots.get(a), m, 10);
+    return m.hp - 1;
+  };
+  assert.equal(heal(3), 10, "검방병은 그대로");
+  assert.equal(heal(2), 5, "궁병은 절반");
+  assert.equal(heal(5), 2.5, "마법사는 1/4");
+});

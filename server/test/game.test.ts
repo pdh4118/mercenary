@@ -692,11 +692,11 @@ test("카드 효과: 용병 체력 강화는 이미 있는 용병의 체력도 �
   const m = g.addMerc(a, SHIELD, 0, 0);
   const before = MERC_STATS[SHIELD]!.hp;
   forceCard(g, a, "mercStat", (e) => e.stat === "hp" && e.type === undefined);
-  assert.equal(g.getMerc(m)!.hp, Math.round(before * 1.05));
+  assert.equal(g.getMerc(m)!.hp, Math.round(before * 1.075));
   const wire = g.snapshotMercs().find((w) => w[0] === m)!;
-  assert.equal(wire[9], Math.round(before * 1.05)); // 최대 체력
+  assert.equal(wire[9], Math.round(before * 1.075)); // 최대 체력
   const m2 = g.addMerc(a, SHIELD, 0, 0); // 새로 고용한 용병도 강화된 체력으로 시작
-  assert.equal(g.getMerc(m2)!.hp, Math.round(before * 1.05));
+  assert.equal(g.getMerc(m2)!.hp, Math.round(before * 1.075));
 });
 
 test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
@@ -705,7 +705,7 @@ test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
   const spear = g.addMerc(a, SPEAR, 0, 0);
   const shield = g.addMerc(a, SHIELD, 0, 0);
   forceCard(g, a, "mercStat", (e) => e.stat === "hp" && e.type === SPEAR);
-  assert.equal(g.getMerc(spear)!.hp, Math.round(MERC_STATS[SPEAR]!.hp * 1.25));
+  assert.equal(g.getMerc(spear)!.hp, Math.round(MERC_STATS[SPEAR]!.hp * 1.375));
   assert.equal(g.getMerc(shield)!.hp, MERC_STATS[SHIELD]!.hp);
 });
 
@@ -713,8 +713,8 @@ test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   forceCard(g, a, "heroMaxHp");
-  assert.equal(g.getPlayer(a)!.maxHp, TUNE.PLAYER_MAX_HP + 25);
-  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 25);
+  assert.equal(g.getPlayer(a)!.maxHp, TUNE.PLAYER_MAX_HP + 13);
+  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 13);
   forceCard(g, a, "priceMult");
   assert.ok(Math.abs(g.getPlayer(a)!.priceMult - 0.85) < 1e-9);
   const p = me(g, a);
@@ -735,7 +735,7 @@ test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
   const x0 = me(g, a).x;
   g.setInput(a, { ...idle, dx: 1 });
   run(g, 1);
-  assert.ok(Math.abs(me(g, a).x - x0 - TUNE.PLAYER_SPEED * 1.12) < 1e-6);
+  assert.ok(Math.abs(me(g, a).x - x0 - TUNE.PLAYER_SPEED * 1.06) < 1e-6);
   g.setInput(a, idle);
   forceCard(g, a, "heroRegen");
   g.getPlayer(a)!.hp = 50;

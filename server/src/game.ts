@@ -2,6 +2,7 @@ import {
   ARCHER,
   BLUNT,
   MAGE,
+  MERC_LIFESTEAL_MULT,
   EVT_METEOR,
   EVT_REFLECT,
   EVT_COUNTER,
@@ -3536,7 +3537,7 @@ export class Game {
   /** 피의 갈증: 때린 쪽(용병 또는 주인공)이 체력을 회복한다 */
   private lifesteal(owner: Slot, src: Merc | undefined, amount: number): void {
     if (src) {
-      if (src.respawn <= 0) src.hp = Math.min(this.mercStats(src).hp, src.hp + amount);
+      if (src.respawn <= 0) src.hp = Math.min(this.mercStats(src).hp, src.hp + amount * (MERC_LIFESTEAL_MULT[src.type] ?? 1));
     } else if (!owner.state.down) {
       owner.state.hp = Math.min(owner.state.maxHp, owner.state.hp + amount);
     }
