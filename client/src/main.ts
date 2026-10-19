@@ -220,7 +220,7 @@ async function main() {
   const [heroTex, campTex, groundTex, allyArrow, enemyArrow] = await Promise.all([
     Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_${f}.png`))),
     Assets.load<Texture>("assets/camp/camp.png"),
-    Assets.load<Texture>("assets/tiles/ground_a.png"),
+    Assets.load<Texture>("assets/tiles/ground_b.png"),
     Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/arrow_ally_${i}.png`))),
     Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/arrow_enemy_${i}.png`))),
   ]);
@@ -238,7 +238,7 @@ async function main() {
   const ground = new TilingSprite({ texture: groundTex, width: WORLD_SIZE + GROUND_MARGIN * 2, height: WORLD_SIZE + GROUND_MARGIN * 2 });
   ground.position.set(-half - GROUND_MARGIN, -half - GROUND_MARGIN);
   ground.tileScale.set(1);
-  ground.tint = 0xa6a6a6; // 전투가 잘 보이도록 바닥을 한 단계 어둡게 눌러 둔다
+  ground.tint = 0xe0e0e0; // 새 바닥은 원래 밝아서 거의 그대로 두되 살짝만 눌러 전투가 잘 보이게 한다
   const border = new Graphics().rect(-half, -half, WORLD_SIZE, WORLD_SIZE).stroke({ width: 4, color: 0x5a3b3b });
   const terrainFlat = new Container(); // 고지대·장식: 모든 유닛 아래
   const terrainLow = new Container(); // 바위·나무·폐허: 유닛 뒤에 있을 때
