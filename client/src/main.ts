@@ -216,7 +216,7 @@ async function main() {
   const enemyCav = [0, 1].map((pose) => cavRaw[pose]!.map((_t, d) => cavTex("e", pose, d, ENEMY_CAV_COLOR)));
   const enemyCavRun = [0, 1, 2, 3, 4, 5, 6, 7].map((d) => [0, 1, 2, 3].map((k) => cavTex("e", 2, d, ENEMY_CAV_COLOR, k)));
   /** 8방위 그림은 크기가 달라 별도 배율·기준점을 쓴다 */
-  const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5;
+  const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5 * 1.4; // 말 탄 병사가 다른 병종과 비슷한 크기로 보이도록 1.4배
   const CAV_ANCHOR: [number, number] = [0.483, 0.72];
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
   // 여성 주인공 그림(없으면 기본 그림으로 대신한다)
