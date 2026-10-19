@@ -239,6 +239,8 @@ async function main() {
   const boostTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_${i}.png`).catch(() => null)));
   // 기마 가속 시작 폭발(6컷, 달리기 시작하는 순간 한 번). 없으면 생략.
   const boostStartTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_start_${i}.png`).catch(() => null)));
+  // 창 돌진 잔상(5컷). 없으면 생략.
+  const dashTex = await Promise.all([0, 1, 2, 3, 4].map((i) => Assets.load<Texture>(`assets/fx/skill_dash_${i}.png`).catch(() => null)));
   // 기마 가속이 풀리는 순간의 이펙트(6컷). 없으면 생략.
   const boostEndTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_end_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
@@ -994,6 +996,8 @@ async function main() {
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
+  const dashFx = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 창 돌진 잔상(주인공별)
+  const DASH_TINT = 0x14162a; // 잔상 색(흰 그림에 곱해 어둡게)
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
   const maceHits: { sp: Sprite; age: number }[] = []; // 던진 철퇴 적중 충격
@@ -1207,6 +1211,18 @@ async function main() {
             sp.position.set(x, y);
             groundFx.addChild(sp);
             maceHits.push({ sp, age: 0 });
+          }
+          else if (kind === EVT_SKILL && val === 0 && WEAPONS[Math.round(ang)]?.type === SPEAR_TYPE && dashTex.every((t) => t !== null) && latest.players.some((q) => q.id === owner)) {
+            // 창 돌진: 돌진하는 동안 몸을 따라가며 잔상이 남는다(무적이라 링은 그리지 않는다)
+            dashFx.get(owner)?.sp.destroy();
+            const q = latest.players.find((r) => r.id === owner)!;
+            const sp = new Sprite(dashTex[0]!);
+            sp.anchor.set(0.72, 0.5);
+            sp.tint = DASH_TINT;
+            sp.alpha = 0.9;
+            sp.position.set(x, y);
+            groundFx.addChild(sp);
+            dashFx.set(owner, { sp, t0: performance.now(), ang: q.aim });
           }
           else if (kind === EVT_SKILL) {
             // 주인공 스킬: 무기 색의 고리. 던진 철퇴가 터지면 폭발 반경만큼 크게, 벽이 부서지면 작게
@@ -2249,6 +2265,23 @@ async function main() {
           bf.sp.destroy();
           bf.burst?.destroy();
           boostFx.delete(p.id);
+        }
+      }
+      const df = dashFx.get(p.id);
+      if (df) {
+        const el = performance.now() - df.t0;
+        const f = Math.floor(el / 70);
+        if (f >= 5 || !v) {
+          df.sp.destroy();
+          dashFx.delete(p.id);
+        } else {
+          const t = dashTex[f]!;
+          const left = Math.cos(df.ang) < 0; // 왼쪽으로 돌진하면 그림을 좌우로 뒤집는다
+          df.sp.texture = t;
+          const sc = 0.37;
+          df.sp.scale.set(left ? -sc : sc, sc);
+          df.sp.rotation = left ? df.ang + Math.PI : df.ang;
+          if (el < 180) df.sp.position.set(v.x, v.y); // 돌진이 끝난 자리에서는 멈춰서 사라진다
         }
       }
       const be = boostEnds.get(p.id);
