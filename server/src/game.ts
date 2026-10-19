@@ -29,6 +29,7 @@ import {
   EVT_INVULN,
   critDamageMult,
   castTimeMult,
+  mageAreaMult,
   EVT_SKILL,
   type WallWire,
   meleeArc,
@@ -2152,7 +2153,7 @@ export class Game {
       p.wind = s.windT;
       s.fireCd = s.windT + w.cooldown / rate;
       const [x, y] = this.heroSpot(s, w);
-      this.casts.set(-p.id, { x, y, total: s.windT, radius: w.splash * s.mods.heroArea });
+      this.casts.set(-p.id, { x, y, total: s.windT, radius: w.splash * mageAreaMult(s.mods.heroArea) });
       return;
     }
     this.strikeHero(s);
@@ -3996,7 +3997,7 @@ export class Game {
       cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
       reach: meleeReach(t, base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier), area * (1 + TIER_AREA[t]! * tier)),
-      splash: base.splash * area * (1 + TIER_AREA[t]! * tier),
+      splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier),
       arc: meleeArc(t, base.arc, area),
     };
   }

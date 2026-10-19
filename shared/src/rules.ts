@@ -91,6 +91,7 @@ export const TUNE = {
   MOUNT_SPEED_MAX: 1.7, // 기마 주인공이 달려서 붙는 최고 속도 배율(걸어갈 때 대비)
   ENEMY_MAGE_FROM_STAGE: 2, // 적 마법사가 나오기 시작하는 스테이지
   MAGE_LOCK_SEC: 1, // 운석이 떨어지기 이 시간 전부터 낙하 지점이 고정된다
+  MAGE_AREA_FACTOR: 0.5, // 마법사 계열(주인공 지팡이·용병 마법사)은 범위 증가 효과를 이 비율만 받는다(범위 +40%면 폭발 반경 +20%)
   MAGE_FALLOFF: 0.4, // 폭발 가장자리의 피해 감소 비율(중심은 100%)
   CAV_RUNUP_SEC: 2.6, // 기병이 한 대 치고 빠져 다시 속도를 붙이는 최대 시간
   CAV_RUNUP_DIST: 240, // 달리기 위해 대상에서 떨어지는 거리(px)
@@ -251,7 +252,7 @@ export const MERC_STATS: readonly UnitStats[] = [
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 225, speed: 75, reach: 40, damage: 32.4, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
   // 마법사: 느리고 약하지만 2초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
-  { hp: 88, speed: 65, reach: 280, damage: 80, windup: 3, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 120 },
+  { hp: 88, speed: 65, reach: 280, damage: 70, windup: 3, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 120 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
@@ -427,6 +428,8 @@ export const defenseTakenMult = (x: number): number => 1 / (1 + Math.max(0, x));
 export const dodgeChanceOf = (x: number): number => (x > 0 ? x / (1 + x) : 0);
 export const respawnTimeMult = (x: number): number => 1 / (1 + Math.max(0, x));
 /** 시전 속도 합계 x → 주문 시간 배율(상한 없음) */
+/** 마법사 계열의 폭발 반경 배율: 범위 증가(area, 1이 기본)를 MAGE_AREA_FACTOR만큼만 받는다 */
+export const mageAreaMult = (area: number): number => 1 + (area - 1) * TUNE.MAGE_AREA_FACTOR;
 export const castTimeMult = (x: number): number => 1 / (1 + Math.max(0, x));
 // 배후 공격: 방어하는 쪽의 등 뒤에서 오는 공격은 피해가 늘어난다(기병의 우회가 빛난다). 적·아군 모두에게 적용된다.
 export const BACKSTAB_ARC = rad(60); // 등 뒤 반각(전체 120도)

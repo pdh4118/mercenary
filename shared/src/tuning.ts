@@ -121,6 +121,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   MOUNT_SPEED_MAX: ["기마 주인공 최고 속도 배율", G.hero, 1, 3, 0.05],
   ENEMY_MAGE_FROM_STAGE: ["적 마법사가 나오기 시작하는 스테이지", G.enemy, 1, 10, 1],
   MAGE_LOCK_SEC: ["운석 낙하 지점이 고정되는 시간(초, 낙하 전)", G.combat, 0, 5, 0.1],
+  MAGE_AREA_FACTOR: ["마법사 계열 범위 증가 효율(1이면 그대로)", G.combat, 0, 1, 0.05],
   MAGE_FALLOFF: ["운석 폭발 가장자리 피해 감소 비율", G.combat, 0, 0.9, 0.05],
   CAV_RUNUP_SEC: ["기병 치고 빠져 속도 붙이는 최대 시간(초)", G.ai, 0.3, 8, 0.1],
   CAV_RUNUP_DIST: ["기병 달리기 위해 떨어지는 거리(px)", G.ai, 60, 600, 10],

@@ -16,6 +16,7 @@ import {
   sanitizeFormation,
   sanitizeInput,
   ZONE_GUARD,
+  mageAreaMult,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -46,7 +47,7 @@ test("마법사: 병종 목록에 있고 느리고 약하지만 준비 3초·한
   assert.equal(m.windup, 3);
   assert.ok(m.hp < Math.min(...others.map((s) => s.hp)), "체력이 가장 낮다");
   assert.ok(m.speed < Math.min(...others.map((s) => s.speed)), "가장 느리다");
-  assert.ok(m.damage > Math.max(...others.map((s) => s.damage)) * 2.4, "한 방이 훨씬 세다");
+  assert.ok(m.damage > Math.max(...others.map((s) => s.damage)) * 2, "한 방이 훨씬 세다");
   assert.ok(m.splash > MERC_STATS[BLUNT]!.splash * 2.5, "범위가 굉장히 넓다");
   assert.equal(m.reach, MERC_STATS[ARCHER]!.reach, "사정거리는 궁수 정도");
   assert.equal(WEAPONS[4]!.type, MAGE);
@@ -217,4 +218,9 @@ test("적 마법사: 모인 아군 위에 운석을 겨누고(낙하 지점이 �
   assert.ok(still.hp < still.max - 20, `서 있으면 맞는다: ${still.hp}`);
   const dodged = run2(true);
   assert.equal(dodged.hp, dodged.max, "벗어나면 맞지 않는다");
+});
+
+test("마법사 계열은 범위 증가를 절반만 받는다", () => {
+  assert.equal(mageAreaMult(1), 1);
+  assert.ok(Math.abs(mageAreaMult(1.4) - 1.2) < 1e-9, "범위 +40%는 반경 +20%");
 });
