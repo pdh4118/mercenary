@@ -241,6 +241,8 @@ async function main() {
   const boostStartTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_start_${i}.png`).catch(() => null)));
   // 활 후퇴 시작의 흙먼지(4컷). 없으면 생략.
   const backDustTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_back_dust_${i}.png`).catch(() => null)));
+  // 활 후퇴 바람선(3컷). 없으면 생략.
+  const backWindTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_back_wind_${i}.png`).catch(() => null)));
   // 기마 가속이 풀리는 순간의 이펙트(6컷). 없으면 생략.
   const boostEndTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_end_${i}.png`).catch(() => null)));
   // 마법사 방벽 그림 3상태(온전함·금이 감·거의 부서짐). 하나라도 없으면 도형으로 그린다.
@@ -997,6 +999,7 @@ async function main() {
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
   const dashFx = new Map<number, { t0: number; lx: number; ly: number }>(); // 돌진 중인 주인공(마지막 잔상을 남긴 자리)
+  const backWinds: { sp: Sprite; t0: number }[] = []; // 활 후퇴 바람선
   const backDusts: { sp: Sprite; t0: number }[] = []; // 활 후퇴를 시작한 자리의 흙먼지
   const dashGhosts: { sp: Sprite; age: number }[] = []; // 돌진 길에 남은 잔상
   const DASH_TINT = 0x14162a; // 잔상 색(주인공 그림에 곱해 어둡게)
@@ -1240,6 +1243,16 @@ async function main() {
               sp.rotation = q.aim + Math.PI + 2.3;
               groundFx.addChild(sp);
               backDusts.push({ sp, t0: performance.now() });
+            }
+            if (WEAPONS[Math.round(ang)]!.type === ARCHER_TYPE && backWindTex.every((t) => t !== null)) {
+              // 바람선: 그림의 오른쪽 끝이 출발한 자리, 왼쪽(후퇴 방향)으로 길게 늘어진다
+              const q = latest.players.find((r) => r.id === owner)!;
+              const sp = new Sprite(backWindTex[0]!);
+              sp.anchor.set(1, 0.5);
+              sp.position.set(x, y + 4);
+              sp.rotation = q.aim;
+              groundFx.addChild(sp);
+              backWinds.push({ sp, t0: performance.now() });
             }
             dashFx.set(owner, { t0: performance.now(), lx: x, ly: y });
             spawnDashGhost(owner, x, y);
@@ -2135,6 +2148,20 @@ async function main() {
         bd.sp.texture = t;
         bd.sp.width = 120;
         bd.sp.height = (120 * t.height) / t.width;
+      }
+    }
+    // 후퇴 바람선: 3컷을 0.21초 동안 재생
+    for (let i = backWinds.length - 1; i >= 0; i--) {
+      const bw = backWinds[i]!;
+      const f = Math.floor((performance.now() - bw.t0) / 70);
+      if (f >= 3) {
+        bw.sp.destroy();
+        backWinds.splice(i, 1);
+      } else {
+        const t = backWindTex[f]!;
+        bw.sp.texture = t;
+        bw.sp.width = 150;
+        bw.sp.height = (150 * t.height) / t.width;
       }
     }
     // 돌진 잔상: 시간이 갈수록 옅어지며 사라진다
