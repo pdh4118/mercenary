@@ -52,7 +52,7 @@ export interface WeaponDef {
 const rad = (d: number) => (d * Math.PI) / 180;
 export const WEAPONS: readonly WeaponDef[] = [
   { name: "활", type: ARCHER, ranged: true, reach: BULLET_RANGE, arc: 0, damage: BULLET_DAMAGE, cooldown: FIRE_COOLDOWN_SEC, windup: 0, splash: 0, note: "원거리 · 방패 정면에는 약함(25%)" },
-  { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 11, cooldown: 0.55, windup: 0, splash: 0, note: "기병 돌격 무효 · 달려오는 기병을 먼저 찌르면 속도를 잃고 카운터 · 아주 긴 사거리" },
+  { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 18, cooldown: 0.9, windup: 0, splash: 0, note: "기병 돌격 무효 · 달려오는 기병을 먼저 찌르면 속도를 잃고 카운터 · 아주 긴 사거리" },
   { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 8, cooldown: 0.35, windup: 0, splash: 0, note: "방패 체력이 정면 공격을 먼저 받아 냄 · 빠른 공격" },
   { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 30, cooldown: 1.2, windup: 1, splash: 46, note: "방패 파괴(300%) · 범위 공격 · 꾹 누르면 1초간 힘을 모으고, 떼는 순간 모은 만큼 피해" },
   { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 100, cooldown: 1.5, windup: 2.5, splash: 130, note: "마우스 위치에 운석 · 2.5초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },

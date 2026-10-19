@@ -38,7 +38,7 @@ test("창은 철퇴·검보다 길고 좁다, 창병 용병도 다른 근접 병
 });
 
 test("철퇴는 한 방이 가장 세지만 꾹 눌러 모은 뒤 떼야 휘두른다", () => {
-  assert.ok(WEAPONS[3]!.damage > WEAPONS[1]!.damage * 2);
+  assert.ok(WEAPONS[3]!.damage > WEAPONS[1]!.damage * 1.5);
   assert.ok(WEAPONS[3]!.windup >= 0.4);
   assert.ok(MERC_STATS[BLUNT]!.windup > MERC_STATS[SHIELD]!.windup * 2);
   const g = quiet();

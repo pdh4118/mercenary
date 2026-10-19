@@ -27,6 +27,8 @@ test("무기 수치: 활 0.5초·8, 검 8, 철퇴 30·준비 1초, 지팡이 100
   assert.equal(WEAPONS[0]!.cooldown, 0.5);
   assert.equal(WEAPONS[0]!.damage, 8);
   assert.equal(WEAPONS[2]!.damage, 8);
+  assert.equal(WEAPONS[1]!.damage, 18);
+  assert.equal(WEAPONS[1]!.cooldown, 0.9);
   assert.equal(WEAPONS[3]!.damage, 30);
   assert.equal(WEAPONS[3]!.windup, 1);
   assert.equal(WEAPONS[4]!.damage, 100);
