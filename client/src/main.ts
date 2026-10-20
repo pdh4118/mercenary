@@ -29,6 +29,7 @@ import {
   EVT_CRIT,
   EVT_DODGE,
   EVT_INVULN,
+  EVT_WALL_HIT,
   EVT_BACKSTAB,
   EVT_DMG_ALLY,
   EVT_DMG_ENEMY,
@@ -1006,6 +1007,7 @@ async function main() {
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
+  let skillPrev = 0; // 직전 프레임의 내 스킬 남은 쿨타임(끝나는 순간에 준비 소리를 내려고)
   const guardFx = new Map<number, { sp: Sprite; phase: 0 | 1 | 2; t0: number }>(); // 무적 막(주인공별): 0 켜짐, 1 유지, 2 끝남
   const dashFx = new Map<number, { t0: number; lx: number; ly: number }>(); // 돌진 중인 주인공(마지막 잔상을 남긴 자리)
   const backWinds: { sp: Sprite; t0: number }[] = []; // 활 후퇴 바람선
@@ -1227,6 +1229,14 @@ async function main() {
         const arrowSpots = (msg.ev ?? []).filter((q) => q[0] === EVT_ARROW_HIT || q[0] === EVT_ENEMY_ARROW_HIT);
         for (const [kind, x, y, ang, val, owner] of msg.ev ?? []) {
           // 서버가 알려 준 순간에 맞춰 소리를 낸다
+          if (kind === EVT_SKILL && val === 0) {
+            // 주인공 스킬 발동음: 활 후퇴 / 창 돌진 / 철퇴 던지기 / 기마 가속(검 무적은 막이 켜질 때, 방벽은 서는 순간에 따로 낸다)
+            const wt = WEAPONS[Math.round(ang)]?.type;
+            if (wt === ARCHER_TYPE) audio.play("skill_backstep", { x, y });
+            else if (wt === SPEAR_TYPE) audio.play("skill_dash", { x, y });
+            else if (wt === BLUNT_TYPE) audio.play("skill_mace_throw", { x, y });
+            else if (wt === 0) audio.play("skill_boost", { x, y });
+          }
           if (kind === EVT_ARROW_HIT) audio.play("arrow_hit", { x, y });
           else if (kind === EVT_ENEMY_ARROW_HIT) hitSound("arrow_hit_enemy", x, y);
           else if (kind === EVT_SHIELD_BLOCK) hitSound("shield_block", x, y);
@@ -1234,12 +1244,13 @@ async function main() {
           else if (kind === EVT_CRIT) audio.play("crit_hit", { x, y });
           else if (kind === EVT_BACKSTAB) audio.play("backstab", { x, y });
           else if (kind === EVT_KNOCK) audio.play("knockback", { x, y });
+          else if (kind === EVT_WALL_HIT) audio.play("skill_wall_hit", { x, y });
           else if (kind === EVT_METEOR) {
             blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
           }
           else if (kind === EVT_SKILL && val >= 10 && maceHitTex.every((t) => t !== null)) {
             // 던진 철퇴가 적에게 닿음: 갈라진 땅과 흙먼지 4컷(지름 약 반경 x 2.3)
-            audio.play("melee_hit", { x, y });
+            audio.play("skill_mace_hit", { x, y });
             const sp = new Sprite(maceHitTex[0]!);
             sp.anchor.set(0.5);
             sp.position.set(x, y);
@@ -2218,6 +2229,7 @@ async function main() {
         if (!pcs) {
           pcs = [];
           wallPieces.set(wid, pcs);
+          audio.play("skill_wall_up", { x: wx, y: wy });
         }
         const cs = Math.cos(wa);
         const sn = Math.sin(wa);
@@ -2306,6 +2318,8 @@ async function main() {
     }
     for (const [id, pcs] of wallPieces) {
       if (!wallSeen.has(id)) {
+        const gone = pcs[Math.floor(pcs.length / 2)];
+        if (gone) audio.play("skill_wall_break", { x: gone.sp.x, y: gone.sp.y });
         // 시간이 다 된 방벽: 조각마다 그 자리에서 조용히 사라지는 4컷을 재생한다(그림이 없으면 바로 지운다)
         const fadeOk = wallFadeTex.every((t) => t !== null);
         const now = performance.now();
@@ -2384,6 +2398,7 @@ async function main() {
             e.position.set(v.x, v.y);
             groundFx.addChild(e);
             boostEnds.set(p.id, { sp: e, t0: performance.now(), ang: bf.ang });
+            audio.play("skill_boost_end", { x: v.x, y: v.y });
           }
           bf.sp.destroy();
           bf.burst?.destroy();
@@ -2414,11 +2429,13 @@ async function main() {
           sp.anchor.set(0.5, 0.5);
           groundFx.addChild(sp);
           gf = { sp, phase: 0, t0: performance.now() };
+          if (v) audio.play("skill_guard", { x: v.x, y: v.y });
           guardFx.set(p.id, gf);
         }
         if (gf) {
           if (!inv && gf.phase !== 2) {
             gf.phase = 2;
+            if (v) audio.play("skill_guard_end", { x: v.x, y: v.y });
             gf.t0 = performance.now();
           }
           const el = performance.now() - gf.t0;
@@ -2587,6 +2604,8 @@ async function main() {
       const curSt = selectedStance(meState);
       stanceBtns.forEach((b, i) => b.classList.toggle("active", curSt === i));
       updateStats(meState);
+      if (skillPrev > 0 && (meState.sk ?? 0) === 0 && !meState.down) audio.play("skill_ready"); // 스킬 쿨타임이 끝났다
+      skillPrev = meState.sk ?? 0;
       hudLv.text = `Lv ${meState.level}`;
       hudTime.text = `${m}:${s}`;
       hudHp.text = `HP ${Math.ceil(meState.hp)} / ${meState.maxHp}`;

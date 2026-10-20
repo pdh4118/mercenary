@@ -65,6 +65,19 @@ export const SOUNDS = {
   camp_open: d(1, 0.4, 600, 1, 0, false),
   ui_click: d(2, 0.4, 40, 2, 0.03, false, { important: true }),
   merc_respawn: d(2, 0.45, 150, 3, 0.05, true),
+  // 주인공 스킬(docs/asset-prompts.md 11-3)
+  skill_backstep: d(2, 0.55, 200, 3),
+  skill_dash: d(2, 0.55, 200, 3),
+  skill_guard: d(1, 0.55, 300, 2, 0.03),
+  skill_guard_end: d(1, 0.45, 300, 2, 0.03),
+  skill_mace_throw: d(2, 0.6, 200, 3),
+  skill_mace_hit: d(2, 0.75, 150, 3),
+  skill_wall_up: d(1, 0.6, 300, 2),
+  skill_wall_break: d(1, 0.45, 300, 2),
+  skill_wall_hit: d(3, 0.5, 80, 4),
+  skill_boost: d(1, 0.6, 400, 2),
+  skill_boost_end: d(1, 0.45, 400, 2),
+  skill_ready: d(1, 0.35, 500, 1, 0, false, { important: true }),
 } as const satisfies Record<string, SoundDef>;
 export type SoundName = keyof typeof SOUNDS;
 

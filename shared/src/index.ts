@@ -181,6 +181,7 @@ export const EVT_DMG_POISON = 16; // 독이 적에게 준 피해(보라색 숫�
 export const EVT_DMG_POISON_ALLY = 17; // 독이 아군(주인공·용병)에게 준 피해(보라색 숫자)
 export const EVT_COUNTER = 15; // 달려오던 기병이 창에 먼저 맞아 속도를 잃고 카운터를 입음(val = 카운터 피해)
 export const EVT_METEOR = 13; // 운석이 떨어져 폭발함(val = 반경)
+export const EVT_WALL_HIT = 20; // 방벽이 적 투사체를 막음(소리용)
 export const EVT_INVULN = 19; // 무적 상태인 주인공이 공격을 받음(owner = 그 플레이어, "무적!" 표시)
 export const EVT_SKILL = 18; // 주인공 스킬을 씀(ang = 무기 번호, val = 0 발동 / 10 이상이면 던진 철퇴가 적에게 닿음(val = 폭발 반경) / 2 벽이 부서짐)
 // 피해 숫자: val은 피해량, owner는 때린 쪽(적에게 준 피해) 또는 맞은 쪽(받은 피해) 플레이어. 같은 대상에게 한 틱에 들어간 피해는 합쳐서 보낸다.

@@ -27,6 +27,7 @@ import {
   dodgeChanceOf,
   EVT_DODGE,
   EVT_INVULN,
+  EVT_WALL_HIT,
   critDamageMult,
   castTimeMult,
   mageAreaMult,
@@ -4611,6 +4612,7 @@ export class Game {
             hit = true;
             b.x = px;
             b.y = py;
+            this.pushEvent(EVT_WALL_HIT, px, py, 0);
             break;
           }
         }

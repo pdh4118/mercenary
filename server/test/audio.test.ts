@@ -73,8 +73,10 @@ test("소리 설정: 범위를 벗어난 값이나 잘못된 형식은 바로잡
 test("소리 목록은 제작 문서(docs/asset-prompts.md 10장)의 파일 이름과 정확히 일치한다", () => {
   const doc = readFileSync(fileURLToPath(new URL("../../docs/asset-prompts.md", import.meta.url)), "utf8");
   const start = doc.indexOf("## 10. 사운드");
-  const end = doc.indexOf("\n## 11.", start); // 11장(스킬 에셋)의 파일은 아직 코드에 연결하기 전이라 비교에서 뺀다
-  const section = doc.slice(start, end < 0 ? undefined : end);
+  const end = doc.indexOf("\n## 11.", start);
+  const s3 = doc.indexOf("### 11-3."); // 11장 중 스킬 소리 표(11-3)는 코드에 연결돼 있어 함께 비교한다
+  const e3 = doc.indexOf("\n### 11-4.", s3);
+  const section = doc.slice(start, end < 0 ? undefined : end) + "\n" + (s3 < 0 ? "" : doc.slice(s3, e3 < 0 ? undefined : e3));
   const named = new Set([...section.matchAll(/^\| `([a-z_]+)` \|/gm)].map((m) => m[1]!));
   const code = new Set(Object.keys(SOUNDS));
   for (const n of code) assert.ok(named.has(n), `문서에 없음: ${n}`);

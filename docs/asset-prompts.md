@@ -932,6 +932,8 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 | `skill_wall_hit` | 방벽이 공격을 맞을 때(방벽이 이제 부서지지 않으므로 `skill_wall_break`는 "시간이 되어 사라질 때"로 쓴다) | `dull hit on a crystal wall, short thud with a tiny glassy crack` | 0.15초, 3종 |
 | `skill_wall_break` | 방벽이 부서질 때 | `crystal wall shattering into pieces, short bright shatter and falling shards` | 0.7초, 1종 |
 | `skill_boost` | 기마 가속 | `horse bursting into a gallop, hoof drum roll and a short whinny with a rush of wind` | 0.8초, 1종 |
+| `skill_boost_end` | 기마 가속이 끝날 때 | `wind trailing off as a galloping horse slows, soft air release and fading hoof beats` | 0.5초, 1종 |
+| `skill_guard_end` | 검 무적이 끝날 때 | `a magical protective ward breaking apart into sparkles, soft glassy fade with a quiet chime` | 0.4초, 1종 |
 | `skill_ready` | 쿨타임이 끝났을 때(작게) | `very soft ready chime, single short low bell, subtle` | 0.3초, 1종 |
 
 ### 11-4. 우선순위
