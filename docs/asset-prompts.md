@@ -919,6 +919,8 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 
 ### 11-3. 소리 - `assets/audio/` (형식·길이 규칙은 **10-0**과 같음)
 
+> **출처 기록**: 이 스킬 소리들은 **일레븐랩스(ElevenLabs) 무료 요금제**로 만든다. 무료 요금제는 상업적 이용 불가·출처 표기 필요(약관 확인 필요)라서, 공개 전에 유료로 다시 만들거나 교체한다(`docs/deploy.md` 점검 목록 참고).
+
 | 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
 | --- | --- | --- | --- |
 | `skill_backstep` | 활 후퇴 | `quick backward skid on dirt, short scuff and a small cloth rustle` | 0.2초, 2종 |
