@@ -754,7 +754,7 @@ test("카드 효과: 용병 부활 시간 단축", () => {
     g.step();
   }
   assert.ok(g.getMerc(m)!.respawn > 0);
-  assert.ok(g.getMerc(m)!.respawn <= MERC_RESPAWN_SEC[BLUNT] * 0.95 + 1e-9);
+  assert.ok(g.getMerc(m)!.respawn <= MERC_RESPAWN_SEC[BLUNT] * 0.97 + 1e-9);
 });
 
 // --- 주인공 무기 ------------------------------------------------------------

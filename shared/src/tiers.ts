@@ -11,7 +11,7 @@ export const TIER_NAMES: readonly (readonly string[])[] = [
   ["마법사", "견습 마도사", "마도사", "대마도사", "현자"],
 ];
 export const TIER_HP = [1, 1.4, 1.9, 2.5, 3.3] as const;
-export const TIER_DMG = [1, 1.3, 1.7, 2.2, 3] as const;
+export const TIER_DMG = [1, 1.25, 1.55, 1.9, 2.5] as const;
 /** 병종별 단계 보너스(단계마다): 기병 이동 속도·돌격 피해, 창병 카운터 피해, 궁병 사거리, 검방병 방패, 둔기병 범위, 마법사 시전 시간·범위 */
 export const TIER_SPEED = [0.05, 0, 0, 0, 0, 0] as const;
 export const TIER_REACH = [0, 0, 0.1, 0, 0, 0] as const;
