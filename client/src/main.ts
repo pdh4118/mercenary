@@ -221,6 +221,23 @@ async function main() {
   /** 8방위 그림은 크기가 달라 별도 배율·기준점을 쓴다 */
   const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5 * 1.4; // 말 탄 병사가 다른 병종과 비슷한 크기로 보이도록 1.4배
   const CAV_ANCHOR: [number, number] = [0.483, 0.72];
+  // 1~6스테이지 보스(장군) 전용 그림: 병종 번호 → 기본 자세, 공격 자세, 배율(그림 한 장 크기가 서로 달라 보스마다 따로 맞춘다)
+  const BOSS_ART_FILES: readonly { idle: string; attack: string | null; scale: number }[] = [
+    { idle: "boss1_idle", attack: "boss1_attack", scale: 0.5 },
+    { idle: "boss2_idle", attack: "boss2_thrust", scale: 0.6 },
+    { idle: "boss3_idle", attack: "boss3_aim", scale: 0.4 },
+    { idle: "boss4_idle", attack: null, scale: 0.42 },
+    { idle: "boss5_idle", attack: "boss5_smash", scale: 0.42 },
+    { idle: "boss6_idle", attack: "boss6_cast", scale: 0.5 },
+  ];
+  const BOSS_ART_STAGES = 6;
+  const bossArt = await Promise.all(
+    BOSS_ART_FILES.map(async (f) => ({
+      idle: await Assets.load<Texture>(`assets/units/${f.idle}.png`).catch(() => null),
+      attack: f.attack ? await Assets.load<Texture>(`assets/units/${f.attack}.png`).catch(() => null) : null,
+      scale: f.scale,
+    })),
+  );
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
   // 여성 주인공 그림(없으면 기본 그림으로 대신한다)
   const heroTexF = await Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_f_${f}.png`).catch(() => null)));
@@ -397,13 +414,16 @@ async function main() {
     }
   };
 
-  const enemies = new Pool<Tracked & Facing & { sprite: Sprite }, EnemyWire>(
+  const enemies = new Pool<Tracked & Facing & { sprite: Sprite; art: (typeof bossArt)[number] | null }, EnemyWire>(
     (w) => {
-      const sprite = new Sprite(w[4] === 0 ? enemyCav[0]![2]! : enemyTex[w[4]]!);
-      if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
+      // 1~6스테이지 보스는 전용 그림을 쓴다(그림이 없으면 병종 그림 그대로)
+      const art = w[11] === 1 && (latest?.g?.stage ?? 99) <= BOSS_ART_STAGES ? bossArt[w[4]] ?? null : null;
+      const sprite = new Sprite(art?.idle ?? (w[4] === 0 ? enemyCav[0]![2]! : enemyTex[w[4]]!));
+      if (art?.idle) sprite.anchor.set(0.5, 0.88);
+      else if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
       else sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       enemyLayer.addChild(sprite);
-      return { node: sprite, sprite, x: 0, y: 0, lastX: w[1], lastY: w[2], dir: 2, spd: 0, phase: 0, runT: 0, face: 1 };
+      return { node: sprite, sprite, art: art?.idle ? art : null, x: 0, y: 0, lastX: w[1], lastY: w[2], dir: 2, spd: 0, phase: 0, runT: 0, face: 1 };
     },
     (w) => [w[0], w[1], w[2]],
     true,
@@ -1779,7 +1799,11 @@ async function main() {
 
     enemies.update(latest.enemies, k, (v, w) => {
       const size = w[11] === 1 ? BOSS_SIZE : 1;
-      if (w[4] === 0) {
+      if (v.art) {
+        faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
+        v.sprite.texture = (w[5] > 0 && v.art.attack) || v.art.idle!;
+        v.sprite.scale.set(v.art.scale * v.face, v.art.scale);
+      } else if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
         const fr = cavGait(v, ticker.deltaMS, w[5] > 0, CAV_SCALE * size);
         v.sprite.texture = w[5] > 0 ? enemyCav[1]![v.dir]! : fr >= 0 ? enemyCavRun[v.dir]![fr]! : enemyCav[0]![v.dir]!;

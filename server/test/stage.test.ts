@@ -57,7 +57,7 @@ test("군대 구성은 합이 맞고 여러 병종이 섞이며 장군 병종이
     assert.equal(comp.reduce((a, b) => a + b, 0), 60);
     assert.ok(comp.every((n) => n > 0), `스테이지 ${stage}`);
   }
-  const heavy = armyComposition(5, 100); // 장군이 궁병
+  const heavy = armyComposition(3, 100); // 장군이 궁병
   assert.ok(heavy[ARCHER]! > armyComposition(1, 100)[ARCHER]!);
 });
 
@@ -70,7 +70,7 @@ test("진형 배치: 앞줄은 검방병, 뒤에 궁병, 기병은 양옆 날개
   const archers = layout.filter((l) => l.type === ARCHER);
   const frontline = layout.filter((l) => l.type === 3);
   assert.ok(Math.max(...archers.map((l) => l.forward)) < Math.min(...frontline.map((l) => l.forward)));
-  const cav = layout.filter((l) => l.type === 0);
+  const cav = layout.filter((l) => l.type === 0 && !l.general); // 장군(스테이지 1은 기병)은 가운데라 뺀다
   assert.ok(cav.some((l) => l.lateral > 0) && cav.some((l) => l.lateral < 0));
   const w = Math.max(...layout.filter((l) => l.type === 3).map((l) => Math.abs(l.lateral)));
   assert.ok(cav.every((l) => Math.abs(l.lateral) > w), "기병은 보병 줄 바깥");
