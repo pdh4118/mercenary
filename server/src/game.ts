@@ -3629,7 +3629,7 @@ export class Game {
 
   /** 운석이 떨어져 폭발한다: 반경 안의 적(토너먼트에서는 상대 선수)에게 방패를 무시한 큰 피해. 중심이 가장 세고 가장자리는 약하다. */
   private landMeteor(x: number, y: number, radius: number, damage: number, ownerId: number, crit: boolean, src?: Merc): void {
-    this.pushEvent(EVT_METEOR, x, y, 0, radius);
+    this.pushEvent(EVT_METEOR, x, y, 0, radius, ownerId); // owner = 쏜 플레이어(우호 마법: 초록)
     const scale = (d: number) => 1 - TUNE.MAGE_FALLOFF * Math.min(1, d / radius);
     if (this.phase === "tournament") {
       for (const f of this.duelFoes(ownerId)) {
@@ -4363,7 +4363,7 @@ export class Game {
       const cast = this.casts.get(e.id);
       this.casts.delete(e.id);
       if (!cast) return;
-      this.pushEvent(EVT_METEOR, cast.x, cast.y, 0, cast.radius);
+      this.pushEvent(EVT_METEOR, cast.x, cast.y, e.boss ? 1 : 0, cast.radius, 0); // owner 0 = 적, ang 1 = 보스의 마법
       for (const f of friendlies) {
         const d = Math.hypot(f.x - cast.x, f.y - cast.y);
         if (d > cast.radius + f.radius) continue;

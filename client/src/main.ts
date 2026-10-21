@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
+import { Application, Assets, ColorMatrixFilter, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
@@ -429,7 +429,15 @@ async function main() {
   let shotWindowStart = 0;
   const hitFx: { node: Container; age: number; grow?: number; life?: number }[] = [];
   // 운석 폭발(폭발 컷 → 바닥 그을음 컷)과 떨어지는 운석 스프라이트
-  const blasts: { x: number; y: number; r: number; age: number; boom: Sprite | null; scorch: Sprite | null }[] = [];
+  const blasts: { x: number; y: number; r: number; age: number; boom: Sprite | null; scorch: Sprite | null; friendly: boolean; boss: boolean }[] = [];
+  /** 우호 마법(아군·주인공이 쓴 것)은 주황 불꽃 그림을 옅은 초록으로 돌려 적의 마법(주황·보스는 붉은빛)과 구분한다 */
+  const friendlyTint = (sp: Sprite): void => {
+    const f = new ColorMatrixFilter();
+    f.hue(85, false);
+    f.saturate(-0.35, true);
+    f.brightness(1.12, true);
+    sp.filters = [f];
+  };
   const falling = new Map<number, Sprite>();
   const BOOM_SEC = 0.6;
   const SCORCH_SEC = 2.8;
@@ -1226,6 +1234,7 @@ async function main() {
         toastLeft = 2.5;
       } else if (msg.t === "state") {
         latest = msg;
+        const duelNow = (msg.g ?? latest.g)?.phase === "tournament"; // 토너먼트: 상대 선수가 맞는 피해도 적처럼 흰 숫자로 보인다(구경꾼도)
         const arrowSpots = (msg.ev ?? []).filter((q) => q[0] === EVT_ARROW_HIT || q[0] === EVT_ENEMY_ARROW_HIT);
         for (const [kind, x, y, ang, val, owner] of msg.ev ?? []) {
           // 서버가 알려 준 순간에 맞춰 소리를 낸다
@@ -1246,7 +1255,7 @@ async function main() {
           else if (kind === EVT_KNOCK) audio.play("knockback", { x, y });
           else if (kind === EVT_WALL_HIT) audio.play("skill_wall_hit", { x, y });
           else if (kind === EVT_METEOR) {
-            blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null });
+            blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null, friendly: owner > 0, boss: owner === 0 && ang === 1 });
           }
           else if (kind === EVT_SKILL && val >= 10 && maceHitTex.every((t) => t !== null)) {
             // 던진 철퇴가 적에게 닿음: 갈라진 땅과 흙먼지 4컷(지름 약 반경 x 2.3)
@@ -1312,6 +1321,8 @@ async function main() {
           else if (owner === myId && kind === EVT_DMG_POISON) spawnFloat(numFmt(val), x, y, { fill: 0xc77dff, fontSize: 14, fontWeight: "700", stroke: { color: 0x2a0a40, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_POISON_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xc77dff, fontSize: 16, fontWeight: "700", stroke: { color: 0x2a0a40, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DMG_SHIELD) spawnFloat(numFmt(val), x, y, { fill: 0x9fdcff, fontSize: 13, fontWeight: "600", stroke: { color: 0x0a1a2a, width: 3 } }, 0.6, 0);
+          else if (duelNow && owner !== myId && kind === EVT_DMG_ALLY) spawnFloat(numFmt(val), x, y, { fill: 0xffffff, fontSize: 15, fontWeight: "600", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);
+          else if (duelNow && owner !== myId && kind === EVT_DMG_POISON_ALLY) spawnFloat(numFmt(val), x, y, { fill: 0xc77dff, fontSize: 14, fontWeight: "700", stroke: { color: 0x2a0a40, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xff5a5a, fontSize: 17, fontWeight: "700", stroke: { color: 0x2a0000, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DODGE) spawnFloat("회피!", x, y, { fill: 0xd8e0ee, fontSize: 18, fontWeight: "800", fontStyle: "italic", stroke: { color: 0x000000, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_INVULN) spawnFloat("무적!", x, y, { fill: 0x9be8ff, fontSize: 18, fontWeight: "800", stroke: { color: 0x0a2a3a, width: 4 } }, 0.9, 0.15);
@@ -1416,13 +1427,17 @@ async function main() {
       return;
     }
     // 스페이스: 살아 있으면 지금 든 무기의 스킬(쿨타임은 무기를 바꿔도 공유). 쓰러져 있으면 아래의 관전 전환.
-    if (e.key === " " && !latest?.players.find((p) => p.id === myId)?.down) {
+    const duelSpectator = (): boolean => {
+      const t = latest?.g?.phase === "tournament" ? latest.g.tour : null;
+      return !!t && myId !== t.a && myId !== t.b; // 토너먼트에서 선수가 아니면 구경만 한다(쓰러졌을 때와 같은 방식)
+    };
+    if (e.key === " " && !latest?.players.find((p) => p.id === myId)?.down && !duelSpectator()) {
       e.preventDefault();
       if (!e.repeat) send({ t: "skill" });
       return;
     }
     // 쓰러져 있을 때 스페이스: 관전 시작/끝, 관전 중 Tab(또는 ←/→): 다음 동료 보기
-    if (!e.repeat && latest?.players.find((p) => p.id === myId)?.down) {
+    if (!e.repeat && (latest?.players.find((p) => p.id === myId)?.down || duelSpectator())) {
       if (e.key === " ") {
         // 첫 스페이스는 관전 시작, 이어서 누를 때마다 다음 동료, 마지막 동료 다음에는 관전이 끝난다
         if (!spectating) {
@@ -2086,24 +2101,29 @@ async function main() {
       const fallFrom = Math.max(0.3, Math.min(0.95, 1 - 0.6 / Math.max(0.6, (total ?? 30) / 10))); // 폭발 약 0.6초 전부터 낙하(소리의 충돌 시점과 맞춘다)
       const p = prog / 100;
       const pulse = 0.5 + 0.5 * Math.sin(now / 130);
-      const mine = owner === myId;
-      const hostile = owner === 0; // 적 마법사의 운석: 아군이 맞는다. 피하라고 붉고 진하게 표시한다
+      const friendly = owner > 0; // 아군(주인공·용병 마법사)의 운석: 옅은 초록
+      const bossMeteor = owner === 0 && (latest.enemies.find((q) => q[0] === key)?.[11] ?? 0) === 1; // 보스의 마법: 붉은 주황
+      // 적(주황)·보스(붉은 주황)·아군(옅은 초록) 순으로 색을 나눈다. 적의 마법은 피하라고 진하게 표시한다.
+      const cFill = friendly ? 0xa8e8b4 : bossMeteor ? 0xff4a1a : 0xff9a2a;
+      const cEdge = friendly ? 0xb4f0bf : bossMeteor ? 0xff5a2a : 0xff8a3a;
+      const cSweep = friendly ? 0x8fdca0 : bossMeteor ? 0xe03a10 : 0xff8a1a;
+      const strong = !friendly;
       // 낙하 예고: 원 안의 음영이 시계처럼(위에서 시계 방향) 차올라, 한 바퀴를 다 돌면 운석이 떨어진다
       const a0 = -Math.PI / 2;
       const a1 = a0 + Math.PI * 2 * p;
       fxLayer
         .circle(mx, my, radius)
-        .fill({ color: hostile ? 0xff1a1a : 0xff9a2a, alpha: hostile ? 0.1 : 0.06 })
-        .stroke({ width: (hostile ? 3 : 2) + 2 * p, color: hostile ? 0xff3030 : mine ? 0xffc04a : 0xff8a3a, alpha: 0.4 + 0.3 * p + 0.15 * pulse });
+        .fill({ color: cFill, alpha: strong ? 0.1 : 0.05 })
+        .stroke({ width: (strong ? 3 : 2) + 2 * p + (bossMeteor ? 1 : 0), color: cEdge, alpha: (friendly ? 0.3 : 0.4) + 0.3 * p + 0.15 * pulse });
       if (p > 0.005) {
         fxLayer
           .moveTo(mx, my)
           .arc(mx, my, radius, a0, a1)
           .closePath()
-          .fill({ color: hostile ? 0xd01010 : 0xff8a1a, alpha: (hostile ? 0.36 : 0.26) + 0.1 * pulse * p })
+          .fill({ color: cSweep, alpha: (friendly ? 0.2 : bossMeteor ? 0.36 : 0.3) + 0.1 * pulse * p })
           .moveTo(mx, my)
           .lineTo(mx + Math.cos(a1) * radius, my + Math.sin(a1) * radius)
-          .stroke({ width: 3, color: 0xffe0a0, alpha: 0.8 });
+          .stroke({ width: 3, color: friendly ? 0xe0ffe6 : 0xffe0a0, alpha: friendly ? 0.6 : 0.8 });
       }
       if (p >= fallFrom) {
         liveKeys.add(key);
@@ -2112,6 +2132,8 @@ async function main() {
           sp = new Sprite(meteorTex[0]!);
           audio.play("meteor_fall", { x: mx, y: my }); // 떨어지기 시작할 때 한 덩어리(낙하음 → 폭발음)로 낸다
           sp.anchor.set(0.2, 0.8);
+          if (friendly) friendlyTint(sp);
+          else if (bossMeteor) sp.tint = 0xffa890;
           skyLayer.addChild(sp);
           falling.set(key, sp);
         }
@@ -2141,6 +2163,8 @@ async function main() {
         b.scorch.anchor.set(0.5, 0.5);
         b.scorch.position.set(b.x, b.y);
         b.scorch.scale.set(b.r / 62);
+        if (b.friendly) friendlyTint(b.scorch);
+        else if (b.boss) b.scorch.tint = 0xffa890;
         groundFx.addChild(b.scorch);
       }
       if (!b.boom) {
@@ -2148,6 +2172,8 @@ async function main() {
         b.boom.anchor.set(0.5, 0.82);
         b.boom.position.set(b.x, b.y);
         b.boom.scale.set(b.r / 70);
+        if (b.friendly) friendlyTint(b.boom);
+        else if (b.boss) b.boom.tint = 0xffa890;
         skyLayer.addChild(b.boom);
       }
       const st = b.age / SCORCH_SEC;
@@ -2577,11 +2603,14 @@ async function main() {
       chargeMark.position.set(meState.chargeX, meState.chargeY);
       chargeLabel.position.set(meState.chargeX, meState.chargeY - 32);
     }
-    if (!meState?.down) spectating = false; // 일어나면 관전 끝
+    const tourNow = latest.g?.phase === "tournament" ? latest.g.tour : null;
+    const duelSpec = !!tourNow && myId !== tourNow.a && myId !== tourNow.b; // 토너먼트 구경꾼
+    if (!meState?.down && !duelSpec) spectating = false; // 일어나면(또는 토너먼트가 끝나면) 관전 끝
     let camTarget = me;
     let specName = "";
     if (spectating) {
-      const alive = latest.players.filter((q) => q.id !== myId && !q.down);
+      // 쓰러졌을 때는 살아 있는 동료를, 토너먼트 구경꾼은 두 선수를 돌아가며 본다
+      const alive = duelSpec ? latest.players.filter((q) => q.id === tourNow!.a || q.id === tourNow!.b) : latest.players.filter((q) => q.id !== myId && !q.down);
       specCount = alive.length;
       if (alive.length === 0 || specIndex >= alive.length) {
         spectating = false; // 볼 동료가 없거나 마지막 동료까지 다 봤다
@@ -2690,7 +2719,11 @@ async function main() {
       lastLevel = meState.level;
       const fallen = latest.players.find((q) => q.id !== myId && q.down && Math.hypot(q.x - meState.x, q.y - meState.y) <= REVIVE_RADIUS * 1.5);
       deadText.text = latest.g?.phase === "tournament"
-        ? "" // 토너먼트 안내는 위쪽 배너가 한다
+        ? duelSpec
+          ? spectating
+            ? `${specName} 관전 중 · 스페이스 다음 선수(마지막 다음엔 끝) · Tab/←→ 이동`
+            : "스페이스: 선수 관전"
+          : "" // 선수 안내는 위쪽 배너가 한다
         : meState.down
         ? meState.revive > 0
           ? `동료가 일으켜 세우는 중... ${Math.round(meState.revive * 100)}%`
