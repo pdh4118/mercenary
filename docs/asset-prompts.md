@@ -18,6 +18,7 @@
 | 기병 장군 본체 2포즈(스테이지 1 보스) | 받음, 보관 (`assets/units/boss1_idle.png`, `boss1_attack.png`, 224x295와 295x297). 깃발·창이 길어 일반 유닛(약 120x110)보다 세로가 큽니다. 보스 구현 때 몸통 크기를 맞춰 씁니다 |
 | 기병 장군 선회 베기 호·돌격 함성 오라 | 흰 배경 재요청본을 받아 적용 준비 완료, 보관 (`assets/fx/boss1_slash_0~3.png`, `boss1_cry_0~2.png`). **돌격 함성 3번 컷은 못 받음**(고리가 완전히 닫힌 컷). 처음에 받은 시안에서 오려 둔 이전 그림은 `*_old.png`로 보관 |
 | 기병 장군 돌진 충돌 임팩트 | 섬광 2장(`boss1_impact_0`, `0b`)과 흰 배경 재요청본 연기 3컷(`boss1_impact_1~3`) 모두 받음, 보관 (`assets/fx/`). 3번 연기는 반투명이라 옅다 |
+| 창병 장군 본체 3포즈 + 여분 1 | 받음, 보관 (`assets/units/boss2_idle.png`(113x314), `boss2_guard.png`(창 겨눔, 249x127), `boss2_thrust.png`(278x130), `boss2_guard_b.png`(창 없이 웅크린 자세, 여분)). 시트에 `boss2_guard` 캡션이 둘이라 창을 겨눈 쪽을 방어 자세로 썼다 |
 | 효과음·음악 | 이 문서 10번 |
 | 스페이스 스킬 아이콘 6종 | 완료, 적용됨 (`assets/ui/skill_icon_*.png`, 철퇴는 시안 2개 중 `skill_icon_mace`를 쓰고 `skill_icon_mace_b`는 보관) |
 | 방벽 상태 3컷(평면 띠 시안) | 보관 (`assets/fx/skill_wall_0~2.png`). 조각 그림이 있으면 쓰이지 않음 |
