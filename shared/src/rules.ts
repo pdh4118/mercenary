@@ -30,7 +30,7 @@ export const TUNE = {
   BOSS_HP_BASE: 7, // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
   BOSS_HP_PER_STAGE: 2.5,
   BOSS_DMG_MULT: 1.6,
-  BOSS_TIMEOUT_SEC: 60, // 보스군이 등장한 뒤 이 시간 안에 장군을 못 잡으면 보스군이 격노해 점점 강해진다
+  BOSS_TIMEOUT_SEC: 120, // 보스군이 등장한 뒤 이 시간(2분) 안에 장군을 못 잡으면 보스군이 격노해 점점 강해진다
   BOSS_HARD_TIMEOUT_SEC: 240, // 그래도 못 잡고 이 시간이 지나면 보스군이 물러나고 다음 스테이지로 넘어간다(마지막 스테이지 제외, 0이면 없음)
   BOSS_RAGE_INTERVAL_SEC: 20, // 격노 단계가 올라가는 간격
   BOSS_RAGE_REINFORCE: 0.1, // 단계마다 늘어나는 병력(처음 병력 대비 비율, 최소 3명)
