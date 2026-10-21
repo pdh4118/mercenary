@@ -147,6 +147,10 @@ import {
   STANCE_HOLD,
   STANCE_PROTECT,
   BOSS_CAV,
+  BOSS_HP_STAGE_MULT,
+  ST_ROOT,
+  ST_SLOW,
+  ST_STUN,
   BOSS_SKILL_NAMES,
   BSK_CHARGE,
   BSK_KICK,
@@ -163,6 +167,7 @@ import {
   TELE_CONE,
   TELE_LINE,
   type TeleWire,
+  type HazardWire,
   WARD_WEIGHT,
   CHEST_OPEN_RADIUS,
   TOURNAMENT_ARENA_RADIUS,
@@ -226,6 +231,8 @@ import {
   TUNE,
 } from "@mercenary/shared";
 import { resolveHit, type Hit, type HitResult } from "./combat.js";
+import { BossSystem } from "./boss/system.js";
+import type { BossKitState } from "./boss/types.js";
 import { SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
@@ -321,7 +328,7 @@ const newMods = (): Mods => ({
   heroSkill: 0,
 });
 
-interface Slot {
+export interface Slot {
   away: boolean; // 접속이 끊겨 돌아오기를 기다리는 중. 주인공은 제자리에 서고 적에게 노려지지 않는다.
   switchCd: number; // 무기를 바꾼 직후 공격할 수 없는 남은 시간
   mods: Mods;
@@ -329,6 +336,10 @@ interface Slot {
   input: PlayerInput;
   fireCd: number;
   stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
+  stunT?: number; // 기절 남은 시간(움직이지도 공격하지도 못한다)
+  rootT?: number; // 속박 남은 시간(움직이지 못한다)
+  slowT?: number; // 둔화 남은 시간
+  slowMult?: number; // 둔화 중 이동 속도 배율
   windT: number; // 주문(지팡이)을 외우는 남은 시간. 0이면 외우는 중이 아니다
   skillCd: number; // 스페이스 스킬 쿨타임이 남은 시간(무기를 바꿔도 공유)
   skillMax: number; // 마지막으로 쓴 스킬의 전체 쿨타임
@@ -377,7 +388,7 @@ interface Fighter {
 }
 
 /** 적 AI가 보는 아군(주인공·용병) */
-interface Foe {
+export interface Foe {
   x: number;
   y: number;
   r: number;
@@ -390,26 +401,7 @@ interface Foe {
   f: Friendly;
 }
 
-/** 장군의 스킬 진행 상태 */
-interface BossKit {
-  cds: number[]; // 스킬 번호별 남은 쿨타임
-  cur: number; // 쓰는 중인 스킬(0이면 없음)
-  ph: number; // 0 예고, 1 시전, 2 후딜
-  t: number; // 지금 단계에 남은 시간
-  total: number; // 지금 단계 전체 시간(예고 표시용)
-  x: number; // 예고 때 고정한 위치·방향
-  y: number;
-  ang: number;
-  idle: number; // 다음 스킬을 고르기까지 남은 시간
-  sprint: number; // 질주가 남은 시간
-  hit: Set<number>; // 이번 시전에 이미 맞힌 대상(용병 번호, 주인공은 음수 번호)
-  hitAt: Map<number, number>; // 선회 베기가 대상을 마지막으로 친 시각
-  orbit: number; // 선회 베기에서 지금까지 돈 각도
-  orbitStart: number; // 선회 베기를 시작할 때의 각도
-  orbitR0: number; // 선회 베기를 시작할 때 중심에서의 거리
-}
-
-interface Enemy extends Fighter {
+export interface Enemy extends Fighter {
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   rage?: number; // 보스군 격노 단계(이동 속도가 단계마다 조금씩 빨라진다)
@@ -420,7 +412,8 @@ interface Enemy extends Fighter {
   poisonAcc?: number; // 아직 숫자로 띄우지 않은 독 피해
   venom?: boolean; // 독 화살을 쏘는 궁병(맞은 아군이 중독된다)
   stunT?: number; // 경직(움직이지도 공격하지도 못하는) 남은 시간
-  bk?: BossKit; // 장군의 스킬 상태
+  bk?: BossKitState; // 장군의 스킬 상태
+  invulnT?: number; // 무적 남은 시간(운석 맞춤 무적 등)
   buffT?: number; // 돌격 함성(보스군 강화)이 남은 시간
   maxHp: number;
   shieldMax: number;
@@ -431,12 +424,15 @@ interface Enemy extends Fighter {
   slotF: number; // 진형 자리(행군 방향 기준)
   slotL: number;
 }
-interface Merc extends Fighter {
+export interface Merc extends Fighter {
   owner: number;
   respawn: number;
   paid: number; // 고용에 쓴 금화(해고 환급 기준)
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   flankT: number; // 기병이 우회 접근에 쓴 시간
+  stunT?: number; // 기절·속박 남은 시간(움직이지도 공격하지도 못한다)
+  slowT?: number; // 둔화 남은 시간
+  slowMult?: number; // 둔화 중 이동 속도 배율
   runId?: number; // 기병이 마지막으로 친 대상(그 뒤로 돌아 들어간다)
   stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
   brawl?: boolean; // 기병이 마무리 싸움 중(대상 체력이 얼마 안 남아 치고 빠지지 않는다)
@@ -445,7 +441,7 @@ interface Merc extends Fighter {
   xp: number; // 강화에 쓰는 경험치
 }
 
-interface Bullet {
+export interface Bullet {
   id: number;
   x: number;
   y: number;
@@ -463,11 +459,15 @@ interface Bullet {
   hitIds: Set<number>; // 이미 맞힌 적(관통 중 중복 피해 방지)
   poison?: number; // 독 피해 비율(화살 피해 대비, 지속 POISON_SEC초)
   merc?: Merc; // 쏜 용병(경험치를 받는다)
-  kind?: number; // 1이면 던진 철퇴(맞거나 다 날아가면 터진다)
+  kind?: number; // 1이면 던진 철퇴(맞거나 다 날아가면 터진다). 2 이상은 장군 투사체 그림 종류(BUL_*)
+  fx?: number; // 맞은 아군에게 거는 상태이상(ST_*)
+  fxSec?: number;
+  fxMult?: number;
+  vis?: boolean; // 그림만 날아간다(피해는 서버가 따로 준다)
 }
 
 /** 마법사 방벽: 적(토너먼트에서는 상대 쪽)이 지나갈 수 없고 화살을 막는다. 부서지거나 시간이 다 되면 사라진다. */
-interface Wall {
+export interface Wall {
   id: number;
   owner: number;
   x: number;
@@ -488,7 +488,7 @@ interface Camp {
 }
 
 /** 공격·피격 대상이 되는 아군(주인공 또는 용병)을 한 형태로 다루기 위한 뷰 */
-interface Friendly {
+export interface Friendly {
   x: number;
   y: number;
   radius: number;
@@ -496,6 +496,10 @@ interface Friendly {
   merc?: Merc; // 용병이면 그 용병(경험치)
   /** 공격을 받는다. 되돌려줄 피해(창병의 돌격 반사)를 돌려준다. */
   hit: (h: Hit) => number;
+  /** 상태이상을 건다(기절·둔화·속박). mult는 둔화 배율 */
+  status: (kind: number, sec: number, mult?: number) => void;
+  /** 마지막 공격에서 실제로 몸에 들어간 피해(막힌 공격이면 0) */
+  lastBody?: number;
 }
 
 /** 용병 AI가 보는 대상 */
@@ -754,6 +758,7 @@ export class Game {
     this.mercs.clear();
     this.camps.clear();
     this.bullets = [];
+    this.boss.reset();
     this.events = [];
     this.army = null;
     this.armyTotal = 0;
@@ -1057,6 +1062,7 @@ export class Game {
     this.separateMercs(dt);
     if (!duel) {
       this.stepEnemies(dt, friendlies);
+      this.boss.stepGlobal(dt, friendlies);
       this.separateEnemies();
       this.separateCross(dt);
     }
@@ -1116,28 +1122,18 @@ export class Game {
       round(e.regenT, 10),
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
-      (e.bk?.cur ?? 0) + ((e.bk?.sprint ?? 0) > 0 ? 10 : 0),
+      e.bk?.show ?? 0,
+      e.boss ? this.boss.flagsOf(e) : (e.invulnT ?? 0) > 0 ? 8 : 0,
     ]);
   }
 
-  /** 보스 스킬 예고: 예고 단계인 스킬마다 모양 하나 */
+  /** 보스 스킬 예고(예고 단계인 스킬마다 모양) */
   snapshotBossTele(): TeleWire[] {
-    const out: TeleWire[] = [];
-    const C = BOSS_CAV;
-    for (const e of this.enemies.values()) {
-      const k = e.bk;
-      if (!k || k.cur === 0 || k.ph !== 0) continue;
-      const left = Math.max(0, Math.round(k.t * 10));
-      const total = Math.max(1, Math.round(k.total * 10));
-      const r = Math.round;
-      switch (k.cur) {
-        case BSK_CHARGE: out.push([TELE_LINE, r(k.x), r(k.y), Math.round(k.ang * 100) / 100, C.chargeLen, C.chargeWidth, left, total, k.cur]); break;
-        case BSK_KICK: out.push([TELE_CONE, r(k.x), r(k.y), Math.round(k.ang * 100) / 100, Math.round(C.kickHalf * 100) / 100, C.kickRange, left, total, k.cur]); break;
-        case BSK_SLASH: out.push([TELE_BAND, r(k.x), r(k.y), 0, C.slashRadius - C.slashBand, C.slashRadius + C.slashBand, left, total, k.cur]); break;
-        default: out.push([TELE_CIRCLE, r(e.x), r(e.y), 0, 80, 0, left, total, k.cur]);
-      }
-    }
-    return out;
+    return this.boss.snapshotTele();
+  }
+
+  snapshotHazards(): HazardWire[] {
+    return this.boss.snapshotHazards();
   }
 
   snapshotMercs(): MercWire[] {
@@ -1165,7 +1161,7 @@ export class Game {
   }
 
   snapshotBullets(): BulletWire[] {
-    return this.bullets.map((b) => [b.id, round(b.x), round(b.y), b.hostile ? 1 : 0, b.kind ?? 0]);
+    return this.bullets.map((b) => [b.id, round(b.x), round(b.y), b.hostile ? 1 : 0, b.kind ?? 0, Math.round(Math.atan2(b.vy, b.vx) * 100) / 100]);
   }
 
   snapshotWalls(): WallWire[] {
@@ -1218,7 +1214,7 @@ export class Game {
     const st = ENEMY_STATS[type]!;
     const minutes = Math.min(this.stageTime, growSec()) / 60;
     const lv = this.averageLevel() - 1;
-    const hpMult = (1 + TUNE.STAGE_ENEMY_HP_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_HP_GROWTH * minutes + TUNE.ENEMY_LEVEL_HP_GROWTH * lv) * (extra.boss ? TUNE.BOSS_HP_BASE + TUNE.BOSS_HP_PER_STAGE * (this.stage - 1) : 1);
+    const hpMult = (1 + TUNE.STAGE_ENEMY_HP_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_HP_GROWTH * minutes + TUNE.ENEMY_LEVEL_HP_GROWTH * lv) * (extra.boss ? (TUNE.BOSS_HP_BASE + TUNE.BOSS_HP_PER_STAGE * (this.stage - 1)) * (BOSS_HP_STAGE_MULT[this.stage] ?? 1) : 1);
     const e: Enemy = {
       id, type, x, y,
       hp: st.hp * hpMult,
@@ -1370,6 +1366,7 @@ export class Game {
     this.phase = "boss";
     this.phaseT = 0;
     this.bossT = 0;
+    this.boss.reset();
     this.rage = 0;
     this.rageT = 0;
     const cx = alive.reduce((a, s) => a + s.state.x, 0) / alive.length;
@@ -1857,6 +1854,7 @@ export class Game {
 
   /** 장군이 쓰러지면 스테이지 클리어: 남은 병사는 흩어져 일반 적이 되고, 보상과 쓰러진 동료의 부활이 주어진다 */
   private onBossDown(at: { x: number; y: number }): void {
+    this.boss.reset();
     for (const e of this.enemies.values()) {
       e.army = false;
       e.boss = false;
@@ -1883,6 +1881,7 @@ export class Game {
 
   /** 보스를 못 잡고 제한 시간이 지났다: 보스군은 사라지고 보상 없이 다음 스테이지로 넘어간다 */
   private skipBoss(): void {
+    this.boss.reset();
     for (const e of [...this.enemies.values()]) if (e.army) this.enemies.delete(e.id);
     this.army = null;
     for (const s of this.slots.values()) if (s.state.down) this.standUp(s);
@@ -2110,6 +2109,18 @@ export class Game {
         continue;
       }
       p.invuln = Math.max(0, p.invuln - dt);
+      // 상태이상: 기절(못 움직이고 못 싸움), 속박(못 움직임), 둔화(느려짐)
+      const stunned = (s.stunT ?? 0) > 0;
+      const rooted = (s.rootT ?? 0) > 0;
+      if (s.stunT) s.stunT = Math.max(0, s.stunT - dt);
+      if (s.rootT) s.rootT = Math.max(0, s.rootT - dt);
+      if (s.slowT) s.slowT = Math.max(0, s.slowT - dt);
+      const slowK = (s.slowT ?? 0) > 0 ? (s.slowMult ?? 0.6) : 1;
+      if (stunned && s.windT > 0) {
+        s.windT = 0; // 기절하면 외우던 주문이 끊긴다
+        p.wind = 0;
+        this.casts.delete(-p.id);
+      }
       s.skillCd = Math.max(0, s.skillCd - dt);
       p.sk = Math.round(s.skillCd * 10) / 10;
       p.skMax = s.skillMax;
@@ -2127,12 +2138,12 @@ export class Game {
       // 토너먼트: 선수는 경기 시작 전·후에는 움직일 수 없고, 경기장 밖으로 나갈 수 없다. 선수가 아니면 싸울 수 없다.
       const frozen = fighter && this.tour?.step !== "fight";
       const casting = s.windT > 0 && WEAPONS[p.weapon]!.type === MAGE; // 주문을 외우는 동안은 움직일 수 없다
-      const moving = !frozen && !casting && (s.input.dx !== 0 || s.input.dy !== 0);
+      const moving = !frozen && !casting && !stunned && !rooted && (s.input.dx !== 0 || s.input.dy !== 0);
       if (s.boostT > 0) s.boostT = Math.max(0, s.boostT - dt);
       p.bst = Math.round(s.boostT * 10) / 10;
       s.mom = mounted && s.boostT > 0 ? 1 : mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
       const bowFiring = WEAPONS[p.weapon]!.ranged && WEAPONS[p.weapon]!.type === ARCHER && s.input.fire && !frozen; // 활을 쏘는 동안은 느려진다
-      const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1);
+      const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1) * slowK;
       if (frozen) s.dashT = 0;
       if (!frozen && s.dashT > 0) {
         // 돌진·후퇴: 입력과 상관없이 정해진 방향으로 빠르게 움직인다
@@ -2144,7 +2155,7 @@ export class Game {
           s.dashStrike = false;
           if (WEAPONS[p.weapon]!.type === SPEAR && !p.down) this.strikeHero(s); // 돌진 끝에 찌른다
         }
-      } else if (!frozen && !casting) {
+      } else if (!frozen && !casting && !stunned && !rooted) {
         p.x = clampToWorld(p.x + s.input.dx * speed * dt, PLAYER_RADIUS);
         p.y = clampToWorld(p.y + s.input.dy * speed * dt, PLAYER_RADIUS);
       }
@@ -2182,8 +2193,8 @@ export class Game {
           this.strikeHero(s);
         }
       } else if (WEAPONS[p.weapon]!.type === BLUNT) {
-        this.stepMaceCharge(s, dt, s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight")));
-      } else if (s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight"))) this.useWeapon(s);
+        this.stepMaceCharge(s, dt, !stunned && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight")));
+      } else if (!stunned && s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight"))) this.useWeapon(s);
     }
     if (this.phase !== "tournament") this.stepRevive(dt);
   }
@@ -2317,6 +2328,7 @@ export class Game {
       return;
     }
     p.swing = SWING_VISUAL_SEC;
+    this.boss.strikeBarriers(p.x, p.y, reach, damage);
     const arc = meleeArc(w.type, w.arc, s.mods.heroArea);
     // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
     const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) : 0;
@@ -2384,6 +2396,8 @@ export class Game {
 
   // --- 스페이스 스킬 ---------------------------------------------------------------
   private walls: Wall[] = [];
+  /** 장군 스킬(스킬 선택·예고·장판) */
+  readonly boss = new BossSystem(this);
 
   private skillCooldownOf(weapon: number): number {
     return [TUNE.SKILL_CD_BOW, TUNE.SKILL_CD_SPEAR, TUNE.SKILL_CD_SWORD, TUNE.SKILL_CD_MACE, TUNE.SKILL_CD_STAFF, TUNE.SKILL_CD_MOUNT][weapon] ?? 10;
@@ -2620,11 +2634,12 @@ export class Game {
     for (const s of this.slots.values()) {
       if (s.state.down || s.away) continue;
       const p = s.state;
-      list.push({
+      const fr: Friendly = {
         x: p.x,
         y: p.y,
         radius: PLAYER_RADIUS,
         ownerId: p.id,
+        status: (kind, sec, mult = 0.6) => this.statusHero(s, kind, sec, mult),
         hit: (h) => {
           if (p.invuln > 0 || (s.dashT > 0 && s.dashStrike)) {
             // 부활 직후·검 스킬·창 돌진 중에는 맞아도 피해가 없고 "무적!"만 띄운다(연속 피격은 0.4초에 한 번만).
@@ -2668,6 +2683,7 @@ export class Game {
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(-p.id, h.poison); // 토너먼트: 몸에 맞은 독 화살
           const taken = this.armorCut(r.body, s.mods.heroArmor) * defenseTakenMult(s.mods.heroDefense) * this.damageTakenMult(p.id); // 고정 감소가 먼저, 방어력(%)은 그다음
+          fr.lastBody = taken;
           p.hp -= taken;
           s.stats.taken += taken;
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
@@ -2681,16 +2697,18 @@ export class Game {
           }
           return r.reflected;
         },
-      });
+      };
+      list.push(fr);
     }
     for (const m of this.mercs.values()) {
       if (m.respawn > 0) continue;
-      list.push({
+      const fm: Friendly = {
         x: m.x,
         y: m.y,
         radius: MERC_STATS[m.type]!.radius,
         ownerId: m.owner,
         merc: m,
+        status: (kind, sec, mult = 0.6) => this.statusMerc(m, kind, sec, mult),
         hit: (h) => {
           if (m.respawn > 0 || m.hp <= 0) return 0; // 이미 쓰러졌다
           const mods = this.slots.get(m.owner)?.mods;
@@ -2710,15 +2728,39 @@ export class Game {
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
           const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner);
+          fm.lastBody = taken;
           this.hurtMerc(m, taken);
           if (mods) this.slots.get(m.owner)!.stats.taken += taken;
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner); // 독 틱(dot, 병종 없음)은 보라색 숫자
           this.thorns(this.slots.get(m.owner), h, m);
           return r.reflected;
         },
-      });
+      };
+      list.push(fm);
     }
     return list;
+  }
+
+  /** 주인공에게 상태이상을 건다(더 긴 쪽이 남는다). 쓰러진 주인공에게는 걸지 않는다. */
+  private statusHero(s: Slot, kind: number, sec: number, mult: number): void {
+    if (s.state.down || sec <= 0) return;
+    if (kind === ST_STUN) s.stunT = Math.max(s.stunT ?? 0, sec);
+    else if (kind === ST_ROOT) s.rootT = Math.max(s.rootT ?? 0, sec);
+    else if (kind === ST_SLOW) {
+      s.slowT = Math.max(s.slowT ?? 0, sec);
+      s.slowMult = Math.min(s.slowMult && s.slowT > 0 ? s.slowMult : 1, mult);
+    }
+  }
+
+  private statusMerc(m: Merc, kind: number, sec: number, mult: number): void {
+    if (m.respawn > 0 || sec <= 0) return;
+    if (kind === ST_STUN || kind === ST_ROOT) {
+      m.stunT = Math.max(m.stunT ?? 0, sec);
+      m.atkT = 0;
+    } else if (kind === ST_SLOW) {
+      m.slowT = Math.max(m.slowT ?? 0, sec);
+      m.slowMult = Math.min(m.slowMult && m.slowT > 0 ? m.slowMult : 1, mult);
+    }
   }
 
   /** 방패 체력을 깎는다. 다 깎이면 깨지고, 일정 시간 뒤 재생된다. */
@@ -2786,6 +2828,7 @@ export class Game {
   private enemyTargets(): Target[] {
     const out: Target[] = [];
     for (const e of this.enemies.values()) {
+      if (e.boss && (e.bk?.v.stealth ?? 0) > 0) continue; // 은신한 장군은 용병이 조준하지 못한다
       out.push({ x: e.x, y: e.y, r: radiusOf(e), type: e.type, face: e.face, shield: e.shield, ranged: ENEMY_STATS[e.type]!.ranged, id: e.id, hero: false, hpFrac: Math.max(0, e.hp) / e.maxHp });
     }
     return out;
@@ -2874,7 +2917,8 @@ export class Game {
     const allyCache = new Map<number, Ally[]>();
 
     for (const m of this.mercs.values()) {
-      const st = this.mercStats(m);
+      const st0 = this.mercStats(m);
+      const st = (m.slowT ?? 0) > 0 ? { ...st0, speed: st0.speed * (m.slowMult ?? 0.6) } : st0; // 둔화 중에는 느리다
       const ownerSlot = this.slots.get(m.owner);
       if (m.respawn > 0) {
         // 토너먼트에서도 쓰러진 용병은 되살아난다(경기 중에는 부활 시간이 TOURNAMENT_RESPAWN_MULT배로 짧다)
@@ -2891,6 +2935,12 @@ export class Game {
         continue;
       }
       if (duel && !(fighting && this.isFighter(m.owner))) continue;
+      if (m.slowT) m.slowT = Math.max(0, m.slowT - dt);
+      if (m.stunT && m.stunT > 0) {
+        m.stunT -= dt; // 기절·속박: 움직이지도 공격하지도 못한다
+        m.atkT = 0;
+        continue;
+      }
       this.regenShield(m, st.shield, dt);
       const regen = ownerSlot ? mstat(ownerSlot.mods, m.type, "regen") : 0;
       if (regen > 0) {
@@ -3515,6 +3565,7 @@ export class Game {
       m.momentum *= CAV_MOMENTUM_AFTER_HIT; // 부딪히면 속도를 잃는다
     }
     m.chargeSnap = 0;
+    this.boss.strikeBarriers(m.x, m.y, st.reach, dmg); // 거대 방패·얼음벽을 때린다
     if (this.phase === "tournament") {
       const foes = this.duelFoes(m.owner);
       const hitFoes: Friendly[] = [];
@@ -3574,7 +3625,11 @@ export class Game {
   }
 
   /** 적이 공격을 받는다. 방패·창병 반사 규칙을 적용하고, 되돌려줄 피해를 돌려준다. src는 때린 용병(없으면 주인공). */
-  private damageEnemy(e: Enemy, hit: Hit, ownerId: number, src?: Merc): number {
+  private damageEnemy(e: Enemy, hit0: Hit, ownerId: number, src?: Merc): number {
+    // 장군 스킬이 피해를 바꾸거나(반사·쉴드·방어력) 막는다(무적)
+    const adj = this.boss.preHit(e, hit0, ownerId, src);
+    if (!adj) return 0;
+    let hit = adj;
     const owner = this.slots.get(ownerId);
     const scope: LegendScope = src ? src.type : "hero"; // 때린 쪽(주인공 또는 그 병종)에게만 전설이 적용된다
     const has = (id: LegendId) => !!owner && hasLegend(owner.mods, id, scope);
@@ -3612,8 +3667,9 @@ export class Game {
       if (sec > (e.stunT ?? 0)) e.stunT = sec;
       e.atkT = 0;
     }
+    if (e.boss) this.boss.onHit(e, hit, ownerId, src);
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
-    else if (owner && r.body + r.shield > 0) this.knockBack(e, hit.fromAngle, src ? mstat(owner.mods, src.type, "knock") : owner.mods.heroKnock);
+    else if (owner && r.body + r.shield > 0 && !(e.boss && e.bk?.cur)) this.knockBack(e, hit.fromAngle, src ? mstat(owner.mods, src.type, "knock") : owner.mods.heroKnock); // 장군은 스킬을 쓰는 동안 밀리지 않는다
     return r.reflected;
   }
 
@@ -3729,6 +3785,7 @@ export class Game {
 
   /** 운석이 떨어져 폭발한다: 반경 안의 적(토너먼트에서는 상대 선수)에게 방패를 무시한 큰 피해. 중심이 가장 세고 가장자리는 약하다. */
   private landMeteor(x: number, y: number, radius: number, damage: number, ownerId: number, crit: boolean, src?: Merc): void {
+    this.boss.meteorBarriers(x, y, radius); // 얼음벽은 범위 공격이 맞은 조각마다 1회 깎인다
     this.pushEvent(EVT_METEOR, x, y, src ? 0 : 2, radius, ownerId); // owner = 쏜 플레이어, ang 2 = 주인공이 직접 쏜 마법(파랑), 용병 마법사는 초록
     const scale = (d: number) => 1 - TUNE.MAGE_FALLOFF * Math.min(1, d / radius);
     if (this.phase === "tournament") {
@@ -4215,7 +4272,7 @@ export class Game {
         continue; // 예비 동작 중에는 멈춰 선다
       }
 
-      if (e.boss && this.stepBossSkill(e, dt, foes)) continue; // 스킬을 쓰는 동안은 스킬이 움직임을 정한다
+      if (e.boss && this.boss.step(e, dt, foes)) continue; // 스킬을 쓰는 동안은 스킬이 움직임을 정한다
 
       const group = e.army ? this.army : e.squad ? (this.squads.get(e.squad)?.a ?? null) : null;
       const home = group ? this.armySlotPos(e.slotF, e.slotL, group) : null;
@@ -4247,7 +4304,7 @@ export class Game {
       }
       // 이동 속도가 곧 위협이다: 적은 조금 더 빠르고, 움직이는 대상을 앞질러 막아선다
       const speed =
-        st.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0)) * (e.buffT && e.buffT > 0 ? BOSS_CAV.roarSpeed : 1) * (e.bk && e.bk.sprint > 0 ? BOSS_CAV.sprintMult : 1);
+        st.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0)) * (e.buffT && e.buffT > 0 ? BOSS_CAV.roarSpeed : 1) * (e.boss ? this.boss.speedMult(e) : 1);
 
       if (e.type === MAGE) {
         // 적 마법사: 쿨다운이 끝나면 사거리 안에서 아군이 가장 많이 모인 곳에 운석을 겨눈다(외우는 동안 멈춰 선다). 그 외에는 궁병처럼 거리를 유지한다.
@@ -4281,264 +4338,6 @@ export class Game {
       }
       this.enemyMove(e, st, dt, foes, archers, target, targetDist, speed);
     }
-  }
-
-  // --- 장군 스킬(기병 장군: 질주·돌진·뒷발차기·선회 베기·돌격 함성) --------------------------------------
-
-  /** 장군에게 스킬 상태를 붙인다. 지금은 스테이지 1의 기병 장군만 스킬이 있다(나머지 장군은 구현 전). */
-  private bossKitOf(e: Enemy): BossKit | null {
-    if (!e.boss || this.stage !== 1 || this.phase !== "boss" || e.type !== CAVALRY) return null;
-    if (!e.bk) {
-      e.bk = { cds: [0, 0, 0, 0, 0, 0], cur: 0, ph: 0, t: 0, total: 0, x: e.x, y: e.y, ang: 0, idle: BOSS_CAV.firstDelay, sprint: 0, hit: new Set(), hitAt: new Map(), orbit: 0, orbitStart: 0, orbitR0: 0 };
-    }
-    return e.bk;
-  }
-
-  private foeKey(f: Foe): number {
-    return f.f.merc ? f.f.merc.id : -f.f.ownerId;
-  }
-
-  /** 취약한 폼 우선: 지팡이를 든 주인공 → 활을 든 주인공 → 그 외(가장 가까운 아군) */
-  private weakFoe(foes: Foe[], e: Enemy, range: number): Foe | null {
-    let best: Foe | null = null;
-    let bs = Infinity;
-    for (const f of foes) {
-      const d = Math.hypot(f.x - e.x, f.y - e.y);
-      if (d > range) continue;
-      let rank = 2;
-      if (f.type === NO_TYPE) {
-        const w = this.slots.get(f.f.ownerId)?.state.weapon;
-        rank = w === 4 ? 0 : w === 0 ? 1 : 2;
-      }
-      const sc = rank * 10000 + d;
-      if (sc < bs) {
-        bs = sc;
-        best = f;
-      }
-    }
-    return best;
-  }
-
-  private endBossSkill(k: BossKit): void {
-    k.cur = 0;
-    k.ph = 0;
-    k.idle = BOSS_CAV.idleMin + Math.random() * (BOSS_CAV.idleMax - BOSS_CAV.idleMin);
-  }
-
-  /** 장군이 쓰는 스킬 고르기: 쿨타임이 돌았고 조건이 맞는 스킬을 가중치로 뽑는다 */
-  private pickBossSkill(e: Enemy, k: BossKit, foes: Foe[]): void {
-    const C = BOSS_CAV;
-    let near = Infinity;
-    for (const f of foes) near = Math.min(near, Math.hypot(f.x - e.x, f.y - e.y));
-    const cands: [number, number][] = [];
-    if (k.cds[BSK_KICK]! <= 0) {
-      const back = e.face + Math.PI;
-      if (foes.some((f) => Math.hypot(f.x - e.x, f.y - e.y) <= C.kickRange + f.r && Math.abs(angleDiff(Math.atan2(f.y - e.y, f.x - e.x), back)) <= C.kickHalf)) cands.push([BSK_KICK, 6]);
-    }
-    const weak = this.weakFoe(foes, e, C.chargeRange);
-    if (k.cds[BSK_CHARGE]! <= 0 && weak && Math.hypot(weak.x - e.x, weak.y - e.y) > 150) cands.push([BSK_CHARGE, 4]);
-    if (k.cds[BSK_SLASH]! <= 0 && this.weakFoe(foes, e, C.slashRange)) cands.push([BSK_SLASH, 2.5]);
-    if (k.cds[BSK_SPRINT]! <= 0 && k.sprint <= 0 && near > 240 && near < 1100) cands.push([BSK_SPRINT, 3]);
-    if (k.cds[BSK_ROAR]! <= 0 && near < 900) {
-      let army = 0;
-      for (const o of this.enemies.values()) if (o.army && !o.boss) army++;
-      if (army >= 3) cands.push([BSK_ROAR, 2]);
-    }
-    if (cands.length === 0) return;
-    let roll = Math.random() * cands.reduce((a, c) => a + c[1], 0);
-    let id = cands[0]![0];
-    for (const [cid, w] of cands) {
-      roll -= w;
-      if (roll <= 0) {
-        id = cid;
-        break;
-      }
-    }
-    k.cur = id;
-    k.ph = 0;
-    k.hit.clear();
-    k.x = e.x;
-    k.y = e.y;
-    k.ang = e.face;
-    switch (id) {
-      case BSK_SPRINT: k.t = k.total = C.sprintTele; k.cds[id] = C.sprintCd; break;
-      case BSK_ROAR: k.t = k.total = C.roarTele; k.cds[id] = C.roarCd; break;
-      case BSK_KICK:
-        k.ang = e.face + Math.PI;
-        k.t = k.total = C.kickTele;
-        k.cds[id] = C.kickCd;
-        break;
-      case BSK_CHARGE:
-        k.ang = Math.atan2(weak!.y - e.y, weak!.x - e.x); // 예고 시작 때 방향을 고정한다
-        e.face = k.ang;
-        k.t = k.total = C.chargeTele;
-        k.cds[id] = C.chargeCd;
-        break;
-      default: {
-        const t = this.weakFoe(foes, e, C.slashRange)!;
-        k.x = t.x; // 궤도 중심도 고정한다
-        k.y = t.y;
-        k.t = k.total = C.slashTele;
-        k.cds[BSK_SLASH] = C.slashCd;
-      }
-    }
-  }
-
-  /** 장군 스킬이 이번 틱의 움직임을 맡으면 true */
-  private stepBossSkill(e: Enemy, dt: number, foes: Foe[]): boolean {
-    const k = this.bossKitOf(e);
-    if (!k) return false;
-    const C = BOSS_CAV;
-    for (let i = 1; i < k.cds.length; i++) k.cds[i] = Math.max(0, k.cds[i]! - dt);
-    if (k.sprint > 0) k.sprint -= dt;
-    if (k.cur === 0) {
-      k.idle -= dt;
-      if (k.idle > 0 || foes.length === 0) return false;
-      this.pickBossSkill(e, k, foes);
-      if (k.cur === 0) {
-        k.idle = 0.4;
-        return false;
-      }
-    }
-    k.t -= dt;
-    switch (k.cur) {
-      case BSK_SPRINT:
-      case BSK_ROAR:
-        if (k.t <= 0) {
-          if (k.cur === BSK_SPRINT) k.sprint = C.sprintSec;
-          else {
-            for (const o of this.enemies.values()) {
-              if (!o.army || o.boss) continue;
-              if (!(o.buffT && o.buffT > 0)) o.dmgMult *= C.roarDmg;
-              o.buffT = C.roarSec;
-            }
-            this.pushEvent(EVT_BOSSFX, e.x, e.y, 0, BFX_ROAR);
-          }
-          this.endBossSkill(k);
-        }
-        return true;
-      case BSK_KICK:
-        if (k.ph === 0 && k.t <= 0) {
-          for (const f of foes) {
-            const d = Math.hypot(f.x - e.x, f.y - e.y);
-            if (d > C.kickRange + f.r || Math.abs(angleDiff(Math.atan2(f.y - e.y, f.x - e.x), k.ang)) > C.kickHalf) continue;
-            this.bossHit(e, f, C.kickDmg, C.kickKnock);
-            this.pushEvent(EVT_BOSSFX, f.x, f.y, Math.atan2(f.y - e.y, f.x - e.x), BFX_IMPACT);
-          }
-          this.pushEvent(EVT_BOSSFX, e.x, e.y, k.ang, BFX_IMPACT);
-          k.ph = 2;
-          k.t = C.kickRest;
-        } else if (k.ph === 2 && k.t <= 0) this.endBossSkill(k);
-        return true;
-      case BSK_CHARGE: {
-        if (k.ph === 0) {
-          e.face = k.ang;
-          if (k.t <= 0) {
-            k.ph = 1;
-            k.orbit = 0; // 달린 거리
-          }
-          return true;
-        }
-        if (k.ph === 1) {
-          const step = C.chargeSpeed * dt;
-          const sub = Math.max(1, Math.ceil(step / 12)); // 얇은 방벽을 뚫고 지나가지 않게 잘게 나눠 움직인다
-          const rr = radiusOf(e) * 0.7;
-          for (let i = 0; i < sub && k.ph === 1; i++) {
-            const dd = Math.min(step / sub, C.chargeLen - k.orbit);
-            e.x = clampToWorld(e.x + Math.cos(k.ang) * dd, 14);
-            e.y = clampToWorld(e.y + Math.sin(k.ang) * dd, 14);
-            k.orbit += dd;
-            e.face = k.ang;
-            // 방벽·바위에 부딪히면 기절한다
-            if (this.walls.some((w) => this.wallLocal(w, e.x, e.y, rr) !== null) || this.terrain?.blocked(e.x, e.y, rr)) {
-              e.x = clampToWorld(e.x - Math.cos(k.ang) * 24, 14);
-              e.y = clampToWorld(e.y - Math.sin(k.ang) * 24, 14);
-              e.stunT = C.chargeStun;
-              this.pushEvent(EVT_BOSSFX, e.x, e.y, k.ang, BFX_CRASH);
-              this.endBossSkill(k);
-              return true;
-            }
-            for (const f of foes) {
-              const key = this.foeKey(f);
-              if (k.hit.has(key)) continue;
-              if (Math.hypot(f.x - e.x, f.y - e.y) > C.chargeWidth / 2 + f.r) continue;
-              k.hit.add(key);
-              this.bossHit(e, f, C.chargeDmg, C.chargeKnock, chargeBonus(200, 1));
-              this.pushEvent(EVT_BOSSFX, f.x, f.y, k.ang, BFX_IMPACT);
-            }
-            if (k.orbit >= C.chargeLen - 0.5) {
-              k.ph = 2;
-              k.t = C.chargeRest; // 딜 타임
-            }
-          }
-          return true;
-        }
-        if (k.t <= 0) this.endBossSkill(k);
-        return true;
-      }
-      default: {
-        // 선회 베기: 예고한 원 궤도를 보스가 크고 빠르게 돌며 지나간 곳을 벤다
-        const R = C.slashRadius;
-        if (k.ph === 0) {
-          if (k.t > 0) return true;
-          k.ph = 1;
-          k.t = C.slashSec;
-          k.orbit = 0;
-          k.orbitStart = Math.atan2(e.y - k.y, e.x - k.x);
-          k.orbitR0 = Math.hypot(e.x - k.x, e.y - k.y);
-          k.hitAt.clear();
-        }
-        if (k.ph === 1) {
-          const elapsed = C.slashSec - Math.max(0, k.t);
-          k.orbit = (elapsed / C.slashSec) * Math.PI * 2;
-          const r = k.orbitR0 + (R - k.orbitR0) * Math.min(1, elapsed / 0.35);
-          const th = k.orbitStart - k.orbit;
-          e.x = clampToWorld(k.x + Math.cos(th) * r, 14);
-          e.y = clampToWorld(k.y + Math.sin(th) * r, 14);
-          e.face = th - Math.PI / 2; // 가는 방향
-          const now = this.time;
-          let slashed = false;
-          for (const f of foes) {
-            if (Math.hypot(f.x - e.x, f.y - e.y) > C.slashBand + f.r) continue;
-            const key = this.foeKey(f);
-            if (now - (k.hitAt.get(key) ?? -9) < 0.45) continue;
-            k.hitAt.set(key, now);
-            this.bossHit(e, f, C.slashDmg, C.slashKnock);
-            slashed = true;
-          }
-          if (slashed || Math.floor(elapsed * 5) !== Math.floor((elapsed - dt) * 5)) this.pushEvent(EVT_BOSSFX, e.x, e.y, e.face, BFX_SLASH);
-          if (k.t <= 0) {
-            k.ph = 2;
-            k.t = C.slashRest;
-          }
-          return true;
-        }
-        if (k.t <= 0) this.endBossSkill(k);
-        return true;
-      }
-    }
-  }
-
-  /** 장군이 아군을 친다: 피해를 주고(창 든 주인공·창병은 돌격을 되돌린다) 뒤로 밀어낸다 */
-  private bossHit(e: Enemy, f: Foe, mult: number, knock: number, charge = 0): void {
-    const st = ENEMY_STATS[e.type]!;
-    const from = Math.atan2(e.y - f.y, e.x - f.x);
-    const back = f.f.hit({ damage: st.damage * e.dmgMult * mult, charge: charge * e.dmgMult, srcType: e.type, fromAngle: from, src: e });
-    if (back > 0) this.reflectToEnemy(e, back, f.f.ownerId, f.f.merc);
-    if (f.f.merc) {
-      const m = f.f.merc;
-      m.x = clampToWorld(m.x - Math.cos(from) * knock, 14);
-      m.y = clampToWorld(m.y - Math.sin(from) * knock, 14);
-      m.atkT = 0;
-      m.cd = Math.max(m.cd, KNOCK_STUN_SEC);
-    } else {
-      const p = this.slots.get(f.f.ownerId)?.state;
-      if (p && !p.down) {
-        p.x = clampToWorld(p.x - Math.cos(from) * knock, PLAYER_RADIUS);
-        p.y = clampToWorld(p.y - Math.sin(from) * knock, PLAYER_RADIUS);
-      }
-    }
-    this.pushEvent(EVT_KNOCK, f.x, f.y, from + Math.PI);
   }
 
   /** 대상 둘레를 돌아 들어가는 접근: 처음에는 옆으로 크게 돌고(포위), 가까워질수록 곧장 붙는다. 대상의 움직임을 예측해 앞질러 간다. */
@@ -4969,6 +4768,14 @@ export class Game {
       if (b.hi === undefined) b.hi = this.terrain?.elevated(b.x, b.y) ?? false;
       const mx = b.vx * dt;
       const my = b.vy * dt;
+      if (b.vis) {
+        // 그림만 날아가는 탄(던진 창·거대 철퇴): 피해는 서버가 시간에 맞춰 따로 준다
+        b.x += mx;
+        b.y += my;
+        b.left -= Math.hypot(mx, my);
+        if (b.left > 0) remaining.push(b);
+        continue;
+      }
       // 빠른 투사체가 대상을 건너뛰지 않도록 이동 구간을 쪼개 검사한다
       const steps = Math.max(1, Math.ceil(Math.hypot(mx, my) / 10));
       let hit = false;
@@ -4991,6 +4798,15 @@ export class Game {
             break;
           }
         }
+        // 장군의 거대 방패·얼음벽: 아군 투사체를 막는다(거대 방패는 적 투사체를 통과시킨다)
+        if (this.boss.hazards.length > 0 && this.boss.blockBullet(b, px, py)) {
+          hit = true;
+          if (b.kind === 1) contact = true;
+          b.x = px;
+          b.y = py;
+          this.pushEvent(EVT_WALL_HIT, px, py, 0);
+          break;
+        }
         if (b.kind === 1) {
           // 던진 철퇴: 맞히려는 대상에 닿으면 멈춰서 터진다(피해는 터질 때 한 번에)
           const touch = this.phase === "tournament"
@@ -5007,9 +4823,17 @@ export class Game {
         }
         if (b.hostile) {
           for (const f of friendlies) {
-            if (Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
+            const key = f.merc ? f.merc.id : -f.ownerId;
+            if (b.hitIds.has(key) || Math.hypot(f.x - px, f.y - py) > b.radius + f.radius) continue;
+            b.hitIds.add(key);
+            f.lastBody = 0;
             f.hit({ damage: b.damage * this.arrowTerrainMult(b, f.x, f.y), charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), poison: b.poison ? b.damage * b.poison : 0 }); // 날아온 쪽이 정면인지 본다. 독 궁병의 화살은 독을 건다
+            if (b.fx && (f.lastBody ?? 0) > 0) f.status(b.fx, b.fxSec ?? 1, b.fxMult); // 방패에 막히지 않고 몸에 맞았을 때만 상태이상
             this.pushEvent(EVT_ENEMY_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
+            if (b.pierce > 0) {
+              b.pierce--;
+              continue;
+            }
             hit = true;
             break;
           }

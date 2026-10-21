@@ -2,6 +2,7 @@ import { Application, Assets, ColorMatrixFilter, Container, Graphics, Sprite, Te
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
+import { createBossFx } from "./bossfx.js";
 import { bindAudioUi, createAudio } from "./audio.js";
 import { createMercPanel, isReady } from "./mercpanel.js";
 import {
@@ -38,15 +39,7 @@ import {
   EVT_DMG_SHIELD,
   EVT_KNOCK,
   EVT_BOSSFX,
-  BFX_CRASH,
-  BFX_IMPACT,
-  BFX_ROAR,
-  BFX_SLASH,
-  BOSS_SKILL_NAMES,
-  TELE_BAND,
-  TELE_CIRCLE,
-  TELE_CONE,
-  TELE_LINE,
+  EF_STEALTH,
   EVT_REFLECT,
   EVT_COUNTER,
   EVT_DMG_POISON,
@@ -231,28 +224,6 @@ async function main() {
   /** 8방위 그림은 크기가 달라 별도 배율·기준점을 쓴다 */
   const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5 * 1.4; // 말 탄 병사가 다른 병종과 비슷한 크기로 보이도록 1.4배
   const CAV_ANCHOR: [number, number] = [0.483, 0.72];
-  // 1~8스테이지 보스(장군) 전용 그림: 스테이지 번호 - 1 → 기본 자세, 공격 자세, 배율(그림 한 장 크기가 서로 달라 보스마다 따로 맞춘다)
-  const BOSS_ART_FILES: readonly { idle: string; attack: string | null; scale: number }[] = [
-    { idle: "boss1_idle", attack: "boss1_attack", scale: 0.5 },
-    { idle: "boss2_idle", attack: "boss2_thrust", scale: 0.6 },
-    { idle: "boss3_idle", attack: "boss3_aim", scale: 0.4 },
-    { idle: "boss4_idle", attack: null, scale: 0.42 },
-    { idle: "boss5_idle", attack: "boss5_smash", scale: 0.42 },
-    { idle: "boss6_idle", attack: "boss6_cast", scale: 0.5 },
-    { idle: "boss7_gallop", attack: "boss7_shoot", scale: 0.55 },
-    { idle: "boss8_normal", attack: "boss8_mad", scale: 0.75 },
-  ];
-  const BOSS_ART_STAGES = BOSS_ART_FILES.length;
-  const bossArt = await Promise.all(
-    BOSS_ART_FILES.map(async (f) => ({
-      idle: await Assets.load<Texture>(`assets/units/${f.idle}.png`).catch(() => null),
-      attack: f.attack ? await Assets.load<Texture>(`assets/units/${f.attack}.png`).catch(() => null) : null,
-      scale: f.scale,
-    })),
-  );
-  // 장군 스킬 효과 그림(기병 장군): 충돌 섬광·먼지, 선회 베기 호, 돌격 함성 오라
-  const loadSeq = (name: string, idx: number[]) => Promise.all(idx.map((i) => Assets.load<Texture>(`assets/fx/${name}_${i}.png`).catch(() => null)));
-  const [bfxImpact, bfxSlash, bfxCry] = await Promise.all([loadSeq("boss1_impact", [0, 1, 2, 3]), loadSeq("boss1_slash", [1, 2, 3]), loadSeq("boss1_cry", [0, 1, 2])]);
   /** 스테이지 보스 이름(스테이지 표시줄용). 1~8스테이지만 정해져 있다. */
   const BOSS_TITLES = ["기병 장군", "창병 장군", "궁병 장군", "검방병 장군", "둔기병 장군", "마법사 장군", "기마궁수", "전차"] as const;
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
@@ -340,6 +311,16 @@ async function main() {
   const terrainHigh = new Container(); // 유닛이 뒤에 서 있는 바위·나무: 유닛을 가린다
   terrainHigh.sortableChildren = true;
   world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, dmgLayer);
+  // 장군 스킬 표현(예고·장판·상태 표시·효과 컷). 서 있는 물건은 적과 함께 깊이 정렬된다.
+  const bossFx = await createBossFx({
+    groundFx,
+    standLayer: enemyLayer,
+    fxLayer,
+    skyLayer,
+    spawnFloat: (text, x, y, style, life, pop) => spawnFloat(text, x, y, style as TextStyleOptions, life, pop),
+    sound: (name, x, y, vol) => audio.play(name as never, { x, y, vol }),
+  });
+  const BOSS_ART_STAGES = bossFx.art.length;
 
   // --- 지형: 서버가 판마다 보내 준다 ---
   const terrainTex = new Map<number, Texture>();
@@ -431,10 +412,10 @@ async function main() {
     }
   };
 
-  const enemies = new Pool<Tracked & Facing & { sprite: Sprite; art: (typeof bossArt)[number] | null }, EnemyWire>(
+  const enemies = new Pool<Tracked & Facing & { sprite: Sprite; art: (typeof bossFx.art)[number] | null }, EnemyWire>(
     (w) => {
-      // 1~6스테이지 보스는 전용 그림을 쓴다(그림이 없으면 병종 그림 그대로)
-      const art = w[11] === 1 && (latest?.g?.stage ?? 99) <= BOSS_ART_STAGES ? bossArt[(latest?.g?.stage ?? 1) - 1] ?? null : null;
+      // 1~8스테이지 보스는 전용 그림을 쓴다(그림이 없으면 병종 그림 그대로)
+      const art = w[11] === 1 && (latest?.g?.stage ?? 99) <= BOSS_ART_STAGES ? bossFx.art[(latest?.g?.stage ?? 1) - 1] ?? null : null;
       const sprite = new Sprite(art?.idle ?? (w[4] === 0 ? enemyCav[0]![2]! : enemyTex[w[4]]!));
       if (art?.idle) sprite.anchor.set(0.5, 0.88);
       else if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
@@ -461,6 +442,7 @@ async function main() {
     trail?: Sprite; // 철퇴 뒤에 깔리는 궤적(그림이 있을 때)
     maceSpr?: Sprite; // 도는 철퇴 그림
     spin?: number;
+    bossKind?: number; // 장군 투사체 그림 종류(BUL_*)
   }
   // 같은 순간에 나간 화살이 많으면 하나씩 소리 내는 대신 '화살 연사' 소리 하나로 낸다
   const shotBuf: { x: number; y: number; hostile: boolean }[] = [];
@@ -509,6 +491,17 @@ async function main() {
         for (let i = 0; i < 6; i++) m.moveTo(Math.cos((i * Math.PI) / 3) * 12, -8 + Math.sin((i * Math.PI) / 3) * 12).lineTo(Math.cos((i * Math.PI) / 3) * 18, -8 + Math.sin((i * Math.PI) / 3) * 18).stroke({ width: 3, color: 0xcfd3dc });
         bulletLayer.addChild(m);
         return { node: m, x: 0, y: 0, hostile: false, angle: 0, ready: true, x0: w[1], y0: w[2], mace: true };
+      }
+      if (w[4] >= 2) {
+        // 장군 투사체(얼음 화살·저격 볼트·던진 창·철퇴·올가미·파편)
+        const look = bossFx.bulletLook(w[4]);
+        if (look?.tex) {
+          const bs = new Sprite(look.tex);
+          bs.anchor.set(look.anchorX, 0.5);
+          bs.scale.set(look.scale);
+          bulletLayer.addChild(bs);
+          return { node: bs, x: 0, y: 0, hostile, angle: 0, ready: true, x0: w[1], y0: w[2], bossKind: w[4] };
+        }
       }
       const sprite = new Sprite((hostile ? enemyArrow : allyArrow)[2]!); // 속도선이 중간 정도인 컷
       sprite.anchor.set(0.82, 0.5); // 화살촉이 위치에 오도록
@@ -1108,23 +1101,6 @@ async function main() {
     floats.push({ node, x: x + (Math.random() - 0.5) * 16, y: y - 18, vx: (Math.random() - 0.5) * 18, age: 0, life, pop });
   };
   const numFmt = (v: number) => (v >= 10 ? String(Math.round(v)) : String(Math.max(0.1, Math.round(v * 10) / 10)));
-  // 컷을 차례로 보여 주는 효과(장군 스킬): 처음부터 끝까지 dur초, 끝에 가까울수록 옅어진다
-  const seqFx: { sp: Sprite; frames: (Texture | null)[]; age: number; dur: number }[] = [];
-  const playSeq = (frames: (Texture | null)[], x: number, y: number, dur: number, scale: number, rot: number) => {
-    const first = frames.find((t) => t !== null);
-    if (!first || seqFx.length > 40) return;
-    const sp = new Sprite(first);
-    sp.anchor.set(0.5);
-    sp.scale.set(scale);
-    sp.rotation = rot;
-    sp.position.set(x, y);
-    fxLayer.addChild(sp);
-    seqFx.push({ sp, frames, age: 0, dur });
-  };
-  // 장군 스킬 예고(텔레그래프): 붉은 바닥 표시와 스킬 이름
-  const teleG = new Graphics();
-  groundFx.addChild(teleG);
-  const teleLabels: Text[] = [];
   const bursts: { kind: number; x: number; y: number; ang: number; age: number }[] = [];
   const BURST_SEC = 0.35;
   const RING_SEC = 0.5;
@@ -1346,19 +1322,7 @@ async function main() {
             dashFx.set(owner, { t0: performance.now(), lx: x, ly: y });
             spawnDashGhost(owner, x, y);
           }
-          else if (kind === EVT_BOSSFX) {
-            // 장군 스킬 효과: 그림 컷을 차례로 보여 준다
-            if (val === BFX_IMPACT || val === BFX_CRASH) {
-              playSeq(bfxImpact, x, y, 0.55, val === BFX_CRASH ? 1 : 0.7, 0);
-              audio.play("knockback", { x, y });
-              if (val === BFX_CRASH) spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
-            } else if (val === BFX_SLASH) {
-              playSeq(bfxSlash, x + Math.cos(ang) * 40, y + Math.sin(ang) * 40, 0.3, 1.2, ang);
-            } else if (val === BFX_ROAR) {
-              playSeq(bfxCry, x, y, 0.9, 1.5, 0);
-              audio.play("boss_warning", { x, y, vol: 0.6 });
-            }
-          }
+          else if (kind === EVT_BOSSFX) bossFx.playFx(val, x, y, ang); // 장군 스킬 효과 컷
           else if (kind === EVT_SKILL) {
             // 주인공 스킬: 무기 색의 고리. 던진 철퇴가 터지면 폭발 반경만큼 크게, 벽이 부서지면 작게
             const col = TYPE_COLORS[WEAPONS[Math.round(ang)]?.type ?? 0]!;
@@ -1784,7 +1748,9 @@ async function main() {
     }
     // 적(작은 붉은 점, 보스는 크게)
     for (const w of st.enemies) {
-      if (w[11] === 1) g.circle(sx(w[1]), sy(w[2]), 4.2).fill(0xff8a2a).stroke({ width: 1, color: 0xffffff });
+      if (w[11] === 1) {
+        if (((w[14] ?? 0) & EF_STEALTH) === 0) g.circle(sx(w[1]), sy(w[2]), 4.2).fill(0xff8a2a).stroke({ width: 1, color: 0xffffff }); // 은신 중에는 미니맵에서 숨는다
+      }
       else g.rect(sx(w[1]) - 0.9, sy(w[2]) - 0.9, 1.8, 1.8).fill({ color: 0xe0504a, alpha: 0.9 });
     }
     // 아군 용병: 주인 색 점. 쓰러진 용병은 X
@@ -1849,7 +1815,7 @@ async function main() {
       const size = w[11] === 1 ? BOSS_SIZE : 1;
       if (v.art) {
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
-        v.sprite.texture = ((w[5] > 0 || (w[13] ?? 0) % 10 > 0) && v.art.attack) || v.art.idle!;
+        v.sprite.texture = v.art.pose(w[13] ?? 0, w[14] ?? 0, w[5] > 0) ?? v.art.idle!;
         v.sprite.scale.set(v.art.scale * v.face, v.art.scale);
       } else if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
@@ -1864,61 +1830,23 @@ async function main() {
       }
       v.sprite.zIndex = v.y;
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
+      if ((w[14] ?? 0) !== 0 || v.sprite.tint !== 0xffffff) {
+        // 장군 상태 표시: 은신(거의 투명)·무적(황금빛)·기절·쉴드·궁지 등
+        const mk = bossFx.enemyMarks(w[0], v.x, v.y, w[14] ?? 0, w[11] === 1, latest?.g?.stage ?? 1, size, performance.now());
+        v.sprite.alpha *= mk.alpha;
+        v.sprite.tint = mk.tint;
+      }
       setPoison(v.sprite, w[12] === 1);
     });
-    // 장군 스킬 예고와 효과 컷
-    teleG.clear();
-    const bt = latest.bt ?? [];
-    for (let i = 0; i < bt.length; i++) {
-      const [kind, tx, ty, ta, tA, tB, left, total, tsk] = bt[i]!;
-      const pr = Math.min(1, Math.max(0, 1 - left / Math.max(1, total)));
-      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 90);
-      const RED = 0xff3a2a;
-      if (kind === TELE_LINE) {
-        const px = -Math.sin(ta) * (tB / 2);
-        const py = Math.cos(ta) * (tB / 2);
-        const ex = tx + Math.cos(ta) * tA;
-        const ey = ty + Math.sin(ta) * tA;
-        teleG.poly([tx + px, ty + py, ex + px, ey + py, ex - px, ey - py, tx - px, ty - py]).fill({ color: RED, alpha: 0.12 }).stroke({ width: 2, color: RED, alpha: 0.55 + 0.25 * pulse });
-        const fx2 = tx + Math.cos(ta) * tA * pr;
-        const fy2 = ty + Math.sin(ta) * tA * pr;
-        teleG.poly([tx + px, ty + py, fx2 + px, fy2 + py, fx2 - px, fy2 - py, tx - px, ty - py]).fill({ color: RED, alpha: 0.3 });
-      } else if (kind === TELE_CONE) {
-        teleG.moveTo(tx, ty).arc(tx, ty, tB, ta - tA, ta + tA).closePath().fill({ color: RED, alpha: 0.12 }).stroke({ width: 2, color: RED, alpha: 0.55 + 0.25 * pulse });
-        teleG.moveTo(tx, ty).arc(tx, ty, tB * pr, ta - tA, ta + tA).closePath().fill({ color: RED, alpha: 0.3 });
-      } else if (kind === TELE_BAND) {
-        const mid = (tA + tB) / 2;
-        teleG.circle(tx, ty, mid).stroke({ width: tB - tA, color: RED, alpha: 0.12 + 0.2 * pr });
-        teleG.circle(tx, ty, tA).stroke({ width: 2, color: RED, alpha: 0.6 + 0.2 * pulse });
-        teleG.circle(tx, ty, tB).stroke({ width: 2, color: RED, alpha: 0.6 + 0.2 * pulse });
-      } else {
-        teleG.circle(tx, ty, tA * (0.6 + 0.4 * pr)).stroke({ width: 3, color: 0xffb04a, alpha: 0.7 }).circle(tx, ty, tA * (0.6 + 0.4 * pr)).fill({ color: 0xffb04a, alpha: 0.12 + 0.12 * pr });
-      }
-      let lab = teleLabels[i];
-      if (!lab) {
-        lab = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 20, fontWeight: "900", stroke: { color: 0x3a0800, width: 5 } } });
-        lab.anchor.set(0.5, 1);
-        skyLayer.addChild(lab);
-        teleLabels[i] = lab;
-      }
-      lab.text = `${BOSS_SKILL_NAMES[tsk] ?? ""}!`;
-      lab.position.set(kind === TELE_LINE || kind === TELE_CONE || kind === TELE_CIRCLE ? tx : tx, (kind === TELE_BAND ? ty - tB - 14 : ty - 70));
-      lab.visible = true;
-    }
-    for (let i = bt.length; i < teleLabels.length; i++) teleLabels[i]!.visible = false;
-    for (let i = seqFx.length - 1; i >= 0; i--) {
-      const f = seqFx[i]!;
-      f.age += ticker.deltaMS / 1000;
-      const idx = Math.min(f.frames.length - 1, Math.floor((f.age / f.dur) * f.frames.length));
-      const tex = f.frames[idx];
-      if (tex) f.sp.texture = tex;
-      f.sp.alpha = Math.max(0, Math.min(1, 2.2 * (1 - f.age / f.dur)));
-      if (f.age >= f.dur) {
-        f.sp.destroy();
-        seqFx.splice(i, 1);
-      }
-    }
+    // 장군 스킬 예고·장판·효과 컷
+    bossFx.frame(latest.bt ?? [], latest.hz ?? [], latest.g?.stage ?? 1, ticker.deltaMS, performance.now());
+    bossFx.endEnemies();
     bullets.update(latest.bullets, k, (v, w) => {
+      if (v.bossKind) {
+        v.node.rotation = v.bossKind === 5 || v.bossKind === 7 ? (v.spin = (v.spin ?? 0) + 0.35) : (w[5] ?? 0); // 철퇴·파편은 돈다, 나머지는 날아가는 방향
+        v.node.visible = true;
+        return;
+      }
       if (v.mace) {
         if (v.maceSpr) v.maceSpr.rotation += 0.4;
         else v.node.rotation += 0.4; // 빙글빙글 돈다(도형일 때는 통째로)

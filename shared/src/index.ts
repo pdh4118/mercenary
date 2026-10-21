@@ -10,7 +10,7 @@ export * from "./names.js";
 export * from "./audio.js";
 export * from "./terrain.js";
 import { ARCHER, BLUNT, CAVALRY, MAGE, SHIELD, SPEAR } from "./rules.js";
-import type { TeleWire } from "./bossskill.js";
+import type { HazardWire, TeleWire } from "./bossskill.js";
 
 export const TICK_RATE = 20; // 서버가 초당 계산·전송하는 횟수
 export const MAX_PLAYERS = 8;
@@ -146,7 +146,8 @@ export type EnemyWire = [
   regen: number, // 깨진 방패가 재생될 때까지 남은 초(0이면 해당 없음)
   boss: number, // 1이면 보스(장군)
   poison: number, // 1이면 독에 중독된 상태(몸이 보랏빛으로 보인다)
-  skill: number, // 장군이 쓰고 있는 스킬 번호(BSK_*, 일의 자리) + 질주 중이면 10. 없으면 0
+  skill: number, // 장군이 쓰고 있는 스킬 번호(BSK_*). 없으면 0
+  flags: number, // 장군 상태 비트(EF_*: 질주·은신·무적·궁지 등)
 ];
 export type MercWire = [
   id: number,
@@ -251,7 +252,7 @@ export interface ResultPlayer {
   champion: number; // 토너먼트 우승 횟수
 }
 
-export type BulletWire = [id: number, x: number, y: number, team: 0 | 1, kind: number]; // team 1 = 적 투사체, kind 0 = 화살, 1 = 던진 철퇴
+export type BulletWire = [id: number, x: number, y: number, team: 0 | 1, kind: number, ang: number]; // team 1 = 적 투사체, kind 0 = 화살, 1 = 던진 철퇴, 2 이상 = 장군 투사체(BUL_*), ang = 날아가는 방향
 /** 마법사 방벽: id, x, y, 각도(라디안), 반길이, 반두께, 남은 시간 비율 0..100(벽은 부서지지 않고 시간이 되면 사라진다), 주인 번호 */
 export type WallWire = [id: number, x: number, y: number, ang: number, hl: number, ht: number, left: number, owner: number];
 /** 보스 보상 상자: id, x, y, 주인 번호, 남은 초 */
@@ -349,6 +350,7 @@ export type ServerMsg =
       meteors?: MeteorWire[];
       walls?: WallWire[];
       bt?: TeleWire[]; // 보스 스킬 예고(없으면 생략)
+      hz?: HazardWire[]; // 장군이 만든 장판·장애물(없으면 생략)
     };
 
 /** 클라이언트 입력은 신뢰하지 않는다: 범위를 자르고, 대각선 속도가 빨라지지 않게 정규화한다. */

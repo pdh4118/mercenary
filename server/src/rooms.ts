@@ -485,6 +485,7 @@ export class RoomManager {
       }
       if (!this.rooms.has(room.code) || room.phase !== "playing") continue;
       const bossTele = room.game.snapshotBossTele();
+      const hazards = room.game.snapshotHazards();
       const state: ServerMsg = {
         t: "state",
         tick: room.game.tick,
@@ -496,6 +497,7 @@ export class RoomManager {
         meteors: room.game.snapshotMeteors(),
         walls: room.game.snapshotWalls(),
         ...(bossTele.length > 0 ? { bt: bossTele } : {}),
+        ...(hazards.length > 0 ? { hz: hazards } : {}),
         enemies: room.game.snapshotEnemies(),
         bullets: room.game.snapshotBullets(),
         g: room.game.info(),

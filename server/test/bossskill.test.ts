@@ -20,7 +20,7 @@ function setup(only: number): { g: Game; b: any; a: number } {
   const b = boss(g);
   g.step(); // 스킬 상태가 붙는다
   assert.ok(b.bk, "스테이지 1 기병 장군에게 스킬 상태가 붙는다");
-  for (let i = 1; i < b.bk.cds.length; i++) b.bk.cds[i] = i === only ? 0 : 999;
+  for (let i = 1; i <= 40; i++) b.bk.cds[i] = i === only ? 0 : 999;
   b.bk.idle = 0;
   b.hp = b.maxHp = 1e9; // 시험 중에는 죽지 않게
   return { g, b, a };
@@ -50,7 +50,7 @@ test("뒷발차기: 뒤에 붙은 대상에게 예고(부채꼴) 뒤 피해와 �
   b.face = 0; // 오른쪽을 보고 있다 → 뒤는 왼쪽
   place(p, b.x - 70, b.y); // 주인공이 보스 바로 뒤
   run(g, 0.1);
-  assert.equal(b.bk.cur, BSK_KICK, "뒤에 붙은 대상이 있으면 뒷발차기를 고른다");
+  assert.equal(b.bk.cur?.id, BSK_KICK, "뒤에 붙은 대상이 있으면 뒷발차기를 고른다");
   assert.ok(g.snapshotBossTele().some((t) => t[0] === TELE_CONE), "부채꼴 예고");
   const hp0 = p.hp;
   const x0 = p.x;
@@ -65,7 +65,7 @@ test("돌진: 취약한 폼을 향해 직선 예고 뒤 달려 지나가며 맞�
   place(b, p.x - 500, p.y);
   b.face = 0;
   run(g, 0.1);
-  assert.equal(b.bk.cur, BSK_CHARGE);
+  assert.equal(b.bk.cur?.id, BSK_CHARGE);
   const tele = g.snapshotBossTele().find((t) => t[0] === TELE_LINE);
   assert.ok(tele, "직선 예고");
   const ang0 = b.bk.ang;
@@ -109,10 +109,10 @@ test("질주: 일정 시간 이동 속도가 오르고 쿨타임이 돈다", () 
   const p = [...(g as any).slots.values()][0].state;
   place(p, 0, 0);
   run(g, BOSS_CAV.sprintTele + 0.2);
-  assert.ok(b.bk.sprint > 0, "질주 중");
+  assert.ok(b.bk.v.sprint > 0, "질주 중");
   assert.ok(b.bk.cds[BSK_SPRINT] > 0, "쿨타임");
   run(g, BOSS_CAV.sprintSec + 0.5);
-  assert.ok(!(b.bk.sprint > 0));
+  assert.ok(!(b.bk.v.sprint > 0));
 });
 
 test("선회 베기: 대상 둘레 고리 띠를 예고하고 보스가 그 궤도를 돈다", () => {
@@ -120,7 +120,7 @@ test("선회 베기: 대상 둘레 고리 띠를 예고하고 보스가 그 궤�
   const p = g.getPlayer(a)!;
   place(b, p.x + 400, p.y);
   run(g, 0.1);
-  assert.equal(b.bk.cur, BSK_SLASH);
+  assert.equal(b.bk.cur?.id, BSK_SLASH);
   const tele = g.snapshotBossTele()[0]!;
   assert.equal(tele[8], BSK_SLASH);
   const cx = b.bk.x;
