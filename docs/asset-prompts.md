@@ -20,6 +20,7 @@
 | 기병 장군 돌진 충돌 임팩트 | 섬광 2장(`boss1_impact_0`, `0b`)과 흰 배경 재요청본 연기 3컷(`boss1_impact_1~3`) 모두 받음, 보관 (`assets/fx/`). 3번 연기는 반투명이라 옅다 |
 | 창병 장군 본체 3포즈 + 여분 1 | 받음, 보관 (`assets/units/boss2_idle.png`(113x314), `boss2_guard.png`(창 겨눔, 249x127), `boss2_thrust.png`(278x130), `boss2_guard_b.png`(창 없이 웅크린 자세, 여분)). 시트에 `boss2_guard` 캡션이 둘이라 창을 겨눈 쪽을 방어 자세로 썼다 |
 | 창병 장군 이펙트 (장창 찌르기 선 3컷, 창 방어 쓸기 3컷, 던진 창, 박힌 창) | 받음, 보관 (`assets/fx/boss2_thrust_0~2`, `boss2_sweep_0~2`, `boss2_spear_fly`, `boss2_spear_stuck`). 시안의 테두리 선은 잘라 냈다. 연한 초록 이펙트는 반투명으로 처리해 옅게 보인다 |
+| 궁병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss3_idle`, `boss3_aim`, `boss3_sky`, `assets/fx/boss3_ice_0~4`, `boss3_snipe`, `boss3_snipe_hit`, `boss3_rain_0·1·stuck·fade`, `boss3_dust_0~3`, `boss3_frost_0~2`). 얼음 둔화 표시는 얼음 고리 그림 대신 **파란 틴트(독과 같은 방식)** 로 하기로 해서 `boss3_frost_*`는 쓰지 않고 보관만 한다 |
 | 효과음·음악 | 이 문서 10번 |
 | 스페이스 스킬 아이콘 6종 | 완료, 적용됨 (`assets/ui/skill_icon_*.png`, 철퇴는 시안 2개 중 `skill_icon_mace`를 쓰고 `skill_icon_mace_b`는 보관) |
 | 방벽 상태 3컷(평면 띠 시안) | 보관 (`assets/fx/skill_wall_0~2.png`). 조각 그림이 있으면 쓰이지 않음 |
