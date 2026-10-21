@@ -146,6 +146,23 @@ import {
   STANCE_DEFEND,
   STANCE_HOLD,
   STANCE_PROTECT,
+  BOSS_CAV,
+  BOSS_SKILL_NAMES,
+  BSK_CHARGE,
+  BSK_KICK,
+  BSK_ROAR,
+  BSK_SLASH,
+  BSK_SPRINT,
+  BFX_CRASH,
+  BFX_IMPACT,
+  BFX_ROAR,
+  BFX_SLASH,
+  EVT_BOSSFX,
+  TELE_BAND,
+  TELE_CIRCLE,
+  TELE_CONE,
+  TELE_LINE,
+  type TeleWire,
   WARD_WEIGHT,
   CHEST_OPEN_RADIUS,
   TOURNAMENT_ARENA_RADIUS,
@@ -373,6 +390,25 @@ interface Foe {
   f: Friendly;
 }
 
+/** 장군의 스킬 진행 상태 */
+interface BossKit {
+  cds: number[]; // 스킬 번호별 남은 쿨타임
+  cur: number; // 쓰는 중인 스킬(0이면 없음)
+  ph: number; // 0 예고, 1 시전, 2 후딜
+  t: number; // 지금 단계에 남은 시간
+  total: number; // 지금 단계 전체 시간(예고 표시용)
+  x: number; // 예고 때 고정한 위치·방향
+  y: number;
+  ang: number;
+  idle: number; // 다음 스킬을 고르기까지 남은 시간
+  sprint: number; // 질주가 남은 시간
+  hit: Set<number>; // 이번 시전에 이미 맞힌 대상(용병 번호, 주인공은 음수 번호)
+  hitAt: Map<number, number>; // 선회 베기가 대상을 마지막으로 친 시각
+  orbit: number; // 선회 베기에서 지금까지 돈 각도
+  orbitStart: number; // 선회 베기를 시작할 때의 각도
+  orbitR0: number; // 선회 베기를 시작할 때 중심에서의 거리
+}
+
 interface Enemy extends Fighter {
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
@@ -384,6 +420,8 @@ interface Enemy extends Fighter {
   poisonAcc?: number; // 아직 숫자로 띄우지 않은 독 피해
   venom?: boolean; // 독 화살을 쏘는 궁병(맞은 아군이 중독된다)
   stunT?: number; // 경직(움직이지도 공격하지도 못하는) 남은 시간
+  bk?: BossKit; // 장군의 스킬 상태
+  buffT?: number; // 돌격 함성(보스군 강화)이 남은 시간
   maxHp: number;
   shieldMax: number;
   dmgMult: number;
@@ -1078,7 +1116,28 @@ export class Game {
       round(e.regenT, 10),
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
+      (e.bk?.cur ?? 0) + ((e.bk?.sprint ?? 0) > 0 ? 10 : 0),
     ]);
+  }
+
+  /** 보스 스킬 예고: 예고 단계인 스킬마다 모양 하나 */
+  snapshotBossTele(): TeleWire[] {
+    const out: TeleWire[] = [];
+    const C = BOSS_CAV;
+    for (const e of this.enemies.values()) {
+      const k = e.bk;
+      if (!k || k.cur === 0 || k.ph !== 0) continue;
+      const left = Math.max(0, Math.round(k.t * 10));
+      const total = Math.max(1, Math.round(k.total * 10));
+      const r = Math.round;
+      switch (k.cur) {
+        case BSK_CHARGE: out.push([TELE_LINE, r(k.x), r(k.y), Math.round(k.ang * 100) / 100, C.chargeLen, C.chargeWidth, left, total, k.cur]); break;
+        case BSK_KICK: out.push([TELE_CONE, r(k.x), r(k.y), Math.round(k.ang * 100) / 100, Math.round(C.kickHalf * 100) / 100, C.kickRange, left, total, k.cur]); break;
+        case BSK_SLASH: out.push([TELE_BAND, r(k.x), r(k.y), 0, C.slashRadius - C.slashBand, C.slashRadius + C.slashBand, left, total, k.cur]); break;
+        default: out.push([TELE_CIRCLE, r(e.x), r(e.y), 0, 80, 0, left, total, k.cur]);
+      }
+    }
+    return out;
   }
 
   snapshotMercs(): MercWire[] {
@@ -4130,6 +4189,14 @@ export class Game {
     for (const o of this.enemies.values()) if (o.type === ARCHER) archers.push(o);
     for (const e of [...this.enemies.values()]) {
       if (this.tickPoison(e, dt)) continue;
+      if (e.buffT && e.buffT > 0) {
+        // 돌격 함성: 끝나면 올려 둔 피해가 돌아온다
+        e.buffT -= dt;
+        if (e.buffT <= 0) {
+          e.buffT = 0;
+          e.dmgMult /= BOSS_CAV.roarDmg;
+        }
+      }
       if (e.stunT && e.stunT > 0) {
         e.stunT -= dt;
         continue; // 경직: 움직이지도 공격하지도 못한다
@@ -4147,6 +4214,8 @@ export class Game {
         }
         continue; // 예비 동작 중에는 멈춰 선다
       }
+
+      if (e.boss && this.stepBossSkill(e, dt, foes)) continue; // 스킬을 쓰는 동안은 스킬이 움직임을 정한다
 
       const group = e.army ? this.army : e.squad ? (this.squads.get(e.squad)?.a ?? null) : null;
       const home = group ? this.armySlotPos(e.slotF, e.slotL, group) : null;
@@ -4177,7 +4246,8 @@ export class Game {
         continue;
       }
       // 이동 속도가 곧 위협이다: 적은 조금 더 빠르고, 움직이는 대상을 앞질러 막아선다
-      const speed = st.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0));
+      const speed =
+        st.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0)) * (e.buffT && e.buffT > 0 ? BOSS_CAV.roarSpeed : 1) * (e.bk && e.bk.sprint > 0 ? BOSS_CAV.sprintMult : 1);
 
       if (e.type === MAGE) {
         // 적 마법사: 쿨다운이 끝나면 사거리 안에서 아군이 가장 많이 모인 곳에 운석을 겨눈다(외우는 동안 멈춰 선다). 그 외에는 궁병처럼 거리를 유지한다.
@@ -4211,6 +4281,264 @@ export class Game {
       }
       this.enemyMove(e, st, dt, foes, archers, target, targetDist, speed);
     }
+  }
+
+  // --- 장군 스킬(기병 장군: 질주·돌진·뒷발차기·선회 베기·돌격 함성) --------------------------------------
+
+  /** 장군에게 스킬 상태를 붙인다. 지금은 스테이지 1의 기병 장군만 스킬이 있다(나머지 장군은 구현 전). */
+  private bossKitOf(e: Enemy): BossKit | null {
+    if (!e.boss || this.stage !== 1 || this.phase !== "boss" || e.type !== CAVALRY) return null;
+    if (!e.bk) {
+      e.bk = { cds: [0, 0, 0, 0, 0, 0], cur: 0, ph: 0, t: 0, total: 0, x: e.x, y: e.y, ang: 0, idle: BOSS_CAV.firstDelay, sprint: 0, hit: new Set(), hitAt: new Map(), orbit: 0, orbitStart: 0, orbitR0: 0 };
+    }
+    return e.bk;
+  }
+
+  private foeKey(f: Foe): number {
+    return f.f.merc ? f.f.merc.id : -f.f.ownerId;
+  }
+
+  /** 취약한 폼 우선: 지팡이를 든 주인공 → 활을 든 주인공 → 그 외(가장 가까운 아군) */
+  private weakFoe(foes: Foe[], e: Enemy, range: number): Foe | null {
+    let best: Foe | null = null;
+    let bs = Infinity;
+    for (const f of foes) {
+      const d = Math.hypot(f.x - e.x, f.y - e.y);
+      if (d > range) continue;
+      let rank = 2;
+      if (f.type === NO_TYPE) {
+        const w = this.slots.get(f.f.ownerId)?.state.weapon;
+        rank = w === 4 ? 0 : w === 0 ? 1 : 2;
+      }
+      const sc = rank * 10000 + d;
+      if (sc < bs) {
+        bs = sc;
+        best = f;
+      }
+    }
+    return best;
+  }
+
+  private endBossSkill(k: BossKit): void {
+    k.cur = 0;
+    k.ph = 0;
+    k.idle = BOSS_CAV.idleMin + Math.random() * (BOSS_CAV.idleMax - BOSS_CAV.idleMin);
+  }
+
+  /** 장군이 쓰는 스킬 고르기: 쿨타임이 돌았고 조건이 맞는 스킬을 가중치로 뽑는다 */
+  private pickBossSkill(e: Enemy, k: BossKit, foes: Foe[]): void {
+    const C = BOSS_CAV;
+    let near = Infinity;
+    for (const f of foes) near = Math.min(near, Math.hypot(f.x - e.x, f.y - e.y));
+    const cands: [number, number][] = [];
+    if (k.cds[BSK_KICK]! <= 0) {
+      const back = e.face + Math.PI;
+      if (foes.some((f) => Math.hypot(f.x - e.x, f.y - e.y) <= C.kickRange + f.r && Math.abs(angleDiff(Math.atan2(f.y - e.y, f.x - e.x), back)) <= C.kickHalf)) cands.push([BSK_KICK, 6]);
+    }
+    const weak = this.weakFoe(foes, e, C.chargeRange);
+    if (k.cds[BSK_CHARGE]! <= 0 && weak && Math.hypot(weak.x - e.x, weak.y - e.y) > 150) cands.push([BSK_CHARGE, 4]);
+    if (k.cds[BSK_SLASH]! <= 0 && this.weakFoe(foes, e, C.slashRange)) cands.push([BSK_SLASH, 2.5]);
+    if (k.cds[BSK_SPRINT]! <= 0 && k.sprint <= 0 && near > 240 && near < 1100) cands.push([BSK_SPRINT, 3]);
+    if (k.cds[BSK_ROAR]! <= 0 && near < 900) {
+      let army = 0;
+      for (const o of this.enemies.values()) if (o.army && !o.boss) army++;
+      if (army >= 3) cands.push([BSK_ROAR, 2]);
+    }
+    if (cands.length === 0) return;
+    let roll = Math.random() * cands.reduce((a, c) => a + c[1], 0);
+    let id = cands[0]![0];
+    for (const [cid, w] of cands) {
+      roll -= w;
+      if (roll <= 0) {
+        id = cid;
+        break;
+      }
+    }
+    k.cur = id;
+    k.ph = 0;
+    k.hit.clear();
+    k.x = e.x;
+    k.y = e.y;
+    k.ang = e.face;
+    switch (id) {
+      case BSK_SPRINT: k.t = k.total = C.sprintTele; k.cds[id] = C.sprintCd; break;
+      case BSK_ROAR: k.t = k.total = C.roarTele; k.cds[id] = C.roarCd; break;
+      case BSK_KICK:
+        k.ang = e.face + Math.PI;
+        k.t = k.total = C.kickTele;
+        k.cds[id] = C.kickCd;
+        break;
+      case BSK_CHARGE:
+        k.ang = Math.atan2(weak!.y - e.y, weak!.x - e.x); // 예고 시작 때 방향을 고정한다
+        e.face = k.ang;
+        k.t = k.total = C.chargeTele;
+        k.cds[id] = C.chargeCd;
+        break;
+      default: {
+        const t = this.weakFoe(foes, e, C.slashRange)!;
+        k.x = t.x; // 궤도 중심도 고정한다
+        k.y = t.y;
+        k.t = k.total = C.slashTele;
+        k.cds[BSK_SLASH] = C.slashCd;
+      }
+    }
+  }
+
+  /** 장군 스킬이 이번 틱의 움직임을 맡으면 true */
+  private stepBossSkill(e: Enemy, dt: number, foes: Foe[]): boolean {
+    const k = this.bossKitOf(e);
+    if (!k) return false;
+    const C = BOSS_CAV;
+    for (let i = 1; i < k.cds.length; i++) k.cds[i] = Math.max(0, k.cds[i]! - dt);
+    if (k.sprint > 0) k.sprint -= dt;
+    if (k.cur === 0) {
+      k.idle -= dt;
+      if (k.idle > 0 || foes.length === 0) return false;
+      this.pickBossSkill(e, k, foes);
+      if (k.cur === 0) {
+        k.idle = 0.4;
+        return false;
+      }
+    }
+    k.t -= dt;
+    switch (k.cur) {
+      case BSK_SPRINT:
+      case BSK_ROAR:
+        if (k.t <= 0) {
+          if (k.cur === BSK_SPRINT) k.sprint = C.sprintSec;
+          else {
+            for (const o of this.enemies.values()) {
+              if (!o.army || o.boss) continue;
+              if (!(o.buffT && o.buffT > 0)) o.dmgMult *= C.roarDmg;
+              o.buffT = C.roarSec;
+            }
+            this.pushEvent(EVT_BOSSFX, e.x, e.y, 0, BFX_ROAR);
+          }
+          this.endBossSkill(k);
+        }
+        return true;
+      case BSK_KICK:
+        if (k.ph === 0 && k.t <= 0) {
+          for (const f of foes) {
+            const d = Math.hypot(f.x - e.x, f.y - e.y);
+            if (d > C.kickRange + f.r || Math.abs(angleDiff(Math.atan2(f.y - e.y, f.x - e.x), k.ang)) > C.kickHalf) continue;
+            this.bossHit(e, f, C.kickDmg, C.kickKnock);
+            this.pushEvent(EVT_BOSSFX, f.x, f.y, Math.atan2(f.y - e.y, f.x - e.x), BFX_IMPACT);
+          }
+          this.pushEvent(EVT_BOSSFX, e.x, e.y, k.ang, BFX_IMPACT);
+          k.ph = 2;
+          k.t = C.kickRest;
+        } else if (k.ph === 2 && k.t <= 0) this.endBossSkill(k);
+        return true;
+      case BSK_CHARGE: {
+        if (k.ph === 0) {
+          e.face = k.ang;
+          if (k.t <= 0) {
+            k.ph = 1;
+            k.orbit = 0; // 달린 거리
+          }
+          return true;
+        }
+        if (k.ph === 1) {
+          const step = C.chargeSpeed * dt;
+          const sub = Math.max(1, Math.ceil(step / 12)); // 얇은 방벽을 뚫고 지나가지 않게 잘게 나눠 움직인다
+          const rr = radiusOf(e) * 0.7;
+          for (let i = 0; i < sub && k.ph === 1; i++) {
+            const dd = Math.min(step / sub, C.chargeLen - k.orbit);
+            e.x = clampToWorld(e.x + Math.cos(k.ang) * dd, 14);
+            e.y = clampToWorld(e.y + Math.sin(k.ang) * dd, 14);
+            k.orbit += dd;
+            e.face = k.ang;
+            // 방벽·바위에 부딪히면 기절한다
+            if (this.walls.some((w) => this.wallLocal(w, e.x, e.y, rr) !== null) || this.terrain?.blocked(e.x, e.y, rr)) {
+              e.x = clampToWorld(e.x - Math.cos(k.ang) * 24, 14);
+              e.y = clampToWorld(e.y - Math.sin(k.ang) * 24, 14);
+              e.stunT = C.chargeStun;
+              this.pushEvent(EVT_BOSSFX, e.x, e.y, k.ang, BFX_CRASH);
+              this.endBossSkill(k);
+              return true;
+            }
+            for (const f of foes) {
+              const key = this.foeKey(f);
+              if (k.hit.has(key)) continue;
+              if (Math.hypot(f.x - e.x, f.y - e.y) > C.chargeWidth / 2 + f.r) continue;
+              k.hit.add(key);
+              this.bossHit(e, f, C.chargeDmg, C.chargeKnock, chargeBonus(200, 1));
+              this.pushEvent(EVT_BOSSFX, f.x, f.y, k.ang, BFX_IMPACT);
+            }
+            if (k.orbit >= C.chargeLen - 0.5) {
+              k.ph = 2;
+              k.t = C.chargeRest; // 딜 타임
+            }
+          }
+          return true;
+        }
+        if (k.t <= 0) this.endBossSkill(k);
+        return true;
+      }
+      default: {
+        // 선회 베기: 예고한 원 궤도를 보스가 크고 빠르게 돌며 지나간 곳을 벤다
+        const R = C.slashRadius;
+        if (k.ph === 0) {
+          if (k.t > 0) return true;
+          k.ph = 1;
+          k.t = C.slashSec;
+          k.orbit = 0;
+          k.orbitStart = Math.atan2(e.y - k.y, e.x - k.x);
+          k.orbitR0 = Math.hypot(e.x - k.x, e.y - k.y);
+          k.hitAt.clear();
+        }
+        if (k.ph === 1) {
+          const elapsed = C.slashSec - Math.max(0, k.t);
+          k.orbit = (elapsed / C.slashSec) * Math.PI * 2;
+          const r = k.orbitR0 + (R - k.orbitR0) * Math.min(1, elapsed / 0.35);
+          const th = k.orbitStart - k.orbit;
+          e.x = clampToWorld(k.x + Math.cos(th) * r, 14);
+          e.y = clampToWorld(k.y + Math.sin(th) * r, 14);
+          e.face = th - Math.PI / 2; // 가는 방향
+          const now = this.time;
+          let slashed = false;
+          for (const f of foes) {
+            if (Math.hypot(f.x - e.x, f.y - e.y) > C.slashBand + f.r) continue;
+            const key = this.foeKey(f);
+            if (now - (k.hitAt.get(key) ?? -9) < 0.45) continue;
+            k.hitAt.set(key, now);
+            this.bossHit(e, f, C.slashDmg, C.slashKnock);
+            slashed = true;
+          }
+          if (slashed || Math.floor(elapsed * 5) !== Math.floor((elapsed - dt) * 5)) this.pushEvent(EVT_BOSSFX, e.x, e.y, e.face, BFX_SLASH);
+          if (k.t <= 0) {
+            k.ph = 2;
+            k.t = C.slashRest;
+          }
+          return true;
+        }
+        if (k.t <= 0) this.endBossSkill(k);
+        return true;
+      }
+    }
+  }
+
+  /** 장군이 아군을 친다: 피해를 주고(창 든 주인공·창병은 돌격을 되돌린다) 뒤로 밀어낸다 */
+  private bossHit(e: Enemy, f: Foe, mult: number, knock: number, charge = 0): void {
+    const st = ENEMY_STATS[e.type]!;
+    const from = Math.atan2(e.y - f.y, e.x - f.x);
+    const back = f.f.hit({ damage: st.damage * e.dmgMult * mult, charge: charge * e.dmgMult, srcType: e.type, fromAngle: from, src: e });
+    if (back > 0) this.reflectToEnemy(e, back, f.f.ownerId, f.f.merc);
+    if (f.f.merc) {
+      const m = f.f.merc;
+      m.x = clampToWorld(m.x - Math.cos(from) * knock, 14);
+      m.y = clampToWorld(m.y - Math.sin(from) * knock, 14);
+      m.atkT = 0;
+      m.cd = Math.max(m.cd, KNOCK_STUN_SEC);
+    } else {
+      const p = this.slots.get(f.f.ownerId)?.state;
+      if (p && !p.down) {
+        p.x = clampToWorld(p.x - Math.cos(from) * knock, PLAYER_RADIUS);
+        p.y = clampToWorld(p.y - Math.sin(from) * knock, PLAYER_RADIUS);
+      }
+    }
+    this.pushEvent(EVT_KNOCK, f.x, f.y, from + Math.PI);
   }
 
   /** 대상 둘레를 돌아 들어가는 접근: 처음에는 옆으로 크게 돌고(포위), 가까워질수록 곧장 붙는다. 대상의 움직임을 예측해 앞질러 간다. */

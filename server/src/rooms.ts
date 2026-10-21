@@ -484,6 +484,7 @@ export class RoomManager {
         if (m.offlineLeft <= 0) this.removeMember(room, m.id, "접속이 끊겨 방에서 제외되었습니다");
       }
       if (!this.rooms.has(room.code) || room.phase !== "playing") continue;
+      const bossTele = room.game.snapshotBossTele();
       const state: ServerMsg = {
         t: "state",
         tick: room.game.tick,
@@ -494,6 +495,7 @@ export class RoomManager {
         chests: room.game.snapshotChests(),
         meteors: room.game.snapshotMeteors(),
         walls: room.game.snapshotWalls(),
+        ...(bossTele.length > 0 ? { bt: bossTele } : {}),
         enemies: room.game.snapshotEnemies(),
         bullets: room.game.snapshotBullets(),
         g: room.game.info(),

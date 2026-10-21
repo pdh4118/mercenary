@@ -37,6 +37,16 @@ import {
   EVT_DMG_ENEMY_CRIT,
   EVT_DMG_SHIELD,
   EVT_KNOCK,
+  EVT_BOSSFX,
+  BFX_CRASH,
+  BFX_IMPACT,
+  BFX_ROAR,
+  BFX_SLASH,
+  BOSS_SKILL_NAMES,
+  TELE_BAND,
+  TELE_CIRCLE,
+  TELE_CONE,
+  TELE_LINE,
   EVT_REFLECT,
   EVT_COUNTER,
   EVT_DMG_POISON,
@@ -240,6 +250,9 @@ async function main() {
       scale: f.scale,
     })),
   );
+  // 장군 스킬 효과 그림(기병 장군): 충돌 섬광·먼지, 선회 베기 호, 돌격 함성 오라
+  const loadSeq = (name: string, idx: number[]) => Promise.all(idx.map((i) => Assets.load<Texture>(`assets/fx/${name}_${i}.png`).catch(() => null)));
+  const [bfxImpact, bfxSlash, bfxCry] = await Promise.all([loadSeq("boss1_impact", [0, 1, 2, 3]), loadSeq("boss1_slash", [1, 2, 3]), loadSeq("boss1_cry", [0, 1, 2])]);
   /** 스테이지 보스 이름(스테이지 표시줄용). 1~8스테이지만 정해져 있다. */
   const BOSS_TITLES = ["기병 장군", "창병 장군", "궁병 장군", "검방병 장군", "둔기병 장군", "마법사 장군", "기마궁수", "전차"] as const;
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
@@ -1095,6 +1108,23 @@ async function main() {
     floats.push({ node, x: x + (Math.random() - 0.5) * 16, y: y - 18, vx: (Math.random() - 0.5) * 18, age: 0, life, pop });
   };
   const numFmt = (v: number) => (v >= 10 ? String(Math.round(v)) : String(Math.max(0.1, Math.round(v * 10) / 10)));
+  // 컷을 차례로 보여 주는 효과(장군 스킬): 처음부터 끝까지 dur초, 끝에 가까울수록 옅어진다
+  const seqFx: { sp: Sprite; frames: (Texture | null)[]; age: number; dur: number }[] = [];
+  const playSeq = (frames: (Texture | null)[], x: number, y: number, dur: number, scale: number, rot: number) => {
+    const first = frames.find((t) => t !== null);
+    if (!first || seqFx.length > 40) return;
+    const sp = new Sprite(first);
+    sp.anchor.set(0.5);
+    sp.scale.set(scale);
+    sp.rotation = rot;
+    sp.position.set(x, y);
+    fxLayer.addChild(sp);
+    seqFx.push({ sp, frames, age: 0, dur });
+  };
+  // 장군 스킬 예고(텔레그래프): 붉은 바닥 표시와 스킬 이름
+  const teleG = new Graphics();
+  groundFx.addChild(teleG);
+  const teleLabels: Text[] = [];
   const bursts: { kind: number; x: number; y: number; ang: number; age: number }[] = [];
   const BURST_SEC = 0.35;
   const RING_SEC = 0.5;
@@ -1315,6 +1345,19 @@ async function main() {
             }
             dashFx.set(owner, { t0: performance.now(), lx: x, ly: y });
             spawnDashGhost(owner, x, y);
+          }
+          else if (kind === EVT_BOSSFX) {
+            // 장군 스킬 효과: 그림 컷을 차례로 보여 준다
+            if (val === BFX_IMPACT || val === BFX_CRASH) {
+              playSeq(bfxImpact, x, y, 0.55, val === BFX_CRASH ? 1 : 0.7, 0);
+              audio.play("knockback", { x, y });
+              if (val === BFX_CRASH) spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
+            } else if (val === BFX_SLASH) {
+              playSeq(bfxSlash, x + Math.cos(ang) * 40, y + Math.sin(ang) * 40, 0.3, 1.2, ang);
+            } else if (val === BFX_ROAR) {
+              playSeq(bfxCry, x, y, 0.9, 1.5, 0);
+              audio.play("boss_warning", { x, y, vol: 0.6 });
+            }
           }
           else if (kind === EVT_SKILL) {
             // 주인공 스킬: 무기 색의 고리. 던진 철퇴가 터지면 폭발 반경만큼 크게, 벽이 부서지면 작게
@@ -1806,7 +1849,7 @@ async function main() {
       const size = w[11] === 1 ? BOSS_SIZE : 1;
       if (v.art) {
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
-        v.sprite.texture = (w[5] > 0 && v.art.attack) || v.art.idle!;
+        v.sprite.texture = ((w[5] > 0 || (w[13] ?? 0) % 10 > 0) && v.art.attack) || v.art.idle!;
         v.sprite.scale.set(v.art.scale * v.face, v.art.scale);
       } else if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
@@ -1823,6 +1866,58 @@ async function main() {
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
       setPoison(v.sprite, w[12] === 1);
     });
+    // 장군 스킬 예고와 효과 컷
+    teleG.clear();
+    const bt = latest.bt ?? [];
+    for (let i = 0; i < bt.length; i++) {
+      const [kind, tx, ty, ta, tA, tB, left, total, tsk] = bt[i]!;
+      const pr = Math.min(1, Math.max(0, 1 - left / Math.max(1, total)));
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 90);
+      const RED = 0xff3a2a;
+      if (kind === TELE_LINE) {
+        const px = -Math.sin(ta) * (tB / 2);
+        const py = Math.cos(ta) * (tB / 2);
+        const ex = tx + Math.cos(ta) * tA;
+        const ey = ty + Math.sin(ta) * tA;
+        teleG.poly([tx + px, ty + py, ex + px, ey + py, ex - px, ey - py, tx - px, ty - py]).fill({ color: RED, alpha: 0.12 }).stroke({ width: 2, color: RED, alpha: 0.55 + 0.25 * pulse });
+        const fx2 = tx + Math.cos(ta) * tA * pr;
+        const fy2 = ty + Math.sin(ta) * tA * pr;
+        teleG.poly([tx + px, ty + py, fx2 + px, fy2 + py, fx2 - px, fy2 - py, tx - px, ty - py]).fill({ color: RED, alpha: 0.3 });
+      } else if (kind === TELE_CONE) {
+        teleG.moveTo(tx, ty).arc(tx, ty, tB, ta - tA, ta + tA).closePath().fill({ color: RED, alpha: 0.12 }).stroke({ width: 2, color: RED, alpha: 0.55 + 0.25 * pulse });
+        teleG.moveTo(tx, ty).arc(tx, ty, tB * pr, ta - tA, ta + tA).closePath().fill({ color: RED, alpha: 0.3 });
+      } else if (kind === TELE_BAND) {
+        const mid = (tA + tB) / 2;
+        teleG.circle(tx, ty, mid).stroke({ width: tB - tA, color: RED, alpha: 0.12 + 0.2 * pr });
+        teleG.circle(tx, ty, tA).stroke({ width: 2, color: RED, alpha: 0.6 + 0.2 * pulse });
+        teleG.circle(tx, ty, tB).stroke({ width: 2, color: RED, alpha: 0.6 + 0.2 * pulse });
+      } else {
+        teleG.circle(tx, ty, tA * (0.6 + 0.4 * pr)).stroke({ width: 3, color: 0xffb04a, alpha: 0.7 }).circle(tx, ty, tA * (0.6 + 0.4 * pr)).fill({ color: 0xffb04a, alpha: 0.12 + 0.12 * pr });
+      }
+      let lab = teleLabels[i];
+      if (!lab) {
+        lab = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 20, fontWeight: "900", stroke: { color: 0x3a0800, width: 5 } } });
+        lab.anchor.set(0.5, 1);
+        skyLayer.addChild(lab);
+        teleLabels[i] = lab;
+      }
+      lab.text = `${BOSS_SKILL_NAMES[tsk] ?? ""}!`;
+      lab.position.set(kind === TELE_LINE || kind === TELE_CONE || kind === TELE_CIRCLE ? tx : tx, (kind === TELE_BAND ? ty - tB - 14 : ty - 70));
+      lab.visible = true;
+    }
+    for (let i = bt.length; i < teleLabels.length; i++) teleLabels[i]!.visible = false;
+    for (let i = seqFx.length - 1; i >= 0; i--) {
+      const f = seqFx[i]!;
+      f.age += ticker.deltaMS / 1000;
+      const idx = Math.min(f.frames.length - 1, Math.floor((f.age / f.dur) * f.frames.length));
+      const tex = f.frames[idx];
+      if (tex) f.sp.texture = tex;
+      f.sp.alpha = Math.max(0, Math.min(1, 2.2 * (1 - f.age / f.dur)));
+      if (f.age >= f.dur) {
+        f.sp.destroy();
+        seqFx.splice(i, 1);
+      }
+    }
     bullets.update(latest.bullets, k, (v, w) => {
       if (v.mace) {
         if (v.maceSpr) v.maceSpr.rotation += 0.4;
