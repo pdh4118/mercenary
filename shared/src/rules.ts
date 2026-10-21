@@ -105,7 +105,7 @@ export const TUNE = {
   MULTISHOT_SPREAD: 0.14, // 화살 사이 각도(라디안)
   SPEAR_HALF_WIDTH_NEAR: 15, // 몸 바로 앞의 반폭(px)
   SPEAR_HALF_WIDTH_FAR: 15, // 사거리 끝의 반폭(px)
-  CAV_HALF_WIDTH: 15, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
+  CAV_HALF_WIDTH: 20, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
   PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s
   SKILL_CD_BOW: 10, // 스페이스 스킬 쿨타임(초, 모두 10초로 통일): 활(후퇴)
@@ -232,7 +232,7 @@ export function inBox(type: number, ox: number, oy: number, aim: number, tx: num
   if (f < -r * 0.5 || f > reach + r) return false;
   return l <= TUNE.CAV_HALF_WIDTH * widthMult + r;
 }
-/** 적의 직사각형 찌르기 폭 배율: 적 기병·창병 모두 아군과 같은 폭(기병·창병 전체 폭 30) */
+/** 적의 직사각형 찌르기 폭 배율: 적 기병·창병 모두 아군과 같은 폭(기병 전체 폭 40·창병 30) */
 export const ENEMY_BOX_WIDTH_MULT: Readonly<Record<number, number>> = { [CAVALRY]: 1, [SPEAR]: 1 };
 /** 범위 증가 능력이 폭에 주는 배율: 기본 부채꼴 각 대비 현재 각의 비 */
 export function boxWidthMult(type: number, arc: number): number {
