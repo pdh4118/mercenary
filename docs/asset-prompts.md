@@ -924,7 +924,7 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 | 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
 | --- | --- | --- | --- |
 | `skill_backstep` | 활 후퇴 | `quick backward skid on dirt, short scuff and a small cloth rustle` | 0.2초, 2종 |
-| `skill_dash` | 창 돌진 | `fast forward dash, sharp air whoosh ending in a light spear tip whistle` | 0.3초, 2종 |
+| `skill_dash` | 창 돌진 | (다시 만듦, 추천 1번) `Explosive spear lunge: a sharp sudden air-tearing crack at the very start, a fast rushing whoosh with a low punchy thump underneath, then a short bright steel spear tip shing and a tiny ringing tail. Tight, powerful, cinematic, dry, no echo.` 이전 소리는 `skill_dash_old_1~2.ogg`로 보관 | 0.5초, 1종 |
 | `skill_guard` | 검 무적 시작 | `bright protective ward activating, short shimmer and a soft metallic ring` | 0.5초, 1종 |
 | `skill_mace_throw` | 철퇴 던질 때 | `heavy mace thrown, deep spinning whoosh that fades away` | 0.5초, 2종 |
 | `skill_mace_hit` | 던진 철퇴가 적에게 닿을 때 | `heavy mace crashing into armor, big dull impact with a short rumbling shockwave` | 0.6초, 2종 |
@@ -934,7 +934,7 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 | `skill_boost` | 기마 가속 | `horse bursting into a gallop, hoof drum roll and a short whinny with a rush of wind` | 0.8초, 1종 |
 | `skill_boost_end` | 기마 가속이 끝날 때 | `wind trailing off as a galloping horse slows, soft air release and fading hoof beats` | 0.5초, 1종 |
 | `skill_guard_end` | 검 무적이 끝날 때 | `a magical protective ward breaking apart into sparkles, soft glassy fade with a quiet chime` | 0.4초, 1종 |
-| `skill_ready` | 쿨타임이 끝났을 때(작게) | `very soft ready chime, single short low bell, subtle` | 0.3초, 1종 |
+| `skill_ready` | 쿨타임이 끝났을 때(작게) | (다시 만듦, 추천 1번) `Tiny pleasant "power ready" chime: two quick rising soft bell notes, a bright glassy sparkle on the second note, then a very short gentle shimmer tail. Warm, cheerful, satisfying, clean, subtle volume, no echo.` 이전 소리는 `skill_ready_old_1.ogg`로 보관 | 0.35초, 1종 |
 
 ### 11-4. 우선순위
 

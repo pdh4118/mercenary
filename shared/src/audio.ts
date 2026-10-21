@@ -67,7 +67,7 @@ export const SOUNDS = {
   merc_respawn: d(2, 0.45, 150, 3, 0.05, true),
   // 주인공 스킬(docs/asset-prompts.md 11-3)
   skill_backstep: d(2, 0.55, 200, 3),
-  skill_dash: d(2, 0.55, 200, 3),
+  skill_dash: d(1, 0.55, 200, 3),
   skill_guard: d(1, 0.55, 300, 2, 0.03),
   skill_guard_end: d(1, 0.45, 300, 2, 0.03),
   skill_mace_throw: d(2, 0.6, 200, 3),
