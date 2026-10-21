@@ -118,6 +118,7 @@ import {
   sanitizeInput,
   DEFAULT_PRESETS,
   layoutFormation,
+  layoutProtective,
   sanitizeFormation,
   type BulletWire,
   type CampWire,
@@ -144,6 +145,7 @@ import {
   STANCE_ASSAULT,
   STANCE_DEFEND,
   STANCE_HOLD,
+  STANCE_PROTECT,
   WARD_WEIGHT,
   CHEST_OPEN_RADIUS,
   TOURNAMENT_ARENA_RADIUS,
@@ -490,6 +492,7 @@ interface AiCtx {
   leash: number;
   assault: boolean;
   guard: boolean; // 주인공 호위(기본) 명령 중
+  fort: boolean; // 보호 진형 도형 안팎의 자리를 지키는 중(검방병은 자리를 지키고, 궁병·마법사는 도형 밖으로 나가지 않는다)
   widthMult: number; // 창병 범위 증가 배율
 }
 
@@ -1938,6 +1941,9 @@ export class Game {
     const alive = [...this.mercs.values()].filter((m) => m.owner === owner && m.respawn <= 0);
     const typeOf = new Map(alive.map((m) => [m.id, m.type]));
     const rel = layoutFormation(alive, s.zones, s.spacing);
+    // 보호 진형을 고른 병종(검방병·창병·궁병·마법사)은 도형 배치로 덮어쓴다(기병·둔기병은 자유롭게 싸우므로 기본 자리 그대로)
+    const prot = alive.filter((m) => s.stances[m.type] === STANCE_PROTECT && m.type !== CAVALRY && m.type !== BLUNT);
+    if (prot.length > 0) for (const [id, pos] of layoutProtective(prot)) rel.set(id, pos);
     for (const [id, [fwd, lat]] of rel) {
       const t = typeOf.get(id) ?? 0;
       const stance = s.stances[t] ?? STANCE_DEFEND;
@@ -1970,7 +1976,7 @@ export class Game {
   /** 용병 진형 모드(기본 / 돌격 / 지점 방어)를 바꾼다. types로 병종을 고를 수 있다(생략하면 전체). */
   setStance(playerId: number, v: unknown, types?: unknown): boolean {
     const sl = this.slots.get(playerId);
-    if (!sl || (v !== STANCE_DEFEND && v !== STANCE_ASSAULT && v !== STANCE_HOLD)) return false;
+    if (!sl || (v !== STANCE_DEFEND && v !== STANCE_ASSAULT && v !== STANCE_HOLD && v !== STANCE_PROTECT)) return false;
     const mask = this.typeMask(types);
     if (v === STANCE_HOLD) {
       // 지점을 정한 적이 없는 병종은 주인공 앞쪽에 지점을 둔다
@@ -2748,9 +2754,15 @@ export class Game {
     return out;
   }
 
+  /** 실제로 따르는 진형 모드: 보호 진형에서 기병·둔기병은 자유롭게 싸우므로(프리롤) 돌격처럼, 나머지는 기본처럼 움직인다 */
+  private effStance(owner: Slot | undefined, type: number): number {
+    const v = owner?.stances[type] ?? STANCE_DEFEND;
+    return v === STANCE_PROTECT ? (type === CAVALRY || type === BLUNT ? STANCE_ASSAULT : STANCE_DEFEND) : v;
+  }
+
   /** 진형 자리에서 벗어나 적을 쫓을 수 있는 거리: 돌격 진형이면 훨씬 멀리까지 쫓는다 */
   private leashOf(st: UnitStats, type: number, owner: Slot | undefined): number {
-    const assault = owner?.stances[type] === STANCE_ASSAULT;
+    const assault = this.effStance(owner, type) === STANCE_ASSAULT;
     return st.leash * (assault ? (type === CAVALRY ? ASSAULT_LEASH_MULT_CAVALRY : TUNE.ASSAULT_LEASH_MULT) : type === CAVALRY ? 1 : TUNE.DEFEND_LEASH_MULT);
   }
 
@@ -2860,8 +2872,9 @@ export class Game {
       }
       let home = slotsByOwner.get(m.owner)?.get(m.id) ?? [m.x, m.y];
       let leash = this.leashOf(st, m.type, ownerSlot);
-      let assault = ownerSlot?.stances[m.type] === STANCE_ASSAULT;
-      let guard = ownerSlot?.stances[m.type] === STANCE_DEFEND;
+      let assault = this.effStance(ownerSlot, m.type) === STANCE_ASSAULT;
+      let guard = this.effStance(ownerSlot, m.type) === STANCE_DEFEND;
+      let fort = ownerSlot?.stances[m.type] === STANCE_PROTECT && m.type !== CAVALRY && m.type !== BLUNT; // 보호 진형 도형 안팎의 자리를 지킨다
       const ord = m.type === CAVALRY ? null : ownerSlot?.orders[m.type];
       if (ord) {
         // 지시를 받은 병종: 지시 지점이 새 "자리"가 된다(이동이면 그 둘레에 흩어져 서고 가까운 적과 싸우며, 공격이면 그 일대의 적을 쫓는다)
@@ -2877,6 +2890,7 @@ export class Game {
           assault = true;
         }
         guard = false;
+        fort = false;
       }
       const c: AiCtx = {
         m,
@@ -2890,6 +2904,7 @@ export class Game {
         leash,
         assault,
         guard,
+        fort,
         widthMult: boxWidthMult(m.type, st.arc),
       };
       switch (m.type) {
@@ -3015,7 +3030,7 @@ export class Game {
       this.aiGoHome(c);
       return;
     }
-    const ward = this.pickWard(c, [SHIELD]);
+    const ward = c.fort ? null : this.pickWard(c, [SHIELD]); // 보호 진형에서는 아군을 쫓지 않고 꼭짓점을 지킨다
     const guardLimit = c.leash * 1.6 + 160; // 진형에서 너무 멀리 떨어진 곳까지 지키러 가지는 않는다
     const near = this.nearestTarget(c, m, st.reach + 14);
     if (ward) {
@@ -3052,7 +3067,7 @@ export class Game {
    */
   private aiArcher(c: AiCtx): void {
     const { m, st, dt } = c;
-    const roam = TUNE.ARCHER_ROAM * (c.assault ? 1.8 : 1);
+    const roam = TUNE.ARCHER_ROAM * (c.assault ? 1.8 : 1) * (c.fort ? 0.3 : 1);
     // 근접 위협 카이팅
     let threat: Target | null = null;
     let gapBest = Infinity;
@@ -3714,7 +3729,7 @@ export class Game {
     }
     // 사거리 밖에 적이 있으면 진형에서 조금(마법사의 활동 범위) 앞으로 나가 사거리 끝 근처에 선다
     const near = m.cd <= 0 ? this.nearestTarget(c, m, st.reach + 170) : null;
-    if (near && c.homeDist < 200) {
+    if (near && c.homeDist < (c.fort ? 60 : 200)) {
       m.face = Math.atan2(near.t.y - m.y, near.t.x - m.x);
       this.moveToward(m, near.t.x, near.t.y, st.speed, dt, st.reach * TUNE.ARCHER_REACH_FRAC);
       return;

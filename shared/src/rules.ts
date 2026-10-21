@@ -128,7 +128,7 @@ export const TUNE = {
   SKILL_WALL_LEN: 170, // 방벽 전체 길이(px)
   SKILL_WALL_THICK: 22, // 방벽 두께(px)
   SKILL_WALL_SEC: 5, // 방벽이 남아 있는 시간(초). 쿨타임 10초의 절반이라 계속 세워 둘 수는 없다
-  BOW_FIRE_SLOW: 0.15, // 활을 쏘는 동안(공격 키를 누르고 있는 동안) 줄어드는 이동 속도 비율
+  BOW_FIRE_SLOW: 0, // 활을 쏘는 동안(공격 키를 누르고 있는 동안) 줄어드는 이동 속도 비율(예전 0.15, 지금은 느려지지 않는다)
   MACE_MIN_CHARGE: 0.2, // 철퇴를 모으지 않고 바로 뗐을 때에도 들어가는 최소 피해 비율(0이면 모은 만큼만)
   ENEMY_SPAWN_BASE_PER_SEC: 1.1, // 플레이어 1명당
   ENEMY_SPAWN_GROWTH_PER_SEC: 0.012, // 시간이 지날수록 초당 늘어나는 양
@@ -304,7 +304,11 @@ export const ARCHER_KITE_HOME_PULL = 0.7; // 물러날 때 진형 자리 쪽으�
 export const STANCE_DEFEND = 0;
 export const STANCE_ASSAULT = 1;
 export const STANCE_HOLD = 2; // 지정한 지점에 진형을 펴고 지킨다(주인공이 떠나도 그 자리에 남는다)
-export const STANCE_NAMES = ["기본(주인공 수비)", "돌격", "지점 방어"] as const;
+export const STANCE_PROTECT = 3; // 보호 진형: 검방병이 도형(2명 양쪽, 3명 정삼각형, 4명 정사각형…)으로 둘러싸고 창병·궁병·마법사는 그 안에 들어간다. 기병·둔기병은 자유롭게 싸운다
+export const STANCE_NAMES = ["기본(주인공 수비)", "돌격", "지점 방어", "보호 진형"] as const;
+export const PROTECT_RADIUS_BASE = 64; // 보호 진형 도형의 기본 반지름(주인공에서 검방병 자리까지)
+export const PROTECT_RADIUS_PER_RANGED = 13; // 안에 들어오는 궁병·마법사 한 명당 늘어나는 반지름
+export const PROTECT_RADIUS_MAX = 230;
 export const ASSAULT_LEASH_MULT_CAVALRY = 1.6;
 
 // 병종별 역할 AI

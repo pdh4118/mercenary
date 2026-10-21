@@ -63,7 +63,7 @@ test("지점 방어: 지점 근처에 온 적과는 싸우고, 잘못된 입력�
   assert.equal(g.setHold(a, "x", 3), false);
   assert.equal(g.setHold(a, NaN, 0), false);
   assert.equal(g.setHold(999, 0, 0), false);
-  assert.equal(g.setStance(a, 3), false);
+  assert.equal(g.setStance(a, 99), false);
 });
 
 test("지점을 지정하지 않고 지점 방어로 바꾸면 주인공 앞쪽을 지킨다", () => {

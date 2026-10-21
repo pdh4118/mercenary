@@ -4,7 +4,14 @@ import {
   FORMATION_ROW_WRAP,
   FORMATION_WING_FORWARD,
   FORMATION_WING_LATERAL,
+  PROTECT_RADIUS_BASE,
+  PROTECT_RADIUS_MAX,
+  PROTECT_RADIUS_PER_RANGED,
   UNIT_TYPES,
+  ARCHER,
+  MAGE,
+  SHIELD,
+  SPEAR,
 } from "./rules.js";
 
 /** 진형 구역: 병종마다 어느 구역에 설지 고른다 */
@@ -80,5 +87,42 @@ export function layoutFormation(units: readonly { id: number; type: number }[], 
       out.set(u.id, [(z === ZONE_GUARD ? ROW_OFFSETS[3] : ROW_OFFSETS[z])! - wrap * 30 * spacing, (col - (inLine - 1) / 2) * gap]);
     });
   }
+  return out;
+}
+
+/** 보호 진형 도형의 꼭짓점 각도(앞쪽이 0, 왼쪽이 +). 1명은 앞, 2명은 양쪽, 3명은 정삼각형(꼭짓점이 앞), 4명은 정사각형, 5명 이상은 정다각형 */
+export function protectAngles(n: number): number[] {
+  if (n <= 0) return [];
+  const offset = n === 2 ? Math.PI / 2 : n === 4 ? Math.PI / 4 : 0;
+  if (n === 2) return [offset, -offset];
+  return Array.from({ length: n }, (_, k) => offset + (2 * Math.PI * k) / n);
+}
+
+/** 보호 진형 도형의 반지름: 안에 들어오는 궁병·마법사가 많을수록 커진다. 검방병이 많으면 서로 부딪히지 않도록 더 키운다. */
+export function protectRadius(swords: number, ranged: number): number {
+  const need = swords > 2 ? (swords * FORMATION_LATERAL_SPACING * 1.1) / (2 * Math.PI) : 0;
+  return Math.min(PROTECT_RADIUS_MAX, Math.max(PROTECT_RADIUS_BASE + PROTECT_RADIUS_PER_RANGED * ranged, need));
+}
+
+/**
+ * 보호 진형 배치: 검방병은 주인공을 가운데에 둔 도형의 꼭짓점에 서고, 창병·궁병·마법사는 그 안에 들어간다
+ * (궁병·마법사가 가운데에 가깝고 창병은 바깥쪽). 기병·둔기병은 여기서 다루지 않는다(자유롭게 싸운다).
+ * 주인공 기준 (앞으로 forward, 왼쪽으로 lateral) 상대 좌표.
+ */
+export function layoutProtective(units: readonly { id: number; type: number }[]): Map<number, [number, number]> {
+  const out = new Map<number, [number, number]>();
+  const swords = units.filter((u) => u.type === SHIELD).sort((a, b) => a.id - b.id);
+  const inner = units
+    .filter((u) => u.type === ARCHER || u.type === MAGE || u.type === SPEAR)
+    .sort((a, b) => (a.type === SPEAR ? 1 : 0) - (b.type === SPEAR ? 1 : 0) || a.id - b.id);
+  const ranged = inner.filter((u) => u.type !== SPEAR).length;
+  const radius = protectRadius(swords.length, ranged);
+  protectAngles(swords.length).forEach((ang, i) => out.set(swords[i]!.id, [Math.cos(ang) * radius, Math.sin(ang) * radius]));
+  const m = inner.length;
+  inner.forEach((u, i) => {
+    const r = radius * 0.62 * Math.sqrt((i + 0.5) / m); // 한가운데부터 나선으로 채운다
+    const ang = i * 2.399963;
+    out.set(u.id, [Math.cos(ang) * r, Math.sin(ang) * r]);
+  });
   return out;
 }

@@ -7,13 +7,16 @@ import {
   DEFAULT_PRESETS,
   FORMATION_SPACING_MAX,
   FORMATION_SPACING_MIN,
+  MAGE,
   SHIELD,
+  STANCE_PROTECT,
   SPEAR,
   ZONE_BACK,
   ZONE_FRONT,
   ZONE_GUARD,
   ZONE_LEFT,
   layoutFormation,
+  layoutProtective,
   sanitizeFormation,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
@@ -87,4 +90,58 @@ test("다시 하기를 해도 고른 진형은 유지된다", () => {
   const p = g.getPlayer(a)!;
   const slot = g.formationSlots(a).get(m)!;
   assert.ok(Math.hypot(slot[0] - p.x, slot[1] - p.y) > 120, "호위 구역(뒤쪽 멀리)에 선다");
+});
+
+test("보호 진형 도형: 2명은 양쪽, 3명은 정삼각형, 4명은 정사각형", () => {
+  const sw = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1, type: SHIELD }));
+  const two = layoutProtective(sw(2));
+  const a = two.get(1)!;
+  const b = two.get(2)!;
+  assert.ok(Math.abs(a[0]) < 1e-6 && Math.abs(b[0]) < 1e-6, "앞뒤는 같은 위치");
+  assert.ok(a[1] > 0 && b[1] < 0 && Math.abs(a[1] + b[1]) < 1e-6, "왼쪽 오른쪽 양쪽");
+  const tri = [...layoutProtective(sw(3)).values()];
+  const d = (p: number[], q: number[]) => Math.hypot(p[0]! - q[0]!, p[1]! - q[1]!);
+  const sides = [d(tri[0]!, tri[1]!), d(tri[1]!, tri[2]!), d(tri[2]!, tri[0]!)];
+  assert.ok(Math.max(...sides) - Math.min(...sides) < 1e-6, "정삼각형");
+  assert.ok(tri[0]![0] > 0 && Math.abs(tri[0]![1]) < 1e-6, "꼭짓점이 앞쪽");
+  const sq = [...layoutProtective(sw(4)).values()];
+  const s4 = [d(sq[0]!, sq[1]!), d(sq[1]!, sq[2]!), d(sq[2]!, sq[3]!), d(sq[3]!, sq[0]!)];
+  const diag = [d(sq[0]!, sq[2]!), d(sq[1]!, sq[3]!)];
+  assert.ok(Math.max(...s4) - Math.min(...s4) < 1e-6 && Math.abs(diag[0]! - diag[1]!) < 1e-6, "정사각형");
+});
+
+test("보호 진형: 안에 들어오는 궁병·마법사가 많을수록 도형이 커지고, 창병·궁병·마법사는 도형 안에 선다", () => {
+  const mk = (ranged: number) => [
+    ...[1, 2, 3].map((id) => ({ id, type: SHIELD })),
+    { id: 10, type: SPEAR },
+    ...Array.from({ length: ranged }, (_, i) => ({ id: 20 + i, type: i % 2 ? MAGE : ARCHER })),
+  ];
+  const radiusOf = (units: { id: number; type: number }[]) => {
+    const l = layoutProtective(units);
+    return Math.hypot(...l.get(1)!);
+  };
+  assert.ok(radiusOf(mk(6)) > radiusOf(mk(0)), "궁병·마법사가 많으면 더 큰 도형");
+  const units = mk(6);
+  const l = layoutProtective(units);
+  const R = Math.hypot(...l.get(1)!);
+  for (const u of units) if (u.type !== SHIELD) assert.ok(Math.hypot(...l.get(u.id)!) < R * 0.7, "도형 안쪽");
+});
+
+test("서버: 보호 진형을 고르면 검방병이 주인공 둘레 도형에 서고 기병·둔기병은 자유롭게 싸운다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const sw = [g.addMerc(a, SHIELD, 0, 0), g.addMerc(a, SHIELD, 0, 0), g.addMerc(a, SHIELD, 0, 0)];
+  const ar = g.addMerc(a, ARCHER, 0, 0);
+  const cav = g.addMerc(a, CAVALRY, 0, 0);
+  const before = g.formationSlots(a).get(cav)!;
+  assert.equal(g.setStance(a, STANCE_PROTECT), true);
+  const p = g.getPlayer(a)!;
+  const slots = g.formationSlots(a);
+  const dist = (id: number) => Math.hypot(slots.get(id)![0] - p.x, slots.get(id)![1] - p.y);
+  const rs = sw.map(dist);
+  assert.ok(Math.max(...rs) - Math.min(...rs) < 1, "세 검방병은 같은 거리(정삼각형)");
+  assert.ok(dist(ar) < rs[0]!, "궁병은 도형 안");
+  assert.deepEqual(slots.get(cav), before, "기병은 기본 자리 그대로");
+  assert.equal(g.setStance(a, 99), false);
 });

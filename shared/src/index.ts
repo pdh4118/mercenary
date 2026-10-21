@@ -315,7 +315,7 @@ export type ClientMsg =
   | { t: "upgrade"; merc: number } // 용병 한 명을 다음 단계로 강화
   | { t: "dismiss"; type: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number } // 기병 돌격 지시(월드 좌표)
-  | { t: "stance"; v: number; types?: number } // 용병 진형 모드(0 기본, 1 돌격, 2 지점 방어). types는 병종 비트마스크(생략하면 전체)
+  | { t: "stance"; v: number; types?: number } // 용병 진형 모드(0 기본, 1 돌격, 2 지점 방어, 3 보호 진형). types는 병종 비트마스크(생략하면 전체)
   | { t: "hold"; x: number; y: number; types?: number } // 이 지점을 지키도록 지시(지점 방어 모드로 바꾼다)
   | { t: "order"; x: number; y: number; types?: number } // 병종 비트마스크(생략하면 전체)에 이동/공격 지시. 적 근처를 찍으면 공격, 빈 땅이면 이동
   | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)
