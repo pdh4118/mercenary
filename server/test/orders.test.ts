@@ -316,3 +316,19 @@ test("공격 지시·공격 진형: 검방병 용병도 주인공 곁에 머물�
   for (let i = 0; i < 6 * 20; i++) g.step();
   assert.ok(es.reduce((s, e) => s + 1e6 - e.hp, 0) > 0, "검방병이 적에게 피해를 줬다");
 });
+
+test("돌격 진형 검방병: 방패 정면을 보이는 적이 바로 앞에 붙어 있으면, 뒤의 적을 향해 밀고 가지 않고 그 적을 친다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  p.x = 0;
+  p.y = 0;
+  const mid = g.addMerc(a, SHIELD, 0, 0);
+  g.setStance(a, STANCE_ASSAULT);
+  const front = dummy(g, 40, 0, SHIELD) as E & { shield: number; face: number };
+  front.shield = 100;
+  front.face = Math.PI; // 검방병 쪽으로 방패 정면
+  const back = dummy(g, 70, 30, SPEAR);
+  run(g, 4);
+  assert.ok(front.shield < 100 || front.hp < 5000 || back.hp < 5000, "붙어 있는 적을 때린다");
+});

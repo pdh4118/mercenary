@@ -3127,9 +3127,22 @@ export class Game {
         }
       }
       if (target) {
-        const d = Math.hypot(target.x - m.x, target.y - m.y);
-        m.face = Math.atan2(target.y - m.y, target.x - m.x);
-        if (d <= st.reach + target.r) {
+        // 이미 사거리 안에 붙은 적이 있으면 그 적을 친다(다른 적을 향해 가다가 앞의 적에게 막혀 서서 안 때리는 일이 없게)
+        let inReach: Target | null = null;
+        let reachScore = Infinity;
+        for (const t of c.targets) {
+          const d = Math.hypot(t.x - m.x, t.y - m.y);
+          if (d > st.reach + t.r) continue;
+          const sc = d * (this.frontalShield(t, m) ? 1.6 : 1);
+          if (sc < reachScore) {
+            reachScore = sc;
+            inReach = t;
+          }
+        }
+        const hit = inReach ?? target;
+        const d = Math.hypot(hit.x - m.x, hit.y - m.y);
+        m.face = Math.atan2(hit.y - m.y, hit.x - m.x);
+        if (d <= st.reach + hit.r) {
           if (m.cd <= 0) this.startAttack(m, st, m.face);
           return;
         }
