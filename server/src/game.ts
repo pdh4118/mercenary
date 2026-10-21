@@ -3629,7 +3629,7 @@ export class Game {
 
   /** 운석이 떨어져 폭발한다: 반경 안의 적(토너먼트에서는 상대 선수)에게 방패를 무시한 큰 피해. 중심이 가장 세고 가장자리는 약하다. */
   private landMeteor(x: number, y: number, radius: number, damage: number, ownerId: number, crit: boolean, src?: Merc): void {
-    this.pushEvent(EVT_METEOR, x, y, 0, radius, ownerId); // owner = 쏜 플레이어(우호 마법: 초록)
+    this.pushEvent(EVT_METEOR, x, y, src ? 0 : 2, radius, ownerId); // owner = 쏜 플레이어, ang 2 = 주인공이 직접 쏜 마법(파랑), 용병 마법사는 초록
     const scale = (d: number) => 1 - TUNE.MAGE_FALLOFF * Math.min(1, d / radius);
     if (this.phase === "tournament") {
       for (const f of this.duelFoes(ownerId)) {

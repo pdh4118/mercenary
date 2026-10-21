@@ -429,11 +429,11 @@ async function main() {
   let shotWindowStart = 0;
   const hitFx: { node: Container; age: number; grow?: number; life?: number }[] = [];
   // 운석 폭발(폭발 컷 → 바닥 그을음 컷)과 떨어지는 운석 스프라이트
-  const blasts: { x: number; y: number; r: number; age: number; boom: Sprite | null; scorch: Sprite | null; friendly: boolean; boss: boolean }[] = [];
-  /** 우호 마법(아군·주인공이 쓴 것)은 주황 불꽃 그림을 옅은 초록으로 돌려 적의 마법(주황·보스는 붉은빛)과 구분한다 */
-  const friendlyTint = (sp: Sprite): void => {
+  const blasts: { x: number; y: number; r: number; age: number; boom: Sprite | null; scorch: Sprite | null; friendly: boolean; hero: boolean; boss: boolean }[] = [];
+  /** 우호 마법은 주황 불꽃 그림의 색조를 돌려 적의 마법(주황·보스는 붉은빛)과 구분한다: 용병 마법사는 옅은 초록, 주인공이 직접 쏜 마법은 파랑 */
+  const friendlyTint = (sp: Sprite, hero = false): void => {
     const f = new ColorMatrixFilter();
-    f.hue(85, false);
+    f.hue(hero ? 190 : 85, false);
     f.saturate(-0.35, true);
     f.brightness(1.12, true);
     sp.filters = [f];
@@ -1255,7 +1255,7 @@ async function main() {
           else if (kind === EVT_KNOCK) audio.play("knockback", { x, y });
           else if (kind === EVT_WALL_HIT) audio.play("skill_wall_hit", { x, y });
           else if (kind === EVT_METEOR) {
-            blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null, friendly: owner > 0, boss: owner === 0 && ang === 1 });
+            blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null, friendly: owner > 0, hero: owner > 0 && ang === 2, boss: owner === 0 && ang === 1 });
           }
           else if (kind === EVT_SKILL && val >= 10 && maceHitTex.every((t) => t !== null)) {
             // 던진 철퇴가 적에게 닿음: 갈라진 땅과 흙먼지 4컷(지름 약 반경 x 2.3)
@@ -2101,12 +2101,13 @@ async function main() {
       const fallFrom = Math.max(0.3, Math.min(0.95, 1 - 0.6 / Math.max(0.6, (total ?? 30) / 10))); // 폭발 약 0.6초 전부터 낙하(소리의 충돌 시점과 맞춘다)
       const p = prog / 100;
       const pulse = 0.5 + 0.5 * Math.sin(now / 130);
-      const friendly = owner > 0; // 아군(주인공·용병 마법사)의 운석: 옅은 초록
+      const friendly = owner > 0; // 아군의 운석: 용병 마법사는 옅은 초록, 주인공(시전자 번호가 음수)은 파랑
+      const heroMeteor = friendly && key < 0;
       const bossMeteor = owner === 0 && (latest.enemies.find((q) => q[0] === key)?.[11] ?? 0) === 1; // 보스의 마법: 붉은 주황
       // 적(주황)·보스(붉은 주황)·아군(옅은 초록) 순으로 색을 나눈다. 적의 마법은 피하라고 진하게 표시한다.
-      const cFill = friendly ? 0xa8e8b4 : bossMeteor ? 0xff4a1a : 0xff9a2a;
-      const cEdge = friendly ? 0xb4f0bf : bossMeteor ? 0xff5a2a : 0xff8a3a;
-      const cSweep = friendly ? 0x8fdca0 : bossMeteor ? 0xe03a10 : 0xff8a1a;
+      const cFill = heroMeteor ? 0x8ec8ff : friendly ? 0xa8e8b4 : bossMeteor ? 0xff4a1a : 0xff9a2a;
+      const cEdge = heroMeteor ? 0x9fd2ff : friendly ? 0xb4f0bf : bossMeteor ? 0xff5a2a : 0xff8a3a;
+      const cSweep = heroMeteor ? 0x6aaaf0 : friendly ? 0x8fdca0 : bossMeteor ? 0xe03a10 : 0xff8a1a;
       const strong = !friendly;
       // 낙하 예고: 원 안의 음영이 시계처럼(위에서 시계 방향) 차올라, 한 바퀴를 다 돌면 운석이 떨어진다
       const a0 = -Math.PI / 2;
@@ -2123,7 +2124,7 @@ async function main() {
           .fill({ color: cSweep, alpha: (friendly ? 0.2 : bossMeteor ? 0.36 : 0.3) + 0.1 * pulse * p })
           .moveTo(mx, my)
           .lineTo(mx + Math.cos(a1) * radius, my + Math.sin(a1) * radius)
-          .stroke({ width: 3, color: friendly ? 0xe0ffe6 : 0xffe0a0, alpha: friendly ? 0.6 : 0.8 });
+          .stroke({ width: 3, color: heroMeteor ? 0xe0f0ff : friendly ? 0xe0ffe6 : 0xffe0a0, alpha: friendly ? 0.6 : 0.8 });
       }
       if (p >= fallFrom) {
         liveKeys.add(key);
@@ -2132,7 +2133,7 @@ async function main() {
           sp = new Sprite(meteorTex[0]!);
           audio.play("meteor_fall", { x: mx, y: my }); // 떨어지기 시작할 때 한 덩어리(낙하음 → 폭발음)로 낸다
           sp.anchor.set(0.2, 0.8);
-          if (friendly) friendlyTint(sp);
+          if (friendly) friendlyTint(sp, heroMeteor);
           else if (bossMeteor) sp.tint = 0xffa890;
           skyLayer.addChild(sp);
           falling.set(key, sp);
@@ -2163,7 +2164,7 @@ async function main() {
         b.scorch.anchor.set(0.5, 0.5);
         b.scorch.position.set(b.x, b.y);
         b.scorch.scale.set(b.r / 62);
-        if (b.friendly) friendlyTint(b.scorch);
+        if (b.friendly) friendlyTint(b.scorch, b.hero);
         else if (b.boss) b.scorch.tint = 0xffa890;
         groundFx.addChild(b.scorch);
       }
@@ -2172,7 +2173,7 @@ async function main() {
         b.boom.anchor.set(0.5, 0.82);
         b.boom.position.set(b.x, b.y);
         b.boom.scale.set(b.r / 70);
-        if (b.friendly) friendlyTint(b.boom);
+        if (b.friendly) friendlyTint(b.boom, b.hero);
         else if (b.boss) b.boom.tint = 0xffa890;
         skyLayer.addChild(b.boom);
       }
