@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  PROTECT_HERO_GAP,
   ARCHER,
   BLUNT,
   CAVALRY,
@@ -124,7 +125,11 @@ test("보호 진형: 안에 들어오는 궁병·마법사가 많을수록 도�
   const units = mk(6);
   const l = layoutProtective(units);
   const R = Math.hypot(...l.get(1)!);
-  for (const u of units) if (u.type !== SHIELD) assert.ok(Math.hypot(...l.get(u.id)!) < R * 0.7, "도형 안쪽");
+  for (const u of units) if (u.type !== SHIELD) {
+    const d = Math.hypot(...l.get(u.id)!);
+    assert.ok(d < R * 0.8, "도형 안쪽");
+    assert.ok(d >= PROTECT_HERO_GAP - 1e-9, "주인공에게서 조금 떨어져 선다");
+  }
 });
 
 test("서버: 보호 진형을 고르면 검방병이 주인공 둘레 도형에 서고 기병·둔기병은 자유롭게 싸운다", () => {

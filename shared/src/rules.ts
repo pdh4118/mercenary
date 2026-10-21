@@ -306,9 +306,10 @@ export const STANCE_ASSAULT = 1;
 export const STANCE_HOLD = 2; // 지정한 지점에 진형을 펴고 지킨다(주인공이 떠나도 그 자리에 남는다)
 export const STANCE_PROTECT = 3; // 보호 진형: 검방병이 도형(2명 양쪽, 3명 정삼각형, 4명 정사각형…)으로 둘러싸고 창병·궁병·마법사는 그 안에 들어간다. 기병·둔기병은 자유롭게 싸운다
 export const STANCE_NAMES = ["기본(주인공 수비)", "돌격", "지점 방어", "보호 진형"] as const;
-export const PROTECT_RADIUS_BASE = 64; // 보호 진형 도형의 기본 반지름(주인공에서 검방병 자리까지)
+export const PROTECT_RADIUS_BASE = 84; // 보호 진형 도형의 기본 반지름(주인공에서 검방병 자리까지)
 export const PROTECT_RADIUS_PER_RANGED = 13; // 안에 들어오는 궁병·마법사 한 명당 늘어나는 반지름
 export const PROTECT_RADIUS_MAX = 230;
+export const PROTECT_HERO_GAP = 40; // 보호 진형 안쪽 병종이 주인공에게서 최소한 떨어지는 거리
 export const ASSAULT_LEASH_MULT_CAVALRY = 1.6;
 
 // 병종별 역할 AI

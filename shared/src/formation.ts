@@ -4,6 +4,7 @@ import {
   FORMATION_ROW_WRAP,
   FORMATION_WING_FORWARD,
   FORMATION_WING_LATERAL,
+  PROTECT_HERO_GAP,
   PROTECT_RADIUS_BASE,
   PROTECT_RADIUS_MAX,
   PROTECT_RADIUS_PER_RANGED,
@@ -120,7 +121,7 @@ export function layoutProtective(units: readonly { id: number; type: number }[])
   protectAngles(swords.length).forEach((ang, i) => out.set(swords[i]!.id, [Math.cos(ang) * radius, Math.sin(ang) * radius]));
   const m = inner.length;
   inner.forEach((u, i) => {
-    const r = radius * 0.62 * Math.sqrt((i + 0.5) / m); // 한가운데부터 나선으로 채운다
+    const r = PROTECT_HERO_GAP + (Math.max(PROTECT_HERO_GAP + 12, radius * 0.75) - PROTECT_HERO_GAP) * Math.sqrt((i + 0.5) / m); // 주인공에서 조금 떨어진 곳부터 나선으로 채운다(너무 붙으면 같이 맞는다)
     const ang = i * 2.399963;
     out.set(u.id, [Math.cos(ang) * r, Math.sin(ang) * r]);
   });
