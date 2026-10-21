@@ -28,6 +28,7 @@ import {
   EVT_DODGE,
   EVT_INVULN,
   EVT_WALL_HIT,
+  EVT_HEAL,
   critDamageMult,
   castTimeMult,
   mageAreaMult,
@@ -541,6 +542,24 @@ export class Game {
   /** 테스트에서 적·캠프 자동 생성을 끌 때 쓴다 */
   autoSpawn = true;
   private slots = new Map<number, Slot>();
+  private healAcc = new Map<number, { amt: number; x: number; y: number; owner: number; tick: number }>(); // 회복 숫자를 모아 두는 곳(주인공은 -번호, 용병은 번호)
+  /** 회복 숫자: 재생·흡혈로 실제로 늘어난 체력을 대상별로 0.6초 모아서 한 번에 보낸다 */
+  private healPop(key: number, x: number, y: number, amount: number, owner: number): void {
+    if (amount <= 0.001 || owner <= 0) return;
+    const h = this.healAcc.get(key);
+    if (h) {
+      h.amt += amount;
+      h.x = x;
+      h.y = y;
+    } else this.healAcc.set(key, { amt: amount, x, y, owner, tick: this.tick });
+  }
+  private flushHeals(): void {
+    for (const [key, h] of this.healAcc) {
+      if (this.tick - h.tick < 12) continue;
+      if (h.amt >= 0.5) this.pushEvent(EVT_HEAL, h.x, h.y, 0, Math.round(h.amt * 10) / 10, h.owner);
+      this.healAcc.delete(key);
+    }
+  }
   private invulnPop = new Map<number, number>(); // 무적 표시를 마지막으로 띄운 틱(주인공별)
   private enemies = new Map<number, Enemy>();
   private mercs = new Map<number, Merc>();
@@ -1002,6 +1021,7 @@ export class Game {
     }
     this.terrainEnd();
     this.stepWalls(dt);
+    this.flushHeals();
     this.stepBullets(dt, friendlies);
     this.clampUnits();
     this.pruneCasts();
@@ -2031,7 +2051,9 @@ export class Game {
       s.fireCd = Math.max(0, s.fireCd - dt);
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
+      const hpBefore = p.hp;
       p.hp = Math.min(p.maxHp, p.hp + s.mods.heroRegen * dt);
+      this.healPop(-p.id, p.x, p.y, p.hp - hpBefore, p.id);
       p.shieldMax = TUNE.HERO_SHIELD_MAX + s.mods.heroShield;
       s.shieldIdle += dt;
       if (s.shieldIdle >= s.shieldDelay) p.shield = Math.min(p.shieldMax, p.shield + p.shieldMax * TUNE.HERO_SHIELD_REGEN_PCT * (1 + s.mods.heroShieldRegen) * dt);
@@ -2800,7 +2822,11 @@ export class Game {
       if (duel && !(fighting && this.isFighter(m.owner))) continue;
       this.regenShield(m, st.shield, dt);
       const regen = ownerSlot ? mstat(ownerSlot.mods, m.type, "regen") : 0;
-      if (regen > 0) m.hp = Math.min(st.hp, m.hp + st.hp * regen * dt);
+      if (regen > 0) {
+        const hb = m.hp;
+        m.hp = Math.min(st.hp, m.hp + st.hp * regen * dt);
+        this.healPop(m.id, m.x, m.y, m.hp - hb, m.owner);
+      }
       m.cd = Math.max(0, m.cd - dt);
 
       // 공포: 사기가 꺾인 동안 모든 용병이 싸우지 않고 적에게서 멀어지는 쪽으로 도망친다(주문·공격 준비도 끊긴다)
@@ -3775,9 +3801,15 @@ export class Game {
   /** 피의 갈증: 때린 쪽(용병 또는 주인공)이 체력을 회복한다 */
   private lifesteal(owner: Slot, src: Merc | undefined, amount: number): void {
     if (src) {
-      if (src.respawn <= 0) src.hp = Math.min(this.mercStats(src).hp, src.hp + amount * (MERC_LIFESTEAL_MULT[src.type] ?? 1));
+      if (src.respawn <= 0) {
+        const hb = src.hp;
+        src.hp = Math.min(this.mercStats(src).hp, src.hp + amount * (MERC_LIFESTEAL_MULT[src.type] ?? 1));
+        this.healPop(src.id, src.x, src.y, src.hp - hb, src.owner);
+      }
     } else if (!owner.state.down) {
+      const hb = owner.state.hp;
       owner.state.hp = Math.min(owner.state.maxHp, owner.state.hp + amount);
+      this.healPop(-owner.state.id, owner.state.x, owner.state.y, owner.state.hp - hb, owner.state.id);
     }
   }
 

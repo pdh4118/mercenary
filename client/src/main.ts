@@ -30,6 +30,7 @@ import {
   EVT_DODGE,
   EVT_INVULN,
   EVT_WALL_HIT,
+  EVT_HEAL,
   EVT_BACKSTAB,
   EVT_DMG_ALLY,
   EVT_DMG_ENEMY,
@@ -1321,6 +1322,7 @@ async function main() {
           else if (owner === myId && kind === EVT_DMG_POISON) spawnFloat(numFmt(val), x, y, { fill: 0xc77dff, fontSize: 14, fontWeight: "700", stroke: { color: 0x2a0a40, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_POISON_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xc77dff, fontSize: 16, fontWeight: "700", stroke: { color: 0x2a0a40, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DMG_SHIELD) spawnFloat(numFmt(val), x, y, { fill: 0x9fdcff, fontSize: 13, fontWeight: "600", stroke: { color: 0x0a1a2a, width: 3 } }, 0.6, 0);
+          else if (owner === myId && kind === EVT_HEAL) spawnFloat(`+${numFmt(val)}`, x, y, { fill: 0x7dff8a, fontSize: 15, fontWeight: "700", stroke: { color: 0x0a3a14, width: 3 } }, 0.9, 0.1); // 체력 재생·흡혈: 밝은 초록
           else if (duelNow && owner !== myId && kind === EVT_DMG_ALLY) spawnFloat(numFmt(val), x, y, { fill: 0xffffff, fontSize: 15, fontWeight: "600", stroke: { color: 0x000000, width: 3 } }, 0.8, 0);
           else if (duelNow && owner !== myId && kind === EVT_DMG_POISON_ALLY) spawnFloat(numFmt(val), x, y, { fill: 0xc77dff, fontSize: 14, fontWeight: "700", stroke: { color: 0x2a0a40, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xff5a5a, fontSize: 17, fontWeight: "700", stroke: { color: 0x2a0000, width: 4 } }, 0.9, 0.15);

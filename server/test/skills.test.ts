@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EVT_INVULN, EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
+import { EVT_HEAL, EVT_INVULN, EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -291,4 +291,22 @@ test("스킬 효과 카드: 돌진 거리·무적 시간·방벽 길이가 늘�
   };
   assert.equal(boost(1).t, boost(0).t, "가속 시간은 그대로");
   assert.ok(boost(1).v > boost(0).v * 1.1, "가속 속도가 더 빠르다");
+});
+
+test("체력 재생으로 회복하면 회복 숫자 이벤트가 0.6초 모아서 한 번 나간다", () => {
+  const { g, a } = start(0);
+  g.applyCardForTest(a, { k: "heroRegen", v: 6 });
+  g.getPlayer(a)!.hp = 20;
+  g.takeEvents();
+  run(g, 0.4);
+  assert.equal(g.takeEvents().filter((e) => e[0] === EVT_HEAL).length, 0, "모으는 동안에는 보내지 않는다");
+  run(g, 0.6);
+  const heals = g.takeEvents().filter((e) => e[0] === EVT_HEAL && e[5] === a);
+  assert.equal(heals.length, 1, "0.6초 뒤 한 번");
+  assert.ok(heals[0]![4] > 2, "회복량이 담긴다");
+  g.getPlayer(a)!.hp = g.getPlayer(a)!.maxHp;
+  run(g, 1); // 모아 둔 마지막 회복이 먼저 나간다
+  g.takeEvents();
+  run(g, 1.5);
+  assert.equal(g.takeEvents().filter((e) => e[0] === EVT_HEAL).length, 0, "체력이 가득 차 있으면 숫자가 없다");
 });
