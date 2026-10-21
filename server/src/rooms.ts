@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import {
+  STAGE_COUNT,
   DIFFICULTY_REDUCTION,
   IDLE_KICK_SEC,
   JOIN_FAIL_BLOCK_SEC,
@@ -50,6 +51,7 @@ interface Room {
   members: Map<number, Member>;
   phase: RoomPhase; // waiting: 대기실(게임 정지), playing: 진행 중
   ranked: boolean; // 랭크(ELO 등) 게임: 난이도가 RANKED_DIFFICULTY로 고정되고 바꿀 수 없다
+  rush: number; // 보스 연습 방이면 시작 스테이지(1~10), 아니면 0
   isPrivate: boolean; // 비공개: 목록·빠른 시작에서 제외, 코드로만 입장
 }
 
@@ -111,7 +113,7 @@ export class RoomManager {
         conn.send({ t: "rooms", rooms: this.list() });
         return;
       case "create":
-        this.create(conn, msg.name, msg.room, msg.private === true);
+        this.create(conn, msg.name, msg.room, msg.private === true, msg.rush);
         return;
       case "join":
         this.join(conn, msg.name, msg.code);
@@ -205,11 +207,14 @@ export class RoomManager {
     }
   }
 
-  private create(conn: Conn, playerName: unknown, roomName: unknown, isPrivate: boolean): void {
+  private create(conn: Conn, playerName: unknown, roomName: unknown, isPrivate: boolean, rush?: unknown): void {
     if (this.where.has(conn)) return this.fail(conn, "이미 방에 들어가 있습니다");
     if (this.rooms.size >= MAX_ROOMS) return this.fail(conn, "지금은 방을 더 만들 수 없습니다");
     const name = clean(playerName, NAME_MAX_LENGTH);
-    const room = this.makeRoom(clean(roomName, ROOM_NAME_MAX_LENGTH) || `${name || "용병단"}의 방`, isPrivate);
+    const rushStage = typeof rush === "number" && Number.isFinite(rush) && rush >= 1 ? Math.min(STAGE_COUNT, Math.floor(rush)) : 0;
+    const label = clean(roomName, ROOM_NAME_MAX_LENGTH) || `${name || "용병단"}의 방`;
+    const room = this.makeRoom(rushStage ? `[보스 연습 ${rushStage}] ${label}` : label, isPrivate);
+    room.rush = rushStage;
     this.enter(conn, room, name);
   }
 
@@ -310,6 +315,7 @@ export class RoomManager {
     if (room.ranked) for (const m of room.members.values()) room.game.setDifficulty(m.id, RANKED_DIFFICULTY); // 랭크는 난이도 고정
     room.phase = "playing";
     room.game.generateTerrain(); // 판마다 새 지형
+    if (room.rush) room.game.startRush(room.rush);
     this.broadcastTerrain(room);
     this.broadcastRoom(room);
     this.broadcastLobby();
@@ -365,7 +371,7 @@ export class RoomManager {
     do {
       code = Array.from({ length: ROOM_CODE_LENGTH }, () => CODE_CHARS[Math.floor(this.rng() * CODE_CHARS.length)]).join("");
     } while (this.rooms.has(code));
-    const room: Room = { code, name, game: new Game(this.rng), hostId: -1, members: new Map(), phase: "waiting", ranked: false, isPrivate };
+    const room: Room = { code, name, game: new Game(this.rng), hostId: -1, members: new Map(), phase: "waiting", ranked: false, rush: 0, isPrivate };
     this.rooms.set(code, room);
     return room;
   }

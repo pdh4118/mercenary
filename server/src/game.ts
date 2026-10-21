@@ -586,6 +586,8 @@ export class Game {
   time = 0;
   /** 테스트에서 적·캠프 자동 생성을 끌 때 쓴다 */
   autoSpawn = true;
+  /** 보스 연습 방: 고른 스테이지의 보스전부터 쉬지 않고 이어서 한다. 쓰러지면 같은 보스를 다시, 잡으면 곧바로 다음 보스 */
+  rush = false;
   private slots = new Map<number, Slot>();
   private healAcc = new Map<number, { amt: number; x: number; y: number; owner: number; tick: number }>(); // 회복 숫자를 모아 두는 곳(주인공은 -번호, 용병은 번호)
   /** 회복 숫자: 재생·흡혈로 실제로 늘어난 체력을 대상별로 0.6초 모아서 한 번에 보낸다 */
@@ -759,6 +761,7 @@ export class Game {
     this.camps.clear();
     this.bullets = [];
     this.boss.reset();
+    this.rush = false;
     this.events = [];
     this.army = null;
     this.armyTotal = 0;
@@ -1073,7 +1076,10 @@ export class Game {
     this.clampUnits();
     this.pruneCasts();
     // 모든 주인공이 쓰러져 있으면 게임오버(동료가 일으켜 세울 사람이 없다). 토너먼트 중에는 지는 것이 정상이라 제외한다.
-    if (!duel && [...this.slots.values()].every((s) => s.state.down)) this.status = "defeat";
+    if (!duel && [...this.slots.values()].every((s) => s.state.down)) {
+      if (this.rush) this.rushBegin(false); // 보스 연습: 쓰러지면 같은 보스를 처음부터 다시
+      else this.status = "defeat";
+    }
     this.tick++;
   }
 
@@ -1314,6 +1320,32 @@ export class Game {
     if (this.phase === "grow") this.startArmy();
   }
 
+  /** 보스 연습 시작: 고른 스테이지의 보스군을 곧바로 부르고, 바로 써 볼 수 있게 금화와 카드를 준다 */
+  startRush(stage: number): void {
+    this.rush = true;
+    this.stage = Math.max(1, Math.min(STAGE_COUNT, Math.floor(stage) || 1));
+    this.rushBegin(true);
+  }
+
+  /** 보스 연습: 이번 스테이지 보스전을 (다시) 연다. 남은 적을 치우고 주인공·용병을 온전하게 한 뒤 보스군을 부른다. */
+  private rushBegin(first: boolean): void {
+    for (const e of [...this.enemies.values()]) this.enemies.delete(e.id);
+    this.bullets = [];
+    this.squads.clear();
+    this.army = null;
+    this.boss.reset();
+    this.phase = "grow";
+    for (const s of this.slots.values()) {
+      this.tourRestore(s);
+      if (first) {
+        s.state.gold += 1500 * this.stage;
+        s.state.pending += 3 + 2 * this.stage;
+        if (s.state.offer.length === 0) s.state.offer = this.rollOffer(s);
+      }
+    }
+    this.startArmy();
+  }
+
   /** 테스트용: 해당 스테이지의 성장 단계 처음으로 이동한다 */
   jumpToStage(stage: number): void {
     this.stage = Math.max(1, Math.min(STAGE_COUNT, Math.floor(stage)));
@@ -1335,7 +1367,7 @@ export class Game {
     } else if (this.phase === "boss") {
       this.stepArmy(dt);
       this.bossT += dt;
-      if (this.autoSpawn && this.bossT >= TUNE.BOSS_TIMEOUT_SEC) {
+      if (this.autoSpawn && !this.rush && this.bossT >= TUNE.BOSS_TIMEOUT_SEC) {
         // 제한 시간 안에 장군을 못 잡으면 보스군이 격노한다: 간격마다 병력이 늘고 모두 강해진다
         this.rageT += dt;
         while (this.rageT >= TUNE.BOSS_RAGE_INTERVAL_SEC && this.rage < TUNE.BOSS_RAGE_MAX) {
@@ -1347,6 +1379,17 @@ export class Game {
       }
     } else if (this.phase === "tournament") {
       this.stepTournament(dt);
+    } else if (this.rush) {
+      this.phaseT -= dt;
+      if (this.phaseT <= 0) {
+        this.stage = Math.min(STAGE_COUNT, this.stage + 1); // 마지막 스테이지는 계속 반복한다
+        for (const s of this.slots.values()) {
+          s.state.gold += 1000 * this.stage;
+          s.state.pending += 3;
+          if (s.state.offer.length === 0) s.state.offer = this.rollOffer(s);
+        }
+        this.rushBegin(false);
+      }
     } else {
       this.phaseT -= dt;
       if (this.phaseT <= 0) {
@@ -1870,6 +1913,10 @@ export class Game {
     }
     this.phase = "break";
     this.phaseT = TUNE.STAGE_BREAK_SEC;
+    if (this.rush) {
+      this.phaseT = 4; // 보스 연습: 잠깐 상자만 줍고 곧바로 다음 보스
+      return;
+    }
     // 3·6·9·10 스테이지: 보스를 잡으면 남은 적을 모두 없애고 플레이어끼리 토너먼트를 연다(2명 이상일 때). 끝난 뒤에 승리 판정이 난다.
     if (isTournamentStage(this.stage) && this.slots.size >= 2) {
       this.tourCountdown = Math.max(0.05, TUNE.TOURNAMENT_NOTICE_SEC);

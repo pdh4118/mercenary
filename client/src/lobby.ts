@@ -97,6 +97,8 @@ export function createLobby(opts: Options): Lobby {
   const roomNameInput = $<HTMLInputElement>("lobbyRoomName");
   const codeInput = $<HTMLInputElement>("lobbyCode");
   const privateInput = $<HTMLInputElement>("lobbyPrivate");
+  const rushInput = $<HTMLInputElement>("lobbyRush");
+  const rushStageInput = $<HTMLSelectElement>("lobbyRushStage");
   const listEl = $("lobbyList");
   const errorEl = $("lobbyError");
   const waitEl = $("waitRoom");
@@ -426,7 +428,7 @@ export function createLobby(opts: Options): Lobby {
   const hideLobby = () => lobbyEl.classList.remove("open");
 
   $("lobbyQuick").onclick = () => opts.send({ t: "quick", name: name() });
-  $("lobbyCreate").onclick = () => opts.send({ t: "create", name: name(), room: roomNameInput.value, private: privateInput.checked });
+  $("lobbyCreate").onclick = () => opts.send({ t: "create", name: name(), room: roomNameInput.value, private: privateInput.checked, rush: rushInput.checked ? Number(rushStageInput.value) : undefined });
   const joinByCode = () => {
     const c = codeInput.value.trim();
     if (c.length < 4) return setError("방 코드 4글자를 입력해 주세요");
