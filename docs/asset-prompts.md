@@ -22,6 +22,7 @@
 | 창병 장군 이펙트 (장창 찌르기 선 3컷, 창 방어 쓸기 3컷, 던진 창, 박힌 창) | 받음, 보관 (`assets/fx/boss2_thrust_0~2`, `boss2_sweep_0~2`, `boss2_spear_fly`, `boss2_spear_stuck`). 시안의 테두리 선은 잘라 냈다. 연한 초록 이펙트는 반투명으로 처리해 옅게 보인다 |
 | 궁병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss3_idle`, `boss3_aim`, `boss3_sky`, `assets/fx/boss3_ice_0~4`, `boss3_snipe`, `boss3_snipe_hit`, `boss3_rain_0·1·stuck·fade`, `boss3_dust_0~3`, `boss3_frost_0~2`). 얼음 둔화 표시는 얼음 고리 그림 대신 **파란 틴트(독과 같은 방식)** 로 하기로 해서 `boss3_frost_*`는 쓰지 않고 보관만 한다 |
 | 검방병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss4_idle`, `boss4_reflect`, `boss4_charge`, `assets/fx/boss4_shield_0~2`, `boss4_reflect_0~3`, `boss4_inv_0~3`, `boss4_bash_1~3`, 대체 시안 `boss4_bash_1b~3b`). **방패 돌진 섬광 `boss4_bash_0`은 못 씀**: 흰 섬광을 흰 배경에 그려서 지우면 중심이 사라진다. 흰 섬광·빛 이펙트는 **검은 배경**으로 다시 요청해야 한다(돌진 임팩트 섬광은 `boss1_impact_0`으로 대신할 수 있다) |
+| 둔기병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss5_idle`, `boss5_jump`, `boss5_smash`, `assets/fx/boss5_mace_fly`, `boss5_mace_stuck`, `boss5_shard_0~2`, `boss5_quake_0~4`, `boss5_spin_0~3`, `boss5_swing_0~2`). 시안의 칸 선과 고리 안 흰 칸은 지웠다 |
 | 효과음·음악 | 이 문서 10번 |
 | 스페이스 스킬 아이콘 6종 | 완료, 적용됨 (`assets/ui/skill_icon_*.png`, 철퇴는 시안 2개 중 `skill_icon_mace`를 쓰고 `skill_icon_mace_b`는 보관) |
 | 방벽 상태 3컷(평면 띠 시안) | 보관 (`assets/fx/skill_wall_0~2.png`). 조각 그림이 있으면 쓰이지 않음 |
