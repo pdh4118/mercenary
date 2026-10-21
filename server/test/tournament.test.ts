@@ -28,8 +28,8 @@ const bossDownAndWait = (g: Game) => {
   for (let i = 0; i < Math.ceil((TUNE.TOURNAMENT_NOTICE_SEC + 0.2) * 20); i++) g.step();
 };
 
-test("한 라운드(성장 시간)는 2분이다", () => {
-  assert.equal(TUNE.STAGE_GROW_SEC, 120);
+test("한 라운드(성장 시간)는 1분 30초이다", () => {
+  assert.equal(TUNE.STAGE_GROW_SEC, 90);
   assert.deepEqual([3, 6, 9, 10].map(isTournamentStage), [true, true, true, true]);
   assert.ok(!isTournamentStage(1) && !isTournamentStage(5));
   assert.deepEqual([1, 2, 3, 4].map(tournamentRoundName), ["결승", "준결승", "8강", "16강"]);

@@ -13,7 +13,7 @@ export const TUNE = {
   CAMP_LIFETIME_SEC: 60,
   CAMP_SPAWN_INTERVAL_SEC: 18,
   XP_TEAM_SHARE: 0.5, // 팀 공유 비율. 나머지(0.5)는 처치한 사람 몫
-  STAGE_GROW_SEC: 120, // 스테이지당 자유 성장 시간(2분)
+  STAGE_GROW_SEC: 90, // 스테이지당 자유 성장 시간(1분 30초)
   STAGE_BREAK_SEC: 10, // 클리어 뒤 쉬는 시간(회복·부활·보상)
   STAGE_ENEMY_HP_GROWTH: 0.3, // 스테이지가 오를 때마다 적 체력 +30%
   VENOM_CHANCE_PER_STAGE: 0.08, // 스테이지마다 늘어나는 독 궁병 비율(2스테이지부터)
