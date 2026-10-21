@@ -221,7 +221,7 @@ async function main() {
   /** 8방위 그림은 크기가 달라 별도 배율·기준점을 쓴다 */
   const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5 * 1.4; // 말 탄 병사가 다른 병종과 비슷한 크기로 보이도록 1.4배
   const CAV_ANCHOR: [number, number] = [0.483, 0.72];
-  // 1~6스테이지 보스(장군) 전용 그림: 병종 번호 → 기본 자세, 공격 자세, 배율(그림 한 장 크기가 서로 달라 보스마다 따로 맞춘다)
+  // 1~8스테이지 보스(장군) 전용 그림: 스테이지 번호 - 1 → 기본 자세, 공격 자세, 배율(그림 한 장 크기가 서로 달라 보스마다 따로 맞춘다)
   const BOSS_ART_FILES: readonly { idle: string; attack: string | null; scale: number }[] = [
     { idle: "boss1_idle", attack: "boss1_attack", scale: 0.5 },
     { idle: "boss2_idle", attack: "boss2_thrust", scale: 0.6 },
@@ -229,8 +229,10 @@ async function main() {
     { idle: "boss4_idle", attack: null, scale: 0.42 },
     { idle: "boss5_idle", attack: "boss5_smash", scale: 0.42 },
     { idle: "boss6_idle", attack: "boss6_cast", scale: 0.5 },
+    { idle: "boss7_gallop", attack: "boss7_shoot", scale: 0.55 },
+    { idle: "boss8_normal", attack: "boss8_mad", scale: 0.75 },
   ];
-  const BOSS_ART_STAGES = 6;
+  const BOSS_ART_STAGES = BOSS_ART_FILES.length;
   const bossArt = await Promise.all(
     BOSS_ART_FILES.map(async (f) => ({
       idle: await Assets.load<Texture>(`assets/units/${f.idle}.png`).catch(() => null),
@@ -238,6 +240,8 @@ async function main() {
       scale: f.scale,
     })),
   );
+  /** 스테이지 보스 이름(스테이지 표시줄용). 1~8스테이지만 정해져 있다. */
+  const BOSS_TITLES = ["기병 장군", "창병 장군", "궁병 장군", "검방병 장군", "둔기병 장군", "마법사 장군", "기마궁수", "전차"] as const;
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
   // 여성 주인공 그림(없으면 기본 그림으로 대신한다)
   const heroTexF = await Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_f_${f}.png`).catch(() => null)));
@@ -417,7 +421,7 @@ async function main() {
   const enemies = new Pool<Tracked & Facing & { sprite: Sprite; art: (typeof bossArt)[number] | null }, EnemyWire>(
     (w) => {
       // 1~6스테이지 보스는 전용 그림을 쓴다(그림이 없으면 병종 그림 그대로)
-      const art = w[11] === 1 && (latest?.g?.stage ?? 99) <= BOSS_ART_STAGES ? bossArt[w[4]] ?? null : null;
+      const art = w[11] === 1 && (latest?.g?.stage ?? 99) <= BOSS_ART_STAGES ? bossArt[(latest?.g?.stage ?? 1) - 1] ?? null : null;
       const sprite = new Sprite(art?.idle ?? (w[4] === 0 ? enemyCav[0]![2]! : enemyTex[w[4]]!));
       if (art?.idle) sprite.anchor.set(0.5, 0.88);
       else if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
@@ -2850,7 +2854,7 @@ async function main() {
       }
       lastTourIn = tin;
       if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · 보스군 도착까지 ${mmss(gi.timer)}${squadText}`;
-      else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${UNIT_NAMES[gi.bossType]} 장군의 군대 ${gi.armyLeft}/${gi.armyTotal}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}${gi.timer > 0 ? ` (다음 ${gi.timer}초)` : " (최대)"}` : gi.timer > 0 ? ` · 격노까지 ${gi.timer}초` : ""}`;
+      else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${BOSS_TITLES[gi.stage - 1] ?? `${UNIT_NAMES[gi.bossType]} 장군`}의 군대 ${gi.armyLeft}/${gi.armyTotal}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}${gi.timer > 0 ? ` (다음 ${gi.timer}초)` : " (최대)"}` : gi.timer > 0 ? ` · 격노까지 ${gi.timer}초` : ""}`;
       else if (gi.phase === "tournament") stageText.text = ""; // 위쪽 대진 배너가 대신한다
       else if ((gi.tourIn ?? 0) > 0) stageText.text = `스테이지 ${gi.stage} 클리어! 토너먼트가 ${gi.tourIn}초 뒤에 시작됩니다`;
       else stageText.text = `스테이지 ${gi.stage} 클리어! 다음 스테이지까지 ${gi.timer}초`;

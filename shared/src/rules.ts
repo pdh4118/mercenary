@@ -371,7 +371,7 @@ export const ARMY_LEASH = 380; // 진형 자리에서 이만큼 벗어나면 되
 export const ARMY_RANK_SPACING = 38;
 export const ARMY_LATERAL_SPACING = 34;
 export const ARMY_RANK_WIDTH = 10; // 한 줄 최대 인원
-/** 스테이지별 보스(장군) 병종: 1~6은 보스 계획대로 기병, 창병, 궁병, 검방병, 둔기병, 마법사. 7~10은 아직 정하지 않아 이전 값(둔기, 기병, 창, 둔기)을 그대로 둔다 */
+/** 스테이지별 보스(장군) 병종: 1~6은 보스 계획대로 기병, 창병, 궁병, 검방병, 둔기병, 마법사. 7 기마궁수는 궁병(원거리), 8 전차는 기병(돌격)의 행동을 빌려 쓴다. 9~10은 아직 정하지 않아 이전 값(창, 둔기)을 그대로 둔다 */
 // 소대: 보스가 아닐 때도 가끔 소규모 혼성 부대가 진형을 갖추고 다가온다
 export const SQUAD_FIRST_SEC = 30; // 스테이지 시작 뒤 첫 소대까지
 export const SQUAD_INTERVAL_STAGE = 3;
@@ -380,7 +380,7 @@ export const SQUAD_MAX_SIZE = 14;
 export const SQUAD_SPAWN_DISTANCE = 700;
 export const SQUAD_MARCH_MULT = 1.3; // 보스군보다 빠르게 행군한다
 export const SQUAD_CLEAR_GOLD = 4; // 소대를 전멸시키면 병사 1명당 모든 플레이어가 받는 금화
-export const BOSS_TYPES = [CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, BLUNT, CAVALRY, SPEAR, BLUNT] as const;
+export const BOSS_TYPES = [CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, ARCHER, CAVALRY, SPEAR, BLUNT] as const;
 export const BOSS_SIZE = 1.7; // 반경·그림 크기 배율
 export const BOSS_SPEED_MULT = 0.9;
 
