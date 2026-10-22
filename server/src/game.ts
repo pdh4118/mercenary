@@ -561,6 +561,10 @@ interface Tournament {
   t: number; // 이 단계에서 남은 초
   winner: string;
   champion: string;
+  /** 이번 경기에서 두 선수의 남은 전력(0..1)을 시간으로 쌓은 값과 지난 시간: 시간 초과 판정은 마지막 순간이 아니라 경기 내내의 평균 전력으로 한다 */
+  sa: number;
+  sb: number;
+  se: number;
 }
 
 /** 시험 플레이용: MERC_STAGE_GROW_SEC=20 처럼 지정하면 성장 시간이 짧아진다 */
@@ -1658,7 +1662,7 @@ export class Game {
       mt.bn = this.tourName(mt.b);
     });
     this.phase = "tournament";
-    this.tour = { rounds, r: 0, m: 0, step: "intro", t: TUNE.TOURNAMENT_INTRO_SEC, winner: "", champion: "" };
+    this.tour = { rounds, r: 0, m: 0, step: "intro", t: TUNE.TOURNAMENT_INTRO_SEC, winner: "", champion: "", sa: 0, sb: 0, se: 0 };
     this.tourAdvance();
   }
 
@@ -1784,6 +1788,7 @@ export class Game {
       if (t.t <= 0) {
         t.step = "fight";
         t.t = TUNE.TOURNAMENT_MATCH_SEC;
+        t.sa = t.sb = t.se = 0;
       }
       return;
     }
@@ -1796,10 +1801,14 @@ export class Game {
         const aw = aOut && bOut ? this.tourPower(mt.a) >= this.tourPower(mt.b) : !aOut;
         return this.tourMatchDone(aw ? 1 : 2);
       }
+      t.sa += this.tourPower(mt.a) * dt;
+      t.sb += this.tourPower(mt.b) * dt;
+      t.se += dt;
       if (t.t <= 0) {
-        const pa = this.tourPower(mt.a);
-        const pb = this.tourPower(mt.b);
-        this.tourMatchDone(pa === pb ? (this.rng() < 0.5 ? 1 : 2) : pa > pb ? 1 : 2); // 시간 초과: 남은 전력이 높은 쪽
+        // 시간 초과: 경기 내내 평균 남은 전력이 높은 쪽(막판 부활·타이밍으로 뒤집히지 않는다)
+        const pa = Math.round(t.sa * 1e6);
+        const pb = Math.round(t.sb * 1e6);
+        this.tourMatchDone(pa === pb ? (this.rng() < 0.5 ? 1 : 2) : pa > pb ? 1 : 2);
       }
       return;
     }
@@ -1887,6 +1896,8 @@ export class Game {
       bn: mt?.bn ?? "",
       ha: Math.round(this.tourPower(a) * 100),
       hb: Math.round(this.tourPower(b) * 100),
+      sa: t.se > 0 ? Math.round((t.sa / t.se) * 100) : Math.round(this.tourPower(a) * 100),
+      sb: t.se > 0 ? Math.round((t.sb / t.se) * 100) : Math.round(this.tourPower(b) * 100),
       winner: t.winner,
       champion: t.champion,
       rounds: t.rounds.map((r) => ({ title: r.title, matches: r.matches.map((m): TourMatchInfo => ({ a: m.an, b: m.bn, w: m.w })) })),

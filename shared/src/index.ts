@@ -231,6 +231,8 @@ export interface TourInfo {
   bn: string;
   ha: number; // 선수의 남은 전력 비율 0..100(주인공+용병 체력 합)
   hb: number;
+  sa: number; // 이번 경기 평균 남은 전력 0..100: 시간 초과 판정 점수
+  sb: number;
   winner: string; // 방금 끝난 경기의 승자 이름(결과 표시 단계)
   champion: string; // 우승자(end 단계)
   rounds: { title: string; matches: TourMatchInfo[] }[];

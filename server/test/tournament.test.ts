@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  SHIELD,
   CHEST_OPEN_RADIUS,
   TICK_RATE,
   TOURNAMENT_OUTRO_SEC,
@@ -279,4 +280,37 @@ test("토너먼트 경기 중 쓰러진 용병도 되살아난다(부활 시간 
   assert.ok(live.respawn < 20, `경기 중 부활 시간이 짧다: ${live.respawn}`);
   run(g, live.respawn + 0.5);
   assert.ok(g.getMerc(m)!.respawn === 0 && g.getMerc(m)!.hp > 0, "경기 중에 돌아왔다");
+});
+
+test("시간 초과 판정은 마지막 순간이 아니라 경기 내내의 평균 남은 전력으로 한다(막판 부활로 뒤집히지 않는다)", () => {
+  const g = quiet();
+  g.addPlayer("a");
+  g.addPlayer("b");
+  g.jumpToStage(3);
+  bossDownAndWait(g);
+  g.step();
+  const tour = g.info().tour!;
+  const ma = g.addMerc(tour.a, SHIELD, 0, 0);
+  const mb = g.addMerc(tour.b, SHIELD, 0, 0);
+  void ma;
+  run(g, TUNE.TOURNAMENT_INTRO_SEC + 0.5);
+  assert.equal(g.info().tour!.step, "fight");
+  const down = (m: number) => {
+    const x = g.getMerc(m)! as unknown as { hp: number; respawn: number };
+    x.hp = 0;
+    x.respawn = 999;
+  };
+  const dummyDown = TICK_RATE * 40;
+  for (let i = 0; i < dummyDown; i++) {
+    down(mb); // 상대 용병은 경기 앞 40초 동안 쓰러져 있다
+    g.step();
+  }
+  (g.getMerc(mb)! as unknown as { respawn: number }).respawn = 0.01; // 막판에 부활해 체력이 가득 찬 채 돌아온다
+  run(g, TUNE.TOURNAMENT_MATCH_SEC - 40 - 0.2);
+  const t = g.info().tour!;
+  assert.ok(t.sa > t.sb, `평균 전력이 앞선다(${t.sa} : ${t.sb})`);
+  run(g, 1);
+  const done = g.info().tour!;
+  assert.equal(done.step, "outro");
+  assert.equal(done.winner, done.an, "경기 내내 앞선 선수가 이긴다");
 });

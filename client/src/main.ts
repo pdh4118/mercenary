@@ -1626,9 +1626,9 @@ async function main() {
     tourBannerEl.style.display = tourBracketEl.style.display = "block";
     tourBannerEl.innerHTML =
       `<div class="tt">토너먼트 · ${esc(tour.title)}</div>` +
-      `<div class="vs"><div class="side"><div class="nm">${nm(tour.an, sa, tour.a)}</div><div class="bar"><div style="width:${tour.ha}%;background:${TEAM_CSS[sa]}"></div></div></div>` +
-      `<span>VS</span><div class="side"><div class="nm">${nm(tour.bn, sb, tour.b)}</div><div class="bar b"><div style="width:${tour.hb}%;background:${TEAM_CSS[sb]}"></div></div></div></div>` +
-      `<div class="tm">${tour.step === "fight" ? `남은 시간 ${tour.t}초 · 주인공이 쓰러지면 패배` : tour.step === "outro" ? "경기 종료" : tour.step === "end" ? "토너먼트 종료" : fighter ? "선수 입장" : "관전 중"}</div>`;
+      `<div class="vs"><div class="side"><div class="nm">${nm(tour.an, sa, tour.a)}</div><div class="pct">${tour.ha}%</div><div class="bar"><div style="width:${tour.ha}%;background:${TEAM_CSS[sa]}"></div></div></div>` +
+      `<span>VS</span><div class="side"><div class="nm">${nm(tour.bn, sb, tour.b)}</div><div class="pct">${tour.hb}%</div><div class="bar b"><div style="width:${tour.hb}%;background:${TEAM_CSS[sb]}"></div></div></div></div>` +
+      `<div class="tm">${tour.step === "fight" ? `남은 시간 ${tour.t}초 · 주인공이 쓰러지면 패배 · 시간 초과 판정(평균 전력) ${tour.sa} : ${tour.sb}` : tour.step === "outro" ? "경기 종료" : tour.step === "end" ? "토너먼트 종료" : fighter ? "선수 입장" : "관전 중"}</div>`;
     let html = "<h3>대진표</h3>";
     tour.rounds.forEach((r, ri) => {
       html += `<div class="rt">${esc(r.title)}</div>`;
