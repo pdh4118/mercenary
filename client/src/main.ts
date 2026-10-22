@@ -2581,7 +2581,7 @@ async function main() {
       const arcNow = meleeArc(w.type, w.arc, p.hs?.[6] || 1);
       if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
         // 철퇴 준비 동작: 범위가 점점 진하게 차오른다(맞기 직전까지 피하라는 신호가 아니라 휘두르는 타이밍 표시)
-        const prog = Math.max(0, Math.min(1, 1 - p.wind / w.windup));
+        const prog = Math.max(0, Math.min(1, 1 - p.wind / (w.type === 0 ? TUNE.CAV_HERO_CHARGE_SEC : w.windup)));
         if (usesBox(w.type)) {
           // 창·기마는 부채꼴이 아니라 앞으로 뻗은 직사각형만 보인다
           drawSpearBox(v.x, v.y, p.aim, reachNow * (0.4 + 0.6 * prog), p.hs?.[6] || 1, 0xffc27a, 0.12 + 0.3 * prog, w.type === 0);

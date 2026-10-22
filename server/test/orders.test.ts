@@ -118,6 +118,8 @@ test("기마 주인공: 속도가 붙을수록 한 방이 세고, 공격하면 �
     const before = e.hp;
     const mom = (g as unknown as { slots: Map<number, { mom: number }> }).slots.get(a)!.mom;
     g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+    run(g, 0.1);
+    g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false }); // 기마는 눌렀다 떼면 바로 휘두른다(꾹 누르면 모은다)
     run(g, 0.3);
     const after = (g as unknown as { slots: Map<number, { mom: number }> }).slots.get(a)!.mom;
     return { dealt: before - e.hp, mom, after };
@@ -140,6 +142,8 @@ test("기마 주인공: 속도가 붙을수록 한 방이 세고, 공격하면 �
   spear.y = p.y;
   const hp0 = p.hp;
   g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+  run(g, 0.1);
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
   run(g, 0.3);
   void hp0;
   void MAGE;
@@ -331,4 +335,28 @@ test("돌격 진형 검방병: 방패 정면을 보이는 적이 바로 앞에 �
   const back = dummy(g, 70, 30, SPEAR);
   run(g, 4);
   assert.ok(front.shield < 100 || front.hp < 5000 || back.hp < 5000, "붙어 있는 적을 때린다");
+});
+
+test("기마 주인공: 그냥 눌렀다 떼면 기본 피해, 꾹 눌러 모으면 기본 피해가 최대 (1+보너스)배로 나가고(속도 돌격 피해는 따로) 모으는 동안 움직일 수 있다", () => {
+  const hit = (holdSec: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    g.setWeapon(a, WEAPONS.findIndex((w) => w.type === CAVALRY));
+    run(g, 0.4);
+    const e = dummy(g, p.x + 40, p.y, 4);
+    const before = e.hp;
+    g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: true });
+    run(g, holdSec);
+    const winding = g.getPlayer(a)!.wind;
+    g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+    run(g, 0.3);
+    return { dealt: before - e.hp, winding };
+  };
+  const tap = hit(0.05);
+  const full = hit(TUNE.CAV_HERO_CHARGE_SEC + 0.3);
+  assert.ok(tap.dealt > 0, "그냥 눌러도 맞는다");
+  const base = WEAPONS.find((w) => w.type === CAVALRY)!.damage;
+  assert.ok(Math.abs(full.dealt - tap.dealt - base * TUNE.CAV_HERO_CHARGE_BONUS) < base * 0.2, `기본 ${tap.dealt} / 모은 ${full.dealt}(기본 피해 ${base}만큼 늘어난다. 속도 돌격 피해는 따로)`);
+  assert.ok(full.winding > 0 && full.winding < 0.05, "다 모으면 준비 표시가 거의 0");
 });
