@@ -160,7 +160,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   SKILL_WALL_THICK: ["방벽 두께", G.hero, 6, 100, 2],
   SKILL_WALL_SEC: ["방벽 지속(초)", G.hero, 1, 60, 1],
   MACE_MIN_CHARGE: ["철퇴 최소 피해 비율(모으지 않고 뗐을 때)", G.hero, 0, 1, 0.05],
-  CAV_HERO_CHARGE_SEC: ["주인공 기마 공격 모으는 시간(초)", G.hero, 0.2, 5, 0.1],
+  CAV_HERO_CHARGE_SEC: ["주인공 기마 공격 모으는 시간(초)", G.hero, 0.05, 5, 0.05],
   CAV_HERO_CHARGE_BONUS: ["주인공 기마 다 모았을 때 추가 피해 비율", G.hero, 0, 5, 0.1],
   ASSAULT_ADVANCE: ["돌격 진형: 대열이 앞으로 나가는 거리(px)", G.ai, 0, 800, 10],
   ASSAULT_LEASH_MULT: ["돌격 진형: 추격 범위 배율", G.ai, 1, 8, 0.1],
