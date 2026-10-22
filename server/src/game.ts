@@ -2250,7 +2250,7 @@ export class Game {
           p.wind = 0;
           this.strikeHero(s);
         }
-      } else if (WEAPONS[p.weapon]!.type === BLUNT || WEAPONS[p.weapon]!.type === CAVALRY) {
+      } else if (WEAPONS[p.weapon]!.type === BLUNT) {
         this.stepMaceCharge(s, dt, !stunned && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight")));
       } else if (!stunned && s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight"))) this.useWeapon(s);
     }
@@ -2327,16 +2327,14 @@ export class Game {
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
     const rate = s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0));
-    const cav = w.type === CAVALRY; // 기마: 그냥 누르면 기본 피해, 꾹 눌러 모으면 최대 (1+보너스)배
-    const total = cav ? TUNE.CAV_HERO_CHARGE_SEC : w.windup;
-    const need = total / rate;
+    const need = w.windup / rate;
     if (canFire && s.input.fire && s.fireCd <= 0) {
       s.chargeT = Math.min(need, s.chargeT + dt);
-      p.wind = Math.max(0.001, total * (1 - s.chargeT / need)); // 화면 표시용: 모을수록 줄어든다(다 모으면 0.001)
+      p.wind = Math.max(0.001, w.windup * (1 - s.chargeT / need)); // 화면 표시용: 모을수록 줄어든다(다 모으면 0.001)
       return;
     }
     if (s.chargeT <= 0) return;
-    const frac = cav ? 1 + TUNE.CAV_HERO_CHARGE_BONUS * (s.chargeT / need) : Math.max(TUNE.MACE_MIN_CHARGE, s.chargeT / need);
+    const frac = Math.max(TUNE.MACE_MIN_CHARGE, s.chargeT / need);
     s.chargeT = 0;
     p.wind = 0;
     if (!canFire) return; // 경기가 끝났거나 무기를 바꾸는 중이면 취소

@@ -162,8 +162,6 @@ test("기마 스킬: 공격하면 가속(최고 속도)이 끝나고 속도를 �
   assert.ok(slot.boostT > 1.9 && slot.mom === 1);
   dummy(g, p.x + 50, p.y);
   g.setInput(a, { ...idle, aim: 0, fire: true });
-  run(g, 0.1);
-  g.setInput(a, { ...idle, aim: 0, fire: false }); // 눌렀다 떼면 휘두른다
   run(g, 0.3);
   assert.equal(slot.boostT, 0, "공격으로 가속이 끝났다");
   assert.ok(slot.mom < 1, "속도를 잃었다");
@@ -246,8 +244,6 @@ test("기마 가속 중에는 상태에 남은 시간(bst)이 실려 속도 이�
   s2.g.useSkill(s2.a);
   dummy(s2.g, s2.p.x + 50, s2.p.y);
   s2.g.setInput(s2.a, { ...idle, aim: 0, fire: true });
-  run(s2.g, 0.1);
-  s2.g.setInput(s2.a, { ...idle, aim: 0, fire: false });
   run(s2.g, 0.3);
   assert.equal(s2.g.getPlayer(s2.a)!.bst, 0);
 });
