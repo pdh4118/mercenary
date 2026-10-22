@@ -1,4 +1,4 @@
-import { Application, Assets, ColorMatrixFilter, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
+import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
@@ -450,14 +450,6 @@ async function main() {
   const hitFx: { node: Container; age: number; grow?: number; life?: number }[] = [];
   // 운석 폭발(폭발 컷 → 바닥 그을음 컷)과 떨어지는 운석 스프라이트
   const blasts: { x: number; y: number; r: number; age: number; boom: Sprite | null; scorch: Sprite | null; friendly: boolean; hero: boolean; boss: boolean }[] = [];
-  /** 우호 마법은 주황 불꽃 그림의 색조를 돌려 적의 마법(주황·보스는 붉은빛)과 구분한다: 용병 마법사는 옅은 초록, 주인공이 직접 쏜 마법은 파랑 */
-  const friendlyTint = (sp: Sprite, hero = false): void => {
-    const f = new ColorMatrixFilter();
-    f.hue(hero ? 190 : 85, false);
-    f.saturate(-0.35, true);
-    f.brightness(1.12, true);
-    sp.filters = [f];
-  };
   const falling = new Map<number, Sprite>();
   const BOOM_SEC = 0.6;
   const SCORCH_SEC = 2.8;
@@ -2158,7 +2150,7 @@ async function main() {
       const friendly = owner > 0; // 아군의 운석: 용병 마법사는 옅은 초록, 주인공(시전자 번호가 음수)은 파랑
       const heroMeteor = friendly && key < 0;
       const bossMeteor = owner === 0 && (latest.enemies.find((q) => q[0] === key)?.[11] ?? 0) === 1; // 보스의 마법: 붉은 주황
-      // 적(주황)·보스(붉은 주황)·아군(옅은 초록) 순으로 색을 나눈다. 적의 마법은 피하라고 진하게 표시한다.
+      // 운석 그림(낙하·폭발·그을음)은 누가 쏘든 같은 원본 색이고, 낙하 지점 위험 표시만 적(주황)·보스(붉은 주황)·아군(옅은 초록·파랑)으로 나눈다. 적의 마법은 피하라고 진하게 표시한다.
       const cFill = heroMeteor ? 0x8ec8ff : friendly ? 0xa8e8b4 : bossMeteor ? 0xff4a1a : 0xff9a2a;
       const cEdge = heroMeteor ? 0x9fd2ff : friendly ? 0xb4f0bf : bossMeteor ? 0xff5a2a : 0xff8a3a;
       const cSweep = heroMeteor ? 0x6aaaf0 : friendly ? 0x8fdca0 : bossMeteor ? 0xe03a10 : 0xff8a1a;
@@ -2187,8 +2179,6 @@ async function main() {
           sp = new Sprite(meteorTex[0]!);
           audio.play("meteor_fall", { x: mx, y: my }); // 떨어지기 시작할 때 한 덩어리(낙하음 → 폭발음)로 낸다
           sp.anchor.set(0.2, 0.8);
-          if (friendly) friendlyTint(sp, heroMeteor);
-          else if (bossMeteor) sp.tint = 0xffa890;
           skyLayer.addChild(sp);
           falling.set(key, sp);
         }
@@ -2218,8 +2208,6 @@ async function main() {
         b.scorch.anchor.set(0.5, 0.5);
         b.scorch.position.set(b.x, b.y);
         b.scorch.scale.set(b.r / 62);
-        if (b.friendly) friendlyTint(b.scorch, b.hero);
-        else if (b.boss) b.scorch.tint = 0xffa890;
         groundFx.addChild(b.scorch);
       }
       if (!b.boom) {
@@ -2227,8 +2215,6 @@ async function main() {
         b.boom.anchor.set(0.5, 0.82);
         b.boom.position.set(b.x, b.y);
         b.boom.scale.set(b.r / 70);
-        if (b.friendly) friendlyTint(b.boom, b.hero);
-        else if (b.boss) b.boom.tint = 0xffa890;
         skyLayer.addChild(b.boom);
       }
       const st = b.age / SCORCH_SEC;
