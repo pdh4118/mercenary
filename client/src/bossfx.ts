@@ -361,54 +361,101 @@ export async function createBossFx(d: BossFxDeps) {
   };
 
   /** 한 프레임: 예고·장판을 그린다 */
-  /** 휠윈드: 장군 둘레에 칼날바람 소용돌이(회전하는 초승달 칼날 세 겹 + 흙먼지)를 그린다 */
-  const whirlG = new Graphics();
-  d.fxLayer.addChild(whirlG);
+  /**
+   * 휠윈드: 장군을 감싸고 위로 갈수록 넓어지는 깔때기(토네이도) 모양 칼날바람.
+   * 나선 바람줄기·층마다 도는 초승달 칼날·말려 올라가는 먼지로 그리고, 깔때기의 먼 쪽 절반은 장군 뒤(바닥층), 가까운 쪽 절반은 장군 앞(효과층)에 그려 몸이 소용돌이 안에 선 것처럼 보이게 한다.
+   */
+  const whirlBack = new Graphics();
+  const whirlFront = new Graphics();
+  d.groundFx.addChild(whirlBack);
+  d.fxLayer.addChild(whirlFront);
   const whirls: { id: number; x: number; y: number }[] = [];
   const whirlStart = new Map<number, number>();
   const drawWhirls = (now: number) => {
-    whirlG.clear();
+    whirlBack.clear();
+    whirlFront.clear();
     for (const id of [...whirlStart.keys()]) if (!whirls.some((w) => w.id === id)) whirlStart.delete(id);
+    const FLAT = 0.5; // 비스듬한 시점이라 가로 원을 세로로 눌러 그린다
+    const HEIGHT = 150; // 깔때기 높이(px)
+    const LEVELS = 8;
     for (const w of whirls) {
       if (!whirlStart.has(w.id)) whirlStart.set(w.id, now);
-      const grow = Math.min(1, (now - whirlStart.get(w.id)!) / 260); // 도는 순간 퍼져 나간다
-      const R = BOSS_BLUNT.whirlRadius * (0.35 + 0.65 * grow);
-      const flat = 0.62; // 바닥을 비스듬히 보는 시점이라 세로를 눌러 그린다
+      const grow = Math.min(1, (now - whirlStart.get(w.id)!) / 300); // 도는 순간 아래에서부터 솟아오른다
       const t = now / 1000;
+      const Rmax = BOSS_BLUNT.whirlRadius * 0.8;
+      /** 높이 h(0~1)에서의 중심과 반지름 */
+      const at = (h: number) => {
+        const hh = h * grow;
+        return { cx: w.x + Math.sin(t * 3.1 + h * 4.2) * 7 * h, cy: w.y + 6 - HEIGHT * hh, r: Rmax * (0.2 + 0.8 * hh ** 0.85) };
+      };
+      /** 각도 a가 화면 아래쪽(가까운 쪽)이면 앞 그래픽, 위쪽(먼 쪽)이면 뒤 그래픽 */
+      const gfx = (a: number) => (Math.sin(a) > 0 ? whirlFront : whirlBack);
+      const seg = (a: number, x0: number, y0: number, x1: number, y1: number, width: number, color: number, alpha: number) => {
+        gfx(a).moveTo(x0, y0).lineTo(x1, y1).stroke({ width, color, alpha });
+      };
       // 바닥 먼지 원반
-      whirlG.ellipse(w.x, w.y + 8, R, R * flat).fill({ color: 0xcdb98f, alpha: 0.13 * grow }).stroke({ width: 3, color: 0xe9f1ff, alpha: 0.25 * grow });
-      // 칼날바람: 안쪽일수록 빠르게 도는 세 겹, 겹마다 초승달 칼날 3개(머리는 굵고 밝고, 꼬리는 가늘고 옅다)
-      for (let layer = 0; layer < 4; layer++) {
-        const rr = R * (0.3 + 0.24 * layer);
-        const speed = 12 - layer * 2;
-        const blades = layer === 3 ? 4 : 3;
-        for (let b = 0; b < blades; b++) {
-          const head = t * speed + (b * Math.PI * 2) / blades + layer * 0.7;
-          const span = 1.25;
-          const seg = 14;
-          for (let j = 0; j < seg; j++) {
-            const f0 = j / seg;
-            const f1 = (j + 1) / seg;
-            const a0 = head - span * (1 - f0);
-            const a1 = head - span * (1 - f1);
-            const x0 = w.x + Math.cos(a0) * rr;
-            const y0 = w.y - 18 + Math.sin(a0) * rr * flat;
-            const x1 = w.x + Math.cos(a1) * rr;
-            const y1 = w.y - 18 + Math.sin(a1) * rr * flat;
-            whirlG.moveTo(x0, y0).lineTo(x1, y1).stroke({ width: 8 + 20 * f1 * f1, color: 0x8fc4ff, alpha: grow * 0.16 * f1 }).moveTo(x0, y0).lineTo(x1, y1).stroke({ width: 3 + 12 * f1 * f1, color: f1 > 0.7 ? 0xffffff : 0xcfe2f8, alpha: grow * (0.15 + 0.85 * f1) });
-          }
-          // 칼날 끝의 날카로운 빛
-          const hx = w.x + Math.cos(head) * rr;
-          const hy = w.y - 18 + Math.sin(head) * rr * flat;
-          whirlG.circle(hx, hy, 6).fill({ color: 0xfff6c8, alpha: 0.95 * grow });
+      whirlBack.ellipse(w.x, w.y + 8, Rmax * 0.95, Rmax * 0.95 * FLAT).fill({ color: 0xcdb98f, alpha: 0.16 * grow });
+      whirlFront.ellipse(w.x, w.y + 8, Rmax * 0.95, Rmax * 0.95 * FLAT).stroke({ width: 3, color: 0xe9f1ff, alpha: 0.28 * grow });
+      // 깔때기 윤곽: 층마다 흐릿한 타원 고리(위로 갈수록 옅다)
+      for (let lv = 1; lv <= LEVELS; lv++) {
+        const h = lv / LEVELS;
+        const c = at(h);
+        const a0 = t * (4 - h * 2) + lv * 1.3;
+        const n = 18;
+        for (let j = 0; j < n; j++) {
+          const aa = a0 + (j / n) * Math.PI * 2;
+          const ab = a0 + ((j + 1) / n) * Math.PI * 2;
+          seg(aa, c.cx + Math.cos(aa) * c.r, c.cy + Math.sin(aa) * c.r * FLAT, c.cx + Math.cos(ab) * c.r, c.cy + Math.sin(ab) * c.r * FLAT, 3, 0xdce9fb, 0.1 * (1 - h * 0.6) * grow);
         }
       }
-      // 바람에 말려 올라가는 흙먼지·파편
-      for (let i = 0; i < 16; i++) {
-        const ph = (i * 0.37 + t * (0.5 + (i % 3) * 0.15)) % 1;
-        const a = i * 2.4 + t * (6 + (i % 4)) ;
-        const rr = R * (0.25 + 0.75 * ph);
-        whirlG.circle(w.x + Math.cos(a) * rr, w.y + 6 + Math.sin(a) * rr * flat - 40 * ph * (1 - ph) * 4, 3 + (i % 3)).fill({ color: i % 2 ? 0xb99a6a : 0xdde6f2, alpha: grow * 0.8 * (1 - ph) });
+      // 나선 바람줄기: 아래에서 위로 감아 올라가는 줄기 6가닥
+      const STRANDS = 6;
+      for (let sI = 0; sI < STRANDS; sI++) {
+        const base = t * 7.5 + (sI * Math.PI * 2) / STRANDS;
+        const steps = 22;
+        let px = 0;
+        let py = 0;
+        let pa = 0;
+        for (let j = 0; j <= steps; j++) {
+          const h = j / steps;
+          const c = at(h);
+          const a = base + h * 5.2;
+          const x = c.cx + Math.cos(a) * c.r;
+          const y = c.cy + Math.sin(a) * c.r * FLAT;
+          if (j > 0) seg(pa, px, py, x, y, 2 + 7 * (1 - h) * (1 - h) + 2, h < 0.5 ? 0xffffff : 0xcfe2f8, grow * (0.75 - 0.5 * h));
+          px = x;
+          py = y;
+          pa = a;
+        }
+      }
+      // 층마다 도는 초승달 칼날(머리는 굵고 밝고 꼬리는 가늘고 옅다): 아래 층일수록 빠르다
+      for (let lv = 1; lv <= LEVELS; lv += 2) {
+        const h = lv / LEVELS;
+        const c = at(h);
+        for (let b = 0; b < 2; b++) {
+          const head = t * (13 - h * 5) + b * Math.PI + lv * 0.9;
+          const span = 1.4;
+          const n = 12;
+          for (let j = 0; j < n; j++) {
+            const f0 = j / n;
+            const f1 = (j + 1) / n;
+            const a0 = head - span * (1 - f0);
+            const a1 = head - span * (1 - f1);
+            seg(a1, c.cx + Math.cos(a0) * c.r, c.cy + Math.sin(a0) * c.r * FLAT, c.cx + Math.cos(a1) * c.r, c.cy + Math.sin(a1) * c.r * FLAT, 3 + 12 * f1 * f1 * (1 - h * 0.4), f1 > 0.7 ? 0xffffff : 0xbcd6f5, grow * (0.12 + 0.85 * f1) * (1 - h * 0.35));
+          }
+          const hx = c.cx + Math.cos(head) * c.r;
+          const hy = c.cy + Math.sin(head) * c.r * FLAT;
+          gfx(head).circle(hx, hy, 5).fill({ color: 0xfff6c8, alpha: 0.95 * grow });
+        }
+      }
+      // 말려 올라가는 먼지·파편
+      for (let i = 0; i < 22; i++) {
+        const ph = (i * 0.173 + t * (0.45 + (i % 3) * 0.12)) % 1;
+        const c = at(ph);
+        const a = i * 2.4 + t * (7 + (i % 4)) + ph * 5;
+        const x = c.cx + Math.cos(a) * c.r * 1.05;
+        const y = c.cy + Math.sin(a) * c.r * FLAT * 1.05;
+        gfx(a).circle(x, y, 2 + (i % 3)).fill({ color: i % 2 ? 0xb99a6a : 0xdde6f2, alpha: grow * 0.8 * (1 - ph * 0.8) });
       }
     }
     whirls.length = 0;
