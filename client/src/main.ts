@@ -464,6 +464,86 @@ async function main() {
   const hitFx: { node: Container; age: number; grow?: number; life?: number }[] = [];
   // 운석 폭발(폭발 컷 → 바닥 그을음 컷)과 떨어지는 운석 스프라이트
   const blasts: { x: number; y: number; r: number; age: number; boom: Sprite | null; scorch: Sprite | null; friendly: boolean; hero: boolean; boss: boolean }[] = [];
+  // --- 타격감: 맞은 대상의 하얀 번쩍임, 근접 타격 히트스톱, 화면 흔들림(서버 판정은 건드리지 않는다) ---
+  // 브라우저 저장소에 feel=off 를 넣으면 히트스톱과 흔들림을 끈다(번쩍임만 남는다).
+  const feelOn = (() => {
+    try {
+      return localStorage.getItem("feel") !== "off";
+    } catch {
+      return true;
+    }
+  })();
+  const flashes = new Map<Sprite, { o: Sprite; t: number; dur: number }>();
+  const flashSprite = (sp: Sprite, dur: number): void => {
+    let f = flashes.get(sp);
+    if (!f) {
+      const o = new Sprite();
+      o.visible = false;
+      sp.addChild(o);
+      f = { o, t: 0, dur };
+      flashes.set(sp, f);
+    }
+    f.t = dur;
+    f.dur = dur;
+  };
+  const stepFlashes = (dt: number): void => {
+    for (const [sp, f] of flashes) {
+      if (sp.destroyed) {
+        flashes.delete(sp);
+        continue;
+      }
+      if (f.t <= 0) {
+        f.o.visible = false;
+        continue;
+      }
+      f.t -= dt;
+      f.o.visible = f.t > 0;
+      if (!f.o.visible) continue;
+      f.o.anchor.copyFrom(sp.anchor);
+      f.o.texture = silhouette(sp.texture);
+      f.o.alpha = 0.85 * Math.min(1, 0.25 + f.t / f.dur);
+    }
+  };
+  const nearestSprite = (views: Map<number, { x: number; y: number; sprite: Sprite }>, x: number, y: number, r: number): { x: number; y: number; sprite: Sprite } | null => {
+    let best: { x: number; y: number; sprite: Sprite } | null = null;
+    let bd = r;
+    for (const v of views.values()) {
+      const d = Math.hypot(v.x - x, v.y - y);
+      if (d < bd) {
+        bd = d;
+        best = v;
+      }
+    }
+    return best;
+  };
+  let hitStopT = 0;
+  let lastHitStop = -1;
+  let shakeT = 0;
+  let shakeDur = 0.12;
+  let shakeAmp = 0;
+  const shake = (amp: number, dur = 0.12): void => {
+    if (!feelOn) return;
+    if (amp >= shakeAmp * Math.max(0, shakeT / shakeDur)) {
+      shakeAmp = amp;
+      shakeDur = dur;
+      shakeT = dur;
+    }
+  };
+  /** 내 주인공의 근접 타격이 들어간 순간: 피해가 클수록·치명타일수록 잠깐 더 멈추고 더 흔들린다(활·지팡이는 제외) */
+  const heroHitFeel = (x: number, y: number, val: number, crit: boolean): void => {
+    if (!feelOn || !latest) return;
+    const me = latest.players.find((q) => q.id === myId);
+    if (!me || me.down || me.swing <= 0) return;
+    const w = WEAPONS[me.weapon]!;
+    if (w.ranged || w.type === MAGE_TYPE) return;
+    if (Math.hypot(x - me.x, y - me.y) > (me.hs?.[2] || w.reach) + 70) return; // 용병이 멀리서 친 것은 제외
+    const now = performance.now() / 1000;
+    if (now - lastHitStop > 0.12) {
+      lastHitStop = now;
+      hitStopT = Math.max(hitStopT, Math.min(0.075, 0.025 + val / 600 + (crit ? 0.02 : 0)));
+    }
+    shake(Math.min(6, 1.8 + val / 25 + (crit ? 1.5 : 0)));
+  };
   const falling = new Map<number, Sprite>();
   const BOOM_SEC = 0.6;
   const SCORCH_SEC = 2.8;
@@ -1365,6 +1445,15 @@ async function main() {
           else if (owner === myId && kind === EVT_DMG_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xff5a5a, fontSize: 17, fontWeight: "700", stroke: { color: 0x2a0000, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DODGE) spawnFloat("회피!", x, y, { fill: 0xd8e0ee, fontSize: 18, fontWeight: "800", fontStyle: "italic", stroke: { color: 0x000000, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_INVULN) spawnFloat("무적!", x, y, { fill: 0x9be8ff, fontSize: 18, fontWeight: "800", stroke: { color: 0x0a2a3a, width: 4 } }, 0.9, 0.15);
+          if (kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) {
+            const hit = nearestSprite(enemies.views, x, y, 60);
+            if (hit) flashSprite(hit.sprite, kind === EVT_DMG_ENEMY_CRIT ? 0.13 : 0.08);
+            if (owner === myId) heroHitFeel(x, y, val, kind === EVT_DMG_ENEMY_CRIT);
+          } else if (kind === EVT_DMG_ALLY) {
+            const hit = nearestSprite(mercs.views, x, y, 45) ?? nearestSprite(players.views, x, y, 45);
+            if (hit) flashSprite(hit.sprite, 0.08);
+            if (owner === myId && players.views.get(myId) && Math.hypot(players.views.get(myId)!.x - x, players.views.get(myId)!.y - y) < 40) shake(Math.min(5, 2 + val / 20), 0.14); // 내 주인공이 맞음
+          }
           if (kind === EVT_ARROW_HIT || kind === EVT_ENEMY_ARROW_HIT) {
             const fx = new Sprite((kind === EVT_ENEMY_ARROW_HIT ? enemyArrow : allyArrow)[4]!);
             fx.anchor.set(0.85, 0.5);
@@ -1815,6 +1904,10 @@ async function main() {
     // 배경 음악: 로비/대기실, 성장 단계, 보스 단계(끝난 뒤에는 멈춘다)
     audio.music(!latest ? "bgm_lobby" : latest.g && latest.g.status !== "playing" ? null : latest.g?.phase === "boss" || latest.g?.phase === "tournament" ? "bgm_boss" : "bgm_grow");
     if (!latest) return;
+    if (hitStopT > 0) {
+      hitStopT -= ticker.deltaMS / 1000; // 히트스톱: 화면을 잠깐 멈춘다(서버는 계속 돌아간다)
+      return;
+    }
     const k = 1 - Math.exp(-ticker.deltaMS / SMOOTH_MS);
 
     enemies.update(latest.enemies, k, (v, w) => {
@@ -2690,7 +2783,14 @@ async function main() {
         specName = t.name;
       }
     }
+    stepFlashes(ticker.deltaMS / 1000);
     if (camTarget) world.position.set(app.screen.width / 2 - camTarget.x, app.screen.height / 2 - camTarget.y);
+    if (shakeT > 0) {
+      shakeT -= ticker.deltaMS / 1000;
+      const a = shakeAmp * Math.max(0, shakeT / shakeDur);
+      world.position.x += (Math.random() * 2 - 1) * a;
+      world.position.y += (Math.random() * 2 - 1) * a;
+    }
     nearCampId = -1;
     if (meState) {
       const m = Math.floor(latest.time / 60);
