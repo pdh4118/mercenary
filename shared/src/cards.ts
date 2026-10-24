@@ -125,11 +125,11 @@ export const MERC_STAT_BASE: Record<MercStat, number> = {
 export const GLOBAL_CARD_FACTOR = 0.2;
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
-  ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "area", "knock", "xp"], // 기병
+  ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "area", "xp"], // 기병
   ["hp", "dmg", "range", "defense", "armor", "thorns", "lifesteal", "atkSpeed", "area", "knock", "xp"], // 창병
-  ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "armor", "xp"], // 궁병(화살이라 범위는 없다)
-  ["hp", "defense", "armor", "thorns", "regen", "lifesteal", "dmg", "respawn", "atkSpeed", "area", "knock", "xp"], // 검방병
-  ["dmg", "area", "hp", "armor", "thorns", "lifesteal", "critMult", "atkSpeed", "knock", "xp"], // 둔기병
+  ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "armor", "knock", "xp"], // 궁병(화살이라 범위는 없다. 거리를 유지하는 병종이라 넉백을 쓴다)
+  ["hp", "defense", "armor", "thorns", "regen", "lifesteal", "dmg", "respawn", "atkSpeed", "area", "xp"], // 검방병
+  ["dmg", "area", "hp", "armor", "thorns", "lifesteal", "critMult", "atkSpeed", "xp"], // 둔기병
   ["dmg", "area", "range", "atkSpeed", "cast", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
 ];
 
@@ -193,7 +193,7 @@ const statCards = (): CardDef[] => {
     }
   }
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
-    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "thorns" || stat === "lifesteal" || stat === "cast") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만
+    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "thorns" || stat === "lifesteal" || stat === "cast" || stat === "knock") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
     for (let r = 0; r < 3; r++) {
       const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR);
       out.push({

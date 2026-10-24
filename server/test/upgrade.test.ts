@@ -498,9 +498,10 @@ test("넉백 카드: 주인공과 병종 전용이 있고 등급이 오를수록
   const hero = [0, 1, 2].map((r) => CARDS.find((c) => c.effect.k === "heroKnock" && c.rarity === r)!);
   const v = (c: (typeof CARDS)[number]) => (c.effect.k === "heroKnock" ? c.effect.v : 0);
   assert.ok(v(hero[0]!) < v(hero[1]!) && v(hero[1]!) < v(hero[2]!));
-  for (const t of [0, 1, 3, 4]) assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === t), `${t}`);
-  assert.ok(!CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === ARCHER_T), "궁병은 넉백 카드 없음");
-  assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === undefined), "전체 용병용도 있다");
+  const has = (t: number | undefined) => CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === t);
+  // 넉백은 거리를 유지해야 하는 창병·궁병만 키운다(기병·검방병·둔기병·마법사와 전체 용병용은 없다)
+  for (const t of [1, ARCHER_T]) assert.ok(has(t), `${t}`);
+  for (const t of [0, 3, 4, 5, undefined]) assert.ok(!has(t), `${t} 없음`);
 });
 
 // --- 경험치·행운·보상금 ---------------------------------------------------------
