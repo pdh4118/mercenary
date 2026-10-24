@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>머서너리 밸런스 통계</title>
+    <style>
+      :root { --bg: #14161c; --panel: #1d2029; --line: #343949; --text: #e6e9f0; --muted: #9aa1b0; --gold: #e0c05d; --bad: #ff9b8f; --good: #7be08f; --bar: #5b8def; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; }
+      header { position: sticky; top: 0; z-index: 5; background: #0f1015; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+      header h1 { margin: 0 8px 0 0; font-size: 18px; color: var(--gold); }
+      button, select { padding: 7px 12px; font-size: 14px; color: var(--text); background: #2c3140; border: 1px solid #3f4659; border-radius: 8px; cursor: pointer; }
+      button:hover { background: #384056; }
+      button.on { background: #b8863b; border-color: #d7a24d; color: #1a1306; font-weight: 700; }
+      label { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
+      .status { font-size: 13px; color: var(--muted); margin-left: auto; }
+      .status.err { color: var(--bad); }
+      main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+      section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+      section > h2 { margin: 0; padding: 10px 14px; font-size: 15px; background: #232736; }
+      section > h2 small { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: 12px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); overflow: hidden; }
+      .grid > div { padding: 12px 14px; box-shadow: 0 0 0 0.5px var(--line); }
+      .grid b { display: block; font-size: 22px; color: var(--gold); }
+      .grid span { color: var(--muted); font-size: 12px; }
+      .wrap { overflow-x: auto; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      th, td { padding: 7px 12px; text-align: right; border-top: 1px solid #262a37; white-space: nowrap; }
+      th { color: var(--muted); font-weight: 600; font-size: 12px; background: #1a1d26; }
+      th:first-child, td:first-child { text-align: left; }
+      td.bar { position: relative; min-width: 110px; }
+      td.bar i { position: absolute; left: 0; top: 3px; bottom: 3px; background: var(--bar); opacity: 0.28; border-radius: 3px; }
+      td.bar span { position: relative; }
+      .hint { padding: 8px 14px; color: var(--muted); font-size: 12px; border-top: 1px solid #262a37; }
+      .empty { padding: 30px; text-align: center; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>밸런스 통계</h1>
+      <span id="periods"></span>
+      <label><input id="rush" type="checkbox" /> 보스 연습 방 포함</label>
+      <select id="diff"><option value="">난이도 전체</option><option value="0">쉬움 75%</option><option value="1">보통 50%</option><option value="2">어려움 25%</option><option value="3">매우 어려움 0%</option></select>
+      <button id="reload">새로고침</button>
+      <span class="status" id="status"></span>
+    </header>
+    <main id="out"><div class="empty">불러오는 중...</div></main>
+    <script>
+      const TOKEN = new URLSearchParams(location.search).get("token") || "";
+      const PERIODS = [[1, "1일"], [3, "3일"], [7, "7일"], [14, "2주"], [30, "한 달"], [0, "전체"]];
+      let days = Number(localStorage.getItem("statsDays") ?? 7);
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+      const num = (n) => Number(n).toLocaleString("ko-KR");
+      const bar = (v, max, text) => `<td class="bar"><i style="width:${max > 0 ? Math.min(100, (v / max) * 100) : 0}%"></i><span>${text}</span></td>`;
+      const DIFF = ["쉬움 75%", "보통 50%", "어려움 25%", "매우 어려움 0%"];
+
+      function drawPeriods() {
+        $("periods").innerHTML = PERIODS.map(([d, t]) => `<button data-d="${d}" class="${d === days ? "on" : ""}">${t}</button>`).join(" ");
+        for (const b of $("periods").querySelectorAll("button")) b.onclick = () => { days = Number(b.dataset.d); localStorage.setItem("statsDays", String(days)); drawPeriods(); load(); };
+      }
+
+      function table(head, rows) {
+        return `<div class="wrap"><table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+      }
+
+      function render(d) {
+        const since = d.since ? new Date(d.since).toLocaleDateString("ko-KR") : d.firstAt ? new Date(d.firstAt).toLocaleDateString("ko-KR") : "-";
+        if (d.matches === 0) {
+          $("out").innerHTML = `<div class="empty">이 기간에 끝난 판이 없습니다. (전체 기록 ${num(d.total)}판)<br />판이 끝나거나 모두 나갈 때마다 기록이 쌓입니다.</div>`;
+          return;
+        }
+        const maxHire = Math.max(...d.mercs.map((m) => m.hireShare), 1);
+        const maxDealt = Math.max(...d.mercs.map((m) => m.dealtShare), 1);
+        const maxTaken = Math.max(...d.mercs.map((m) => m.takenShare), 1);
+        const maxUsed = Math.max(...d.mercs.map((m) => m.usedRate), 1);
+        const mercRows = d.mercs.map((m) => `<tr><td>${m.name}</td>${bar(m.hireShare, maxHire, m.hireShare + "%")}${bar(m.usedRate, maxUsed, m.usedRate + "%")}<td>${num(m.hired)}</td><td>${m.avgHired}</td>${bar(m.dealtShare, maxDealt, m.dealtShare + "%")}<td>${num(m.dealtPerHired)}</td>${bar(m.takenShare, maxTaken, m.takenShare + "%")}<td>${num(m.deaths)}</td><td>${m.deathsPerHired}</td></tr>`);
+        const maxSec = Math.max(...d.weapons.map((w) => w.secShare), 1);
+        const maxWD = Math.max(...d.weapons.map((w) => w.dealtShare), 1);
+        const wRows = d.weapons.map((w) => `<tr><td>${w.name}</td>${bar(w.secShare, maxSec, w.secShare + "%")}<td>${num(w.sec)}초</td>${bar(w.dealtShare, maxWD, w.dealtShare + "%")}<td>${num(w.dealt)}</td><td>${w.dps}</td></tr>`);
+        const sRows = d.stages.map((s) => `<tr><td>${s.stage}</td>${bar(s.reachRate, 100, s.reachRate + "%")}<td>${s.reached}</td><td>${s.clearRate}%</td><td>${s.skipped}</td><td>${s.avgLen ? s.avgLen + "초" : "-"}</td><td>${s.avgHeroDowns}</td><td>${s.avgMercDeaths}</td><td>${num(s.avgDealt)}</td><td>${num(s.avgTaken)}</td></tr>`);
+        const maxCard = Math.max(...d.cards.map((c) => c.count), 1);
+        const cRows = d.cards.map((c) => `<tr><td>${esc(c.name)}</td>${bar(c.count, maxCard, num(c.count))}</tr>`);
+        const dRows = d.difficulty.map((x) => `<tr><td>${DIFF[x.diff] ?? x.diff}</td><td>${num(x.count)}명</td></tr>`);
+        const zRows = d.sizes.map((x) => `<tr><td>${x.players}명 방</td><td>${num(x.count)}판</td></tr>`);
+        $("out").innerHTML = `
+          <section><h2>요약<small>${since} ~ 지금 · 전체 기록 ${num(d.total)}판</small></h2><div class="grid">
+            <div><b>${num(d.matches)}</b><span>끝난 판</span></div>
+            <div><b>${num(d.players)}</b><span>참가 플레이어(연인원)</span></div>
+            <div><b>${d.victoryRate}%</b><span>승리율(끝까지 한 판 기준)</span></div>
+            <div><b>${d.abandonRate}%</b><span>중간에 모두 나간 판</span></div>
+            <div><b>${d.avgStage}</b><span>평균 도달 스테이지</span></div>
+            <div><b>${Math.floor(d.avgDur / 60)}분 ${Math.round(d.avgDur % 60)}초</b><span>평균 플레이 시간</span></div>
+            <div><b>${d.avgLevel}</b><span>평균 주인공 레벨</span></div>
+            <div><b>${d.avgHeroDowns}</b><span>주인공 쓰러짐(플레이어당)</span></div>
+            <div><b>${num(d.avgHeroTaken)}</b><span>주인공 받은 피해(플레이어당)</span></div>
+          </div></section>
+          <section><h2>병종(용병)별<small>선택률·피해·쓰러짐</small></h2>${table(["병종", "고용 비율", "사용 플레이어", "고용 수", "1인 평균", "피해 비율", "1명당 피해", "받은 피해 비율", "쓰러짐", "1명당 쓰러짐"], mercRows)}
+            <div class="hint">고용 비율=전체 고용 중 비율, 사용 플레이어=한 번이라도 고용한 비율, 피해 비율=용병이 준 피해 중 비율(주인공 제외), 1명당=고용 1명당. 같은 고용 수라도 1명당 피해가 낮으면 약한 병종입니다.</div></section>
+          <section><h2>주인공 무기별<small>든 시간·피해</small></h2>${table(["무기(병종 속성)", "사용 시간 비율", "사용 시간", "피해 비율", "준 피해", "초당 피해"], wRows)}</section>
+          <section><h2>스테이지별</h2>${table(["스테이지", "도달률", "도달한 판", "장군 격파율", "시간 초과", "평균 소요", "주인공 쓰러짐", "용병 쓰러짐", "준 피해", "받은 피해"], sRows)}
+            <div class="hint">도달률=전체 판 중 이 스테이지에 닿은 비율, 격파율=닿은 판 중 장군을 잡은 비율, 쓰러짐·피해는 플레이어당 평균.</div></section>
+          <section><h2>많이 고른 카드<small>상위 40</small></h2>${table(["카드", "횟수"], cRows)}</section>
+          <section><h2>난이도·인원</h2><div style="display:grid;grid-template-columns:1fr 1fr">${table(["난이도", "플레이어"], dRows)}${table(["인원", "판 수"], zRows)}</div></section>`;
+      }
+
+      async function load() {
+        $("status").textContent = "불러오는 중...";
+        $("status").className = "status";
+        const q = new URLSearchParams({ days: String(days), rush: $("rush").checked ? "1" : "0" });
+        if ($("diff").value !== "") q.set("diff", $("diff").value);
+        if (TOKEN) q.set("token", TOKEN);
+        try {
+          const res = await fetch("/api/stats?" + q);
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || res.status);
+          render(data);
+          $("status").textContent = "갱신 " + new Date().toLocaleTimeString("ko-KR");
+        } catch (e) {
+          $("status").textContent = String(e.message || e);
+          $("status").className = "status err";
+          $("out").innerHTML = `<div class="empty">통계를 불러오지 못했습니다.<br />${esc(e.message || e)}</div>`;
+        }
+      }
+      $("reload").onclick = load;
+      $("rush").onchange = load;
+      $("diff").onchange = load;
+      drawPeriods();
+      load();
+    </script>
+  </body>
+</html>

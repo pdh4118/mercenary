@@ -6,6 +6,7 @@ import { TICK_RATE, tuneOverrides, type ClientMsg, type ServerMsg } from "@merce
 import { RoomManager, type Conn } from "./rooms.js";
 import { serveStatic } from "./static.js";
 import { handleTuningApi, loadTuning, TUNING_FILE } from "./tuning-store.js";
+import { appendMatch, handleStatsApi, STATS_FILE } from "./stats-store.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -23,11 +24,17 @@ const PING_INTERVAL_MS = 15000;
 const loadedTuning = loadTuning();
 if (loadedTuning > 0) console.log(`[mercenary] 수치 조정 ${loadedTuning}개를 ${TUNING_FILE}에서 불러왔습니다`);
 const manager = new RoomManager();
+manager.onMatch = (rec) => appendMatch(rec); // 밸런스 통계: 한 판이 끝날 때마다 한 줄 기록한다(보기: /stats.html)
+console.log(`[mercenary] 밸런스 통계 파일: ${STATS_FILE}`);
 const hasClient = existsSync(STATIC_DIR);
 
 const http = createServer((req, res) => {
   if (req.url === "/healthz") {
     res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true, rooms: manager.roomCount(), connections: metas.size }));
+    return;
+  }
+  if (req.url?.startsWith("/api/stats")) {
+    handleStatsApi(req, res);
     return;
   }
   if (req.url?.startsWith("/api/tuning")) {

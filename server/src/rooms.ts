@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import {
+  type MatchRecord,
   STAGE_COUNT,
   DIFFICULTY_REDUCTION,
   IDLE_KICK_SEC,
@@ -51,6 +52,7 @@ interface Room {
   members: Map<number, Member>;
   phase: RoomPhase; // waiting: 대기실(게임 정지), playing: 진행 중
   ranked: boolean; // 랭크(ELO 등) 게임: 난이도가 RANKED_DIFFICULTY로 고정되고 바꿀 수 없다
+  recorded?: boolean; // 통계 기록을 이미 남겼다
   rush: number; // 보스 연습 방이면 시작 스테이지(1~10), 아니면 0
   isPrivate: boolean; // 비공개: 목록·빠른 시작에서 제외, 코드로만 입장
 }
@@ -76,6 +78,9 @@ export class RoomManager {
   /** 코드 무작위 대입을 막기 위한 주소별 참가 실패 기록. 시각은 서버가 진행한 시간(초) 기준. */
   private failures = new Map<string, { count: number; blockedUntil: number }>();
   private clock = 0;
+
+  /** 한 판이 끝났거나(승리·패배) 중간에 모두 나갔을 때 부른다: 밸런스 통계 기록을 받는다 */
+  onMatch: ((rec: MatchRecord) => void) | null = null;
 
   constructor(private rng: () => number = Math.random) {}
 
@@ -366,6 +371,17 @@ export class RoomManager {
     return at && { code: at.room.code, game: at.room.game, hostId: at.room.hostId };
   }
 
+  /** 밸런스 통계: 끝난 판은 결과로, 진행 중에 모두 나간 판(30초 넘게 한 경우)은 abandoned로 한 번만 남긴다 */
+  private recordMatch(room: Room): void {
+    if (!this.onMatch || room.recorded || room.phase === "waiting") return;
+    const g = room.game;
+    if (g.status === "playing" && g.time < 30) return;
+    room.recorded = true;
+    const rec = g.statsRecord();
+    if (g.status === "playing") rec.status = "abandoned";
+    this.onMatch(rec);
+  }
+
   private makeRoom(name: string, isPrivate: boolean): Room {
     let code = "";
     do {
@@ -409,6 +425,7 @@ export class RoomManager {
       m.conn.send({ t: "rooms", rooms: this.list() });
     }
     if (room.members.size === 0) {
+      this.recordMatch(room);
       this.rooms.delete(room.code);
     } else if (room.hostId === id) {
       const next = [...room.members.values()].sort((a, b) => Number(!!b.conn) - Number(!!a.conn) || a.id - b.id)[0]!;
@@ -518,6 +535,7 @@ export class RoomManager {
       if (room.game.status !== "playing") {
         // 마지막 상태를 보낸 뒤 결과를 알리고, 방은 끝난 상태로 둔다
         room.phase = "ended";
+        this.recordMatch(room);
         const result: ServerMsg = { t: "result", ...room.game.result() };
         for (const m of room.members.values()) m.conn?.send(result);
         this.broadcastRoom(room);

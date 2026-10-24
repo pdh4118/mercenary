@@ -167,6 +167,7 @@ import {
   TELE_CONE,
   TELE_LINE,
   type TeleWire,
+  type MatchRecord,
   type HazardWire,
   WARD_WEIGHT,
   CHEST_OPEN_RADIUS,
@@ -365,11 +366,26 @@ export interface Slot {
   spacing: number; // 진형 간격 배율
   revives: number; // 동료를 일으켜 세운 횟수
   stats: { dealt: number; taken: number; downs: number; mercDeaths: number; gold: number; wins: number; champion: number }; // 기록용 누적
+  detail: SlotDetail; // 밸런스 통계용 세부 기록(병종별 고용·피해·쓰러짐, 무기별 사용 시간, 고른 카드, 스테이지별 합계)
   facing: number; // 진형이 바라보는 방향. 조준 방향을 천천히 따라간다
   difficulty: number; // 이 플레이어의 난이도(DIFFICULTY_REDUCTION 인덱스). 방에서 판이 시작되기 전에만 바뀐다
   shieldIdle: number; // 마지막으로 방패 체력이 깎인 뒤 지난 시간(초). 차오르기 시작할 때를 잰다
   shieldDelay: number; // 차오르기 시작하기까지 필요한 시간(깨졌으면 더 길다)
 }
+
+/** 밸런스 통계용 세부 기록. 배열은 병종 번호(기병·창병·궁병·검방병·둔기병·마법사) 순서다. */
+export interface SlotDetail {
+  hired: number[]; // 병종별 고용 횟수
+  mercDeaths: number[]; // 병종별 용병 쓰러짐
+  dealtMerc: number[]; // 병종별 용병이 적에게 준 피해
+  dealtHero: number[]; // 주인공이 든 무기(병종 속성)별로 준 피해
+  takenMerc: number[]; // 병종별 용병이 받은 피해
+  takenHero: number; // 주인공이 받은 피해
+  heroSec: number[]; // 무기(병종 속성)별로 든 시간(초)
+  cards: Record<string, number>; // 고른 카드 이름별 횟수
+  stage: Record<number, [dealt: number, taken: number, heroDowns: number, mercDeaths: number]>; // 스테이지별 합계
+}
+const newDetail = (): SlotDetail => ({ hired: [0, 0, 0, 0, 0, 0], mercDeaths: [0, 0, 0, 0, 0, 0], dealtMerc: [0, 0, 0, 0, 0, 0], dealtHero: [0, 0, 0, 0, 0, 0], takenMerc: [0, 0, 0, 0, 0, 0], takenHero: 0, heroSec: [0, 0, 0, 0, 0, 0], cards: {}, stage: {} });
 
 interface Fighter {
   id: number;
@@ -590,6 +606,9 @@ export class Game {
   time = 0;
   /** 테스트에서 적·캠프 자동 생성을 끌 때 쓴다 */
   autoSpawn = true;
+  /** 보스를 쓰러뜨린 시각 기록 [스테이지, 게임 시간(초)] 과 시간 초과로 넘어간 스테이지(밸런스 통계용) */
+  readonly clears: [number, number][] = [];
+  readonly skips: number[] = [];
   /** 보스 연습 방: 고른 스테이지의 보스전부터 쉬지 않고 이어서 한다. 쓰러지면 같은 보스를 다시, 잡으면 곧바로 다음 보스 */
   rush = false;
   private slots = new Map<number, Slot>();
@@ -867,6 +886,7 @@ export class Game {
       spacing: DEFAULT_PRESETS[0]!.spacing,
       revives: 0,
       stats: { dealt: 0, taken: 0, downs: 0, mercDeaths: 0, gold: 0, wins: 0, champion: 0 },
+      detail: newDetail(),
       facing: 0,
       shieldIdle: 99,
       shieldDelay: 0,
@@ -916,6 +936,7 @@ export class Game {
     const price = Math.round(mercPrice(type, owned) * TIER_BUY_MULT[tier]! * s.state.priceMult);
     if (s.state.gold < price) return { ok: false, reason: `금화가 부족합니다 (${price}G 필요)` };
     s.state.gold -= price;
+    s.detail.hired[type] = (s.detail.hired[type] ?? 0) + 1;
     this.addMerc(playerId, type, s.state.x, s.state.y, price, tier);
     return { ok: true };
   }
@@ -1329,6 +1350,51 @@ export class Game {
     this.rush = true;
     this.stage = Math.max(1, Math.min(STAGE_COUNT, Math.floor(stage) || 1));
     this.rushBegin(true);
+  }
+
+  /** 스테이지별 합계(밸런스 통계). 토너먼트(플레이어끼리의 대결)는 세지 않는다. */
+  private stageStat(s: Slot): [number, number, number, number] {
+    return (s.detail.stage[this.stage] ??= [0, 0, 0, 0]);
+  }
+
+  /** 적에게 준 피해 기록: 용병이면 병종별, 주인공이면 든 무기별로 쌓는다 */
+  private addDealt(owner: Slot, src: Merc | undefined, srcType: number, amount: number): void {
+    owner.stats.dealt += amount;
+    if (this.phase === "tournament" || amount <= 0) return;
+    if (src) owner.detail.dealtMerc[src.type] = (owner.detail.dealtMerc[src.type] ?? 0) + amount;
+    else owner.detail.dealtHero[srcType >= 0 && srcType < 6 ? srcType : ARCHER] = (owner.detail.dealtHero[srcType >= 0 && srcType < 6 ? srcType : ARCHER] ?? 0) + amount;
+    this.stageStat(owner)[0] += amount;
+  }
+
+  /** 한 판의 밸런스 통계 기록(플레이어마다 병종별 고용·피해·쓰러짐 등). 서버가 파일에 쌓아 기간별로 집계한다. */
+  statsRecord(): MatchRecord {
+    const r1 = (v: number) => Math.round(v);
+    const arr = (a: number[]) => a.map(r1);
+    return {
+      v: 1,
+      t: Date.now(),
+      dur: r1(this.time),
+      stage: this.stage,
+      status: this.status,
+      rush: this.rush,
+      clears: this.clears.map(([st, tm]) => [st, r1(tm)]),
+      skips: [...this.skips],
+      players: [...this.slots.values()].map((s) => ({
+        diff: s.difficulty,
+        level: s.state.level,
+        kills: s.state.kills,
+        downs: s.stats.downs,
+        hired: [...s.detail.hired],
+        mercDeaths: [...s.detail.mercDeaths],
+        dealtMerc: arr(s.detail.dealtMerc),
+        dealtHero: arr(s.detail.dealtHero),
+        takenMerc: arr(s.detail.takenMerc),
+        takenHero: r1(s.detail.takenHero),
+        heroSec: arr(s.detail.heroSec),
+        cards: { ...s.detail.cards },
+        stage: Object.fromEntries(Object.entries(s.detail.stage).map(([k, v]) => [k, v.map(r1)])),
+      })),
+    };
   }
 
   /** 보스 연습: 이번 스테이지 보스전을 (다시) 연다. 남은 적을 치우고 주인공·용병을 온전하게 한 뒤 보스군을 부른다. */
@@ -1914,6 +1980,7 @@ export class Game {
       e.boss = false;
     }
     this.army = null;
+    this.clears.push([this.stage, this.time]);
     this.dropChests(at.x, at.y);
     for (const s of this.slots.values()) {
       const bonus = Math.round(TUNE.STAGE_CLEAR_GOLD * this.stage * s.mods.bounty);
@@ -1939,6 +2006,7 @@ export class Game {
 
   /** 보스를 못 잡고 제한 시간이 지났다: 보스군은 사라지고 보상 없이 다음 스테이지로 넘어간다 */
   private skipBoss(): void {
+    this.skips.push(this.stage);
     this.boss.reset();
     for (const e of [...this.enemies.values()]) if (e.army) this.enemies.delete(e.id);
     this.army = null;
@@ -2167,6 +2235,7 @@ export class Game {
         continue;
       }
       p.invuln = Math.max(0, p.invuln - dt);
+      if (this.phase !== "tournament") s.detail.heroSec[WEAPONS[p.weapon]!.type] = (s.detail.heroSec[WEAPONS[p.weapon]!.type] ?? 0) + dt; // 밸런스 통계: 무기별로 든 시간
       // 상태이상: 기절(못 움직이고 못 싸움), 속박(못 움직임), 둔화(느려짐)
       const stunned = (s.stunT ?? 0) > 0;
       const rooted = (s.rootT ?? 0) > 0;
@@ -2744,12 +2813,17 @@ export class Game {
           fr.lastBody = taken;
           p.hp -= taken;
           s.stats.taken += taken;
+          if (this.phase !== "tournament") {
+            s.detail.takenHero += taken;
+            this.stageStat(s)[1] += taken;
+          }
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
           this.thorns(s, h);
           if (p.hp <= 0) {
             p.hp = 0;
             p.down = true;
             s.stats.downs++;
+            if (this.phase !== "tournament") this.stageStat(s)[2]++;
             p.revive = 0;
             p.chargeLeft = 0;
           }
@@ -2788,7 +2862,14 @@ export class Game {
           const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner);
           fm.lastBody = taken;
           this.hurtMerc(m, taken);
-          if (mods) this.slots.get(m.owner)!.stats.taken += taken;
+          if (mods) {
+            const os = this.slots.get(m.owner)!;
+            os.stats.taken += taken;
+            if (this.phase !== "tournament") {
+              os.detail.takenMerc[m.type] = (os.detail.takenMerc[m.type] ?? 0) + taken;
+              this.stageStat(os)[1] += taken;
+            }
+          }
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner); // 독 틱(dot, 병종 없음)은 보라색 숫자
           this.thorns(this.slots.get(m.owner), h, m);
           return r.reflected;
@@ -2859,6 +2940,10 @@ export class Game {
     m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * respawnTimeMult(owner ? mstat(owner.mods, m.type, "respawn") : 0) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
     if (owner) {
       owner.stats.mercDeaths++;
+      if (this.phase !== "tournament") {
+        owner.detail.mercDeaths[m.type] = (owner.detail.mercDeaths[m.type] ?? 0) + 1;
+        this.stageStat(owner)[3]++;
+      }
       this.noteDeath(owner);
     }
     m.atkT = 0;
@@ -3722,7 +3807,7 @@ export class Game {
     }
     const dealt = Math.min(r.body, Math.max(0, e.hp));
     e.hp -= r.body;
-    if (owner) owner.stats.dealt += dealt + r.shield;
+    if (owner) this.addDealt(owner, src, hit.srcType, dealt + r.shield);
     if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
     if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
     // 흡혈: 카드로 쌓은 비율 + 전설 피의 갈증(치명타는 2배). 때린 쪽(주인공 또는 그 병종)만 회복한다.
@@ -3960,7 +4045,7 @@ export class Game {
     const dealt = Math.min(dmg, Math.max(0, e.hp));
     e.hp -= dmg;
     e.poisonAcc = (e.poisonAcc ?? 0) + dmg;
-    if (owner) owner.stats.dealt += dealt;
+    if (owner) this.addDealt(owner, e.poisonSrc, ARCHER, dealt);
     if (e.poisonSrc) this.gainMercXp(e.poisonSrc, dealt * MERC_XP_PER_DAMAGE);
     if (e.poisonAcc >= 1 || (e.poisonT <= 0 && e.poisonAcc > 0.05)) {
       this.pushDamage(EVT_DMG_POISON, e.id, e.x, e.y, e.poisonAcc, e.poisonOwner ?? 0);
@@ -4025,7 +4110,7 @@ export class Game {
       const steal = (src ? mstat(owner.mods, src.type, "lifesteal") : owner.mods.heroLifesteal) + (hasLegend(owner.mods, "bloodthirst", scope) ? LEGEND_CONST.bloodthirstFrac : 0);
       const dealt = Math.min(amount, Math.max(0, e.hp));
       if (steal > 0 && dealt > 0) this.lifesteal(owner, src, dealt * steal);
-      owner.stats.dealt += dealt;
+      this.addDealt(owner, src, src ? src.type : SPEAR, dealt);
     }
     if (src) this.gainMercXp(src, amount * MERC_XP_PER_DAMAGE);
     e.hp -= amount;
@@ -4108,6 +4193,7 @@ export class Game {
     const card = s.state.offer[index] !== undefined ? CARDS[s.state.offer[index]!] : undefined;
     if (!card) return false;
     this.applyCard(s, card.effect);
+    s.detail.cards[card.name] = (s.detail.cards[card.name] ?? 0) + 1;
     s.state.rerolls = Math.min(REROLL_MAX, s.state.rerolls + REROLL_PER_PICK); // 고를 때마다 새로고침 1회 적립
     s.state.pending--;
     if (s.state.box > 0) s.state.box--; // 상자 카드가 먼저 나온다

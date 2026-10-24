@@ -1,6 +1,7 @@
 // 서버와 클라이언트가 함께 쓰는 규칙·프로토콜. 전투 규칙은 여기에 두어 양쪽이 어긋나지 않게 한다.
 
 export * from "./rules.js";
+export * from "./stats.js";
 export * from "./tuning.js";
 export * from "./cards.js";
 export * from "./formation.js";
