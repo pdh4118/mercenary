@@ -128,8 +128,7 @@ export async function createBossFx(d: BossFxDeps) {
     maceStuck: await fx("boss5_mace_stuck"),
     shard: await seq("boss5_shard", [0, 1, 2]),
     quake: await seq("boss5_quake", [0, 1, 2, 3, 4]),
-    tornadoA: await seq("boss5_tornado_a", [0, 1, 2, 3]),
-    tornadoB: await seq("boss5_tornado_b", [0, 1, 2, 3]),
+    spinRing: await seq("boss5_spin", [0, 1, 2, 3]),
     iceWall: await seq("boss6_ice", [0, 1, 2]),
     iceBreak: await seq("boss6_break", [0, 1, 2, 3]),
     bubble: await seq("boss6_shield", [0, 1, 2]),
@@ -368,74 +367,58 @@ export async function createBossFx(d: BossFxDeps) {
 
   /** 한 프레임: 예고·장판을 그린다 */
   /**
-   * 휠윈드: 장군 뒤에 소용돌이 그림(회전 4컷)을 깔고, 앞에는 옅은 소용돌이를 한 겹 더 씌워 장군이 소용돌이 안에서 도는 것처럼 보이게 한다.
-   * 바닥에는 피해 범위(먼지 원반과 고리)와 지면을 도는 칼날 빛줄기를 코드로 그린다. 도는 장군 그림은 enemy 그림 선택(art.pose)에서 고른다.
+   * 휠윈드: 몸 둘레를 크게 도는 속이 빈 소용돌이 고리(회전 4컷)를 두 겹 그린다 — 바닥에 넓은 고리 하나(장군 뒤), 몸통 높이에 작은 고리 하나(장군 앞).
+   * 가운데가 비어 있어 장군 몸이 그대로 보인다. 바닥에는 피해 범위 원반을 깔고, 도는 장군 그림은 enemy 그림 선택(art.pose)에서 고른다.
    */
   const whirlBack = new Graphics();
-  const whirlFront = new Graphics();
   d.groundFx.addChild(whirlBack);
-  d.fxLayer.addChild(whirlFront);
   const whirls: { id: number; x: number; y: number }[] = [];
   interface WhirlView {
     t0: number;
-    back: Sprite;
-    front: Sprite;
+    ground: Sprite;
+    body: Sprite;
   }
   const whirlViews = new Map<number, WhirlView>();
-  const WHIRL_HEIGHT = 250; // 소용돌이 그림이 서는 높이(px)
   const drawWhirls = (now: number) => {
     whirlBack.clear();
-    whirlFront.clear();
     for (const [id, v] of whirlViews) {
       if (whirls.some((w) => w.id === id)) continue;
-      v.back.destroy();
-      v.front.destroy();
+      v.ground.destroy();
+      v.body.destroy();
       whirlViews.delete(id);
     }
     const frameNo = Math.floor(now / WHIRL_FRAME_MS);
     for (const w of whirls) {
       let v = whirlViews.get(w.id);
       if (!v) {
-        const back = new Sprite();
-        const front = new Sprite();
-        back.anchor.set(0.5, 0.96);
-        front.anchor.set(0.5, 0.96);
-        d.standLayer.addChild(back);
-        d.standLayer.addChild(front);
-        v = { t0: now, back, front };
+        const ground = new Sprite();
+        const body = new Sprite();
+        ground.anchor.set(0.5);
+        body.anchor.set(0.5);
+        d.standLayer.addChild(ground);
+        d.standLayer.addChild(body);
+        v = { t0: now, ground, body };
         whirlViews.set(w.id, v);
       }
-      const grow = Math.min(1, (now - v.t0) / 280); // 도는 순간 아래에서부터 솟아오른다
-      const ta = pick(T.tornadoA, frameNo % 4);
-      const tb = pick(T.tornadoB, (frameNo + 2) % 4);
-      for (const [spr, tex, z, alpha] of [[v.back, ta, -2, 0.92], [v.front, tb, 2, 0.22]] as const) {
+      const grow = Math.min(1, (now - v.t0) / 250); // 도는 순간 몸에서 바깥으로 퍼진다
+      const FLAT = 0.52; // 비스듬한 시점이라 가로로 넓은 타원으로 눌러 그린다
+      const rings: [Sprite, number, number, number, number, number][] = [
+        // 스프라이트, 가로 지름, 세로 중심 오프셋, 프레임 어긋남, zIndex 보정, 투명도
+        [v.ground, BOSS_BLUNT.whirlRadius * 2.15, 14, 0, -2, 0.92],
+        [v.body, BOSS_BLUNT.whirlRadius * 1.5, -34, 2, 2, 0.8],
+      ];
+      for (const [spr, width, dy, shift, z, alpha] of rings) {
+        const tex = pick(T.spinRing, (frameNo + shift) % 4);
         if (tex) spr.texture = tex;
-        const sc = (WHIRL_HEIGHT / (tex?.height || 509)) * (0.35 + 0.65 * grow);
-        spr.scale.set(sc);
-        spr.position.set(w.x, w.y + 14);
+        const sx = ((width * grow) / (tex?.width || 132)) * 1;
+        spr.scale.set(sx, sx * FLAT * ((tex?.width || 132) / (tex?.height || 120)));
+        spr.position.set(w.x, w.y + dy);
         spr.zIndex = w.y + z;
         spr.alpha = alpha * grow;
       }
-      // 바닥: 피해 범위(먼지 원반·고리)와 지면을 도는 칼날 빛줄기
+      // 바닥: 피해 범위 원반과 고리
       const R = BOSS_BLUNT.whirlRadius * grow;
-      const FLAT = 0.5;
-      whirlBack.ellipse(w.x, w.y + 10, R, R * FLAT).fill({ color: 0xcdb98f, alpha: 0.16 * grow });
-      whirlFront.ellipse(w.x, w.y + 10, R, R * FLAT).stroke({ width: 3, color: 0xe9f1ff, alpha: 0.3 * grow });
-      const t = now / 1000;
-      for (let b = 0; b < 3; b++) {
-        const head = t * 14 + (b * Math.PI * 2) / 3;
-        const n = 12;
-        for (let j = 0; j < n; j++) {
-          const f0 = j / n;
-          const f1 = (j + 1) / n;
-          const a0 = head - 1.3 * (1 - f0);
-          const a1 = head - 1.3 * (1 - f1);
-          const g = Math.sin(a1) > 0 ? whirlFront : whirlBack;
-          g.moveTo(w.x + Math.cos(a0) * R * 0.92, w.y + 10 + Math.sin(a0) * R * 0.92 * FLAT)
-            .lineTo(w.x + Math.cos(a1) * R * 0.92, w.y + 10 + Math.sin(a1) * R * 0.92 * FLAT)
-            .stroke({ width: 2 + 8 * f1 * f1, color: f1 > 0.7 ? 0xffffff : 0xbcd6f5, alpha: grow * (0.1 + 0.8 * f1) });
-        }
-      }
+      whirlBack.ellipse(w.x, w.y + 12, R, R * FLAT).fill({ color: 0xcdb98f, alpha: 0.13 * grow }).stroke({ width: 2, color: 0xe9f1ff, alpha: 0.22 * grow });
     }
     whirls.length = 0;
   };
