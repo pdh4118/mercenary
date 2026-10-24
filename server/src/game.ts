@@ -168,6 +168,8 @@ import {
   TELE_LINE,
   type TeleWire,
   type MatchRecord,
+  type TourMatchRecord,
+  type TourSideRec,
   type HazardWire,
   WARD_WEIGHT,
   CHEST_OPEN_RADIUS,
@@ -581,7 +583,21 @@ interface Tournament {
   sa: number;
   sb: number;
   se: number;
+  /** 이번 경기 통계용: 두 선수의 시작 구성과 경기 중 피해·쓰러짐 합계 */
+  side: [TourSideTally, TourSideTally] | null;
 }
+
+interface TourSideTally {
+  id: number;
+  mercs: number[];
+  dealtByType: number[];
+  takenMerc: number[];
+  takenHero: number;
+  mercDeaths: number[];
+}
+const z6 = (): number[] => [0, 0, 0, 0, 0, 0];
+/** 피해를 준 쪽의 병종 번호(독 등 병종이 없으면 궁병으로 센다) */
+const tourType = (srcType: number): number => (srcType >= 0 && srcType < 6 ? srcType : ARCHER);
 
 /** 시험 플레이용: MERC_STAGE_GROW_SEC=20 처럼 지정하면 성장 시간이 짧아진다 */
 const growSec = (): number => (Number(process.env.MERC_STAGE_GROW_SEC) > 0 ? Number(process.env.MERC_STAGE_GROW_SEC) : TUNE.STAGE_GROW_SEC);
@@ -609,6 +625,8 @@ export class Game {
   /** 보스를 쓰러뜨린 시각 기록 [스테이지, 게임 시간(초)] 과 시간 초과로 넘어간 스테이지(밸런스 통계용) */
   readonly clears: [number, number][] = [];
   readonly skips: number[] = [];
+  /** 토너먼트 경기별 기록(밸런스 통계) */
+  readonly tourLog: TourMatchRecord[] = [];
   /** 보스 연습 방: 고른 스테이지의 보스전부터 쉬지 않고 이어서 한다. 쓰러지면 같은 보스를 다시, 잡으면 곧바로 다음 보스 */
   rush = false;
   private slots = new Map<number, Slot>();
@@ -1352,6 +1370,15 @@ export class Game {
     this.rushBegin(true);
   }
 
+  /** 토너먼트 경기 중 맞은 쪽(victim)과 때린 쪽(상대)의 통계 칸. 경기 중이 아니면 null */
+  private tourTally(victim: number): { me: TourSideTally; foe: TourSideTally } | null {
+    const sd = this.tour?.step === "fight" ? this.tour.side : null;
+    if (!sd) return null;
+    if (sd[0].id === victim) return { me: sd[0], foe: sd[1] };
+    if (sd[1].id === victim) return { me: sd[1], foe: sd[0] };
+    return null;
+  }
+
   /** 스테이지별 합계(밸런스 통계). 토너먼트(플레이어끼리의 대결)는 세지 않는다. */
   private stageStat(s: Slot): [number, number, number, number] {
     return (s.detail.stage[this.stage] ??= [0, 0, 0, 0]);
@@ -1379,6 +1406,7 @@ export class Game {
       rush: this.rush,
       clears: this.clears.map(([st, tm]) => [st, r1(tm)]),
       skips: [...this.skips],
+      ...(this.tourLog.length > 0 ? { tour: this.tourLog.map((x) => ({ ...x })) } : {}),
       players: [...this.slots.values()].map((s) => ({
         diff: s.difficulty,
         level: s.state.level,
@@ -1728,7 +1756,7 @@ export class Game {
       mt.bn = this.tourName(mt.b);
     });
     this.phase = "tournament";
-    this.tour = { rounds, r: 0, m: 0, step: "intro", t: TUNE.TOURNAMENT_INTRO_SEC, winner: "", champion: "", sa: 0, sb: 0, se: 0 };
+    this.tour = { rounds, r: 0, m: 0, step: "intro", t: TUNE.TOURNAMENT_INTRO_SEC, winner: "", champion: "", sa: 0, sb: 0, se: 0, side: null };
     this.tourAdvance();
   }
 
@@ -1855,6 +1883,12 @@ export class Game {
         t.step = "fight";
         t.t = TUNE.TOURNAMENT_MATCH_SEC;
         t.sa = t.sb = t.se = 0;
+        const fm = t.rounds[t.r]!.matches[t.m]!;
+        t.side = [fm.a, fm.b].map((id): TourSideTally => {
+          const mercs = z6();
+          for (const m of this.mercs.values()) if (m.owner === id && m.respawn <= 0) mercs[m.type] = (mercs[m.type] ?? 0) + 1;
+          return { id, mercs, dealtByType: z6(), takenMerc: z6(), takenHero: 0, mercDeaths: z6() };
+        }) as [TourSideTally, TourSideTally];
       }
       return;
     }
@@ -1865,7 +1899,7 @@ export class Game {
       if (aOut || bOut) {
         // 주인공이 쓰러진 쪽이 진다(동시에 쓰러지면 남은 용병이 많은 쪽)
         const aw = aOut && bOut ? this.tourPower(mt.a) >= this.tourPower(mt.b) : !aOut;
-        return this.tourMatchDone(aw ? 1 : 2);
+        return this.tourMatchDone(aw ? 1 : 2, aOut && bOut ? "both" : "down");
       }
       t.sa += this.tourPower(mt.a) * dt;
       t.sb += this.tourPower(mt.b) * dt;
@@ -1874,7 +1908,7 @@ export class Game {
         // 시간 초과: 경기 내내 평균 남은 전력이 높은 쪽(막판 부활·타이밍으로 뒤집히지 않는다)
         const pa = Math.round(t.sa * 1e6);
         const pb = Math.round(t.sb * 1e6);
-        this.tourMatchDone(pa === pb ? (this.rng() < 0.5 ? 1 : 2) : pa > pb ? 1 : 2);
+        this.tourMatchDone(pa === pb ? (this.rng() < 0.5 ? 1 : 2) : pa > pb ? 1 : 2, "time");
       }
       return;
     }
@@ -1888,7 +1922,34 @@ export class Game {
     if (t.t <= 0) this.tourEnd();
   }
 
-  private tourMatchDone(winner: 1 | 2): void {
+  /** 경기 통계: 이긴 쪽과 판정 이유, 두 선수의 구성·피해·전력을 기록한다(밸런스 통계) */
+  private tourLogMatch(winner: 1 | 2, reason: "down" | "time" | "both"): void {
+    const t = this.tour!;
+    const mt = t.rounds[t.r]!.matches[t.m]!;
+    if (!t.side) return;
+    const rec: TourSideRec[] = t.side.map((sd, i) => {
+      const s = this.slots.get(sd.id);
+      const r1 = (v: number) => Math.round(v);
+      return {
+        diff: s?.difficulty ?? 0,
+        level: s?.state.level ?? 0,
+        weapon: s ? WEAPONS[s.state.weapon]!.type : 0,
+        mercs: [...sd.mercs],
+        dealtByType: sd.dealtByType.map(r1),
+        takenMerc: sd.takenMerc.map(r1),
+        takenHero: r1(sd.takenHero),
+        mercDeaths: [...sd.mercDeaths],
+        avg: t.se > 0 ? r1(((i === 0 ? t.sa : t.sb) / t.se) * 100) : r1(this.tourPower(sd.id) * 100),
+        end: r1(this.tourPower(sd.id) * 100),
+        down: !s || s.state.down,
+      };
+    });
+    this.tourLog.push({ stage: this.stage, round: t.rounds[t.r]!.title, dur: Math.round(TUNE.TOURNAMENT_MATCH_SEC - Math.max(0, t.t)), reason, winner: winner === 1 ? 0 : 1, sides: rec as [TourSideRec, TourSideRec] });
+    void mt;
+  }
+
+  private tourMatchDone(winner: 1 | 2, reason: "down" | "time" | "both" = "time"): void {
+    this.tourLogMatch(winner, reason);
     const t = this.tour!;
     const mt = t.rounds[t.r]!.matches[t.m]!;
     mt.w = winner;
@@ -2816,6 +2877,12 @@ export class Game {
           if (this.phase !== "tournament") {
             s.detail.takenHero += taken;
             this.stageStat(s)[1] += taken;
+          } else {
+            const tt = this.tourTally(p.id);
+            if (tt) {
+              tt.me.takenHero += taken;
+              tt.foe.dealtByType[tourType(h.srcType)] = (tt.foe.dealtByType[tourType(h.srcType)] ?? 0) + taken;
+            }
           }
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, -p.id, p.x, p.y, taken, p.id); // 주인공은 음수 번호(용병 번호와 겹치지 않게)
           this.thorns(s, h);
@@ -2868,6 +2935,12 @@ export class Game {
             if (this.phase !== "tournament") {
               os.detail.takenMerc[m.type] = (os.detail.takenMerc[m.type] ?? 0) + taken;
               this.stageStat(os)[1] += taken;
+            } else {
+              const tt = this.tourTally(m.owner);
+              if (tt) {
+                tt.me.takenMerc[m.type] = (tt.me.takenMerc[m.type] ?? 0) + taken;
+                tt.foe.dealtByType[tourType(h.srcType)] = (tt.foe.dealtByType[tourType(h.srcType)] ?? 0) + taken;
+              }
             }
           }
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner); // 독 틱(dot, 병종 없음)은 보라색 숫자
@@ -2943,6 +3016,9 @@ export class Game {
       if (this.phase !== "tournament") {
         owner.detail.mercDeaths[m.type] = (owner.detail.mercDeaths[m.type] ?? 0) + 1;
         this.stageStat(owner)[3]++;
+      } else {
+        const tt = this.tourTally(m.owner);
+        if (tt) tt.me.mercDeaths[m.type] = (tt.me.mercDeaths[m.type] ?? 0) + 1;
       }
       this.noteDeath(owner);
     }

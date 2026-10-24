@@ -65,6 +65,28 @@
         return `<div class="wrap"><table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
       }
 
+      const REASON = { down: "주인공 쓰러짐", time: "시간 초과", both: "동시에 쓰러짐" };
+      function renderTour(t) {
+        if (!t || t.matches === 0) return `<section><h2>토너먼트</h2><div class="empty">이 기간에 열린 토너먼트 경기가 없습니다. (3·6·9·10 스테이지에서 2명 이상일 때 열립니다)</div></section>`;
+        const maxPick = Math.max(...t.weapons.map((w) => w.pickRate), 1);
+        const wRows = t.weapons.map((w) => `<tr><td>${w.name}</td>${bar(w.pickRate, maxPick, w.pickRate + "%")}<td>${w.picks}</td><td>${w.winRate}%</td><td>${num(w.avgDealt)}</td><td>${num(w.avgTaken)}</td></tr>`);
+        const maxPres = Math.max(...t.mercs.map((m) => m.presentRate), 1);
+        const mRows = t.mercs.map((m) => `<tr><td>${m.name}</td>${bar(m.presentRate, maxPres, m.presentRate + "%")}<td>${m.avgCount}</td><td>${m.winRateWith}%</td><td>${m.winRateWithout}%</td><td>${m.avgWinners}</td><td>${m.avgLosers}</td><td>${m.dealtShare}%</td><td>${num(m.dealtPerUnit)}</td><td>${m.deathsPerUnit}</td></tr>`);
+        const rRows = t.rounds.map((r) => `<tr><td>${esc(r.round)}</td><td>${r.count}경기</td></tr>`);
+        return `<section><h2>토너먼트<small>${num(t.matches)}경기 · 평균 ${t.avgDur}초</small></h2>
+          <div class="grid">
+            <div><b>${t.reasons.down}%</b><span>${REASON.down}으로 끝남</span></div>
+            <div><b>${t.reasons.time}%</b><span>${REASON.time}(평균 전력 판정)</span></div>
+            <div><b>${t.reasons.both}%</b><span>${REASON.both}</span></div>
+            <div><b>${t.flipRate}%</b><span>시간 초과 중 평균 판정이 마지막 전력과 다르게 가른 비율 (${t.flipped}/${t.timeouts})</span></div>
+            <div><b>${t.avgMargin}%p</b><span>시간 초과 경기의 평균 전력 차</span></div>
+          </div>
+          <h2 style="background:#1f2330">주인공 무기별(경기 끝 때 든 무기)</h2>${table(["무기", "선택 비율", "경기 수", "승률", "경기당 준 피해", "경기당 받은 피해"], wRows)}
+          <h2 style="background:#1f2330">용병 병종별(경기 시작 때 구성)</h2>${table(["병종", "보유 선수 비율", "평균 수", "있을 때 승률", "없을 때 승률", "이긴 선수 평균 수", "진 선수 평균 수", "피해 비율", "1명당 피해", "1명당 쓰러짐"], mRows)}
+          <div class="hint">피해는 같은 병종 속성(주인공 무기 + 그 병종 용병)이 상대에게 준 합계라서 1명당 피해는 참고용입니다. 승률 차이가 크고 표본이 충분한 병종이 균형 점검 대상입니다. 평균 판정이 마지막 전력과 다르게 가른 비율이 높으면 판정 방식이 일발 역전을 얼마나 막는지 보여 줍니다.</div>
+          <h2 style="background:#1f2330">라운드</h2>${table(["라운드", "경기 수"], rRows)}</section>`;
+      }
+
       function render(d) {
         const since = d.since ? new Date(d.since).toLocaleDateString("ko-KR") : d.firstAt ? new Date(d.firstAt).toLocaleDateString("ko-KR") : "-";
         if (d.matches === 0) {
@@ -102,6 +124,7 @@
           <section><h2>스테이지별</h2>${table(["스테이지", "도달률", "도달한 판", "장군 격파율", "시간 초과", "평균 소요", "주인공 쓰러짐", "용병 쓰러짐", "준 피해", "받은 피해"], sRows)}
             <div class="hint">도달률=전체 판 중 이 스테이지에 닿은 비율, 격파율=닿은 판 중 장군을 잡은 비율, 쓰러짐·피해는 플레이어당 평균.</div></section>
           <section><h2>많이 고른 카드<small>상위 40</small></h2>${table(["카드", "횟수"], cRows)}</section>
+          ${renderTour(d.tour)}
           <section><h2>난이도·인원</h2><div style="display:grid;grid-template-columns:1fr 1fr">${table(["난이도", "플레이어"], dRows)}${table(["인원", "판 수"], zRows)}</div></section>`;
       }
 

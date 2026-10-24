@@ -86,3 +86,82 @@ test("파일: 한 줄씩 쌓이고 깨진 줄은 건너뛰며, API는 기간과 
   assert.equal(call("/api/stats?days=7", "8.8.8.8").code, 403, "밖에서는 토큰이 없으면 열리지 않는다");
   assert.equal(call("/api/stats?days=7", "127.0.0.1", { "x-forwarded-for": "1.2.3.4" }).code, 403, "프록시를 거친 요청은 밖에서 온 것으로 본다");
 });
+
+// --- 토너먼트 통계 ---------------------------------------------------------------
+
+import { SHIELD, SPEAR, TUNE, aggregateStats as agg, type TourMatchRecord } from "@mercenary/shared";
+
+const toStart = (g: Game) => {
+  (g as unknown as { onBossDown(at: { x: number; y: number }): void }).onBossDown({ x: 0, y: 0 });
+  for (let i = 0; i < Math.ceil((TUNE.TOURNAMENT_NOTICE_SEC + 0.2) * TICK_RATE); i++) g.step();
+  for (let i = 0; i < Math.ceil((TUNE.TOURNAMENT_INTRO_SEC + 0.3) * TICK_RATE); i++) g.step();
+};
+
+test("토너먼트 경기 기록: 시간 초과 판정이면 이유와 평균·끝 전력, 시작 때 용병 구성이 남는다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const b = g.addPlayer("b")!;
+  g.jumpToStage(3);
+  g.addMerc(a, SHIELD, 0, 0);
+  g.addMerc(a, SHIELD, 0, 0);
+  g.addMerc(b, SPEAR, 0, 0);
+  toStart(g);
+  for (const id of [a, b]) g.getPlayer(id)!.invuln = 1e6;
+  for (let i = 0; i < Math.ceil((TUNE.TOURNAMENT_MATCH_SEC + 0.5) * TICK_RATE); i++) g.step();
+  const rec = g.statsRecord();
+  assert.equal(rec.tour?.length, 1);
+  const m = rec.tour![0]!;
+  assert.equal(m.reason, "time");
+  assert.equal(m.round, "결승");
+  assert.ok(m.dur >= TUNE.TOURNAMENT_MATCH_SEC - 1 && m.dur <= TUNE.TOURNAMENT_MATCH_SEC + 1);
+  const sideOf = (n: number) => m.sides.find((s) => s.mercs[n]! > 0)!;
+  assert.equal(sideOf(SHIELD).mercs[SHIELD], 2);
+  assert.equal(sideOf(SPEAR).mercs[SPEAR], 1);
+  assert.ok(m.sides.every((s) => s.avg > 0 && s.avg <= 100 && s.end > 0));
+  assert.ok(m.winner === 0 || m.winner === 1);
+});
+
+test("토너먼트 경기 기록: 주인공이 쓰러지면 down 이유와 쓰러진 쪽이 남고, 피해는 상대 병종 속성으로 센다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const b = g.addPlayer("b")!;
+  g.jumpToStage(3);
+  toStart(g);
+  const fighters = g.info().tour!;
+  const loser = fighters.b;
+  const pl = g.getPlayer(loser)!;
+  pl.hp = 0;
+  (g as unknown as { slots: Map<number, { state: { down: boolean } }> }).slots.get(loser)!.state.down = true;
+  g.step();
+  const m = g.statsRecord().tour![0]!;
+  assert.equal(m.reason, "down");
+  assert.equal(m.sides.filter((s) => s.down).length, 1);
+  assert.equal(m.winner, m.sides.findIndex((s) => !s.down));
+  void a;
+  void b;
+});
+
+test("토너먼트 집계: 무기·병종별 승률, 판정 이유, 시간 초과에서 평균 판정이 결과를 바꾼 비율", () => {
+  const side = (over: Partial<TourMatchRecord["sides"][0]> = {}): TourMatchRecord["sides"][0] => ({ diff: 3, level: 10, weapon: 0, mercs: [0, 0, 0, 0, 0, 0], dealtByType: [0, 0, 0, 0, 0, 0], takenMerc: [0, 0, 0, 0, 0, 0], takenHero: 0, mercDeaths: [0, 0, 0, 0, 0, 0], avg: 50, end: 50, down: false, ...over });
+  const m = (over: Partial<TourMatchRecord>): TourMatchRecord => ({ stage: 3, round: "결승", dur: 60, reason: "time", winner: 0, sides: [side(), side()], ...over });
+  const tm: TourMatchRecord[] = [
+    m({ reason: "down", dur: 30, winner: 0, sides: [side({ weapon: 0, mercs: [0, 0, 4, 0, 0, 0], dealtByType: [0, 0, 300, 0, 0, 0] }), side({ weapon: 1, mercs: [0, 3, 0, 0, 0, 0], down: true, mercDeaths: [0, 2, 0, 0, 0, 0] })] }),
+    m({ reason: "time", winner: 0, sides: [side({ avg: 70, end: 40 }), side({ avg: 55, end: 60 })] }), // 끝 전력은 뒤졌지만 평균으로 이김
+    m({ reason: "time", winner: 1, sides: [side({ avg: 40, end: 30 }), side({ avg: 60, end: 80 })] }),
+    m({ reason: "both", winner: 1, dur: 20, sides: [side({ down: true }), side({ down: true })] }),
+  ];
+  const r = agg([{ v: 1, t: Date.now(), dur: 600, stage: 3, status: "defeat", rush: false, clears: [], skips: [], players: [], tour: tm }]);
+  const t = r.tour;
+  assert.equal(t.matches, 4);
+  assert.deepEqual(t.reasons, { down: 25, time: 50, both: 25 });
+  assert.equal(t.timeouts, 2);
+  assert.equal(t.flipped, 1);
+  assert.equal(t.flipRate, 50);
+  assert.equal(t.weapons[0]!.picks, 7);
+  assert.equal(t.weapons[1]!.winRate, 0);
+  assert.equal(t.mercs[2]!.winRateWith, 100, "궁병이 있던 선수는 이겼다");
+  assert.equal(t.mercs[1]!.winRateWith, 0);
+  assert.equal(t.mercs[1]!.deathsPerUnit, 0.67);
+});

@@ -20,6 +20,31 @@ export interface PlayerRecord {
   stage: Record<string, number[]>; // 스테이지 → [준 피해, 받은 피해, 주인공 쓰러짐, 용병 쓰러짐]
 }
 
+/** 토너먼트 한 경기에서 한쪽 선수의 기록 */
+export interface TourSideRec {
+  diff: number;
+  level: number;
+  weapon: number; // 경기 끝날 때 든 무기(병종 속성)
+  mercs: number[]; // 경기 시작 때 병종별 용병 수
+  dealtByType: number[]; // 상대에게 준 피해(병종 속성별: 주인공 무기와 같은 병종 용병 합계)
+  takenMerc: number[]; // 병종별 용병이 받은 피해
+  takenHero: number; // 주인공이 받은 피해
+  mercDeaths: number[]; // 병종별 용병 쓰러짐
+  avg: number; // 경기 내내 평균 남은 전력(%)
+  end: number; // 끝날 때 남은 전력(%)
+  down: boolean; // 주인공이 쓰러졌다
+}
+
+/** 토너먼트 한 경기 */
+export interface TourMatchRecord {
+  stage: number;
+  round: string; // 결승·준결승·8강·16강
+  dur: number; // 경기 시간(초)
+  reason: "down" | "time" | "both"; // 주인공이 쓰러짐 / 시간 초과 / 동시에 쓰러짐
+  winner: 0 | 1; // sides 인덱스
+  sides: [TourSideRec, TourSideRec];
+}
+
 export interface MatchRecord {
   v: 1;
   t: number; // 끝난 시각(ms)
@@ -30,6 +55,7 @@ export interface MatchRecord {
   clears: [stage: number, time: number][]; // 장군을 쓰러뜨린 게임 시간
   skips: number[]; // 못 잡아서 시간 초과로 넘어간 스테이지
   players: PlayerRecord[];
+  tour?: TourMatchRecord[]; // 토너먼트 경기들(없으면 열리지 않은 판)
 }
 
 const sum = (a: readonly number[]): number => a.reduce((x, y) => x + y, 0);
@@ -135,6 +161,57 @@ export function aggregateStats(records: readonly MatchRecord[], opt: StatsOption
   const sizeMap = new Map<number, number>();
   for (const m of ms) sizeMap.set(m.players.length, (sizeMap.get(m.players.length) ?? 0) + 1);
 
+  // 토너먼트 경기
+  const tm = ms.flatMap((m) => m.tour ?? []);
+  const sides = tm.flatMap((x) => x.sides.map((sd, i) => ({ sd, won: x.winner === i, x })));
+  const S = sides.length;
+  const timeouts = tm.filter((x) => x.reason === "time");
+  const flipped = timeouts.filter((x) => {
+    const endLead = x.sides[0].end === x.sides[1].end ? -1 : x.sides[0].end > x.sides[1].end ? 0 : 1;
+    return endLead >= 0 && endLead !== x.winner; // 끝날 때 전력이 앞선 쪽이 졌다(평균 전력 판정이 결과를 바꾼 경기)
+  });
+  const roundMap = new Map<string, number>();
+  for (const x of tm) roundMap.set(x.round, (roundMap.get(x.round) ?? 0) + 1);
+  const tourTypeSum = (t: number) => sides.reduce((a, { sd }) => a + at(sd.dealtByType, t), 0);
+  const tourDealtAll = sum(UNIT_NAMES.map((_, t) => tourTypeSum(t)));
+  const tour = {
+    matches: tm.length,
+    avgDur: avg(sum(tm.map((x) => x.dur)), tm.length),
+    reasons: { down: pct(tm.filter((x) => x.reason === "down").length, tm.length), time: pct(timeouts.length, tm.length), both: pct(tm.filter((x) => x.reason === "both").length, tm.length) },
+    timeouts: timeouts.length,
+    flipped: flipped.length, // 시간 초과 경기 중, 끝날 때 전력이 앞선 쪽이 평균 판정으로 진 경기
+    flipRate: pct(flipped.length, timeouts.length),
+    avgMargin: avg(sum(timeouts.map((x) => Math.abs(x.sides[0].avg - x.sides[1].avg))), timeouts.length), // 평균 전력 차(%p)
+    rounds: [...roundMap.entries()].map(([round, count]) => ({ round, count })),
+    weapons: UNIT_NAMES.map((name, t) => {
+      const w = sides.filter(({ sd }) => sd.weapon === t);
+      const wins = w.filter((x) => x.won).length;
+      return { type: t, name, picks: w.length, pickRate: pct(w.length, S), wins, winRate: pct(wins, w.length), avgDealt: w.length ? Math.round(sum(w.map(({ sd }) => sum(sd.dealtByType))) / w.length) : 0, avgTaken: w.length ? Math.round(sum(w.map(({ sd }) => sd.takenHero + sum(sd.takenMerc))) / w.length) : 0 };
+    }),
+    mercs: UNIT_NAMES.map((name, t) => {
+      const has = sides.filter(({ sd }) => at(sd.mercs, t) > 0);
+      const no = sides.filter(({ sd }) => at(sd.mercs, t) === 0);
+      const winners = sides.filter((x) => x.won);
+      const losers = sides.filter((x) => !x.won);
+      const mean = (arr: typeof sides) => (arr.length ? Math.round((sum(arr.map(({ sd }) => at(sd.mercs, t))) / arr.length) * 100) / 100 : 0);
+      const deaths = sum(sides.map(({ sd }) => at(sd.mercDeaths, t)));
+      const hired = sum(sides.map(({ sd }) => at(sd.mercs, t)));
+      return {
+        type: t,
+        name,
+        presentRate: pct(has.length, S), // 이 병종이 있던 선수 비율
+        avgCount: mean(sides),
+        winRateWith: pct(has.filter((x) => x.won).length, has.length),
+        winRateWithout: pct(no.filter((x) => x.won).length, no.length),
+        avgWinners: mean(winners), // 이긴 선수의 평균 수
+        avgLosers: mean(losers), // 진 선수의 평균 수
+        dealtShare: pct(tourTypeSum(t), tourDealtAll),
+        dealtPerUnit: hired ? Math.round(tourTypeSum(t) / hired) : 0, // 경기에 나온 1명(주인공 무기 포함 안 함)당 준 피해(병종 속성 합계 기준)
+        deathsPerUnit: hired ? Math.round((deaths / hired) * 100) / 100 : 0,
+      };
+    }),
+  };
+
   return {
     matches: ms.length,
     players: N,
@@ -150,6 +227,7 @@ export function aggregateStats(records: readonly MatchRecord[], opt: StatsOption
     stages,
     cards,
     difficulty: [...diffMap.entries()].sort((a, b) => a[0] - b[0]).map(([diff, count]) => ({ diff, count })),
+    tour,
     sizes: [...sizeMap.entries()].sort((a, b) => a[0] - b[0]).map(([players, count]) => ({ players, count })),
   };
 }
