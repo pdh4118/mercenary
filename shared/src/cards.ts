@@ -169,6 +169,9 @@ const statDesc = (t: number, stat: MercStat, v: number): string =>
       : `${UNIT_NAMES[t]}만: ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""}`;
 
 /** 잘 나오게 하고 싶은 능력치의 뽑힐 확률 가중치(일반 5). 체력 재생·흡혈은 한 장의 효과를 낮추는 대신 자주 나온다. */
+/** 궁병은 화살마다 밀어서 연사·다중 발사와 겹치면 강하므로, 넉백 카드 효과를 창병의 이 비율만큼만 준다 */
+export const ARCHER_KNOCK_FACTOR = 0.5;
+
 const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 };
 
 const statCards = (): CardDef[] => {
@@ -177,7 +180,7 @@ const statCards = (): CardDef[] => {
     for (const stat of MERC_TYPE_FOCUS[t]!) {
       const special = stat === "pierce" || stat === "multi" || stat === "poison" || stat === "critMult" || stat === "thorns";
       for (let r = stat === "armor" ? 1 : 0; r < 3; r++) {
-        const v = scaledValue(stat, MERC_STAT_BASE[stat], r);
+        const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * (stat === "knock" && t === ARCHER ? ARCHER_KNOCK_FACTOR : 1));
         out.push({
           name: `${UNIT_NAMES[t]} ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`,
           desc: statDesc(t, stat, v),
