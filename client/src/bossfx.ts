@@ -64,6 +64,9 @@ import {
 
 type Tex = Texture | null;
 
+/** 휠윈드: 도는 장군 4방향 그림과 소용돌이 그림을 넘기는 간격(ms). 짧을수록 빠르게 돈다 */
+const WHIRL_FRAME_MS = 55;
+
 /** 스테이지 장군 그림: 기본 그림과 상황별 자세, 화면 배율 */
 export interface BossArt {
   idle: Tex;
@@ -93,6 +96,7 @@ const BOSS_UNIT_TEX = [
   "boss3_idle", "boss3_aim", "boss3_sky",
   "boss4_idle", "boss4_reflect", "boss4_charge",
   "boss5_idle", "boss5_jump", "boss5_smash",
+  "boss5_whirlpose_0", "boss5_whirlpose_1", "boss5_whirlpose_2", "boss5_whirlpose_3",
   "boss6_idle", "boss6_cast", "boss6_blink",
   "boss7_gallop", "boss7_shoot",
   "boss8_normal", "boss8_mad",
@@ -124,6 +128,8 @@ export async function createBossFx(d: BossFxDeps) {
     maceStuck: await fx("boss5_mace_stuck"),
     shard: await seq("boss5_shard", [0, 1, 2]),
     quake: await seq("boss5_quake", [0, 1, 2, 3, 4]),
+    tornadoA: await seq("boss5_tornado_a", [0, 1, 2, 3]),
+    tornadoB: await seq("boss5_tornado_b", [0, 1, 2, 3]),
     iceWall: await seq("boss6_ice", [0, 1, 2]),
     iceBreak: await seq("boss6_break", [0, 1, 2, 3]),
     bubble: await seq("boss6_shield", [0, 1, 2]),
@@ -146,7 +152,7 @@ export async function createBossFx(d: BossFxDeps) {
     { idle: u("boss2_idle"), scale: 0.6, pose: (sk, _fl, atk) => (sk === BSK_GUARD ? u("boss2_guard") : sk === BSK_CLONE || sk === BSK_TRIPLE || sk === BSK_THROW || atk ? u("boss2_thrust") : u("boss2_idle")) },
     { idle: u("boss3_idle"), scale: 0.4, pose: (sk, _fl, atk) => (sk === BSK_RAIN ? u("boss3_sky") : sk === BSK_SNIPE || sk === BSK_ICEARROW || atk ? u("boss3_aim") : u("boss3_idle")) },
     { idle: u("boss4_idle"), scale: 0.42, pose: (sk, fl) => (sk === BSK_REFLECT || fl & EF_GUARD ? u("boss4_reflect") : sk === BSK_SHIELDRUSH ? u("boss4_charge") : u("boss4_idle")) },
-    { idle: u("boss5_idle"), scale: 0.42, pose: (sk, _fl, atk) => (sk === BSK_JUMP ? u("boss5_jump") : sk === BSK_MACETHROW || sk === BSK_FLURRY || sk === BSK_WHIRL || atk ? u("boss5_smash") : u("boss5_idle")) },
+    { idle: u("boss5_idle"), scale: 0.42, pose: (sk, fl, atk) => (fl & EF_WHIRL ? u(`boss5_whirlpose_${Math.floor(performance.now() / WHIRL_FRAME_MS) % 4}`) : sk === BSK_JUMP ? u("boss5_jump") : sk === BSK_MACETHROW || sk === BSK_FLURRY || sk === BSK_WHIRL || atk ? u("boss5_smash") : u("boss5_idle")) },
     { idle: u("boss6_idle"), scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_BLINK ? u("boss6_blink") : sk > 0 || atk ? u("boss6_cast") : u("boss6_idle")) },
     { idle: u("boss7_gallop"), scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")) },
     { idle: u("boss8_normal"), scale: 0.75, pose: (sk, fl) => (sk === BSK_ACCEL ? u("boss8_normal") : fl & EF_MAD || sk === BSK_RAMPAGE ? u("boss8_mad") : u("boss8_normal")) },
@@ -362,100 +368,73 @@ export async function createBossFx(d: BossFxDeps) {
 
   /** 한 프레임: 예고·장판을 그린다 */
   /**
-   * 휠윈드: 장군을 감싸고 위로 갈수록 넓어지는 깔때기(토네이도) 모양 칼날바람.
-   * 나선 바람줄기·층마다 도는 초승달 칼날·말려 올라가는 먼지로 그리고, 깔때기의 먼 쪽 절반은 장군 뒤(바닥층), 가까운 쪽 절반은 장군 앞(효과층)에 그려 몸이 소용돌이 안에 선 것처럼 보이게 한다.
+   * 휠윈드: 장군 뒤에 소용돌이 그림(회전 4컷)을 깔고, 앞에는 옅은 소용돌이를 한 겹 더 씌워 장군이 소용돌이 안에서 도는 것처럼 보이게 한다.
+   * 바닥에는 피해 범위(먼지 원반과 고리)와 지면을 도는 칼날 빛줄기를 코드로 그린다. 도는 장군 그림은 enemy 그림 선택(art.pose)에서 고른다.
    */
   const whirlBack = new Graphics();
   const whirlFront = new Graphics();
   d.groundFx.addChild(whirlBack);
   d.fxLayer.addChild(whirlFront);
   const whirls: { id: number; x: number; y: number }[] = [];
-  const whirlStart = new Map<number, number>();
+  interface WhirlView {
+    t0: number;
+    back: Sprite;
+    front: Sprite;
+  }
+  const whirlViews = new Map<number, WhirlView>();
+  const WHIRL_HEIGHT = 250; // 소용돌이 그림이 서는 높이(px)
   const drawWhirls = (now: number) => {
     whirlBack.clear();
     whirlFront.clear();
-    for (const id of [...whirlStart.keys()]) if (!whirls.some((w) => w.id === id)) whirlStart.delete(id);
-    const FLAT = 0.5; // 비스듬한 시점이라 가로 원을 세로로 눌러 그린다
-    const HEIGHT = 150; // 깔때기 높이(px)
-    const LEVELS = 8;
+    for (const [id, v] of whirlViews) {
+      if (whirls.some((w) => w.id === id)) continue;
+      v.back.destroy();
+      v.front.destroy();
+      whirlViews.delete(id);
+    }
+    const frameNo = Math.floor(now / WHIRL_FRAME_MS);
     for (const w of whirls) {
-      if (!whirlStart.has(w.id)) whirlStart.set(w.id, now);
-      const grow = Math.min(1, (now - whirlStart.get(w.id)!) / 300); // 도는 순간 아래에서부터 솟아오른다
+      let v = whirlViews.get(w.id);
+      if (!v) {
+        const back = new Sprite();
+        const front = new Sprite();
+        back.anchor.set(0.5, 0.96);
+        front.anchor.set(0.5, 0.96);
+        d.standLayer.addChild(back);
+        d.standLayer.addChild(front);
+        v = { t0: now, back, front };
+        whirlViews.set(w.id, v);
+      }
+      const grow = Math.min(1, (now - v.t0) / 280); // 도는 순간 아래에서부터 솟아오른다
+      const ta = pick(T.tornadoA, frameNo % 4);
+      const tb = pick(T.tornadoB, (frameNo + 2) % 4);
+      for (const [spr, tex, z, alpha] of [[v.back, ta, -2, 0.92], [v.front, tb, 2, 0.22]] as const) {
+        if (tex) spr.texture = tex;
+        const sc = (WHIRL_HEIGHT / (tex?.height || 509)) * (0.35 + 0.65 * grow);
+        spr.scale.set(sc);
+        spr.position.set(w.x, w.y + 14);
+        spr.zIndex = w.y + z;
+        spr.alpha = alpha * grow;
+      }
+      // 바닥: 피해 범위(먼지 원반·고리)와 지면을 도는 칼날 빛줄기
+      const R = BOSS_BLUNT.whirlRadius * grow;
+      const FLAT = 0.5;
+      whirlBack.ellipse(w.x, w.y + 10, R, R * FLAT).fill({ color: 0xcdb98f, alpha: 0.16 * grow });
+      whirlFront.ellipse(w.x, w.y + 10, R, R * FLAT).stroke({ width: 3, color: 0xe9f1ff, alpha: 0.3 * grow });
       const t = now / 1000;
-      const Rmax = BOSS_BLUNT.whirlRadius * 0.8;
-      /** 높이 h(0~1)에서의 중심과 반지름 */
-      const at = (h: number) => {
-        const hh = h * grow;
-        return { cx: w.x + Math.sin(t * 3.1 + h * 4.2) * 7 * h, cy: w.y + 6 - HEIGHT * hh, r: Rmax * (0.2 + 0.8 * hh ** 0.85) };
-      };
-      /** 각도 a가 화면 아래쪽(가까운 쪽)이면 앞 그래픽, 위쪽(먼 쪽)이면 뒤 그래픽 */
-      const gfx = (a: number) => (Math.sin(a) > 0 ? whirlFront : whirlBack);
-      const seg = (a: number, x0: number, y0: number, x1: number, y1: number, width: number, color: number, alpha: number) => {
-        gfx(a).moveTo(x0, y0).lineTo(x1, y1).stroke({ width, color, alpha });
-      };
-      // 바닥 먼지 원반
-      whirlBack.ellipse(w.x, w.y + 8, Rmax * 0.95, Rmax * 0.95 * FLAT).fill({ color: 0xcdb98f, alpha: 0.16 * grow });
-      whirlFront.ellipse(w.x, w.y + 8, Rmax * 0.95, Rmax * 0.95 * FLAT).stroke({ width: 3, color: 0xe9f1ff, alpha: 0.28 * grow });
-      // 깔때기 윤곽: 층마다 흐릿한 타원 고리(위로 갈수록 옅다)
-      for (let lv = 1; lv <= LEVELS; lv++) {
-        const h = lv / LEVELS;
-        const c = at(h);
-        const a0 = t * (4 - h * 2) + lv * 1.3;
-        const n = 18;
+      for (let b = 0; b < 3; b++) {
+        const head = t * 14 + (b * Math.PI * 2) / 3;
+        const n = 12;
         for (let j = 0; j < n; j++) {
-          const aa = a0 + (j / n) * Math.PI * 2;
-          const ab = a0 + ((j + 1) / n) * Math.PI * 2;
-          seg(aa, c.cx + Math.cos(aa) * c.r, c.cy + Math.sin(aa) * c.r * FLAT, c.cx + Math.cos(ab) * c.r, c.cy + Math.sin(ab) * c.r * FLAT, 3, 0xdce9fb, 0.1 * (1 - h * 0.6) * grow);
+          const f0 = j / n;
+          const f1 = (j + 1) / n;
+          const a0 = head - 1.3 * (1 - f0);
+          const a1 = head - 1.3 * (1 - f1);
+          const g = Math.sin(a1) > 0 ? whirlFront : whirlBack;
+          g.moveTo(w.x + Math.cos(a0) * R * 0.92, w.y + 10 + Math.sin(a0) * R * 0.92 * FLAT)
+            .lineTo(w.x + Math.cos(a1) * R * 0.92, w.y + 10 + Math.sin(a1) * R * 0.92 * FLAT)
+            .stroke({ width: 2 + 8 * f1 * f1, color: f1 > 0.7 ? 0xffffff : 0xbcd6f5, alpha: grow * (0.1 + 0.8 * f1) });
         }
-      }
-      // 나선 바람줄기: 아래에서 위로 감아 올라가는 줄기 6가닥
-      const STRANDS = 6;
-      for (let sI = 0; sI < STRANDS; sI++) {
-        const base = t * 7.5 + (sI * Math.PI * 2) / STRANDS;
-        const steps = 22;
-        let px = 0;
-        let py = 0;
-        let pa = 0;
-        for (let j = 0; j <= steps; j++) {
-          const h = j / steps;
-          const c = at(h);
-          const a = base + h * 5.2;
-          const x = c.cx + Math.cos(a) * c.r;
-          const y = c.cy + Math.sin(a) * c.r * FLAT;
-          if (j > 0) seg(pa, px, py, x, y, 2 + 7 * (1 - h) * (1 - h) + 2, h < 0.5 ? 0xffffff : 0xcfe2f8, grow * (0.75 - 0.5 * h));
-          px = x;
-          py = y;
-          pa = a;
-        }
-      }
-      // 층마다 도는 초승달 칼날(머리는 굵고 밝고 꼬리는 가늘고 옅다): 아래 층일수록 빠르다
-      for (let lv = 1; lv <= LEVELS; lv += 2) {
-        const h = lv / LEVELS;
-        const c = at(h);
-        for (let b = 0; b < 2; b++) {
-          const head = t * (13 - h * 5) + b * Math.PI + lv * 0.9;
-          const span = 1.4;
-          const n = 12;
-          for (let j = 0; j < n; j++) {
-            const f0 = j / n;
-            const f1 = (j + 1) / n;
-            const a0 = head - span * (1 - f0);
-            const a1 = head - span * (1 - f1);
-            seg(a1, c.cx + Math.cos(a0) * c.r, c.cy + Math.sin(a0) * c.r * FLAT, c.cx + Math.cos(a1) * c.r, c.cy + Math.sin(a1) * c.r * FLAT, 3 + 12 * f1 * f1 * (1 - h * 0.4), f1 > 0.7 ? 0xffffff : 0xbcd6f5, grow * (0.12 + 0.85 * f1) * (1 - h * 0.35));
-          }
-          const hx = c.cx + Math.cos(head) * c.r;
-          const hy = c.cy + Math.sin(head) * c.r * FLAT;
-          gfx(head).circle(hx, hy, 5).fill({ color: 0xfff6c8, alpha: 0.95 * grow });
-        }
-      }
-      // 말려 올라가는 먼지·파편
-      for (let i = 0; i < 22; i++) {
-        const ph = (i * 0.173 + t * (0.45 + (i % 3) * 0.12)) % 1;
-        const c = at(ph);
-        const a = i * 2.4 + t * (7 + (i % 4)) + ph * 5;
-        const x = c.cx + Math.cos(a) * c.r * 1.05;
-        const y = c.cy + Math.sin(a) * c.r * FLAT * 1.05;
-        gfx(a).circle(x, y, 2 + (i % 3)).fill({ color: i % 2 ? 0xb99a6a : 0xdde6f2, alpha: grow * 0.8 * (1 - ph * 0.8) });
       }
     }
     whirls.length = 0;
