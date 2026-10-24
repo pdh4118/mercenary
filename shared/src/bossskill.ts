@@ -83,6 +83,7 @@ export const EF_BUBBLE = 32; // 매직 쉴드
 export const EF_STUN = 64; // 기절·그로기
 export const EF_MAD = 128; // 광분(바퀴가 붉게 달아오름)
 export const EF_SCYTHE = 256; // 낫 바퀴
+export const EF_WHIRL = 512; // 휠윈드로 도는 중(칼날바람 소용돌이)
 
 /** 장판·장애물(hazard) 종류. 전송값: [id, 종류, x, y, 방향, a, b, 남은 시간(0.1초), 전체 시간(0.1초), 상태(0 예고, 1 작동)] */
 export const HZ_FIRE = 1; // 불길 장판: a = 반지름

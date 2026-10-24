@@ -5,6 +5,7 @@ import {
   BSK_MACETHROW,
   BSK_WHIRL,
   BFX_IMPACT,
+  EF_WHIRL,
   BFX_MACEBOOM,
   BUL_MACE,
   BUL_SHARD,
@@ -171,7 +172,6 @@ const whirl: SkillDef = {
           if (sys.dist(f, e) > C.whirlRadius + f.r) continue;
           sys.hitFoe(e, f, C.whirlDmg, C.whirlKnock);
         }
-        sys.fx(e.x, e.y, Math.random() * 6.28, BFX_IMPACT);
         // 박힌 철퇴를 부수고 파편이 튄다
         for (const h of sys.hazards) {
           if (h.kind !== HZ_MACE || h.delay > 0 || Math.hypot(h.x - e.x, h.y - e.y) > C.whirlRadius + h.solid) continue;
@@ -197,4 +197,5 @@ export const bluntKit: KitDef = {
   idleMin: C.idleMin,
   idleMax: C.idleMax,
   skills: [jump, maceThrow, flurry, whirl],
+  flags: ({ k }) => (k.cur?.id === BSK_WHIRL && k.ph === 1 ? EF_WHIRL : 0),
 };

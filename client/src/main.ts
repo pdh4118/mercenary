@@ -1934,6 +1934,7 @@ async function main() {
         const mk = bossFx.enemyMarks(w[0], v.x, v.y, w[14] ?? 0, w[11] === 1, latest?.g?.stage ?? 1, size, performance.now());
         v.sprite.alpha *= mk.alpha;
         v.sprite.tint = mk.tint;
+        if ((w[14] ?? 0) & 512) v.sprite.scale.x *= Math.cos(performance.now() / 55); // 휠윈드: 몸이 빙글빙글 도는 것처럼 좌우로 뒤집힌다
       }
       setPoison(v.sprite, w[12] === 1);
     });

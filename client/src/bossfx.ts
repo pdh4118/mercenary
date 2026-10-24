@@ -5,6 +5,7 @@ import {
   BFX_ICEBREAK,
   BFX_IMPACT,
   BOSS_SPEAR,
+  BOSS_BLUNT,
   BFX_MACEBOOM,
   BFX_ROAR,
   BFX_SHIELDBREAK,
@@ -43,6 +44,7 @@ import {
   EF_SCYTHE,
   EF_STEALTH,
   EF_STUN,
+  EF_WHIRL,
   HZ_FIRE,
   HZ_GHOST,
   HZ_ICE,
@@ -359,7 +361,61 @@ export async function createBossFx(d: BossFxDeps) {
   };
 
   /** 한 프레임: 예고·장판을 그린다 */
+  /** 휠윈드: 장군 둘레에 칼날바람 소용돌이(회전하는 초승달 칼날 세 겹 + 흙먼지)를 그린다 */
+  const whirlG = new Graphics();
+  d.fxLayer.addChild(whirlG);
+  const whirls: { id: number; x: number; y: number }[] = [];
+  const whirlStart = new Map<number, number>();
+  const drawWhirls = (now: number) => {
+    whirlG.clear();
+    for (const id of [...whirlStart.keys()]) if (!whirls.some((w) => w.id === id)) whirlStart.delete(id);
+    for (const w of whirls) {
+      if (!whirlStart.has(w.id)) whirlStart.set(w.id, now);
+      const grow = Math.min(1, (now - whirlStart.get(w.id)!) / 260); // 도는 순간 퍼져 나간다
+      const R = BOSS_BLUNT.whirlRadius * (0.35 + 0.65 * grow);
+      const flat = 0.62; // 바닥을 비스듬히 보는 시점이라 세로를 눌러 그린다
+      const t = now / 1000;
+      // 바닥 먼지 원반
+      whirlG.ellipse(w.x, w.y + 8, R, R * flat).fill({ color: 0xcdb98f, alpha: 0.13 * grow }).stroke({ width: 3, color: 0xe9f1ff, alpha: 0.25 * grow });
+      // 칼날바람: 안쪽일수록 빠르게 도는 세 겹, 겹마다 초승달 칼날 3개(머리는 굵고 밝고, 꼬리는 가늘고 옅다)
+      for (let layer = 0; layer < 4; layer++) {
+        const rr = R * (0.3 + 0.24 * layer);
+        const speed = 12 - layer * 2;
+        const blades = layer === 3 ? 4 : 3;
+        for (let b = 0; b < blades; b++) {
+          const head = t * speed + (b * Math.PI * 2) / blades + layer * 0.7;
+          const span = 1.25;
+          const seg = 14;
+          for (let j = 0; j < seg; j++) {
+            const f0 = j / seg;
+            const f1 = (j + 1) / seg;
+            const a0 = head - span * (1 - f0);
+            const a1 = head - span * (1 - f1);
+            const x0 = w.x + Math.cos(a0) * rr;
+            const y0 = w.y - 18 + Math.sin(a0) * rr * flat;
+            const x1 = w.x + Math.cos(a1) * rr;
+            const y1 = w.y - 18 + Math.sin(a1) * rr * flat;
+            whirlG.moveTo(x0, y0).lineTo(x1, y1).stroke({ width: 8 + 20 * f1 * f1, color: 0x8fc4ff, alpha: grow * 0.16 * f1 }).moveTo(x0, y0).lineTo(x1, y1).stroke({ width: 3 + 12 * f1 * f1, color: f1 > 0.7 ? 0xffffff : 0xcfe2f8, alpha: grow * (0.15 + 0.85 * f1) });
+          }
+          // 칼날 끝의 날카로운 빛
+          const hx = w.x + Math.cos(head) * rr;
+          const hy = w.y - 18 + Math.sin(head) * rr * flat;
+          whirlG.circle(hx, hy, 6).fill({ color: 0xfff6c8, alpha: 0.95 * grow });
+        }
+      }
+      // 바람에 말려 올라가는 흙먼지·파편
+      for (let i = 0; i < 16; i++) {
+        const ph = (i * 0.37 + t * (0.5 + (i % 3) * 0.15)) % 1;
+        const a = i * 2.4 + t * (6 + (i % 4)) ;
+        const rr = R * (0.25 + 0.75 * ph);
+        whirlG.circle(w.x + Math.cos(a) * rr, w.y + 6 + Math.sin(a) * rr * flat - 40 * ph * (1 - ph) * 4, 3 + (i % 3)).fill({ color: i % 2 ? 0xb99a6a : 0xdde6f2, alpha: grow * 0.8 * (1 - ph) });
+      }
+    }
+    whirls.length = 0;
+  };
+
   const frame = (bt: TeleWire[], hz: HazardWire[], stage: number, dtMs: number, now: number) => {
+    drawWhirls(now);
     teleG.clear();
     for (let i = 0; i < bt.length; i++) drawTele(bt[i]!, now, i);
     for (let i = bt.length; i < labels.length; i++) labels[i]!.visible = false;
@@ -469,6 +525,7 @@ export async function createBossFx(d: BossFxDeps) {
       if (boss) mark(id, "inv", pick(T.inv, 1 + (Math.floor(now / 140) % 2)), x, y + 6, 1.7, 0.6, true, 0.7);
     }
     if (!boss) return { alpha, tint };
+    if (flags & EF_WHIRL) whirls.push({ id, x, y });
     const top = y - 120 * Math.max(0.8, size);
     if (flags & EF_STUN) mark(id, "dazed", pick(T.dazed, Math.floor(now / 110) % 4), x, top, 0.9, 0.95);
     if (flags & EF_CORNERED) mark(id, "cornered", pick(T.cornered, 1), x, top - 12, 0.6, 1);
