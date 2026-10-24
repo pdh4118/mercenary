@@ -4,6 +4,8 @@ import {
   BFX_CRASH,
   BFX_ICEBREAK,
   BFX_IMPACT,
+  BOSS_SPEAR,
+  BFX_MACEBOOM,
   BFX_ROAR,
   BFX_SHIELDBREAK,
   BFX_SLASH,
@@ -79,6 +81,8 @@ export interface BossFxDeps {
   skyLayer: Container;
   spawnFloat: (text: string, x: number, y: number, style: Record<string, unknown>, life: number, pop: number) => void;
   sound: (name: string, x: number, y: number, vol?: number) => void;
+  /** 던진 철퇴가 땅에 닿는 폭발 그림(갈라진 땅과 흙먼지). 그림이 없으면 false */
+  maceBoom: (x: number, y: number, r: number) => boolean;
 }
 
 const BOSS_UNIT_TEX = [
@@ -167,6 +171,9 @@ export async function createBossFx(d: BossFxDeps) {
       playSeq(T.impact, x, y, 0.55, val === BFX_CRASH ? 1 : 0.7, 0);
       d.sound("knockback", x, y);
       if (val === BFX_CRASH) d.spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
+    } else if (val === BFX_MACEBOOM) {
+      if (!d.maceBoom(x, y, ang * 100)) playSeq(T.impact, x, y, 0.55, 1, 0);
+      d.sound("skill_mace_hit", x, y);
     } else if (val === BFX_SLASH) playSeq(T.slash, x + Math.cos(ang) * 40, y + Math.sin(ang) * 40, 0.3, 1.2, ang);
     else if (val === BFX_ROAR) {
       playSeq(T.cry, x, y, 0.9, 1.5, 0);
@@ -189,6 +196,9 @@ export async function createBossFx(d: BossFxDeps) {
     kind: number;
     sp: Sprite | null;
     t0: number; // 처음 본 남은 시간(예고 진행도 계산용)
+    sx?: number; // 서버 위치가 마지막으로 바뀐 때의 값과 시각(빠르게 움직이는 분신을 매끄럽게 그리려고)
+    sy?: number;
+    st?: number;
   }
   const hzViews = new Map<number, HzView>();
   const stood = (sp: Sprite) => {
@@ -244,8 +254,21 @@ export async function createBossFx(d: BossFxDeps) {
     const [, kind, x, y, ang, a, b, left, total, state] = h;
     const sp = v.sp;
     if (!sp) return;
-    sp.position.set(x, y);
-    sp.zIndex = y;
+    let px = x;
+    let py = y;
+    if (kind === HZ_GHOST) {
+      // 분신은 아주 빨라서 서버 위치(20Hz)만 그리면 순간이동처럼 보인다: 바뀐 시점부터 진행 방향으로 이어서 그린다
+      if (v.sx !== x || v.sy !== y) {
+        v.sx = x;
+        v.sy = y;
+        v.st = now;
+      }
+      const ahead = Math.min(0.06, Math.max(0, (now - (v.st ?? now)) / 1000));
+      px += Math.cos(ang) * BOSS_SPEAR.cloneSpeed * ahead;
+      py += Math.sin(ang) * BOSS_SPEAR.cloneSpeed * ahead;
+    }
+    sp.position.set(px, py);
+    sp.zIndex = py;
     const sec = left / 10;
     const fade = Math.min(1, sec / 0.5);
     switch (kind) {

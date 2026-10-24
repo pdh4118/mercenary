@@ -5,6 +5,7 @@ import {
   BSK_MACETHROW,
   BSK_WHIRL,
   BFX_IMPACT,
+  BFX_MACEBOOM,
   BUL_MACE,
   BUL_SHARD,
   HZ_MACE,
@@ -48,7 +49,7 @@ const jump: SkillDef = {
         sys.hitFoe(e, f, C.jumpDmg, 80);
         f.f.status(ST_STUN, C.jumpStun);
       }
-      sys.fx(e.x, e.y, 0, BFX_IMPACT);
+      sys.fx(e.x, e.y, C.jumpRadius / 100, BFX_MACEBOOM);
       k.ph = 2;
       k.t = 0.9;
     } else if (k.ph === 2 && k.t <= 0) sys.end(c);

@@ -319,6 +319,15 @@ async function main() {
     skyLayer,
     spawnFloat: (text, x, y, style, life, pop) => spawnFloat(text, x, y, style as TextStyleOptions, life, pop),
     sound: (name, x, y, vol) => audio.play(name as never, { x, y, vol }),
+    maceBoom: (x, y, r) => {
+      if (!maceHitTex.every((t) => t !== null)) return false;
+      const sp = new Sprite(maceHitTex[0]!);
+      sp.anchor.set(0.5);
+      sp.position.set(x, y);
+      groundFx.addChild(sp);
+      maceHits.push({ sp, age: 0, r });
+      return true;
+    },
   });
   const BOSS_ART_STAGES = bossFx.art.length;
 
@@ -443,6 +452,11 @@ async function main() {
     maceSpr?: Sprite; // 도는 철퇴 그림
     spin?: number;
     bossKind?: number; // 장군 투사체 그림 종류(BUL_*)
+    sx?: number; // 서버 위치가 마지막으로 바뀐 때의 값과 시각(20Hz 스냅샷 사이를 매끄럽게 이어 그리려고)
+    sy?: number;
+    st?: number;
+    vx?: number; // 마지막 두 스냅샷으로 구한 초당 속도
+    vy?: number;
   }
   // 같은 순간에 나간 화살이 많으면 하나씩 소리 내는 대신 '화살 연사' 소리 하나로 낸다
   const shotBuf: { x: number; y: number; hostile: boolean }[] = [];
@@ -1835,6 +1849,19 @@ async function main() {
     bossFx.endEnemies();
     bullets.update(latest.bullets, k, (v, w) => {
       if (v.bossKind) {
+        // 빠른 투사체(던진 창 등)는 스냅샷 사이에 한참 날아가므로, 바뀐 시점부터 속도대로 이어서 그려 끊기지 않게 한다
+        const nowMs = performance.now();
+        if (v.sx !== w[1] || v.sy !== w[2]) {
+          if (v.sx !== undefined && v.sy !== undefined) {
+            v.vx = (w[1] - v.sx) * TICK_RATE;
+            v.vy = (w[2] - v.sy) * TICK_RATE;
+          }
+          v.sx = w[1];
+          v.sy = w[2];
+          v.st = nowMs;
+        }
+        const ahead = Math.min(0.07, Math.max(0, (nowMs - (v.st ?? nowMs)) / 1000));
+        v.node.position.set(w[1] + (v.vx ?? 0) * ahead, w[2] + (v.vy ?? 0) * ahead);
         v.node.rotation = v.bossKind === 5 || v.bossKind === 7 ? (v.spin = (v.spin ?? 0) + 0.35) : (w[5] ?? 0); // 철퇴·파편은 돈다, 나머지는 날아가는 방향
         v.node.visible = true;
         return;

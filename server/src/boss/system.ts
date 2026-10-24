@@ -393,6 +393,8 @@ export class BossSystem {
           break;
         }
         case HZ_GHOST: {
+          const px = h.x;
+          const py = h.y;
           h.x += h.vx * dt;
           h.y += h.vy * dt;
           const boss = src(h.src);
@@ -400,9 +402,14 @@ export class BossSystem {
             h.t = 0;
             break;
           }
+          // 분신이 한 틱에 수십~백 픽셀을 달리므로, 지난 위치에서 지금 위치까지 이은 선분과의 거리로 맞았는지 본다(대상을 건너뛰지 않게)
+          const sx = h.x - px;
+          const sy = h.y - py;
+          const sl = sx * sx + sy * sy || 1;
           for (const f of friendlies) {
             const key = f.merc ? f.merc.id : -f.ownerId;
-            if (h.hit.has(key) || Math.hypot(f.x - h.x, f.y - h.y) > h.b / 2 + f.radius) continue;
+            const u = Math.max(0, Math.min(1, ((f.x - px) * sx + (f.y - py) * sy) / sl));
+            if (h.hit.has(key) || Math.hypot(f.x - (px + sx * u), f.y - (py + sy * u)) > h.b / 2 + f.radius) continue;
             h.hit.add(key);
             this.hitFriendly(boss, f, h.dmg, h.d.knock ?? 90, 0, Math.atan2(-h.vy, -h.vx));
             this.g.pushEvent(EVT_BOSSFX, f.x, f.y, h.ang, BFX_IMPACT);

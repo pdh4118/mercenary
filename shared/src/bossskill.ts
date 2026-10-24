@@ -126,6 +126,7 @@ export const BFX_CRASH = 4; // 돌진이 방벽·바위에 부딪힘
 export const BFX_ICEBREAK = 5; // 얼음벽 조각이 부서짐
 export const BFX_SHIELDBREAK = 6; // 거대 방패가 부서짐
 export const BFX_BLINK = 7; // 순간이동(마법진 섬광)
+export const BFX_MACEBOOM = 9; // 점프 쿵: 던진 철퇴가 땅에 닿는 폭발 그림(ang x 100 = 반경)
 
 /** 기병 장군(스테이지 1) 수치 */
 export const BOSS_CAV = {
@@ -185,7 +186,7 @@ export const BOSS_SPEAR = {
   // 분신 돌진: 범위 안 주인공(플레이어)마다 분신이 한 명씩 돌진한다
   cloneRange: 450,
   cloneTele: 1.6,
-  cloneSpeed: 700,
+  cloneSpeed: 2400, // 예고(cloneTele)가 끝나면 매우 빠르게 돌진한다
   cloneWidth: 40,
   cloneDmg: 4,
   cloneKnock: 90,
@@ -204,7 +205,7 @@ export const BOSS_SPEAR = {
   tripleLen: 420,
   tripleWidth: 50,
   tripleGap: (Math.PI * 25) / 180,
-  tripleStep: 0.3,
+  tripleStep: 0.07, // 예고가 끝나면 세 번을 아주 빠르게 연달아 찌른다
   tripleDmg: 3,
   tripleKnock: 60,
   tripleRest: 0.6,
