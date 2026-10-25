@@ -161,7 +161,7 @@ export const BOSS_CAV = {
   kickRest: 0.6,
   kickCd: 8,
   // 선회 베기: 대상 둘레의 원 궤도를 크고 빠르게 돈다
-  slashTele: 1.4,
+  slashTele: 1.3,
   slashRadius: 350,
   slashBand: 70, // 궤도 안팎 폭의 절반
   slashSec: 2.5,
