@@ -2199,7 +2199,7 @@ async function main() {
     }
     // 장군: 발밑에 금빛 고리
     for (const w of latest.enemies) {
-      if (w[11] !== 1) continue;
+      if (w[11] !== 1 || ((w[14] ?? 0) & EF_STEALTH) !== 0) continue; // 은신 중에는 발밑 고리도 숨겨 위치를 알 수 없게 한다
       const v = enemies.views.get(w[0]);
       if (v) fxLayer.ellipse(v.x, v.y + 22, 34, 15).stroke({ width: 3, color: 0xffd45d, alpha: 0.85 });
     }
