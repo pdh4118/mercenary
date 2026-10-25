@@ -2434,17 +2434,18 @@ export class Game {
     for (const d of this.slots.values()) {
       const dp = d.state;
       if (!dp.down) continue;
-      const helper = [...this.slots.values()].find(
+      const helpers = [...this.slots.values()].filter(
         (r) => !r.state.down && !r.away && r.input.revive && Math.hypot(r.state.x - dp.x, r.state.y - dp.y) <= REVIVE_RADIUS,
       );
+      const helper = helpers[0];
       if (!helper) {
         dp.revive = Math.max(0, dp.revive - (dt / TUNE.REVIVE_SEC) * REVIVE_DECAY_FACTOR);
         continue;
       }
-      dp.revive = Math.min(1, dp.revive + dt / TUNE.REVIVE_SEC);
+      dp.revive = Math.min(1, dp.revive + (dt * helpers.length) / TUNE.REVIVE_SEC); // 여럿이 함께 누르면 사람 수만큼 빨라진다
       if (dp.revive >= 1) {
         this.standUp(d);
-        helper.revives++;
+        for (const h of helpers) h.revives++;
       }
     }
   }

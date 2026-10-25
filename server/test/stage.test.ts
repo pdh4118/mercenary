@@ -218,6 +218,26 @@ test("동료가 곁에서 부활 키를 누르고 있으면 일으켜 세운다"
   assert.equal(g.result().players.find((p) => p.name === "a")!.revives, 1);
 });
 
+test("여럿이 함께 부활 키를 누르면 사람 수만큼 빨리 일어난다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const c = g.addPlayer("c")!;
+  const b = g.addPlayer("b")!;
+  knockDown(g, b);
+  const pb = g.getPlayer(b)!;
+  for (const id of [a, c]) {
+    const p = g.getPlayer(id)!;
+    p.x = pb.x + REVIVE_RADIUS - 5;
+    p.y = pb.y;
+    g.setInput(id, { dx: 0, dy: 0, aim: 0, fire: false, revive: true });
+  }
+  run(g, TUNE.REVIVE_SEC * 0.5 + 0.2);
+  assert.equal(me(g, b).down, false, "두 명이면 절반 시간에 일어난다");
+  const r = g.result().players;
+  assert.equal(r.find((p) => p.name === "a")!.revives, 1);
+  assert.equal(r.find((p) => p.name === "c")!.revives, 1);
+});
+
 test("멀리 있거나 키를 떼면 부활이 진행되지 않고 줄어든다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
