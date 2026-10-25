@@ -138,7 +138,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 };
 /** 병종 전용 일반 카드 한 장의 효과량(이전의 1.5배: 후반에는 용병술이 더 중요하도록). 관통·발사 수는 개수라 그대로다. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.375, dmg: 0.3, atkSpeed: 0.225, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.1,
+  hp: 0.375, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.1,
 };
 /** 수치 조정 도구로 바꿀 수 있는 카드 설정 */
 export const CARD_TUNE = { globalFactor: 0.35, globalLifesteal: 5, globalWeight: 6, legendWeight: 0.6, bloodthirstWeight: 1.6, legendMinLevel: 6 };
@@ -261,7 +261,7 @@ export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "
   { k: "heroMaxHp", label: "최대 체력", base: 18.75, weight: 8, fmt: "flat" },
   { k: "heroSpeed", label: "이동 속도", base: 0.09, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.1875, weight: 8, fmt: "pct" },
-  { k: "heroFireRate", label: "공격 속도", base: 0.1125, weight: 6, fmt: "pct" },
+  { k: "heroFireRate", label: "공격 속도", base: 0.27, weight: 6, fmt: "pct" },
   { k: "heroRange", label: "사거리", base: 0.09, weight: 6, fmt: "pct" },
   { k: "heroPierce", label: "관통", base: 1, weight: 4, minLevel: 3, fmt: "int" },
   { k: "heroMulti", label: "발사 수", base: 1, weight: 3, minLevel: 3, fmt: "int" },
