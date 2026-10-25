@@ -40,6 +40,7 @@ import {
   EVT_KNOCK,
   EVT_BOSSFX,
   EF_STEALTH,
+  ST_BIT_STUN,
   EVT_REFLECT,
   EVT_COUNTER,
   EVT_DMG_POISON,
@@ -2036,6 +2037,7 @@ async function main() {
       paintRing(v, ownerColor(w[5]), teamSide(w[5]) !== null);
       if (v.wasDown && w[8] <= 0 && w[5] === myId) audio.play("merc_respawn", { x: v.x, y: v.y });
       v.wasDown = w[8] > 0;
+      if (w[8] <= 0 && ((w[19] ?? 0) & ST_BIT_STUN) !== 0) bossFx.stunMark(`m${w[0]}`, v.x, v.y - 66, 0.5, performance.now()); // 기절한 용병: 머리 위에 별
       const grow = 1 + 0.05 * w[15]; // 강화할수록 조금 커진다
       const col = ownerColor(w[5]);
       if (w[4] === 0) {
@@ -2072,6 +2074,7 @@ async function main() {
     });
     players.update(latest.players, k, (v, p) => {
       const dead = p.down;
+      if (!dead && ((p.status ?? 0) & ST_BIT_STUN) !== 0) bossFx.stunMark(`p${p.id}`, v.x, v.y - 84, 0.6, performance.now()); // 기절한 주인공: 머리 위에 별
       paintRing(v, ownerColor(p.id), teamSide(p.id) !== null);
       const side = teamSide(p.id);
       v.label.style.fill = side === "red" ? TEAM_RED : side === "blue" ? 0x8fc3ff : 0xffffff; // 토너먼트 선수는 이름도 팀 색

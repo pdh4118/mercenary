@@ -665,7 +665,7 @@ export async function createBossFx(d: BossFxDeps) {
   // --- 장군 몸 위 표시(은신·무적·기절·쉴드 등) ---------------------------------------
   const marks = new Map<string, Sprite>();
   const touched = new Set<string>();
-  const mark = (id: number, kind: string, tex: Tex, x: number, y: number, scale: number, alpha: number, below = false, anchorY = 0.5): void => {
+  const mark = (id: number | string, kind: string, tex: Tex, x: number, y: number, scale: number, alpha: number, below = false, anchorY = 0.5): void => {
     const key = `${id}:${kind}`;
     touched.add(key);
     if (!tex) return;
@@ -708,6 +708,11 @@ export async function createBossFx(d: BossFxDeps) {
     return { alpha, tint };
   };
 
+  /** 주인공·용병의 기절 표시: 머리 위에 별이 도는 그림(장군 기절 표시와 같은 그림을 쓴다). key는 대상마다 다른 문자열 */
+  const stunMark = (key: string, x: number, y: number, scale: number, now: number): void => {
+    mark(key, "stun", pick(T.dazed, Math.floor(now / 110) % 4), x, y, scale, 0.95);
+  };
+
   /** 이번 프레임에 표시를 갱신하지 않은 것(사라진 적)을 치운다 */
   const endEnemies = () => {
     for (const [key, sp] of marks) {
@@ -740,6 +745,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, playFx, enemyMarks, endEnemies, bulletLook, T };
+  return { art, frame, playFx, enemyMarks, stunMark, endEnemies, bulletLook, T };
 }
 

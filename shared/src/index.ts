@@ -99,6 +99,7 @@ export interface PlayerState {
   xpNeed: number; // 다음 레벨까지 필요한 경험치
   pending: number; // 아직 고르지 않은 카드 선택 횟수(레벨업 + 보상 상자)
   poisoned?: boolean; // 독에 중독된 상태(토너먼트)
+  status?: number; // 상태 이상 비트(ST_BIT_*): 1 기절, 2 속박, 4 둔화
   hs: number[]; // 주인공 능력치(지금 무기 기준): [공격력, 초당 공격 횟수, 사거리, 치명타 확률, 치명타 배율, 관통, 범위 배율, 넉백, 방어력, 회피율, 재생(초당), 이동 속도, 발사 수, 흡혈]
   stance: number; // 용병 진형 모드(STANCE_DEFEND / STANCE_ASSAULT / STANCE_HOLD)
   holdX: number; // 지점 방어 모드에서 지키는 지점(stance가 STANCE_HOLD일 때만 의미가 있다)
@@ -150,6 +151,11 @@ export type EnemyWire = [
   skill: number, // 장군이 쓰고 있는 스킬 번호(BSK_*). 없으면 0
   flags: number, // 장군 상태 비트(EF_*: 질주·은신·무적·궁지 등)
 ];
+/** 상태 이상 비트(주인공·용병 전송용) */
+export const ST_BIT_STUN = 1;
+export const ST_BIT_ROOT = 2;
+export const ST_BIT_SLOW = 4;
+
 export type MercWire = [
   id: number,
   x: number,
@@ -170,6 +176,7 @@ export type MercWire = [
   nameId: number, // mercName()으로 이름을 얻는다
   xp: number, // 용병 경험치(다음 단계 필요량은 mercXpNeed)
   poison: number, // 1이면 독에 중독된 상태(토너먼트)
+  status: number, // 상태 이상 비트(ST_BIT_*): 1 기절·속박(머리 위에 별), 4 둔화
 ];
 /** 서버가 알려 주는 순간 효과(그 틱에 일어난 일): [종류, x, y, 방향] */
 export const EVT_ARROW_HIT = 0; // 아군 화살 명중
