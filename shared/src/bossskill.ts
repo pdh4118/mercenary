@@ -161,7 +161,7 @@ export const BOSS_CAV = {
   kickRest: 0.6,
   kickCd: 8,
   // 선회 베기: 대상 둘레의 원 궤도를 크고 빠르게 돈다
-  slashTele: 1.3,
+  slashTele: 1.2,
   slashRadius: 350,
   slashBand: 70, // 궤도 안팎 폭의 절반
   slashSec: 2.5,
@@ -205,7 +205,7 @@ export const BOSS_SPEAR = {
   cloneCd: 16,
   // 창 방어 태세: 정면 부채꼴로 들어오는 대상을 찌르고 화살을 쓸어 낸다
   guardTele: 1.2,
-  guardSec: 5,
+  guardSec: 3,
   guardHalf: (Math.PI * 100) / 180 / 2,
   guardRange: 200,
   guardStep: 0.1, // 태세 중 이 간격으로 쉬지 않고 찌른다(아주 빠른 연속 찌르기)
