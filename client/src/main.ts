@@ -1421,7 +1421,10 @@ async function main() {
             bulletLayer.addChild(fx);
             hitFx.push({ node: fx, age: 0, grow: val === 0 ? 2.4 : 0.6, life: val >= 10 ? 0.4 : 0.5 });
           }
-          else if (kind === EVT_REFLECT || kind === EVT_COUNTER) {
+          else if ((kind === EVT_REFLECT || kind === EVT_COUNTER) && kind === EVT_REFLECT && latest.g?.stage === 4 && latest.enemies.some((q) => q[11] === 1 && Math.hypot(q[1] - x, q[2] - y) < 70 && ((q[14] ?? 0) & 4) !== 0)) {
+            bossFx.reflectFlash(x, y); // 검방병 장군이 반사했다: 등딱지 섬광
+            audio.play("shield_block", { x, y });
+          } else if (kind === EVT_REFLECT || kind === EVT_COUNTER) {
             // 가시 갑옷의 반사(주황)와 창병의 카운터(붉은 주황, 더 크게): 맞은 자리에 충격 고리와 금속음. 내 유닛과 관련되면 피해 숫자도 띄운다.
             const counter = kind === EVT_COUNTER;
             audio.play("shield_block", { x, y });

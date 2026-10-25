@@ -158,6 +158,8 @@ export async function createBossFx(d: BossFxDeps) {
     dazed: await seq("boss8_dazed", [0, 1, 2, 3]),
     scythe: await seq("boss8_scythe", [0, 1, 2, 3]),
     crash: await seq("boss8_crash", [1, 2, 3, 4]),
+    shell: await seq("boss4_shell", [0, 1, 2, 3, 4]),
+    shellHit: await seq("boss4_shell_hit", [0, 1, 2]),
     fogBurst: await seq("boss9_fog_burst", [0, 1, 2, 3]),
     fog: await seq("boss9_fog", [0, 1, 2, 3]),
     corpse: await fx("boss9_corpse"),
@@ -851,7 +853,12 @@ export async function createBossFx(d: BossFxDeps) {
     if (flags & EF_STUN) mark(id, "dazed", pick(T.dazed, Math.floor(now / 110) % 4), x, top, 0.9, 0.95);
     if (flags & EF_CORNERED) mark(id, "cornered", pick(T.cornered, 1), x, top - 12, 0.6, 1);
     if (flags & EF_BUBBLE) mark(id, "bubble", pick(T.bubble, 1 + (Math.floor(now / 200) % 2)), x, y - 40, 2.1, 0.75);
-    if ((flags & EF_GUARD) && stage === 4) guardWalls.push({ x, y, ang: faceAng }); // 반사 태세: 장군이 바라보는 쪽에 평평하게 휜 큰 방패 판
+    if ((flags & EF_GUARD) && stage === 4) {
+      // 반사 태세: 몸을 감싼 투명한 뿔 달린 등딱지(그림이 없으면 예전의 휜 하늘색 판)
+      const sh = pick(T.shell, Math.floor(now / 130) % 5);
+      if (sh) mark(id, "shell", sh, x, y + 30, 1.25, 0.7, true, 0.9);
+      else guardWalls.push({ x, y, ang: faceAng });
+    }
     if (flags & EF_SCYTHE) mark(id, "scythe", pick(T.scythe, 3), x, y - 20, 1.7, 0.9);
     return { alpha, tint };
   };
@@ -859,6 +866,11 @@ export async function createBossFx(d: BossFxDeps) {
   /** 주인공·용병의 기절 표시: 머리 위에 별이 도는 그림(장군 기절 표시와 같은 그림을 쓴다). key는 대상마다 다른 문자열 */
   const stunMark = (key: string, x: number, y: number, scale: number, now: number): void => {
     mark(key, "stun", pick(T.dazed, Math.floor(now / 110) % 4), x, y, scale, 0.95);
+  };
+
+  /** 반사 태세에서 공격을 되돌려 줄 때: 등딱지에서 섬광과 충격파가 터진다 */
+  const reflectFlash = (x: number, y: number): void => {
+    playSeq(T.shellHit, x, y - 4, 0.35, 1.15, 0);
   };
 
   /** 이번 프레임에 표시를 갱신하지 않은 것(사라진 적)을 치운다 */
@@ -895,6 +907,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, playFx, enemyMarks, stunMark, endEnemies, bulletLook, skelTex, T };
+  return { art, frame, playFx, enemyMarks, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, T };
 }
 
