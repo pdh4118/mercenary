@@ -208,8 +208,8 @@ export async function createBossFx(d: BossFxDeps) {
   void BSK_STEALTH;
 
   // --- 효과 컷(순서대로) ---------------------------------------------------------
-  const seqFx: { sp: Sprite; frames: Tex[]; age: number; dur: number }[] = [];
-  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5, flipY = false) => {
+  const seqFx: { sp: Sprite; frames: Tex[]; age: number; dur: number; maxA: number }[] = [];
+  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5, flipY = false, maxA = 1) => {
     const f = first(frames);
     if (!f || seqFx.length > 60) return;
     const sp = new Sprite(f);
@@ -218,7 +218,7 @@ export async function createBossFx(d: BossFxDeps) {
     sp.rotation = rot;
     sp.position.set(x, y);
     d.fxLayer.addChild(sp);
-    seqFx.push({ sp, frames, age: 0, dur });
+    seqFx.push({ sp, frames, age: 0, dur, maxA });
   };
 
   const now0 = (): number => performance.now();
@@ -256,10 +256,10 @@ export async function createBossFx(d: BossFxDeps) {
       if (val === BFX_CRASH) d.spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
     } else if (val === BFX_SWING) {
       // 철퇴 난타: 몸 중심에서 앞으로 휘두르는 호(좌우로 번갈아 뒤집는다)
-      playSeq(T.flurryArc, x, y - 12, 0.28, 1.2, ang, 0.53, len === 1);
+      playSeq(T.flurryArc, x, y - 12, 0.28, 1.2, ang, 0.53, len === 1, 0.6);
       d.sound("skill_mace_hit", x, y, 0.5);
     } else if (val === BFX_FLURRYHIT) {
-      playSeq(T.flurryHit, x, y, 0.4, 1.1, 0);
+      playSeq(T.flurryHit, x, y, 0.4, 1.1, 0, 0.5, false, 0.8);
     } else if (val === BFX_RISE) {
       playSeq(T.rise, x, y - 20, 0.6, 1.3, 0);
       d.sound("skill_wall_break", x, y, 0.5);
@@ -825,7 +825,7 @@ export async function createBossFx(d: BossFxDeps) {
       const idx = Math.min(f.frames.length - 1, Math.floor((f.age / f.dur) * f.frames.length));
       const tex = f.frames[idx];
       if (tex) f.sp.texture = tex;
-      f.sp.alpha = Math.max(0, Math.min(1, 2.2 * (1 - f.age / f.dur)));
+      f.sp.alpha = Math.max(0, Math.min(f.maxA, 2.2 * (1 - f.age / f.dur) * f.maxA));
       if (f.age >= f.dur) {
         f.sp.destroy();
         seqFx.splice(i, 1);
