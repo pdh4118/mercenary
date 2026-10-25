@@ -6,6 +6,7 @@ import {
   BOSS_SKILL_NAMES,
   ENEMY_STATS,
   EVT_BOSSFX,
+  EVT_INVULN,
   EVT_KNOCK,
   HZ_FIRE,
   HZ_GHOST,
@@ -343,6 +344,9 @@ export class BossSystem {
   }
 
   /** 장판·장애물을 만든다 */
+  /** 무적인 대상을 때렸을 때 "무적!"을 마지막으로 띄운 시각(대상:때린 사람) */
+  private readonly invulPing = new Map<string, number>();
+
   addHazard(h: Partial<Hazard> & { kind: number; x: number; y: number }): Hazard {
     const hz: Hazard = { id: this.nextHz++, ang: 0, a: 0, b: 0, t: 1, total: 1, delay: 0, vx: 0, vy: 0, hp: 0, hpMax: 0, hit: new Set(), tick: 0, src: 0, dmg: 0, solid: 0, d: {}, ...h };
     hz.total = h.total ?? hz.t;
@@ -374,7 +378,7 @@ export class BossSystem {
                 if (h.d.stun) f.status(ST_STUN, h.d.stun);
               }
             }
-            this.g.pushEvent(EVT_BOSSFX, h.x, h.y, 0, BFX_IMPACT);
+            if (h.b === 1) this.g.pushEvent(EVT_BOSSFX, h.x, h.y, 0, BFX_IMPACT); // 철퇴 착탄만 충격 효과가 나온다(화살비는 땅에 박힌 화살만 남는다)
             h.t = 0.35;
             h.total = 0.35;
             h.d.fell = 1;
@@ -591,7 +595,16 @@ export class BossSystem {
 
   /** 장군(또는 무적인 보스군)이 맞기 전에 피해를 바꾼다. null이면 피해 없음. */
   preHit(e: Enemy, hit: Hit, ownerId: number, src?: Merc): Hit | null {
-    if (e.invulnT && e.invulnT > 0) return null;
+    if (e.invulnT && e.invulnT > 0) {
+      // 무적인 대상을 때리면 때린 사람에게 "무적!"을 띄운다(같은 사람에게는 0.4초에 한 번만)
+      const key = `${e.id}:${ownerId}`;
+      const now = (this.g as unknown as { time: number }).time;
+      if (ownerId > 0 && now - (this.invulPing.get(key) ?? -9) >= 0.4) {
+        this.invulPing.set(key, now);
+        this.g.pushEvent(EVT_INVULN, e.x, e.y - 50, 0, 0, ownerId);
+      }
+      return null;
+    }
     const def = this.active(e);
     if (!def?.preHit || !e.bk) return hit;
     return def.preHit(this.ctx(e, e.bk, [], 0), hit, ownerId, src);

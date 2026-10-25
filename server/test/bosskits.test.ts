@@ -217,3 +217,23 @@ test("궁수 장군 얼음 화살: 쏘기 시작할 때 먼지를 일으키며 �
   assert.ok(back >= 1, "물러나는 먼지 효과 이벤트");
   assert.ok(y0 - b.y > 120, `뒤로(대상 반대쪽) 물러났다 ${y0 - b.y}`);
 });
+
+import { EVT_INVULN } from "@mercenary/shared";
+
+test("무적인 장군을 때리면 때린 사람에게 \"무적!\" 이벤트가 나가고(0.4초에 한 번), 피해는 들어가지 않는다", () => {
+  const { g, b, ids } = setup(4, 0);
+  b.invulnT = 2;
+  const hp0 = b.hp;
+  const takeEvents = (g as any).takeEvents.bind(g) as () => number[][];
+  takeEvents();
+  const hit = () => (g as any).damageEnemy(b, { damage: 50, charge: 0, srcType: 0, fromAngle: 0, crit: false }, ids[0]!);
+  hit();
+  hit(); // 같은 순간에 또 맞아도 한 번만 띄운다
+  const pings = takeEvents().filter((ev) => ev[0] === EVT_INVULN && ev[5] === ids[0]);
+  assert.equal(pings.length, 1);
+  assert.equal(b.hp, hp0, "피해 없음");
+  for (let i = 0; i < 12; i++) g.step();
+  b.invulnT = 2;
+  hit();
+  assert.ok(takeEvents().some((ev) => ev[0] === EVT_INVULN), "시간이 지나면 다시 띄운다");
+});

@@ -249,6 +249,8 @@ export async function createBossFx(d: BossFxDeps) {
     t0: number; // 처음 본 남은 시간(예고 진행도 계산용)
     lx?: number; // 분신 잔상을 마지막으로 남긴 자리
     ly?: number;
+    endAt?: number; // 화살비: 이 시각(ms)에 땅에 닿는다(남은 시간이 0.1초 단위로만 오므로 사이를 이어서 그린다)
+    lastLeft?: number;
     sx?: number; // 서버 위치가 마지막으로 바뀐 때의 값과 시각(빠르게 움직이는 분신을 매끄럽게 그리려고)
     sy?: number;
     st?: number;
@@ -424,7 +426,7 @@ export async function createBossFx(d: BossFxDeps) {
       case HZ_MACE:
         return T.maceStuck;
       case HZ_SHIELD:
-        return first(T.shield);
+        return null; // 그림 대신 코드로 그린 곡면 판(drawCurvedWall)
       case HZ_ICE:
         return first(T.iceWall);
       case HZ_FIRE:
@@ -437,6 +439,64 @@ export async function createBossFx(d: BossFxDeps) {
         return null;
     }
   };
+
+  /**
+   * 방패 효과(반사 태세·거대 방패): 평평하지만 살짝 휜 큰 하늘색 판. 벽을 따라 곡선을 그리고 위로 세워 올린다.
+   * dir 방향으로 볼록하게 휘고, 가운데가 가장 앞으로 나온다. hp(0~100)가 낮을수록 금이 간다.
+   */
+  const wallG = new Graphics();
+  d.fxLayer.addChild(wallG);
+  const drawCurvedWall = (cx: number, cy: number, along: number, dir: number, halfLen: number, bulge: number, height: number, alpha: number, hp: number, now: number): void => {
+    const FLAT = 0.6; // 비스듬한 시점이라 바닥 위의 길이를 세로로 눌러 그린다
+    const THICK = 20; // 판의 두께(윗면이 보인다)
+    const N = 18;
+    const bot: [number, number][] = [];
+    const top: [number, number][] = [];
+    const topIn: [number, number][] = []; // 윗면의 안쪽 가장자리(두께만큼 안으로)
+    for (let i = 0; i <= N; i++) {
+      const t = (i / N) * 2 - 1;
+      const bulgeNow = bulge * (1 - t * t);
+      const gx = cx + Math.cos(along) * halfLen * t + Math.cos(dir) * bulgeNow;
+      const gy = cy + (Math.sin(along) * halfLen * t + Math.sin(dir) * bulgeNow) * FLAT;
+      bot.push([gx, gy]);
+      const ty = gy - height;
+      top.push([gx, ty]);
+      topIn.push([gx - Math.cos(dir) * THICK, ty - Math.sin(dir) * THICK * FLAT]);
+    }
+    const flat = (a: [number, number][]) => a.flatMap(([x, y]) => [x, y]);
+    // 앞면: 하늘색 반투명 판 + 위쪽이 더 밝은 층
+    wallG.poly([...flat(bot), ...flat(top.slice().reverse())]).fill({ color: 0x4aa8ff, alpha: 0.34 * alpha });
+    const mid = top.map(([x, y], i) => [x, y + (bot[i]![1] - y) * 0.5] as [number, number]);
+    wallG.poly([...flat(top), ...flat(mid.slice().reverse())]).fill({ color: 0xbfe6ff, alpha: 0.24 * alpha });
+    // 윗면(두께): 밝게
+    wallG.poly([...flat(top), ...flat(topIn.slice().reverse())]).fill({ color: 0xe8f8ff, alpha: 0.55 * alpha });
+    // 테두리
+    wallG.poly(flat(top), false).stroke({ width: 4, color: 0xffffff, alpha: 0.95 * alpha });
+    wallG.poly(flat(topIn), false).stroke({ width: 2, color: 0xbfe6ff, alpha: 0.8 * alpha });
+    wallG.poly(flat(bot), false).stroke({ width: 3, color: 0x3b8fd6, alpha: 0.85 * alpha });
+    wallG.moveTo(bot[0]![0], bot[0]![1]).lineTo(top[0]![0], top[0]![1]).moveTo(bot[N]![0], bot[N]![1]).lineTo(top[N]![0], top[N]![1]).stroke({ width: 3, color: 0xcfeaff, alpha: 0.9 * alpha });
+    // 세로 빛줄기(천천히 흐른다)
+    for (let j = 0; j < 3; j++) {
+      const i = Math.round(((((now / 2600 + j / 3) % 1) * 0.8 + 0.1) * N));
+      wallG.moveTo(bot[i]![0], bot[i]![1]).lineTo(top[i]![0], top[i]![1]).stroke({ width: 2, color: 0xffffff, alpha: 0.35 * alpha });
+    }
+    // 금: 체력이 줄수록 늘어난다
+    const cracks = hp > 66 ? 0 : hp > 33 ? 2 : 4;
+    for (let c = 0; c < cracks; c++) {
+      const i = 3 + c * 4 + (c % 2);
+      const x0 = top[i]![0];
+      let y0 = top[i]![1] + height * 0.12;
+      const x1 = bot[i]![0];
+      const yb = bot[i]![1];
+      wallG.moveTo(x0, y0);
+      for (let s = 1; s <= 4; s++) {
+        y0 += (yb - y0) / (5 - s);
+        wallG.lineTo(x0 + (s % 2 ? 7 : -7) + (x1 - x0) * (s / 4), y0);
+      }
+      wallG.stroke({ width: 2, color: 0xffffff, alpha: 0.8 * alpha });
+    }
+  };
+  const guardWalls: { x: number; y: number; ang: number }[] = [];
 
   /** 한 프레임: 예고·장판을 그린다 */
   /**
@@ -499,6 +559,9 @@ export async function createBossFx(d: BossFxDeps) {
   const frame = (bt: TeleWire[], hz: HazardWire[], stage: number, dtMs: number, now: number) => {
     drawWhirls(now);
     drawThrustCores(dtMs);
+    wallG.clear();
+    for (const gw of guardWalls) drawCurvedWall(gw.x + Math.cos(gw.ang) * 48, gw.y + 8 + Math.sin(gw.ang) * 48 * 0.6, gw.ang + Math.PI / 2, gw.ang, 96, 44, 104, 0.95, 100, now);
+    guardWalls.length = 0;
     teleG.clear();
     for (let i = 0; i < bt.length; i++) drawTele(bt[i]!, now, i);
     for (let i = bt.length; i < labels.length; i++) labels[i]!.visible = false;
@@ -522,25 +585,43 @@ export async function createBossFx(d: BossFxDeps) {
       if (state === 0) v.t0 = Math.max(v.t0, left);
       // 예고 중인 화살비·철퇴 착탄: 바닥에 붉은 원
       if (kind === HZ_RAIN && state === 0) {
-        const pr = Math.min(1, Math.max(0, 1 - left / Math.max(1, v.t0)));
-        teleG.circle(x, y, a).fill({ color: 0xff3a2a, alpha: 0.1 + 0.2 * pr }).stroke({ width: 2, color: 0xff3a2a, alpha: 0.7 });
-        if (b !== 1) {
-          // 떨어지는 화살 한 대
-          const ft = pick(T.rain, 0);
-          if (ft) {
-            if (!v.sp) {
-              v.sp = new Sprite(ft);
-              v.sp.anchor.set(0.5, 0.9);
-              v.sp.scale.set(0.5);
-              d.standLayer.addChild(v.sp);
-            }
-            v.sp.visible = true;
-            v.sp.texture = ft;
-            v.sp.position.set(x - 30 * (1 - pr), y - 380 * (1 - pr));
-            v.sp.zIndex = y + 1;
-            v.sp.rotation = 0.35;
+        if (v.lastLeft !== left) {
+          v.lastLeft = left;
+          v.endAt = now + left * 100; // 남은 시간은 0.1초 단위로 오므로 도착 시각으로 바꿔 이어서 센다
+        }
+        const remain = Math.max(0, ((v.endAt ?? now) - now) / 1000);
+        const pr = Math.min(1, Math.max(0, 1 - remain / Math.max(0.1, v.t0 / 10)));
+        if (b === 1) {
+          teleG.circle(x, y, a).fill({ color: 0xff3a2a, alpha: 0.1 + 0.2 * pr }).stroke({ width: 2, color: 0xff3a2a, alpha: 0.7 });
+          if (v.sp) v.sp.visible = false;
+          continue;
+        }
+        // 화살비: 떨어질 자리를 또렷하게 알린다(진해지는 붉은 원 + 줄어드는 고리 + 십자 표시). 화살은 마지막 순간에만 아주 빠르게 내리꽂힌다.
+        const pulse = 0.6 + 0.4 * Math.sin(now / 90 + id);
+        teleG.circle(x, y, a).fill({ color: 0xff3a2a, alpha: 0.1 + 0.26 * pr }).stroke({ width: 3, color: 0xff5a3a, alpha: 0.55 + 0.35 * pr });
+        teleG.circle(x, y, a * (1 - 0.85 * pr)).stroke({ width: 2, color: 0xffe08a, alpha: 0.5 + 0.4 * pulse });
+        teleG.moveTo(x - a * 0.35, y).lineTo(x + a * 0.35, y).moveTo(x, y - a * 0.35).lineTo(x, y + a * 0.35).stroke({ width: 2, color: 0xffe08a, alpha: 0.7 });
+        const DROP = 0.2;
+        const ft = pick(T.rain, 0);
+        if (ft && remain <= DROP) {
+          const fp = 1 - remain / DROP;
+          if (!v.sp) {
+            v.sp = new Sprite(ft);
+            v.sp.anchor.set(0.5, 0.9);
+            v.sp.scale.set(0.5);
+            d.standLayer.addChild(v.sp);
           }
+          v.sp.visible = true;
+          v.sp.texture = ft;
+          v.sp.position.set(x - 30 * (1 - fp), y - 420 * (1 - fp));
+          v.sp.zIndex = y + 1;
+          v.sp.rotation = 0.35;
         } else if (v.sp) v.sp.visible = false;
+        continue;
+      }
+      if (kind === HZ_SHIELD) {
+        // 거대 방패: 그림 없이 하늘색 곡면 판으로 그린다(벽 방향 ang, 볼록한 쪽은 장군이 바라보는 쪽 = ang - 90도)
+        drawCurvedWall(x, y + 4, ang, ang - Math.PI / 2, a, 46, 92, Math.min(1, left / 10 / 0.5 + 0.05) * (state === 0 ? 0.5 : 1), b, now);
         continue;
       }
       if (kind === HZ_RAIN && state === 1 && v.sp) v.sp.visible = true;
@@ -608,7 +689,7 @@ export async function createBossFx(d: BossFxDeps) {
    * 적(장군이든 아니든) 한 마리의 상태 표시. 돌려주는 값으로 투명도·색을 바꾼다.
    * @returns alpha 배율(은신이면 아주 투명), tint
    */
-  const enemyMarks = (id: number, x: number, y: number, flags: number, boss: boolean, stage: number, size: number, now: number): { alpha: number; tint: number } => {
+  const enemyMarks = (id: number, x: number, y: number, flags: number, boss: boolean, stage: number, size: number, now: number, faceAng = 0): { alpha: number; tint: number } => {
     let alpha = 1;
     let tint = 0xffffff;
     if (flags & EF_STEALTH) alpha = 0.12;
@@ -622,7 +703,7 @@ export async function createBossFx(d: BossFxDeps) {
     if (flags & EF_STUN) mark(id, "dazed", pick(T.dazed, Math.floor(now / 110) % 4), x, top, 0.9, 0.95);
     if (flags & EF_CORNERED) mark(id, "cornered", pick(T.cornered, 1), x, top - 12, 0.6, 1);
     if (flags & EF_BUBBLE) mark(id, "bubble", pick(T.bubble, 1 + (Math.floor(now / 200) % 2)), x, y - 40, 2.1, 0.75);
-    if ((flags & EF_GUARD) && stage === 4) mark(id, "reflect", pick(T.reflect, 2), x, y - 30, 1.6, 0.6);
+    if ((flags & EF_GUARD) && stage === 4) guardWalls.push({ x, y, ang: faceAng }); // 반사 태세: 장군이 바라보는 쪽에 평평하게 휜 큰 방패 판
     if (flags & EF_SCYTHE) mark(id, "scythe", pick(T.scythe, 3), x, y - 20, 1.7, 0.9);
     return { alpha, tint };
   };

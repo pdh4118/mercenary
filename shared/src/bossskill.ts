@@ -264,7 +264,7 @@ export const BOSS_ARCHER = {
   iceSlowMult: 0.6,
   // 화살비
   rainTele: 1,
-  rainFall: 0.55, // 화살이 하늘에서 떨어지는 시간(예고 원이 차오르는 시간)
+  rainFall: 1.0, // 예고 원이 보이고 나서 화살이 떨어지기까지(화살은 마지막 0.2초에 아주 빠르게 내리꽂힌다)
   rainGap: 0.04, // 화살 사이 간격
   rainArea: 260,
   rainR: 60,

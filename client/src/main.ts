@@ -1914,6 +1914,8 @@ async function main() {
       const size = w[11] === 1 ? BOSS_SIZE : 1;
       if (v.art) {
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
+        // 스킬을 쓰는 중에는 장군이 바라보는 쪽(서버 방향)으로 그림을 돌린다: 방패·창이 엉뚱한 쪽에 보이지 않게
+        if ((w[13] ?? 0) > 0 || ((w[14] ?? 0) & 4) !== 0) v.face = Math.cos(w[8] ?? 0) >= 0 ? 1 : -1;
         v.sprite.texture = v.art.pose(w[13] ?? 0, w[14] ?? 0, w[5] > 0) ?? v.art.idle!;
         v.sprite.scale.set(v.art.scale * v.face, v.art.scale);
       } else if (w[4] === 0) {
@@ -1931,7 +1933,7 @@ async function main() {
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
       if ((w[14] ?? 0) !== 0 || v.sprite.tint !== 0xffffff) {
         // 장군 상태 표시: 은신(거의 투명)·무적(황금빛)·기절·쉴드·궁지 등
-        const mk = bossFx.enemyMarks(w[0], v.x, v.y, w[14] ?? 0, w[11] === 1, latest?.g?.stage ?? 1, size, performance.now());
+        const mk = bossFx.enemyMarks(w[0], v.x, v.y, w[14] ?? 0, w[11] === 1, latest?.g?.stage ?? 1, size, performance.now(), w[8] ?? 0);
         v.sprite.alpha *= mk.alpha;
         v.sprite.tint = mk.tint;
       }
