@@ -1940,14 +1940,14 @@ async function main() {
         faceFrom(v, v.x, null);
         v.sprite.texture = ((sv.hurtT ?? 0) > 0 && bossFx.supply.hurt) || (moved ? bossFx.supply.run[Math.floor((sv.runT ?? 0) * 12) % 5] : null) || bossFx.supply.idle;
         v.sprite.anchor.set(0.5, 0.8);
-        v.sprite.scale.set(SPRITE_SCALE * 1.15 * v.face, SPRITE_SCALE * 1.15);
+        v.sprite.scale.set(SPRITE_SCALE * 1.4 * v.face, SPRITE_SCALE * 1.4);
         v.lastX = v.x;
       } else if (((w[14] ?? 0) & EF_SKEL) !== 0 && bossFx.skelTex[w[4]]) {
         // 안개 속 시체에서 되살아난 스켈레톤: 병종별 스켈레톤 그림(방향은 좌우만)
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
         v.sprite.texture = bossFx.skelTex[w[4]]!;
         v.sprite.anchor.set(0.5, 0.8);
-        v.sprite.scale.set(SPRITE_SCALE * 1.05 * v.face, SPRITE_SCALE * 1.05);
+        v.sprite.scale.set(SPRITE_SCALE * 1.25 * v.face, SPRITE_SCALE * 1.25);
         v.lastX = v.x;
       } else if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
