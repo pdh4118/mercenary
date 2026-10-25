@@ -27,7 +27,7 @@ export const TUNE = {
   ENEMY_LEVEL_DMG_GROWTH: 0.015, // 적 피해 +1.5%
   STAGE_CLEAR_GOLD: 40, // 클리어 보상 금화 = 이 값 x 스테이지 (모든 플레이어에게)
   STAGE_CLEAR_XP: 30, // 클리어 보상 경험치 = 이 값 + 15 x 스테이지
-  BOSS_HP_BASE: 14, // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
+  BOSS_HP_BASE: 10, // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
   BOSS_HP_PER_STAGE: 5,
   BOSS_DMG_MULT: 2,
   BOSS_TIMEOUT_SEC: 90, // 보스군이 등장한 뒤 이 시간(1분 30초) 안에 장군을 못 잡으면 보스군이 격노해 점점 강해진다
