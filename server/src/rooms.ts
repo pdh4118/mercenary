@@ -519,6 +519,7 @@ export class RoomManager {
         camps: room.game.snapshotCamps(),
         chests: room.game.snapshotChests(),
         rice: room.game.snapshotRice(),
+        tents: room.game.snapshotTents(),
         meteors: room.game.snapshotMeteors(),
         walls: room.game.snapshotWalls(),
         ...(bossTele.length > 0 ? { bt: bossTele } : {}),

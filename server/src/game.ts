@@ -30,6 +30,10 @@ import {
   EVT_WALL_HIT,
   EVT_HEAL,
   EVT_RICE,
+  EVT_TENT,
+  ST_BIT_REST,
+  TENT,
+  type TentWire,
   EF_SUPPLY,
   SUPPLY,
   critDamageMult,
@@ -360,6 +364,7 @@ export interface Slot {
   dashVx: number;
   dashVy: number;
   dashStrike: boolean; // 돌진이 끝나면 찌른다(창)
+  restTent: number; // 쉬고 있는 텐트 번호(0이면 쉬지 않음)
   dashHit: Set<number>; // 이번 돌진에서 이미 지나가며 벤 적(번호)
   chargeT: number; // 철퇴를 꾹 누르고 모은 시간(초). 0이면 모으는 중이 아니다
   mom: number; // 기마 주인공의 속도(0~1). 달리면 오르고 멈추면 줄어든다
@@ -667,6 +672,8 @@ export class Game {
   private mercs = new Map<number, Merc>();
   private camps = new Map<number, Camp>();
   private chests = new Map<number, Chest>();
+  private tents = new Map<number, { id: number; x: number; y: number; left: number; variant: number }>(); // 휴식 텐트
+  private tentTimer: number = TENT.firstSec;
   private rice = new Map<number, { id: number; x: number; y: number; left: number }>(); // 군량병이 떨군 쌀
   private supplyCd: number = SUPPLY.firstSec;
   private foePos = new Map<string, [number, number]>(); // 적 AI가 아군의 이동 속도를 구하려고 기억하는 지난 위치
@@ -816,6 +823,11 @@ export class Game {
     this.enemies.clear();
     this.mercs.clear();
     this.camps.clear();
+    this.tents.clear();
+    for (const sl of this.slots.values()) {
+      sl.restTent = 0;
+      sl.state.rest = false;
+    }
     this.bullets = [];
     this.boss.reset();
     this.rush = false;
@@ -904,6 +916,7 @@ export class Game {
       dashVy: 0,
       dashStrike: false,
       dashHit: new Set(),
+      restTent: 0,
       chargeT: 0,
       mom: 0,
       stances: UNIT_TYPES.map(() => STANCE_DEFEND),
@@ -1089,6 +1102,12 @@ export class Game {
       this.camps.clear();
       this.chests.clear();
       this.rice.clear();
+      this.tents.clear();
+      for (const sl of this.slots.values()) {
+        sl.restTent = 0;
+        sl.state.rest = false;
+      }
+      this.tentTimer = TENT.firstSec;
       this.supplyCd = SUPPLY.firstSec;
       this.tour = null;
       this.tourCountdown = 0;
@@ -1117,6 +1136,7 @@ export class Game {
     this.stepStage(dt);
     this.stepChests(dt);
     this.stepRice(dt);
+    this.stepTents(dt);
     if (!duel) {
       this.stepCamps(dt);
       this.spawnEnemies(dt);
@@ -1231,7 +1251,7 @@ export class Game {
       m.nameId,
       Math.floor(m.xp),
       (this.duelPoison.get(m.id)?.t ?? 0) > 0 ? 1 : 0,
-      ((m.stunT ?? 0) > 0 ? ST_BIT_STUN : 0) | ((m.slowT ?? 0) > 0 ? ST_BIT_SLOW : 0),
+      ((m.stunT ?? 0) > 0 ? ST_BIT_STUN : 0) | ((m.slowT ?? 0) > 0 ? ST_BIT_SLOW : 0) | ((this.slots.get(m.owner)?.restTent ?? 0) > 0 ? ST_BIT_REST : 0),
     ]);
   }
 
@@ -1759,6 +1779,11 @@ export class Game {
     this.enemies.clear();
     this.bullets = [];
     this.camps.clear();
+    this.tents.clear();
+    for (const sl of this.slots.values()) {
+      sl.restTent = 0;
+      sl.state.rest = false;
+    }
     this.squads.clear();
     this.army = null;
     for (let i = ids.length - 1; i > 0; i--) {
@@ -2168,6 +2193,102 @@ export class Game {
     return id;
   }
 
+  snapshotTents(): TentWire[] | undefined {
+    if (this.tents.size === 0) return undefined;
+    return [...this.tents.values()].map((t) => {
+      let n = 0;
+      for (const s of this.slots.values()) if (s.restTent === t.id) n++;
+      return [t.id, round(t.x), round(t.y), Math.ceil(t.left), t.variant, n];
+    });
+  }
+
+  private enterTent(s: Slot, id: number): boolean {
+    const t = this.tents.get(id);
+    if (!t || s.restTent > 0) return false;
+    s.restTent = id;
+    s.state.rest = true;
+    s.state.x = t.x;
+    s.state.y = t.y;
+    s.input.dx = 0;
+    s.input.dy = 0;
+    s.input.fire = false;
+    s.windT = 0;
+    s.state.wind = 0;
+    this.casts.delete(-s.state.id);
+    for (const m of this.mercs.values()) {
+      if (m.owner !== s.state.id) continue;
+      m.x = t.x;
+      m.y = t.y;
+      m.atkT = 0;
+    }
+    this.pushEvent(EVT_TENT, t.x, t.y, 0, 0, s.state.id);
+    return true;
+  }
+
+  private exitTent(s: Slot): boolean {
+    const t = this.tents.get(s.restTent);
+    s.restTent = 0;
+    s.state.rest = false;
+    const x = t?.x ?? s.state.x;
+    const y = (t?.y ?? s.state.y) + 70; // 텐트 앞으로 나온다
+    s.state.x = clampToWorld(x, PLAYER_RADIUS);
+    s.state.y = clampToWorld(y, PLAYER_RADIUS);
+    let i = 0;
+    const mine = [...this.mercs.values()].filter((m) => m.owner === s.state.id);
+    for (const m of mine) {
+      const a = (i++ / Math.max(1, mine.length)) * Math.PI * 2;
+      m.x = clampToWorld(s.state.x + Math.cos(a) * 60, 14);
+      m.y = clampToWorld(s.state.y + Math.sin(a) * 60, 14);
+    }
+    this.pushEvent(EVT_TENT, s.state.x, s.state.y, 0, 1, s.state.id);
+    return true;
+  }
+
+  /** 휴식 텐트: 성장 단계에서만 가끔 생겼다가 사라진다. 사라지거나 보스전이 시작되면 안에 있던 사람은 밖으로 나온다. */
+  private stepTents(dt: number): void {
+    const ejectAll = (id?: number) => {
+      for (const s of this.slots.values()) if (s.restTent > 0 && (id === undefined || s.restTent === id)) this.exitTent(s);
+    };
+    if (this.phase !== "grow") {
+      if (this.tents.size > 0 || [...this.slots.values()].some((s) => s.restTent > 0)) {
+        ejectAll();
+        this.tents.clear();
+      }
+      return;
+    }
+    for (const t of [...this.tents.values()]) {
+      t.left -= dt;
+      if (t.left <= 0) {
+        ejectAll(t.id);
+        this.tents.delete(t.id);
+      }
+    }
+    if (!this.autoSpawn) return;
+    this.tentTimer -= dt;
+    const alive = this.alivePlayers();
+    if (this.tentTimer > 0 || alive.length === 0) return;
+    this.tentTimer = TENT.intervalSec;
+    if (this.tents.size >= Math.min(TENT.max, Math.ceil(alive.length / 2))) return;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const around = alive[Math.floor(this.rng() * alive.length)]!.state;
+      const angle = this.rng() * Math.PI * 2;
+      const dist = 300 + this.rng() * 240;
+      const x = clampToWorld(around.x + Math.cos(angle) * dist, 150);
+      const y = clampToWorld(around.y + Math.sin(angle) * dist, 150);
+      if ([...this.tents.values()].some((c) => Math.hypot(c.x - x, c.y - y) < 500)) continue;
+      if ([...this.camps.values()].some((c) => Math.hypot(c.x - x, c.y - y) < 260)) continue; // 캠프와 겹치지 않게
+      if (this.terrain?.blocked(x, y, 90)) continue;
+      this.spawnTentAt(x, y);
+      return;
+    }
+  }
+
+  spawnTentAt(x: number, y: number, variant = Math.floor(this.rng() * 2)): number {
+    const id = this.nextEntityId++;
+    this.tents.set(id, { id, x, y, left: TENT.lifeSec, variant });
+    return id;
+  }
+
   spawnCampAt(x: number, y: number, offers: number[]): number {
     const id = this.nextEntityId++;
     this.camps.set(id, { id, x, y, left: TUNE.CAMP_LIFETIME_SEC, offers });
@@ -2320,6 +2441,18 @@ export class Game {
         p.chargeLeft = 0;
         s.windT = 0;
         p.wind = 0;
+        continue;
+      }
+      if (s.restTent > 0) {
+        // 텐트에서 쉬는 중: 움직이지도 싸우지도 않고 체력이 찬다
+        const hb = p.hp;
+        p.hp = Math.min(p.maxHp, p.hp + p.maxHp * TENT.healPerSec * dt);
+        this.healPop(-p.id, p.x, p.y, p.hp - hb, p.id);
+        s.skillCd = Math.max(0, s.skillCd - dt);
+        p.sk = Math.round(s.skillCd * 10) / 10;
+        s.fireCd = Math.max(0, s.fireCd - dt);
+        s.dashT = 0;
+        p.aim = s.input.aim;
         continue;
       }
       p.invuln = Math.max(0, p.invuln - dt);
@@ -2655,6 +2788,12 @@ export class Game {
    */
   useSkill(playerId: number): boolean {
     const s = this.slots.get(playerId);
+    if (s && !s.away && !s.state.down && this.phase !== "tournament") {
+      // 텐트 곁에서 스페이스: 들어가 쉬고, 쉬는 중에 다시 누르면 나온다(스킬 쿨타임과 무관)
+      if (s.restTent > 0) return this.exitTent(s);
+      const t = [...this.tents.values()].find((q) => Math.hypot(q.x - s.state.x, q.y - s.state.y) <= TENT.useRadius);
+      if (t) return this.enterTent(s, t.id);
+    }
     if (!s || s.away || s.state.down || s.skillCd > 0) return false;
     const duel = this.phase === "tournament";
     if (duel && !(this.isFighter(playerId) && this.tour?.step === "fight")) return false;
@@ -2970,7 +3109,7 @@ export class Game {
   private collectFriendlies(): Friendly[] {
     const list: Friendly[] = [];
     for (const s of this.slots.values()) {
-      if (s.state.down || s.away) continue;
+      if (s.state.down || s.away || s.restTent > 0) continue; // 텐트 안의 사람은 공격받지 않는다
       const p = s.state;
       const fr: Friendly = {
         x: p.x,
@@ -3050,7 +3189,7 @@ export class Game {
       list.push(fr);
     }
     for (const m of this.mercs.values()) {
-      if (m.respawn > 0) continue;
+      if (m.respawn > 0 || (this.slots.get(m.owner)?.restTent ?? 0) > 0) continue; // 쉬는 주인의 용병도 텐트 안에 있다
       const fm: Friendly = {
         x: m.x,
         y: m.y,
@@ -3290,6 +3429,30 @@ export class Game {
       const st0 = this.mercStats(m);
       const st = (m.slowT ?? 0) > 0 ? { ...st0, speed: st0.speed * (m.slowMult ?? 0.6) } : st0; // 둔화 중에는 느리다
       const ownerSlot = this.slots.get(m.owner);
+      if (ownerSlot && ownerSlot.restTent > 0) {
+        // 주인이 텐트에서 쉬는 동안: 용병도 안에서 쉰다(체력이 차고, 쓰러진 용병은 더 빨리 일어난다)
+        const tent = this.tents.get(ownerSlot.restTent);
+        if (tent) {
+          m.x = tent.x;
+          m.y = tent.y;
+        }
+        m.atkT = 0;
+        if (m.respawn > 0) {
+          m.respawn = Math.max(0, m.respawn - dt * TENT.respawnBoost);
+          if (m.respawn === 0) {
+            m.hp = st.hp;
+            m.shield = st.shield;
+            m.regenT = 0;
+            m.momentum = 0;
+            m.cd = 0;
+          }
+        } else {
+          const hb = m.hp;
+          m.hp = Math.min(st.hp, m.hp + st.hp * TENT.healPerSec * dt);
+          this.healPop(m.id, m.x, m.y, m.hp - hb, m.owner);
+        }
+        continue;
+      }
       if (m.respawn > 0) {
         // 토너먼트에서도 쓰러진 용병은 되살아난다(경기 중에는 부활 시간이 TOURNAMENT_RESPAWN_MULT배로 짧다)
         m.respawn = Math.max(0, m.respawn - dt);
@@ -4630,6 +4793,24 @@ export class Game {
     }
   }
 
+  /** 쉬는 사람이 있는 텐트 가까이의 적은 공격을 멈추고 멀어진다 */
+  private repelFromTent(e: Enemy, speed: number, dt: number): boolean {
+    for (const t of this.tents.values()) {
+      const d = Math.hypot(e.x - t.x, e.y - t.y);
+      if (d >= TENT.repelRadius) continue;
+      let occupied = false;
+      for (const s of this.slots.values()) if (s.restTent === t.id) occupied = true;
+      if (!occupied) continue;
+      e.atkT = 0;
+      const a = d > 1 ? Math.atan2(e.y - t.y, e.x - t.x) : Math.cos(e.id) * Math.PI;
+      e.face = a;
+      e.x = clampToWorld(e.x + Math.cos(a) * speed * TUNE.ENEMY_SPEED_MULT * TENT.repelSpeed * dt, 14);
+      e.y = clampToWorld(e.y + Math.sin(a) * speed * TUNE.ENEMY_SPEED_MULT * TENT.repelSpeed * dt, 14);
+      return true;
+    }
+    return false;
+  }
+
   private stepEnemies(dt: number, friendlies: Friendly[]): void {
     const foes = this.buildFoes(friendlies, dt);
     const archers: Enemy[] = [];
@@ -4653,6 +4834,7 @@ export class Game {
         continue;
       }
       const st = ENEMY_STATS[e.type]!;
+      if (!e.boss && this.repelFromTent(e, st.speed, dt)) continue; // 누군가 쉬는 텐트 근처에서는 물러난다
       this.regenShield(e, e.shieldMax, dt);
       e.cd = Math.max(0, e.cd - dt);
 

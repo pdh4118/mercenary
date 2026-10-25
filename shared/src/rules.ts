@@ -449,3 +449,16 @@ const lengthensOnArea = (type: number): boolean => type === BLUNT || type === SH
 export const meleeArc = (type: number, baseArc: number, area: number): number => (lengthensOnArea(type) ? baseArc : Math.min(AREA_ARC_MAX, baseArc * area));
 export const meleeReach = (type: number, reach: number, area: number): number => (lengthensOnArea(type) ? reach * area : reach);
 export const AREA_ARC_MAX = 2.4; // 범위 증가로 넓어지는 근접 부채꼴 반각 상한(라디안)
+
+/** 휴식 텐트: 가까이에서 스페이스를 누르면 주인공과 용병이 들어가 쉬고(체력 회복), 적은 물러난다. 다시 누르면 나온다. */
+export const TENT = {
+  useRadius: 110,
+  repelRadius: 420, // 누군가 쉬는 동안 이 안의 적은 물러난다
+  repelSpeed: 1.3, // 물러나는 속도(적 이동 속도 배율)
+  lifeSec: 80,
+  firstSec: 25,
+  intervalSec: 30,
+  max: 2,
+  healPerSec: 0.1, // 최대 체력의 비율(초당)
+  respawnBoost: 2, // 쓰러진 용병은 부활 시간이 이 배수만큼 더 빨리 준다
+} as const;

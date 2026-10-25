@@ -43,6 +43,10 @@ import {
   EF_SKEL,
   EF_SUPPLY,
   EVT_RICE,
+  EVT_TENT,
+  ST_BIT_REST,
+  TENT,
+  type TentWire,
   ST_BIT_STUN,
   EVT_REFLECT,
   EVT_COUNTER,
@@ -233,6 +237,7 @@ async function main() {
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
   // 여성 주인공 그림(없으면 기본 그림으로 대신한다)
   const heroTexF = await Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_f_${f}.png`).catch(() => null)));
+  const tentTex = await Promise.all([0, 1].map((i) => Assets.load<Texture>(`assets/camp/tent_${i}.png`).catch(() => null)));
   const [heroTex, campTex, groundTex, allyArrow, enemyArrow] = await Promise.all([
     Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_${f}.png`))),
     Assets.load<Texture>("assets/camp/camp.png"),
@@ -729,6 +734,30 @@ async function main() {
       node.addChild(ring, tent, label);
       campLayer.addChild(node);
       return { node, label, x: 0, y: 0 };
+    },
+    (w) => [w[0], w[1], w[2]],
+    false,
+  );
+
+  // 휴식 텐트: 가까이에서 스페이스로 들어가 쉰다. 누가 쉬고 있으면 Zzz가 떠오른다.
+  interface TentView extends Tracked {
+    label: Text;
+    sprite: Sprite;
+    zT: number;
+  }
+  const tents = new Pool<TentView, TentWire>(
+    (w) => {
+      const node = new Container();
+      const ring = new Graphics().circle(0, 0, TENT.useRadius).fill({ color: 0x7fb4ff, alpha: 0.05 }).stroke({ width: 2, color: 0x7fb4ff, alpha: 0.4 });
+      const sprite = new Sprite(tentTex[w[4] % 2] ?? tentTex[0] ?? undefined);
+      sprite.anchor.set(0.5, 0.62);
+      sprite.scale.set(0.8);
+      const label = new Text({ text: "", style: { fill: 0xbfd9ff, fontSize: 13, stroke: { color: 0x000000, width: 3 } } });
+      label.anchor.set(0.5, 0);
+      label.y = 74;
+      node.addChild(ring, sprite, label);
+      campLayer.addChild(node);
+      return { node, label, sprite, zT: 0, x: 0, y: 0 };
     },
     (w) => [w[0], w[1], w[2]],
     false,
@@ -1412,6 +1441,7 @@ async function main() {
             dashFx.set(owner, { t0: performance.now(), lx: x, ly: y });
             spawnDashGhost(owner, x, y);
           }
+          else if (kind === EVT_TENT) audio.play(val === 0 ? "camp_open" : "card_pick", { x, y });
           else if (kind === EVT_RICE) bossFx.riceEvent(val, x, y);
           else if (kind === EVT_BOSSFX) bossFx.playFx(val, x, y, ang, owner); // 장군 스킬 효과 컷
           else if (kind === EVT_SKILL) {
@@ -1845,6 +1875,7 @@ async function main() {
     }
     // 캠프와 상자
     for (const c of st.camps) g.rect(sx(c[1]) - 3, sy(c[2]) - 3, 6, 6).fill(0xe0c05d);
+    for (const t of st.tents ?? []) g.poly([sx(t[1]), sy(t[2]) - 4, sx(t[1]) - 4, sy(t[2]) + 3, sx(t[1]) + 4, sy(t[2]) + 3]).fill(0x7fb4ff);
     for (const c of st.chests ?? []) {
       const mine = c[3] === myId;
       g.rect(sx(c[1]) - 3, sy(c[2]) - 2.5, 6, 5).fill(mine ? 0xffd45d : 0x7a6a4a).stroke({ width: 1, color: 0x1a1208 });
@@ -2064,7 +2095,7 @@ async function main() {
       }
     }
     mercs.update(latest.mercs, k, (v, w) => {
-      v.node.visible = w[8] <= 0; // 쓰러진 용병은 부활할 때까지 숨긴다
+      v.node.visible = w[8] <= 0 && ((w[19] ?? 0) & ST_BIT_REST) === 0; // 쓰러진 용병은 부활할 때까지, 텐트에서 쉬는 용병은 나올 때까지 숨긴다
       paintRing(v, ownerColor(w[5]), teamSide(w[5]) !== null);
       if (v.wasDown && w[8] <= 0 && w[5] === myId) audio.play("merc_respawn", { x: v.x, y: v.y });
       v.wasDown = w[8] > 0;
@@ -2105,6 +2136,7 @@ async function main() {
     });
     players.update(latest.players, k, (v, p) => {
       const dead = p.down;
+      v.node.visible = !p.rest; // 텐트에서 쉬는 동안은 보이지 않는다
       if (!dead && ((p.status ?? 0) & ST_BIT_STUN) !== 0) bossFx.stunMark(`p${p.id}`, v.x, v.y - 84, 0.6, performance.now()); // 기절한 주인공: 머리 위에 별
       paintRing(v, ownerColor(p.id), teamSide(p.id) !== null);
       const side = teamSide(p.id);
@@ -2149,6 +2181,18 @@ async function main() {
     });
     camps.update(latest.camps, k, (v, w) => {
       v.label.text = `캠프 ${Math.ceil(w[3])}초`;
+    });
+
+    tents.update(latest.tents ?? [], k, (v, w) => {
+      v.label.text = w[5] > 0 ? `쉬는 중 ${w[5]}명 · ${Math.ceil(w[3])}초` : `휴식 텐트 ${Math.ceil(w[3])}초`;
+      v.sprite.alpha = w[5] > 0 ? 0.92 : 1;
+      if (w[5] > 0) {
+        v.zT -= ticker.deltaMS;
+        if (v.zT <= 0) {
+          v.zT = 900;
+          spawnFloat("Z", v.x + 10, v.y - 70, { fill: 0xbfd9ff, fontSize: 20, fontWeight: "800", stroke: { color: 0x10203a, width: 4 } }, 1.2, 0.2);
+        }
+      }
     });
 
     // 공격 예고
@@ -2939,6 +2983,13 @@ async function main() {
           : (latest.chests ?? []).some((c) => c[3] === myId)
             ? "보상 상자가 떨어졌습니다! 반짝이는 내 상자 곁으로 가세요"
             : "";
+
+      // 휴식 텐트 안내
+      {
+        const nearTent = (latest.tents ?? []).some((t) => Math.hypot(t[1] - meState.x, t[2] - meState.y) <= TENT.useRadius);
+        if (meState.rest) deadText.text = "텐트에서 쉬는 중 — 체력이 찹니다 · 스페이스: 나가기";
+        else if (nearTent && !meState.down && latest.g?.phase !== "tournament") deadText.text = "스페이스: 텐트에서 쉬기 (적이 물러납니다)";
+      }
 
       // 가까운 캠프의 고용 목록
       let best: CampWire | null = null;
