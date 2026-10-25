@@ -70,7 +70,9 @@ const guard: SkillDef = {
             near = f;
           }
         }
-        if (near) sys.fx(e.x, e.y, Math.atan2(near.y - e.y, near.x - e.x) + (Math.random() - 0.5) * 0.24, BFX_THRUST, C.guardRange);
+        // 태세를 유지하는 동안은 부채꼴 안에 아무도 없어도 정면으로 계속 찌르는 줄기가 나간다(있으면 가장 가까운 대상 쪽으로)
+        const aim = near ? Math.atan2(near.y - e.y, near.x - e.x) : k.ang + (Math.random() - 0.5) * C.guardHalf * 1.6;
+        sys.fx(e.x, e.y, aim + (Math.random() - 0.5) * 0.24, BFX_THRUST, C.guardRange);
       }
       // 부채꼴 안으로 날아오는 아군 화살·투척류를 쓸어서 떨어뜨린다
       g.bullets = (g.bullets as any[]).filter((b) => b.hostile || !sys.inCone({ x: b.x, y: b.y, r: 0 }, e.x, e.y, k.ang, C.guardHalf, C.guardRange));

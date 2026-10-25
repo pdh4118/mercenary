@@ -314,7 +314,7 @@ export const BOSS_BLUNT = {
   idleMin: 1,
   idleMax: 2.4,
   jumpRange: 520,
-  jumpTele: 0.9,
+  jumpTele: 1.0,
   jumpRadius: 220,
   jumpDmg: 6,
   jumpStun: 1.5,
