@@ -231,7 +231,7 @@ import {
   TIER_CAST,
   TIER_CHARGE,
   TIER_COUNTER,
-  tierDmg,
+  TIER_DMG,
   TIER_HP,
   TIER_REACH,
   TIER_SHIELD,
@@ -4350,7 +4350,7 @@ export class Game {
     if (flat <= 0) return;
     const attacker = h.src as Enemy;
     // 반사 피해도 공격력(%)·단계 배율을 받는다
-    const dmgMult = src ? mstat(owner.mods, src.type, "dmg") * tierDmg(src.type, src.tier) : owner.mods.heroDmg;
+    const dmgMult = src ? mstat(owner.mods, src.type, "dmg") * TIER_DMG[src.tier]! : owner.mods.heroDmg;
     if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, flat * dmgMult, owner.state.id, src);
   }
 
@@ -4550,7 +4550,7 @@ export class Game {
       ...base,
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
-      damage: base.damage * mstat(mods, t, "dmg") * tierDmg(t, tier) * (1 + (slot?.state.swarm ?? 0)),
+      damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)),
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier),
       cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
