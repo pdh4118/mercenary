@@ -112,7 +112,7 @@ const BOSS_UNIT_TEX = [
   "boss2_idle", "boss2_guard", "boss2_thrust",
   "boss3_idle", "boss3_aim", "boss3_sky",
   "boss4_idle", "boss4_reflect", "boss4_charge",
-  "boss5_idle", "boss5_jump", "boss5_smash",
+  "boss5_idle", "boss5_jump", "boss5_smash", "boss5_swing_a", "boss5_swing_b",
   "boss5_whirlpose_0", "boss5_whirlpose_1", "boss5_whirlpose_2", "boss5_whirlpose_3",
   "boss6_idle", "boss6_cast", "boss6_blink",
   "boss7_gallop", "boss7_shoot",
@@ -123,6 +123,9 @@ const BOSS_UNIT_TEX = [
 /**
  * 장군 스킬의 화면 표현: 예고(붉은 바닥 표시와 이름표), 장판·장애물·분신, 상태 표시(은신·무적·기절 등), 효과 컷, 장군 투사체 그림.
  */
+/** 철퇴 난타에서 마지막으로 휘두른 시각(휘두르는 포즈를 잠깐 보여 준다) */
+let lastSwingAt = 0;
+
 export async function createBossFx(d: BossFxDeps) {
   const fx = async (name: string): Promise<Tex> => Assets.load<Texture>(`assets/fx/${name}.png`).catch(() => null);
   const seq = (name: string, idx: number[]) => Promise.all(idx.map((i) => fx(`${name}_${i}`)));
@@ -199,7 +202,7 @@ export async function createBossFx(d: BossFxDeps) {
     { idle: u("boss2_idle"), scale: 0.6, pose: (sk, _fl, atk) => (sk === BSK_GUARD ? u("boss2_guard") : sk === BSK_CLONE || sk === BSK_TRIPLE || sk === BSK_THROW || atk ? u("boss2_thrust") : u("boss2_idle")) },
     { idle: u("boss3_idle"), scale: 0.4, pose: (sk, _fl, atk) => (sk === BSK_RAIN ? u("boss3_sky") : sk === BSK_SNIPE || sk === BSK_ICEARROW || atk ? u("boss3_aim") : u("boss3_idle")) },
     { idle: u("boss4_idle"), scale: 0.42, pose: (sk, fl) => (sk === BSK_REFLECT || fl & EF_GUARD ? u("boss4_reflect") : sk === BSK_SHIELDRUSH ? u("boss4_charge") : u("boss4_idle")) },
-    { idle: u("boss5_idle"), scale: 0.42, pose: (sk, fl, atk) => (fl & EF_WHIRL ? u(`boss5_whirlpose_${Math.floor(performance.now() / WHIRL_FRAME_MS) % 4}`) : sk === BSK_JUMP ? u("boss5_jump") : sk === BSK_MACETHROW || sk === BSK_FLURRY || sk === BSK_WHIRL || atk ? u("boss5_smash") : u("boss5_idle")) },
+    { idle: u("boss5_idle"), scale: 0.42, pose: (sk, fl, atk) => (fl & EF_WHIRL ? u(`boss5_whirlpose_${Math.floor(performance.now() / WHIRL_FRAME_MS) % 4}`) : sk === BSK_JUMP ? u("boss5_jump") : sk === BSK_FLURRY ? (performance.now() - lastSwingAt < 170 ? u("boss5_swing_b") : u("boss5_swing_a")) : sk === BSK_MACETHROW || sk === BSK_WHIRL || atk ? u("boss5_smash") : u("boss5_idle")) },
     { idle: u("boss6_idle"), scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_BLINK ? u("boss6_blink") : sk > 0 || atk ? u("boss6_cast") : u("boss6_idle")) },
     { idle: u("boss7_gallop"), scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")) },
     { idle: u("boss8_normal"), scale: 0.75, pose: (sk, fl) => (sk === BSK_ACCEL ? u("boss8_normal") : fl & EF_MAD || sk === BSK_RAMPAGE ? u("boss8_mad") : u("boss8_normal")) },
@@ -255,6 +258,7 @@ export async function createBossFx(d: BossFxDeps) {
       d.sound("knockback", x, y);
       if (val === BFX_CRASH) d.spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
     } else if (val === BFX_SWING) {
+      lastSwingAt = performance.now();
       // 철퇴 난타: 몸 중심에서 앞으로 휘두르는 호(좌우로 번갈아 뒤집는다)
       playSeq(T.flurryArc, x, y - 12, 0.28, 1.2, ang, 0.53, len === 1, 0.6);
       d.sound("skill_mace_hit", x, y, 0.5);
