@@ -218,7 +218,7 @@ test("궁수 장군 얼음 화살: 쏘기 시작할 때 먼지를 일으키며 �
   assert.ok(y0 - b.y > 120, `뒤로(대상 반대쪽) 물러났다 ${y0 - b.y}`);
 });
 
-import { EVT_INVULN } from "@mercenary/shared";
+import { EVT_INVULN, EVT_REFLECT } from "@mercenary/shared";
 
 test("무적인 장군을 때리면 때린 사람에게 \"무적!\" 이벤트가 나가고(0.4초에 한 번), 피해는 들어가지 않는다", () => {
   const { g, b, ids } = setup(4, 0);
@@ -236,4 +236,22 @@ test("무적인 장군을 때리면 때린 사람에게 \"무적!\" 이벤트가
   b.invulnT = 2;
   hit();
   assert.ok(takeEvents().some((ev) => ev[0] === EVT_INVULN), "시간이 지나면 다시 띄운다");
+});
+
+test("검방병 장군 반사 태세: 궁병·마법사(활·지팡이)의 공격은 되돌려받지 않고, 근접 공격은 되돌려받는다", () => {
+  const { g, b, ids } = setup(4, 14);
+  const p = hero(g, ids[0]!);
+  place(p, b.x, b.y + 200);
+  run(g, 0.1);
+  b.bk.v.reflect = 3;
+  const takeEvents = (g as any).takeEvents.bind(g) as () => number[][];
+  takeEvents();
+  const hit = (srcType: number) => (g as any).damageEnemy(b, { damage: 10, charge: 0, srcType, fromAngle: 0, crit: false }, ids[0]!);
+  hit(0); // 근접(기병)
+  const reflected = (k: number) => takeEvents().filter((ev) => ev[0] === 16 || ev[0] === EVT_REFLECT).length >= k;
+  assert.ok(reflected(1), "근접은 되돌려받는다");
+  takeEvents();
+  hit(2); // 궁병
+  hit(5); // 마법사
+  assert.equal(takeEvents().filter((ev) => ev[0] === EVT_REFLECT).length, 0, "궁병·마법사는 반사 없음");
 });

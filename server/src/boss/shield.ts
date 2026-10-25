@@ -7,6 +7,7 @@ import {
   BFX_CRASH,
   BFX_IMPACT,
   ARCHER,
+  MAGE,
   EF_GUARD,
   EVT_REFLECT,
   HZ_SHIELD,
@@ -206,6 +207,7 @@ export const shieldKit: KitDef = {
   /** 반사 태세: 받는 피해가 줄고 맞은 피해의 몇 배가 때린 쪽에게 돌아간다 */
   preHit: ({ e, k, sys }, hit, ownerId, src) => {
     if ((k.v.reflect ?? 0) <= 0 || hit.dot) return hit;
+    if (hit.srcType === ARCHER || hit.srcType === MAGE) return { ...hit, damage: hit.damage * C.reflectTaken, charge: hit.charge * C.reflectTaken }; // 궁병·마법사(활·지팡이 포함)의 공격은 되돌려받지 않는다(받는 피해 감소만 적용)
     const raw = hit.damage + hit.charge;
     const back = raw * C.reflectMult;
     sys.reflectTo(ownerId, src, back);
