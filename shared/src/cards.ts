@@ -174,7 +174,7 @@ export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
 /** 등급을 반영한 효과량. 관통은 정수로 1/2/3, 나머지는 등급 배율. */
 export const scaledValue = (stat: MercStat | "heroPierce" | "heroMulti" | "heroArmor" | "heroThorns", base: number, rarity: number): number =>
-  stat === "armor" || stat === "heroArmor" ? base * rarity : stat === "thorns" || stat === "heroThorns" ? round3(base * (rarity + 1)) : stat === "pierce" || stat === "multi" || stat === "heroPierce" || stat === "heroMulti" ? base * (rarity + 1) : round3(base * RARITY[rarity]!.mult);
+  stat === "armor" || stat === "heroArmor" ? base * rarity : stat === "thorns" || stat === "heroThorns" ? round3(base * (rarity + 1)) : stat === "multi" || stat === "heroMulti" ? base * rarity : stat === "pierce" || stat === "heroPierce" ? base * (rarity + 1) : round3(base * RARITY[rarity]!.mult);
 
 /** 능력치 변화량을 사람이 읽는 문구로 */
 export function describeStat(stat: MercStat, v: number): string {
@@ -221,7 +221,7 @@ const statCards = (): CardDef[] => {
     for (const stat of MERC_TYPE_FOCUS[t]!) {
       if (!TYPE_ONLY_STATS.has(stat)) continue; // 그 병종만의 특화 능력이 아니면 용병 공용 카드로만 나온다
       const special = stat === "pierce" || stat === "multi" || stat === "poison" || stat === "critMult" || stat === "thorns";
-      for (let r = stat === "armor" ? 1 : 0; r < 3; r++) {
+      for (let r = stat === "armor" || stat === "multi" ? 1 : 0; r < 3; r++) { // 방어구·발사 수는 희귀부터
         const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * (stat === "knock" && t === ARCHER ? ARCHER_KNOCK_FACTOR : 1));
         out.push({
           name: `${UNIT_NAMES[t]} ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`,
@@ -284,8 +284,8 @@ export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "
 ];
 const heroCards = (): CardDef[] =>
   HERO_STATS.flatMap((h) =>
-    (h.k === "heroArmor" ? [1, 2] : [0, 1, 2]).map((r): CardDef => {
-      const v = h.k === "heroArmor" ? h.base * r : h.k === "heroThorns" ? h.base * (r + 1) : h.k === "heroPierce" || h.k === "heroMulti" ? h.base * (r + 1) : h.fmt === "flat" ? Math.round(h.base * RARITY[r]!.mult) : round3(h.base * RARITY[r]!.mult);
+    (h.k === "heroArmor" || h.k === "heroMulti" ? [1, 2] : [0, 1, 2]).map((r): CardDef => {
+      const v = h.k === "heroArmor" ? h.base * r : h.k === "heroThorns" ? h.base * (r + 1) : h.k === "heroMulti" ? h.base * r : h.k === "heroPierce" ? h.base * (r + 1) : h.fmt === "flat" ? Math.round(h.base * RARITY[r]!.mult) : round3(h.base * RARITY[r]!.mult);
       const text = h.k === "heroArmor" ? `-${v}` : h.k === "heroThorns" ? `${v}` : h.k === "heroPoison" ? `화살 피해의 ${Math.round(v * 100)}%` : h.fmt === "cut" ? `-${Math.round(Math.abs(v) * 1000) / 10}%` : h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 +${Math.round(v * 10) / 10}` : `+${v}`;
       return {
         name: `${h.label} ${text}`,
