@@ -211,11 +211,11 @@ test("방벽은 적의 화살을 막고, 아무리 맞아도 부서지지 않는
   assert.ok(g.snapshotWalls()[0]![6] > 70, "남은 시간 비율은 시간만 따라 줄어든다");
 });
 
-test("스킬 회복 속도 카드: 일반 +4%, 쌓을수록 쿨타임이 1/(1+합)배로 줄고 효율은 같다", async () => {
+test("스킬 회복 속도 카드: 일반 +6%, 쌓을수록 쿨타임이 1/(1+합)배로 줄고 효율은 같다", async () => {
   const { CARDS } = await import("@mercenary/shared");
   const cards = CARDS.filter((c) => c.effect.k === "heroSkill");
   assert.equal(cards.length, 3, "일반·희귀·영웅");
-  assert.ok(cards[0]!.effect.k === "heroSkill" && Math.abs(cards[0]!.effect.v - 0.04) < 1e-9, "일반 +4%");
+  assert.ok(cards[0]!.effect.k === "heroSkill" && Math.abs(cards[0]!.effect.v - 0.06) < 1e-9, "일반 +6%");
   assert.equal(cards[0]!.minLevel, 1, "1레벨부터 나온다");
   assert.ok(cards[0]!.effect.k === "heroSkill" && cards[1]!.effect.k === "heroSkill" && Math.abs(cards[1]!.effect.v / cards[0]!.effect.v - 1.6) < 1e-6, "희귀는 x1.6");
   const cooldownAfter = (n: number) => {

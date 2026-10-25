@@ -716,8 +716,8 @@ test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   forceCard(g, a, "heroMaxHp");
-  assert.equal(g.getPlayer(a)!.maxHp, TUNE.PLAYER_MAX_HP + 13);
-  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 13);
+  assert.equal(g.getPlayer(a)!.maxHp, TUNE.PLAYER_MAX_HP + 19);
+  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 19);
   forceCard(g, a, "priceMult");
   assert.ok(Math.abs(g.getPlayer(a)!.priceMult - 0.85) < 1e-9);
   const p = me(g, a);
@@ -738,7 +738,7 @@ test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
   const x0 = me(g, a).x;
   g.setInput(a, { ...idle, dx: 1 });
   run(g, 1);
-  assert.ok(Math.abs(me(g, a).x - x0 - TUNE.PLAYER_SPEED * 1.06) < 1e-6);
+  assert.ok(Math.abs(me(g, a).x - x0 - TUNE.PLAYER_SPEED * 1.09) < 1e-6);
   g.setInput(a, idle);
   forceCard(g, a, "heroRegen");
   g.getPlayer(a)!.hp = 50;

@@ -256,31 +256,31 @@ const statCards = (): CardDef[] => {
   return out;
 };
 
-/** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용). 체력 재생·흡혈·근접 반사·관통·발사 수를 뺀 수치는 이전의 절반(초반엔 영웅, 후반엔 용병술). */
+/** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용). 체력 재생·흡혈·근접 반사·피해 감소·관통·발사 수를 뺀 수치는 이전의 1.5배(용병 공용 카드 1명분의 약 1.8배). */
 export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "leadershipPct" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
-  { k: "heroMaxHp", label: "최대 체력", base: 12.5, weight: 8, fmt: "flat" },
-  { k: "heroSpeed", label: "이동 속도", base: 0.06, weight: 6, fmt: "pct" },
-  { k: "heroDmg", label: "공격력", base: 0.125, weight: 8, fmt: "pct" },
-  { k: "heroFireRate", label: "공격 속도", base: 0.075, weight: 6, fmt: "pct" },
-  { k: "heroRange", label: "사거리", base: 0.06, weight: 6, fmt: "pct" },
+  { k: "heroMaxHp", label: "최대 체력", base: 18.75, weight: 8, fmt: "flat" },
+  { k: "heroSpeed", label: "이동 속도", base: 0.09, weight: 6, fmt: "pct" },
+  { k: "heroDmg", label: "공격력", base: 0.1875, weight: 8, fmt: "pct" },
+  { k: "heroFireRate", label: "공격 속도", base: 0.1125, weight: 6, fmt: "pct" },
+  { k: "heroRange", label: "사거리", base: 0.09, weight: 6, fmt: "pct" },
   { k: "heroPierce", label: "관통", base: 1, weight: 4, minLevel: 3, fmt: "int" },
   { k: "heroMulti", label: "발사 수", base: 1, weight: 3, minLevel: 3, fmt: "int" },
-  { k: "heroPoison", label: "독 화살", base: 0.25, weight: 3, minLevel: 3, fmt: "pct" },
+  { k: "heroPoison", label: "독 화살", base: 0.375, weight: 3, minLevel: 3, fmt: "pct" },
   { k: "heroArmor", label: "피해 감소", base: 1, weight: 2.5, minLevel: 4, fmt: "int" },
-  { k: "heroCrit", label: "치명타 확률", base: 0.04, weight: 6, fmt: "pct" },
-  { k: "heroCritMult", label: "치명타 피해", base: 0.1, weight: 4, minLevel: 3, fmt: "pct" },
-  { k: "heroArea", label: "범위", base: 0.075, weight: 4, fmt: "pct" },
-  { k: "heroKnock", label: "넉백", base: 15, weight: 5, fmt: "flat" },
+  { k: "heroCrit", label: "치명타 확률", base: 0.12, weight: 6, fmt: "pct" },
+  { k: "heroCritMult", label: "치명타 피해", base: 0.15, weight: 4, minLevel: 3, fmt: "pct" },
+  { k: "heroArea", label: "범위", base: 0.1125, weight: 4, fmt: "pct" },
+  { k: "heroKnock", label: "넉백", base: 22.5, weight: 5, fmt: "flat" },
   { k: "heroThorns", label: "근접 반사", base: 2, weight: 4, minLevel: 3, fmt: "int" },
-  { k: "heroDefense", label: "방어력", base: 0.04, weight: 7, fmt: "pct" },
-  { k: "heroDodge", label: "회피율", base: 0.03, weight: 5, fmt: "pct" },
+  { k: "heroDefense", label: "방어력", base: 0.225, weight: 7, fmt: "pct" },
+  { k: "heroDodge", label: "회피율", base: 0.18, weight: 5, fmt: "pct" },
   { k: "heroRegen", label: "체력 재생", base: 0.12, weight: 9, fmt: "regen" },
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
-  { k: "heroCast", label: "시전 속도", base: 0.05, weight: 4, fmt: "pct" },
-  { k: "heroSkill", label: "스킬 가속", base: 0.04, weight: 5, fmt: "pct" }, // 일반 +4%(희귀 x1.6, 영웅 x2.4), 쿨타임 1/(1+합)배
-  { k: "heroSkillPow", label: "스킬 효과", base: 0.08, weight: 5, fmt: "pct" }, // 일반 +8%(희귀 x1.6, 영웅 x2.4)
-  { k: "heroShield", label: "방패 체력", base: 40, weight: 5, fmt: "flat" },
-  { k: "heroShieldRegen", label: "방패 재생 속도", base: 0.2, weight: 5, fmt: "pct" },
+  { k: "heroCast", label: "시전 속도", base: 0.075, weight: 4, fmt: "pct" },
+  { k: "heroSkill", label: "스킬 가속", base: 0.06, weight: 5, fmt: "pct" }, // 일반 +4%(희귀 x1.6, 영웅 x2.4), 쿨타임 1/(1+합)배
+  { k: "heroSkillPow", label: "스킬 효과", base: 0.12, weight: 5, fmt: "pct" }, // 일반 +8%(희귀 x1.6, 영웅 x2.4)
+  { k: "heroShield", label: "방패 체력", base: 60, weight: 5, fmt: "flat" },
+  { k: "heroShieldRegen", label: "방패 재생 속도", base: 0.3, weight: 5, fmt: "pct" },
 ];
 const heroCards = (): CardDef[] =>
   HERO_STATS.flatMap((h) =>

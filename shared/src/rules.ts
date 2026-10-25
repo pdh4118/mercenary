@@ -38,7 +38,7 @@ export const TUNE = {
   BOSS_RAGE_SPEED: 0.02, // 단계마다 늘어나는 이동 속도 비율
   BOSS_RAGE_MAX: 12, // 격노 최대 단계
   REVIVE_SEC: 5, // 한 명이 눌러서 가득 채우는 데 걸리는 시간
-  CRIT_BASE_MULT: 1.3, // 치명타 기본 피해 배율(이전 1.5)
+  CRIT_BASE_MULT: 1.5, // 치명타 기본 피해 배율
   BACKSTAB_MULT: 1.5,
   SHIELD_REGEN_SEC: 8, // 방패가 깨진 뒤 재생될 때까지
   SPLASH_FACTOR: 0.5,
