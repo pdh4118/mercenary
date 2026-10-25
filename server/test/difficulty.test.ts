@@ -79,7 +79,7 @@ test("난이도는 사람마다 적용된다: 한 명이 쉬움이어도 다른 
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;
   const b = g.addPlayer("b")!;
-  g.setDifficulty(a, 0); // 피해 -75%
+  g.setDifficulty(a, 0); // 피해 -85%
   const pa = g.getPlayer(a)!;
   const pb = g.getPlayer(b)!;
   for (const p of [pa, pb]) p.hp = p.maxHp = 100000;
@@ -90,7 +90,7 @@ test("난이도는 사람마다 적용된다: 한 명이 쉬움이어도 다른 
   const la = 100000 - pa.hp;
   const lb = 100000 - pb.hp;
   assert.ok(lb > 40);
-  assert.ok(Math.abs(la / lb - 0.25) < 0.1, `${la} vs ${lb}`);
+  assert.ok(Math.abs(la / lb - 0.15) < 0.08, `${la} vs ${lb}`);
 });
 
 test("용병은 한 자리에 뭉쳐 쌓이지 않는다", () => {

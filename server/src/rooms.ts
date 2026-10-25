@@ -105,6 +105,7 @@ export class RoomManager {
     m.offlineLeft = RECONNECT_GRACE_SEC;
     at.room.game.setAway(m.id, true);
     this.broadcastRoom(at.room);
+    this.broadcastLobby();
   }
 
   // --- 요청 처리 ---------------------------------------------------------
@@ -356,7 +357,7 @@ export class RoomManager {
 
   list(): RoomInfo[] {
     return [...this.rooms.values()]
-      .filter((r) => !r.isPrivate)
+      .filter((r) => !r.isPrivate && [...r.members.values()].some((m) => m.conn)) // 접속한 사람이 없는 방(재접속 대기 중)은 목록에서 뺀다
       .map((r) => ({ code: r.code, name: r.name, players: r.game.playerCount, max: MAX_PLAYERS, playing: r.phase !== "waiting" }))
       .sort((a, b) => b.players - a.players || a.code.localeCompare(b.code));
   }

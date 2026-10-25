@@ -640,3 +640,16 @@ test("로비·대기실에서 5분 동안 아무 조작이 없으면 연결을 �
   assert.equal(player.closed, false);
   assert.equal(player.last("left"), undefined);
 });
+
+test("접속한 사람이 없는 방(재접속 대기 중)은 방 목록에서 빠진다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  const b = conn();
+  m.handle(a, { t: "create", name: "A" });
+  assert.equal(m.list().length, 1);
+  m.disconnect(a);
+  assert.equal(m.roomCount(), 1, "자리는 잠깐 지켜 준다");
+  assert.equal(m.list().length, 0, "하지만 목록에는 보이지 않는다");
+  m.handle(b, { t: "list" });
+  assert.equal(b.last("rooms")!.rooms.length, 0);
+});
