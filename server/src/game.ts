@@ -154,6 +154,7 @@ import {
   STANCE_DEFEND,
   STANCE_HOLD,
   STANCE_PROTECT,
+  STANCE_SPREAD,
   BOSS_CAV,
   BOSS_HP_STAGE_MULT,
   ST_ROOT,
@@ -2355,7 +2356,15 @@ export class Game {
       const fx = Math.cos(face);
       const fy = Math.sin(face);
       const adv = stance === STANCE_ASSAULT ? TUNE.ASSAULT_ADVANCE : 0; // 돌격 진형은 대열이 앞으로 나간다
-      out.set(id, [clampToWorld(ox + fx * (fwd + adv) - fy * lat, 24), clampToWorld(oy + fy * (fwd + adv) + fx * lat, 24)]); // 진형 자리가 맵 밖이면 가장자리로
+      let f2 = fwd + adv;
+      let l2 = lat;
+      if (stance === STANCE_SPREAD) {
+        // 산개: 자리를 앞뒤·좌우로 늘리고 자리마다 조금씩 어긋나게 해 한 곳에 뭉치지 않게 한다
+        const a = id * 2.399963;
+        f2 = fwd * TUNE.SPREAD_FORWARD + Math.cos(a) * TUNE.SPREAD_JITTER;
+        l2 = lat * TUNE.SPREAD_LATERAL + Math.sin(a) * TUNE.SPREAD_JITTER;
+      }
+      out.set(id, [clampToWorld(ox + fx * f2 - fy * l2, 24), clampToWorld(oy + fy * f2 + fx * l2, 24)]); // 진형 자리가 맵 밖이면 가장자리로
     }
     return out;
   }
@@ -2376,7 +2385,7 @@ export class Game {
   /** 용병 진형 모드(기본 / 돌격 / 지점 방어)를 바꾼다. types로 병종을 고를 수 있다(생략하면 전체). */
   setStance(playerId: number, v: unknown, types?: unknown): boolean {
     const sl = this.slots.get(playerId);
-    if (!sl || (v !== STANCE_DEFEND && v !== STANCE_ASSAULT && v !== STANCE_HOLD && v !== STANCE_PROTECT)) return false;
+    if (!sl || (v !== STANCE_DEFEND && v !== STANCE_ASSAULT && v !== STANCE_HOLD && v !== STANCE_PROTECT && v !== STANCE_SPREAD)) return false;
     const mask = this.typeMask(types);
     if (v === STANCE_HOLD) {
       // 지점을 정한 적이 없는 병종은 주인공 앞쪽에 지점을 둔다
@@ -3380,6 +3389,7 @@ export class Game {
   /** 실제로 따르는 진형 모드: 보호 진형에서 기병·둔기병은 자유롭게 싸우므로(프리롤) 돌격처럼, 나머지는 기본처럼 움직인다 */
   private effStance(owner: Slot | undefined, type: number): number {
     const v = owner?.stances[type] ?? STANCE_DEFEND;
+    if (v === STANCE_SPREAD) return STANCE_DEFEND; // 산개는 기본 진형처럼 싸우되 자리만 넓게 흩어진다
     return v === STANCE_PROTECT ? (type === CAVALRY || type === BLUNT ? STANCE_ASSAULT : STANCE_DEFEND) : v;
   }
 

@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>머서너리 수치 조정</title>
     <style>
-      :root { --bg: #14161c; --panel: #1d2029; --line: #343949; --text: #e6e9f0; --muted: #9aa1b0; --gold: #e0c05d; --changed: #ffe08a; --bad: #ff9b8f; --good: #7be08f; }
+      :root { --bg: #14161c; --panel: #1d2029; --panel2: #232736; --line: #343949; --text: #e6e9f0; --muted: #9aa1b0; --gold: #e0c05d; --changed: #ffe08a; --bad: #ff9b8f; --good: #7be08f; --blue: #7fb4ff; }
       * { box-sizing: border-box; }
       html, body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; }
-      header { position: sticky; top: 0; z-index: 5; background: #0f1015; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      header { position: sticky; top: 0; z-index: 10; background: #0f1015; border-bottom: 1px solid var(--line); padding: 10px 16px 0; }
+      .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding-bottom: 10px; }
       header h1 { margin: 0; font-size: 18px; color: var(--gold); margin-right: 8px; }
-      header input[type="search"] { flex: 1; min-width: 180px; max-width: 360px; padding: 8px 10px; font-size: 14px; color: var(--text); background: #12141a; border: 1px solid #3a4052; border-radius: 8px; outline: none; }
+      header input[type="search"] { flex: 1; min-width: 180px; max-width: 340px; padding: 8px 10px; font-size: 14px; color: var(--text); background: #12141a; border: 1px solid #3a4052; border-radius: 8px; outline: none; }
       header input[type="search"]:focus { border-color: var(--gold); }
       button { white-space: nowrap; padding: 8px 14px; font-size: 14px; color: var(--text); background: #2c3140; border: 1px solid #3f4659; border-radius: 8px; cursor: pointer; }
       button:hover:not(:disabled) { background: #384056; }
@@ -18,72 +19,121 @@
       button.primary { background: #b8863b; border-color: #d7a24d; color: #1a1306; font-weight: 700; }
       button.primary:hover:not(:disabled) { background: #cb9644; }
       button.danger { background: #5b2a2a; border-color: #8a3f3f; }
-      button.small { padding: 4px 8px; font-size: 12px; }
+      button.small { padding: 3px 8px; font-size: 12px; }
       .status { font-size: 13px; color: var(--muted); }
       .status.ok { color: var(--good); }
       .status.err { color: var(--bad); }
-      main { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
-      nav { position: sticky; top: 64px; width: 220px; flex: none; max-height: calc(100vh - 80px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
-      nav a { display: flex; justify-content: space-between; gap: 6px; padding: 6px 8px; border-radius: 6px; color: var(--text); text-decoration: none; font-size: 13px; }
-      nav a:hover { background: #262b3a; }
-      nav a .n { color: var(--changed); font-weight: 700; }
-      #groups { flex: 1; min-width: 0; }
+      .tabs { display: flex; gap: 4px; overflow-x: auto; }
+      .tab { padding: 9px 16px; border-radius: 8px 8px 0 0; background: #181b24; color: var(--muted); border: 1px solid var(--line); border-bottom: none; cursor: pointer; font-size: 14px; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+      .tab:hover { color: var(--text); background: #1f2330; }
+      .tab.on { background: var(--panel); color: var(--gold); font-weight: 700; border-color: #4a5168; }
+      .tab .n { background: var(--changed); color: #2a2000; border-radius: 10px; padding: 0 7px; font-size: 11px; font-weight: 700; }
+      main { padding: 16px; max-width: 1280px; margin: 0 auto; }
+      .note { margin: 0 0 14px; padding: 10px 14px; background: #1b2230; border: 1px solid #2c3a55; border-radius: 10px; color: #b8c6e0; font-size: 13px; line-height: 1.6; }
+      .intro { margin: 0 0 12px; color: var(--muted); font-size: 13px; line-height: 1.55; }
       section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
-      section > h2 { margin: 0; padding: 10px 14px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #232736; }
-      section > h2 .cnt { font-size: 12px; color: var(--muted); font-weight: 400; }
-      section.closed .rows { display: none; }
-      .row { display: grid; grid-template-columns: minmax(180px, 1fr) 150px 120px 70px; gap: 10px; align-items: center; padding: 7px 14px; border-top: 1px solid #262a37; }
-      .row.changed { background: rgba(224, 192, 93, 0.08); }
+      section > h2 { margin: 0; padding: 10px 14px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; background: var(--panel2); }
+      section > h2 .cnt { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+      section > h2 .chg { color: var(--changed); font-size: 12px; font-weight: 700; margin-left: 8px; }
+      section.closed .body { display: none; }
+      .body { padding: 6px 0; overflow-x: auto; }
+      /* 표(격자) */
+      table.grid { border-collapse: collapse; margin: 6px 14px 10px; }
+      table.grid th { font-weight: 600; font-size: 12px; color: var(--muted); padding: 6px 8px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--line); }
+      table.grid th.rowh { text-align: left; color: var(--text); font-size: 14px; padding: 4px 14px 4px 4px; border-bottom: none; position: sticky; left: 0; background: var(--panel); }
+      table.grid td { padding: 3px 4px; }
+      table.grid tr:hover td, table.grid tr:hover th.rowh { background: rgba(255, 255, 255, 0.03); }
+      .cell { display: flex; align-items: center; gap: 3px; }
+      .cell input { width: 84px; padding: 6px 7px; font-size: 14px; color: var(--text); background: #12141a; border: 1px solid #3a4052; border-radius: 6px; outline: none; text-align: right; }
+      .cell input:focus { border-color: var(--gold); }
+      .cell.changed input { border-color: var(--changed); color: var(--changed); background: #231f10; }
+      .cell.bad input { border-color: var(--bad); color: var(--bad); }
+      .cell .u { color: var(--muted); font-size: 12px; min-width: 1.4em; }
+      .cell .rs { visibility: hidden; padding: 0 5px; font-size: 11px; line-height: 20px; }
+      .cell.changed .rs { visibility: visible; }
+      .emptycell { color: #3a4052; text-align: center; }
+      /* 블록(스킬별 묶음) */
+      .blocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; padding: 10px 14px; }
+      .blk { background: #191c26; border: 1px solid #2a3040; border-radius: 8px; padding: 8px 10px; }
+      .blk h3 { margin: 0 0 6px; font-size: 14px; color: var(--blue); display: flex; justify-content: space-between; align-items: center; }
+      .fld { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 2px 0; }
+      .fld span { font-size: 13px; color: #cfd3dc; }
+      /* 목록(슬라이더) */
+      .row { display: grid; grid-template-columns: minmax(200px, 1.2fr) minmax(160px, 1.4fr) 130px 60px; gap: 12px; align-items: center; padding: 7px 14px; border-top: 1px solid #262a37; }
+      .row.changed { background: rgba(224, 192, 93, 0.07); }
       .row .name { overflow: hidden; text-overflow: ellipsis; }
       .row .name small { display: block; color: var(--muted); font-size: 11px; }
-      .row input[type="number"] { width: 100%; padding: 6px 8px; font-size: 15px; color: var(--text); background: #12141a; border: 1px solid #3a4052; border-radius: 6px; outline: none; text-align: right; }
-      .row input[type="number"]:focus { border-color: var(--gold); }
-      .row.changed input[type="number"] { border-color: var(--changed); color: var(--changed); }
-      .row.bad input[type="number"] { border-color: var(--bad); color: var(--bad); }
-      .row .def { color: var(--muted); font-size: 12px; text-align: right; }
-      .row .range { color: #6a7184; font-size: 11px; }
+      .row input[type="range"] { width: 100%; accent-color: var(--gold); }
+      .row .num { display: flex; align-items: center; gap: 4px; }
+      .row .num input { width: 100%; padding: 6px 8px; font-size: 15px; color: var(--text); background: #12141a; border: 1px solid #3a4052; border-radius: 6px; outline: none; text-align: right; }
+      .row .num input:focus { border-color: var(--gold); }
+      .row.changed .num input { border-color: var(--changed); color: var(--changed); }
+      .row.bad .num input { border-color: var(--bad); color: var(--bad); }
+      .row .num .u { color: var(--muted); font-size: 12px; min-width: 1.5em; }
+      .row .def { color: var(--muted); font-size: 11px; text-align: right; }
       .empty { padding: 30px; text-align: center; color: var(--muted); }
-      .note { margin: 0 0 14px; padding: 10px 14px; background: #1b2230; border: 1px solid #2c3a55; border-radius: 10px; color: #b8c6e0; font-size: 13px; line-height: 1.6; }
-      @media (max-width: 860px) { nav { display: none; } .row { grid-template-columns: 1fr 120px; } .row .def, .row button { display: none; } }
+      footer { position: sticky; bottom: 0; background: #0f1015; border-top: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 12px; align-items: center; justify-content: center; }
+      @media (max-width: 760px) { .row { grid-template-columns: 1fr 120px; } .row input[type="range"], .row .def { display: none; } }
     </style>
   </head>
   <body>
     <header>
-      <h1>수치 조정</h1>
-      <input id="q" type="search" placeholder="이름으로 찾기 (예: 창병, 체력, 보스)" />
-      <button id="save" class="primary" disabled>저장하고 적용</button>
-      <button id="revert" disabled>변경 취소</button>
-      <button id="resetAll" class="danger">전체를 기본값으로</button>
-      <span id="status" class="status"></span>
+      <div class="bar">
+        <h1>수치 조정</h1>
+        <input id="q" type="search" placeholder="어디 있는지 모르면 검색 (예: 창병, 체력, 흡혈, 돌진)" />
+        <button id="save" class="primary" disabled>저장하고 적용</button>
+        <button id="revert" disabled>변경 취소</button>
+        <button id="resetAll" class="danger">전체를 기본값으로</button>
+        <span id="status" class="status"></span>
+      </div>
+      <div id="tabs" class="tabs"></div>
     </header>
     <main>
-      <nav id="nav"></nav>
-      <div id="groups">
-        <p class="note">
-          숫자를 바꾸고 <b>저장하고 적용</b>을 누르면 <b>게임 중인 사람들에게도 바로 적용</b>되고, 서버를 다시 켜도 유지됩니다(서버 폴더의 <code>tuning.json</code>).
-          노란색 칸은 기본값과 다른 값입니다. 오른쪽 <b>기본값</b>을 누르면 그 항목만 되돌립니다. 범위를 벗어난 값은 가까운 값으로 맞춰집니다.
-          이 화면은 서버를 켠 컴퓨터에서만 열립니다(밖에서 열려면 서버에 <code>MERC_ADMIN_TOKEN</code>을 정하고 주소 뒤에 <code>?token=값</code>).
-        </p>
-        <div id="list"></div>
-      </div>
+      <details class="note" open>
+        <summary style="cursor:pointer"><b>사용법</b> (눌러서 접기)</summary>
+        <div style="margin-top:6px">
+          칸의 숫자를 고치고 <b>저장하고 적용</b>(Ctrl+S)을 누르면 <b>게임 중인 사람들에게도 바로 적용</b>되고 서버를 다시 켜도 유지됩니다.
+          <b style="color:var(--changed)">노란 칸</b>은 기본값과 다른 값이고, 칸 옆 <b>↺</b>를 누르면 그 칸만 기본값으로 돌아갑니다. 칸 위에 마우스를 올리면 기본값과 설명이 보입니다.
+          카드 탭의 숫자는 카드 이름·설명에도 바로 반영됩니다. 이 화면은 서버를 켠 컴퓨터에서만 열립니다(밖에서 열려면 서버에 <code>MERC_ADMIN_TOKEN</code>을 정하고 주소 뒤에 <code>?token=값</code>).
+        </div>
+      </details>
+      <div id="view"></div>
     </main>
+    <footer>
+      <span id="foot" class="status"></span>
+    </footer>
     <script>
       const qs = new URLSearchParams(location.search);
       const token = qs.get("token") || "";
       const headers = { "Content-Type": "application/json", ...(token ? { "x-admin-token": token } : {}) };
       const $ = (id) => document.getElementById(id);
+      const TAB_HELP = {
+        "용병": "내가 고용하는 병종의 체력·공격력·사거리, 고용 가격·통솔력·부활 시간, 강화 단계별 배율입니다.",
+        "적": "적 병종의 능력치와 처치 보상, 병종별 생성 비율입니다.",
+        "주인공": "주인공이 드는 무기의 능력치와 스킬, 기본 체력·이동 속도입니다.",
+        "카드": "레벨업·상자에서 나오는 카드의 효과 크기와 나올 확률입니다. 바꾸면 카드 이름과 설명도 함께 바뀝니다.",
+        "보스": "보스 체력·피해 배율, 격노, 그리고 장군별 스킬(예고 시간·피해·재사용 대기 등)입니다.",
+        "스테이지·규칙": "스테이지가 오를수록 강해지는 정도, 적 생성량, 경험치, 토너먼트, 지형 규칙입니다.",
+        "AI·진형": "용병이 따라붙고 싸우는 방식(진형·돌격·보호·산개), 병종별 우선도입니다.",
+        "전투·난이도": "난이도별 받는 피해 감소, 전투 공통 규칙, 군량병과 휴식 텐트입니다.",
+      };
+      let tabs = [];
       let defs = [];
       let saved = {}; // 서버에 저장된 현재 값
       let draft = {}; // 화면에서 편집 중인 값(저장 전)
-      const closed = new Set(JSON.parse(localStorage.getItem("tuning.closed") || "[]"));
+      let curTab = localStorage.getItem("tuning.tab") || "용병";
+      const closed = new Set(JSON.parse(localStorage.getItem("tuning.closed2") || "[]"));
 
       const setStatus = (text, kind = "") => {
         const el = $("status");
         el.textContent = text;
         el.className = "status " + kind;
       };
-      const fmt = (v) => (Number.isInteger(v) ? String(v) : String(Math.round(v * 10000) / 10000));
+      const round = (v) => Math.round(v * 100000) / 100000;
+      const show = (d, v) => round(v * (d.scale || 1)); // 화면에 보이는 값
+      const store = (d, v) => v / (d.scale || 1); // 저장하는 값
       const dirtyKeys = () => defs.filter((d) => draft[d.key] !== saved[d.key]).map((d) => d.key);
+      const isChanged = (d) => Math.abs(draft[d.key] - d.def) > 1e-12;
 
       async function api(path, body) {
         const res = await fetch(path, { method: body ? "POST" : "GET", headers, body: body ? JSON.stringify(body) : undefined });
@@ -94,115 +144,301 @@
 
       function load(data) {
         defs = data.defs;
+        tabs = [...new Set(defs.map((d) => d.tab))];
+        const order = ["용병", "적", "주인공", "카드", "보스", "스테이지·규칙", "AI·진형", "전투·난이도"];
+        tabs.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+        if (!tabs.includes(curTab)) curTab = tabs[0];
         saved = { ...data.values };
         draft = { ...data.values };
         render();
-        refreshButtons();
       }
 
-      function refreshButtons() {
+      function refreshCounts() {
         const n = dirtyKeys().length;
         $("save").disabled = n === 0;
         $("revert").disabled = n === 0;
         $("save").textContent = n ? "저장하고 적용 (" + n + "개)" : "저장하고 적용";
-        // 묶음별 변경 개수
-        document.querySelectorAll("[data-count]").forEach((el) => {
-          const g = el.getAttribute("data-count");
-          el.textContent = defs.filter((d) => d.group === g && draft[d.key] !== d.def).length || "";
+        $("foot").textContent = n ? n + "개를 고쳤습니다. 저장하고 적용을 눌러야 반영됩니다." : "고친 곳이 없습니다.";
+        document.querySelectorAll("[data-tab]").forEach((el) => {
+          const t = el.getAttribute("data-tab");
+          const c = defs.filter((d) => d.tab === t && isChanged(d)).length;
+          const badge = el.querySelector(".n");
+          badge.textContent = c || "";
+          badge.style.display = c ? "" : "none";
+        });
+        document.querySelectorAll("[data-sec]").forEach((el) => {
+          const s = el.getAttribute("data-sec");
+          const c = defs.filter((d) => secKey(d) === s && isChanged(d)).length;
+          el.textContent = c ? c + "개 변경" : "";
         });
       }
 
-      function render() {
-        const q = $("q").value.trim().toLowerCase();
-        const groups = new Map();
-        for (const d of defs) {
-          if (q && !(d.label + " " + d.group + " " + d.key).toLowerCase().includes(q)) continue;
-          if (!groups.has(d.group)) groups.set(d.group, []);
-          groups.get(d.group).push(d);
-        }
-        const list = $("list");
-        const nav = $("nav");
-        list.replaceChildren();
-        nav.replaceChildren();
-        if (groups.size === 0) {
-          list.innerHTML = '<div class="empty">찾는 항목이 없습니다</div>';
-          return;
-        }
-        let i = 0;
-        for (const [name, items] of groups) {
-          const id = "g" + i++;
-          const a = document.createElement("a");
-          a.href = "#" + id;
-          a.innerHTML = "<span></span><span class='n' data-count=''></span>";
-          a.firstChild.textContent = name;
-          a.lastChild.setAttribute("data-count", name);
-          nav.append(a);
-          const sec = document.createElement("section");
-          sec.id = id;
-          if (!q && closed.has(name)) sec.classList.add("closed");
-          const h = document.createElement("h2");
-          h.innerHTML = "<span></span><span class='cnt'></span>";
-          h.firstChild.textContent = name;
-          h.lastChild.textContent = items.length + "개";
-          h.onclick = () => {
-            sec.classList.toggle("closed");
-            sec.classList.contains("closed") ? closed.add(name) : closed.delete(name);
-            localStorage.setItem("tuning.closed", JSON.stringify([...closed]));
-          };
-          sec.append(h);
-          const rows = document.createElement("div");
-          rows.className = "rows";
-          for (const d of items) rows.append(rowFor(d));
-          sec.append(rows);
-          list.append(sec);
-        }
-        refreshButtons();
+      const secKey = (d) => d.tab + "|" + (d.sheet || d.group);
+
+      /** 숫자 칸 하나(표·블록 공용). 바뀌면 draft를 갱신한다 */
+      function cellFor(d, opts = {}) {
+        const wrap = document.createElement("div");
+        wrap.className = "cell";
+        const input = document.createElement("input");
+        input.type = "number";
+        input.step = String(round(d.step * (d.scale || 1)));
+        input.min = String(round(d.min * (d.scale || 1)));
+        input.max = String(round(d.max * (d.scale || 1)));
+        input.value = String(show(d, draft[d.key]));
+        input.title = d.label + "\n기본값 " + show(d, d.def) + (d.unit || "") + "  (범위 " + show(d, d.min) + " ~ " + show(d, d.max) + ")" + (d.hint ? "\n" + d.hint : "");
+        const u = document.createElement("span");
+        u.className = "u";
+        u.textContent = d.unit || "";
+        const rs = document.createElement("button");
+        rs.className = "small rs";
+        rs.textContent = "↺";
+        rs.title = "기본값(" + show(d, d.def) + (d.unit || "") + ")으로";
+        const mark = () => {
+          const v = Number(input.value);
+          const bad = input.value === "" || !Number.isFinite(v) || store(d, v) < d.min - 1e-9 || store(d, v) > d.max + 1e-9;
+          wrap.classList.toggle("bad", bad);
+          wrap.classList.toggle("changed", !bad && Math.abs(store(d, v) - d.def) > 1e-12);
+        };
+        input.oninput = () => {
+          const v = Number(input.value);
+          if (input.value !== "" && Number.isFinite(v)) draft[d.key] = store(d, v);
+          mark();
+          refreshCounts();
+        };
+        rs.onclick = () => {
+          draft[d.key] = d.def;
+          input.value = String(show(d, d.def));
+          mark();
+          refreshCounts();
+        };
+        mark();
+        wrap.append(input, u, rs);
+        return wrap;
       }
 
-      function rowFor(d) {
+      /** 표: 행 × 열 격자 */
+      function gridFor(items) {
+        const cols = [...new Set(items.map((d) => d.col))];
+        const rows = [...new Set(items.map((d) => d.row))];
+        const byKey = new Map(items.map((d) => [d.row + "\u0001" + d.col, d]));
+        const table = document.createElement("table");
+        table.className = "grid";
+        const head = document.createElement("tr");
+        head.append(document.createElement("th"));
+        for (const c of cols) {
+          const th = document.createElement("th");
+          th.textContent = c;
+          head.append(th);
+        }
+        table.append(head);
+        for (const r of rows) {
+          const tr = document.createElement("tr");
+          const th = document.createElement("th");
+          th.className = "rowh";
+          th.textContent = r;
+          tr.append(th);
+          for (const c of cols) {
+            const td = document.createElement("td");
+            const d = byKey.get(r + "\u0001" + c);
+            if (d) td.append(cellFor(d));
+            else {
+              td.className = "emptycell";
+              td.textContent = "·";
+            }
+            tr.append(td);
+          }
+          table.append(tr);
+        }
+        return table;
+      }
+
+      /** 블록: 스킬(행)마다 묶음 상자 안에 항목 목록 */
+      function blocksFor(items) {
+        const wrap = document.createElement("div");
+        wrap.className = "blocks";
+        const rows = [...new Set(items.map((d) => d.row))];
+        for (const r of rows) {
+          const mine = items.filter((d) => d.row === r);
+          const box = document.createElement("div");
+          box.className = "blk";
+          const h = document.createElement("h3");
+          h.textContent = r;
+          box.append(h);
+          for (const d of mine) {
+            const f = document.createElement("div");
+            f.className = "fld";
+            const l = document.createElement("span");
+            l.textContent = d.col;
+            if (d.hint) l.title = d.hint;
+            f.append(l, cellFor(d));
+            box.append(f);
+          }
+          wrap.append(box);
+        }
+        return wrap;
+      }
+
+      /** 목록 한 줄: 이름 + 슬라이더 + 숫자 칸 + 기본값 */
+      function rowFor(d, showTab = false) {
         const row = document.createElement("div");
         row.className = "row";
         const name = document.createElement("div");
         name.className = "name";
         name.textContent = d.label;
-        const key = document.createElement("small");
-        key.textContent = d.key;
-        name.append(key);
+        const small = document.createElement("small");
+        small.textContent = (showTab ? d.tab + " › " : "") + (d.hint ? d.hint : d.group);
+        name.append(small);
+        const range = document.createElement("input");
+        range.type = "range";
+        const num = document.createElement("div");
+        num.className = "num";
         const input = document.createElement("input");
         input.type = "number";
-        input.step = String(d.step);
-        input.min = String(d.min);
-        input.max = String(d.max);
-        input.value = fmt(draft[d.key]);
+        input.step = String(round(d.step * (d.scale || 1)));
+        const unit = document.createElement("span");
+        unit.className = "u";
+        unit.textContent = d.unit || "";
+        num.append(input, unit);
         const def = document.createElement("div");
         def.className = "def";
-        def.innerHTML = "기본 <b></b><div class='range'></div>";
-        def.querySelector("b").textContent = fmt(d.def);
-        def.querySelector(".range").textContent = fmt(d.min) + " ~ " + fmt(d.max);
         const btn = document.createElement("button");
         btn.className = "small";
         btn.textContent = "기본값";
+        def.append("기본 " + show(d, d.def) + (d.unit || ""));
+        // 슬라이더 범위: 기본값 둘레(너무 넓은 허용 범위 전체를 쓰면 조절이 어렵다)
+        const lo = Math.max(d.min, d.def > 0 ? Math.min(d.def * 0.2, d.def - d.step) : d.min);
+        const hi = Math.min(d.max, d.def > 0 ? d.def * 3 : Math.max(d.max / 10, d.def + d.step * 10));
+        const syncRange = () => {
+          const v = draft[d.key];
+          range.min = String(Math.min(lo, v));
+          range.max = String(Math.max(hi, v));
+          range.step = String(d.step);
+          range.value = String(v);
+        };
         const mark = () => {
           const v = Number(input.value);
-          const bad = input.value === "" || !Number.isFinite(v) || v < d.min || v > d.max;
+          const bad = input.value === "" || !Number.isFinite(v) || store(d, v) < d.min - 1e-9 || store(d, v) > d.max + 1e-9;
           row.classList.toggle("bad", bad);
-          row.classList.toggle("changed", !bad && v !== d.def);
+          row.classList.toggle("changed", !bad && Math.abs(store(d, v) - d.def) > 1e-12);
         };
+        const setValue = (v, fromRange) => {
+          draft[d.key] = v;
+          input.value = String(show(d, v));
+          if (!fromRange) syncRange();
+          mark();
+          refreshCounts();
+        };
+        input.value = String(show(d, draft[d.key]));
+        syncRange();
         input.oninput = () => {
           const v = Number(input.value);
-          if (input.value !== "" && Number.isFinite(v)) draft[d.key] = v;
+          if (input.value !== "" && Number.isFinite(v)) {
+            draft[d.key] = store(d, v);
+            syncRange();
+          }
           mark();
-          refreshButtons();
+          refreshCounts();
         };
-        btn.onclick = () => {
-          draft[d.key] = d.def;
-          input.value = fmt(d.def);
-          mark();
-          refreshButtons();
-        };
+        range.oninput = () => setValue(Math.max(d.min, Math.min(d.max, Number(range.value))), true);
+        btn.onclick = () => setValue(d.def, false);
         mark();
-        row.append(name, input, def, btn);
+        row.append(name, range, num, btn);
+        row.title = "기본값 " + show(d, d.def) + (d.unit || "") + " · 범위 " + show(d, d.min) + " ~ " + show(d, d.max) + (d.unit || "");
         return row;
+      }
+
+      function section(title, count, key, bodyEl, help) {
+        const sec = document.createElement("section");
+        if (closed.has(key)) sec.classList.add("closed");
+        const h = document.createElement("h2");
+        const left = document.createElement("span");
+        left.textContent = title;
+        const c = document.createElement("span");
+        c.className = "cnt";
+        c.textContent = count + "개";
+        const chg = document.createElement("span");
+        chg.className = "chg";
+        chg.setAttribute("data-sec", key);
+        left.append(c, chg);
+        const right = document.createElement("span");
+        right.className = "cnt";
+        right.textContent = help || "";
+        h.append(left, right);
+        h.onclick = () => {
+          sec.classList.toggle("closed");
+          sec.classList.contains("closed") ? closed.add(key) : closed.delete(key);
+          localStorage.setItem("tuning.closed2", JSON.stringify([...closed]));
+        };
+        const body = document.createElement("div");
+        body.className = "body";
+        body.append(bodyEl);
+        sec.append(h, body);
+        return sec;
+      }
+
+      function render() {
+        // 탭
+        const tabsEl = $("tabs");
+        tabsEl.replaceChildren();
+        for (const t of tabs) {
+          const el = document.createElement("div");
+          el.className = "tab" + (t === curTab && !$("q").value.trim() ? " on" : "");
+          el.setAttribute("data-tab", t);
+          el.innerHTML = "<span></span><span class='n'></span>";
+          el.firstChild.textContent = t;
+          el.onclick = () => {
+            curTab = t;
+            $("q").value = "";
+            localStorage.setItem("tuning.tab", t);
+            render();
+            window.scrollTo(0, 0);
+          };
+          tabsEl.append(el);
+        }
+        const view = $("view");
+        view.replaceChildren();
+        const q = $("q").value.trim().toLowerCase();
+        if (q) {
+          // 검색: 모든 탭에서 찾아 목록으로 보여 준다
+          const hit = defs.filter((d) => (d.label + " " + d.group + " " + (d.sheet || "") + " " + (d.row || "") + " " + (d.col || "") + " " + d.key + " " + (d.hint || "")).toLowerCase().includes(q));
+          if (!hit.length) view.innerHTML = '<div class="empty">찾는 항목이 없습니다</div>';
+          else {
+            const list = document.createElement("div");
+            for (const d of hit.slice(0, 300)) list.append(rowFor(d, true));
+            view.append(section("검색 결과", hit.length, "q", list, hit.length > 300 ? "앞의 300개만 보입니다" : ""));
+          }
+          refreshCounts();
+          return;
+        }
+        const intro = document.createElement("p");
+        intro.className = "intro";
+        intro.textContent = TAB_HELP[curTab] || "";
+        view.append(intro);
+        const items = defs.filter((d) => d.tab === curTab);
+        // 같은 묶음(표 이름, 없으면 그룹 이름)끼리 모은다
+        const groups = new Map();
+        for (const d of items) {
+          const k = d.sheet || d.group;
+          if (!groups.has(k)) groups.set(k, []);
+          groups.get(k).push(d);
+        }
+        // 표(격자)를 먼저, 슬라이더 목록은 뒤에(보스 탭은 공통 설정이 먼저)
+        const isSheetList = (l) => l.every((d) => d.sheet && d.row && d.col);
+        const ordered = [...groups].sort((a, b) => (curTab === "보스" ? 0 : Number(!isSheetList(a[1])) - Number(!isSheetList(b[1]))));
+        for (const [name, list] of ordered) {
+          const key = curTab + "|" + name;
+          const isSheet = list.every((d) => d.sheet && d.row && d.col);
+          let el;
+          if (isSheet) {
+            const cols = new Set(list.map((d) => d.col)).size;
+            el = cols > 8 || curTab === "보스" ? blocksFor(list) : gridFor(list);
+          } else {
+            el = document.createElement("div");
+            for (const d of list) el.append(rowFor(d));
+          }
+          view.append(section(name, list.length, key, el));
+        }
+        refreshCounts();
       }
 
       $("q").oninput = render;
@@ -211,7 +447,8 @@
         render();
         setStatus("변경을 취소했습니다");
       };
-      $("save").onclick = async () => {
+      const save = async () => {
+        if (!dirtyKeys().length) return;
         const changes = {};
         for (const k of dirtyKeys()) changes[k] = draft[k];
         try {
@@ -223,6 +460,13 @@
           setStatus(e.message, "err");
         }
       };
+      $("save").onclick = save;
+      window.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+          e.preventDefault();
+          save();
+        }
+      });
       $("resetAll").onclick = async () => {
         if (!confirm("모든 수치를 기본값으로 되돌릴까요? (게임 중인 사람들에게도 바로 적용됩니다)")) return;
         try {

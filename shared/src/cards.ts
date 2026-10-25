@@ -11,11 +11,16 @@ export const RARITY_NAMES = ["일반", "희귀", "영웅", "전설"] as const;
 /** 독 지속 시간(초) */
 export const POISON_SEC = 4;
 
-export const RARITY = [
+export interface RarityDef {
+  mult: number;
+  weight: number;
+  minLevel: number;
+}
+export const RARITY: [RarityDef, RarityDef, RarityDef] = [
   { mult: 1, weight: 1, minLevel: 1 },
   { mult: 1.6, weight: 0.4, minLevel: 3 },
   { mult: 2.4, weight: 0.12, minLevel: 6 },
-] as const;
+];
 
 /** 전설 능력은 적용 대상이 정해져 있다: 주인공만, 또는 특정 병종만. 효과가 양쪽에 겹쳐 적용되지 않는다. */
 export type LegendId = "stormfire" | "bloodthirst" | "pierceRamp" | "execute" | "chargeBoost" | "undying" | "splashBoost" | "warcry";
@@ -32,17 +37,30 @@ export const LEGEND_CONST = {
   warcryStep: 0.08, // 처치 한 번당 공격 속도
   warcryMax: 5, // 최대 중첩
   warcrySec: 6, // 중첩 유지 시간
-} as const;
-export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: readonly LegendScope[] }> = {
-  stormfire: { name: "폭풍 연사", desc: "치명타가 터지면 다음 공격 대기시간이 사라진다 (치명타·공격 속도와 시너지)", scopes: ["hero", CAVALRY, ARCHER] },
-  bloodthirst: { name: "피의 갈증", desc: "준 피해의 0.6%를 회복, 치명타는 2배 (치명타 피해와 시너지)", scopes: ["hero", CAVALRY, SPEAR, BLUNT] },
-  pierceRamp: { name: "관통 증폭", desc: "화살이 적을 뚫을 때마다 피해 +35% (관통 수와 시너지)", scopes: ["hero", ARCHER] },
-  execute: { name: "처형", desc: "체력 30% 이하 적에게 피해 x2 (공격력·치명타와 시너지)", scopes: ["hero", SPEAR, BLUNT] },
-  chargeBoost: { name: "돌격 가속", desc: "돌격 피해 x2 (이동 속도와 시너지)", scopes: [CAVALRY] },
-  undying: { name: "불사", desc: "쓰러질 때 35% 확률로 체력 절반으로 즉시 되살아난다", scopes: [SPEAR, SHIELD, BLUNT] },
-  splashBoost: { name: "광역 증폭", desc: "범위 공격 피해 x2 (범위·공격력과 시너지)", scopes: ["hero", BLUNT, MAGE] },
-  warcry: { name: "전장의 함성", desc: "적을 처치할 때마다 6초간 공격 속도 +8% (최대 5중첩)", scopes: ["hero", CAVALRY, ARCHER, BLUNT, MAGE] },
 };
+const pctText = (v: number): string => `${Math.round(v * 1000) / 10}%`;
+/** 전설 능력의 설명: 수치는 LEGEND_CONST에서 만든다(수치를 조정하면 다시 만든다) */
+const legendDescs = (): Record<LegendId, string> => ({
+  stormfire: "치명타가 터지면 다음 공격 대기시간이 사라진다 (치명타·공격 속도와 시너지)",
+  bloodthirst: `준 피해의 ${pctText(LEGEND_CONST.bloodthirstFrac)}를 회복, 치명타는 2배 (치명타 피해와 시너지)`,
+  pierceRamp: `화살이 적을 뚫을 때마다 피해 +${Math.round((LEGEND_CONST.pierceRamp - 1) * 100)}% (관통 수와 시너지)`,
+  execute: `체력 ${Math.round(LEGEND_CONST.executeBelow * 100)}% 이하 적에게 피해 x${LEGEND_CONST.executeMult} (공격력·치명타와 시너지)`,
+  chargeBoost: `돌격 피해 x${LEGEND_CONST.chargeMult} (이동 속도와 시너지)`,
+  undying: `쓰러질 때 ${Math.round(LEGEND_CONST.undyingChance * 100)}% 확률로 체력 절반으로 즉시 되살아난다`,
+  splashBoost: `범위 공격 피해 x${LEGEND_CONST.splashMult} (범위·공격력과 시너지)`,
+  warcry: `적을 처치할 때마다 ${LEGEND_CONST.warcrySec}초간 공격 속도 +${Math.round(LEGEND_CONST.warcryStep * 100)}% (최대 ${LEGEND_CONST.warcryMax}중첩)`,
+});
+export const LEGENDS: Record<LegendId, { name: string; desc: string; scopes: readonly LegendScope[] }> = {
+  stormfire: { name: "폭풍 연사", desc: "", scopes: ["hero", CAVALRY, ARCHER] },
+  bloodthirst: { name: "피의 갈증", desc: "", scopes: ["hero", CAVALRY, SPEAR, BLUNT] },
+  pierceRamp: { name: "관통 증폭", desc: "", scopes: ["hero", ARCHER] },
+  execute: { name: "처형", desc: "", scopes: ["hero", SPEAR, BLUNT] },
+  chargeBoost: { name: "돌격 가속", desc: "", scopes: [CAVALRY] },
+  undying: { name: "불사", desc: "", scopes: [SPEAR, SHIELD, BLUNT] },
+  splashBoost: { name: "광역 증폭", desc: "", scopes: ["hero", BLUNT, MAGE] },
+  warcry: { name: "전장의 함성", desc: "", scopes: ["hero", CAVALRY, ARCHER, BLUNT, MAGE] },
+};
+for (const [id, d] of Object.entries(legendDescs())) LEGENDS[id as LegendId].desc = d;
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
 /** 용병 능력치 종류. 배율 계열(hp~area, xp)은 곱해지고, 나머지는 더해진다. 방어력·회피율·부활 속도·시전 속도는 더한 값 x를 x/(1+x) 꼴로 환산한다(상한 없음). */
@@ -122,9 +140,27 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 export const MERC_STAT_BASE: Record<MercStat, number> = {
   hp: 0.375, dmg: 0.3, atkSpeed: 0.225, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.1,
 };
+/** 수치 조정 도구로 바꿀 수 있는 카드 설정 */
+export const CARD_TUNE = { globalFactor: 0.35, globalLifesteal: 5, globalWeight: 6, legendWeight: 0.6, bloodthirstWeight: 1.6, legendMinLevel: 6 };
+/** 규모 카드(통솔력·고용 비용·경험치·행운·보상금·전리품): base는 일반 등급 효과량, weight는 일반 등급 뽑힐 가중치 */
+export const SCALE_CARD = {
+  leadWeight: 40,
+  leadPctBase: 0.1,
+  leadPctWeight: 14,
+  priceBase: 0.15,
+  priceWeight: 5,
+  xpBase: 0.15,
+  xpWeight: 6,
+  luckBase: 0.2,
+  luckWeight: 4,
+  bountyBase: 0.3,
+  bountyWeight: 4,
+  goldBase: 0.25,
+  goldWeight: 5,
+};
 /** 용병 공용 흡혈 카드는 효과가 작아 다른 공용 카드의 5배로 준다(궁병 50%·마법사 25%는 따로 적용) */
-export const GLOBAL_LIFESTEAL_BOOST = 5;
-export const GLOBAL_CARD_FACTOR = 0.35; // 병종 전용 카드가 없어지고 용병 공용 카드가 그 자리를 대신하므로 예전(0.2)보다 올렸다
+export const GLOBAL_LIFESTEAL_BOOST = 5; // 기본값
+export const GLOBAL_CARD_FACTOR = 0.35; // 기본값(수치 조정 도구가 바꾸는 실제 값은 CARD_TUNE) // 병종 전용 카드가 없어지고 용병 공용 카드가 그 자리를 대신하므로 예전(0.2)보다 올렸다
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
   ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "area", "xp"], // 기병
@@ -204,13 +240,13 @@ const statCards = (): CardDef[] => {
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
     if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "thorns" || stat === "cast" || stat === "knock") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
     for (let r = 0; r < 3; r++) {
-      const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR * (stat === "lifesteal" ? GLOBAL_LIFESTEAL_BOOST : 1));
+      const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * CARD_TUNE.globalFactor * (stat === "lifesteal" ? CARD_TUNE.globalLifesteal : 1));
       out.push({
         name: `용병 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`,
-        desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""} (병종 전용 카드의 ${GLOBAL_CARD_FACTOR * 100}%)`,
+        desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""} (병종 전용 카드의 ${Math.round(CARD_TUNE.globalFactor * 100)}%)`,
         category: 1,
         rarity: r as 0 | 1 | 2,
-        weight: (STAT_WEIGHT[stat] ?? 6) * RARITY[r]!.weight, // 병종 전용 카드가 줄어든 만큼 공용 카드가 더 자주 나온다
+        weight: (STAT_WEIGHT[stat] ?? CARD_TUNE.globalWeight) * RARITY[r]!.weight, // 병종 전용 카드가 줄어든 만큼 공용 카드가 더 자주 나온다
         stars: r + 1,
         minLevel: RARITY[r]!.minLevel,
         effect: { k: "mercStat", stat, v },
@@ -221,7 +257,7 @@ const statCards = (): CardDef[] => {
 };
 
 /** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용). 체력 재생·흡혈·근접 반사·관통·발사 수를 뺀 수치는 이전의 절반(초반엔 영웅, 후반엔 용병술). */
-const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "leadershipPct" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
+export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "leadershipPct" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
   { k: "heroMaxHp", label: "최대 체력", base: 12.5, weight: 8, fmt: "flat" },
   { k: "heroSpeed", label: "이동 속도", base: 0.06, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.125, weight: 8, fmt: "pct" },
@@ -270,22 +306,23 @@ const scaleCards = (): CardDef[] =>
     const m = RARITY[r]!;
     const rr = r as 0 | 1 | 2;
     const lead = r + 1;
-    const price = round3(1 - 0.15 * m.mult);
-    const gold = round3(0.25 * m.mult);
+    const C = SCALE_CARD;
+    const price = round3(1 - C.priceBase * m.mult);
+    const gold = round3(C.goldBase * m.mult);
+    const pct = (v: number) => Math.round(v * 100);
     return [
-      { name: `통솔력 +${lead}`, desc: `더 많은 용병을 거느린다 (통솔력 +${lead})`, category: 0, rarity: rr, weight: 40 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "leadership", v: lead } },
-      { name: `통솔력 +${Math.round(10 * m.mult)}%`, desc: `거느릴 수 있는 통솔력이 ${Math.round(10 * m.mult)}% 늘어난다 (통솔력이 클수록 효과가 크다)`, category: 0, rarity: rr, weight: 14 * m.weight, stars: r + 1, minLevel: m.minLevel + 2, effect: { k: "leadershipPct", v: round3(0.1 * m.mult) } },
-      { name: `고용 비용 -${Math.round((1 - price) * 100)}%`, desc: `캠프 고용 가격이 ${Math.round((1 - price) * 100)}% 내려간다`, category: 0, rarity: rr, weight: 5 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "priceMult", v: price } },
-      { name: `경험치 +${Math.round(15 * m.mult)}%`, desc: `주인공이 얻는 경험치가 ${Math.round(15 * m.mult)}% 늘어난다 (더 빨리 레벨업)`, category: 0, rarity: rr, weight: 6 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "xpMult", v: round3(0.15 * m.mult) } },
-      { name: `행운 +${Math.round(20 * m.mult)}%`, desc: `희귀·영웅·전설 카드가 나올 확률이 올라간다 (행운 +${Math.round(20 * m.mult)}%)`, category: 0, rarity: rr, weight: 4 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "luck", v: round3(0.2 * m.mult) } },
-      { name: `보상금 +${Math.round(30 * m.mult)}%`, desc: `스테이지·소대를 정리했을 때 받는 금화가 ${Math.round(30 * m.mult)}% 늘어난다`, category: 0, rarity: rr, weight: 4 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "bounty", v: round3(0.3 * m.mult) } },
-      { name: `전리품 +${Math.round(gold * 100)}%`, desc: `적을 잡아 얻는 금화가 ${Math.round(gold * 100)}% 늘어난다`, category: 0, rarity: rr, weight: 5 * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "goldMult", v: gold } },
+      { name: `통솔력 +${lead}`, desc: `더 많은 용병을 거느린다 (통솔력 +${lead})`, category: 0, rarity: rr, weight: C.leadWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "leadership", v: lead } },
+      { name: `통솔력 +${pct(C.leadPctBase * m.mult)}%`, desc: `거느릴 수 있는 통솔력이 ${pct(C.leadPctBase * m.mult)}% 늘어난다 (통솔력이 클수록 효과가 크다)`, category: 0, rarity: rr, weight: C.leadPctWeight * m.weight, stars: r + 1, minLevel: m.minLevel + 2, effect: { k: "leadershipPct", v: round3(C.leadPctBase * m.mult) } },
+      { name: `고용 비용 -${pct(1 - price)}%`, desc: `캠프 고용 가격이 ${pct(1 - price)}% 내려간다`, category: 0, rarity: rr, weight: C.priceWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "priceMult", v: price } },
+      { name: `경험치 +${pct(C.xpBase * m.mult)}%`, desc: `주인공이 얻는 경험치가 ${pct(C.xpBase * m.mult)}% 늘어난다 (더 빨리 레벨업)`, category: 0, rarity: rr, weight: C.xpWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "xpMult", v: round3(C.xpBase * m.mult) } },
+      { name: `행운 +${pct(C.luckBase * m.mult)}%`, desc: `희귀·영웅·전설 카드가 나올 확률이 올라간다 (행운 +${pct(C.luckBase * m.mult)}%)`, category: 0, rarity: rr, weight: C.luckWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "luck", v: round3(C.luckBase * m.mult) } },
+      { name: `보상금 +${pct(C.bountyBase * m.mult)}%`, desc: `스테이지·소대를 정리했을 때 받는 금화가 ${pct(C.bountyBase * m.mult)}% 늘어난다`, category: 0, rarity: rr, weight: C.bountyWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "bounty", v: round3(C.bountyBase * m.mult) } },
+      { name: `전리품 +${pct(gold)}%`, desc: `적을 잡아 얻는 금화가 ${pct(gold)}% 늘어난다`, category: 0, rarity: rr, weight: C.goldWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "goldMult", v: gold } },
     ];
   });
 
 /** 전설: 드물게 나오고 같은 (능력, 대상) 조합은 한 번만 고를 수 있다 */
 /** 전설 카드 가중치(기본 0.6). 피의 갈증은 흡혈 카드와 함께 자주 나오게 한다. */
-const LEGEND_WEIGHT: Partial<Record<LegendId, number>> = { bloodthirst: 1.6 };
 const legendCards = (): CardDef[] =>
   (Object.keys(LEGENDS) as LegendId[]).flatMap((id) =>
     LEGENDS[id].scopes.map(
@@ -294,9 +331,9 @@ const legendCards = (): CardDef[] =>
         desc: LEGENDS[id].desc, // 대상은 이름에 이미 들어 있다
         category: 3,
         rarity: 3,
-        weight: LEGEND_WEIGHT[id] ?? 0.6,
+        weight: id === "bloodthirst" ? CARD_TUNE.bloodthirstWeight : CARD_TUNE.legendWeight,
         stars: 3,
-        minLevel: 6,
+        minLevel: CARD_TUNE.legendMinLevel,
         unique: true,
         unitType: scope === "hero" ? undefined : scope,
         effect: { k: "legend", id, scope },
@@ -304,7 +341,20 @@ const legendCards = (): CardDef[] =>
     ),
   );
 
-export const CARDS: readonly CardDef[] = [...scaleCards(), ...statCards(), ...legendCards(), ...heroCards()];
+const buildCards = (): CardDef[] => [...scaleCards(), ...statCards(), ...legendCards(), ...heroCards()];
+const cardList: CardDef[] = buildCards();
+export const CARDS: readonly CardDef[] = cardList;
+
+/**
+ * 수치 조정 도구가 카드 수치(RARITY·MERC_STAT_BASE·CARD_TUNE·SCALE_CARD·HERO_STATS·LEGEND_CONST)를 바꾼 뒤 카드 목록을 다시 만든다.
+ * 카드의 번호(CARDS 안의 자리)는 서버와 클라이언트가 같아야 하므로 같은 자리에 새 카드를 덮어쓴다(개수·순서는 수치와 무관하다).
+ */
+export function rebuildCards(): void {
+  for (const [id, d] of Object.entries(legendDescs())) LEGENDS[id as LegendId].desc = d;
+  const next = buildCards();
+  if (next.length !== cardList.length) return;
+  for (let i = 0; i < next.length; i++) cardList[i] = next[i]!;
+}
 
 export const OFFER_SIZE = 3;
 /** 행운 1.0이면 등급별 카드 확률 배율이 (1 + 행운 x 이 값)이 된다(일반 카드는 그대로). 전설 포함. */

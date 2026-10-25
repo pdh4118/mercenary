@@ -42,7 +42,7 @@ export interface FormationUi {
   isOpen(): boolean;
   toggle(): void;
   close(): void;
-  /** 아래 버튼과 편성 화면에서 저장된 진형을 적용한다(F1~F3은 용병 명령에 쓰고 F4는 비워 두었다) */
+  /** 아래 버튼과 편성 화면에서 저장된 진형을 적용한다(F1~F5는 용병 명령에 쓴다) */
   apply(slot: number): void;
   /** 방에 들어갔을 때 지금 고른 진형을 서버에 알린다 */
   resend(): void;

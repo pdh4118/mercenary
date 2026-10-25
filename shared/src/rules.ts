@@ -66,6 +66,9 @@ export const TUNE = {
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
+  SPREAD_LATERAL: 2.2, // 산개 진형: 좌우 간격 배율
+  SPREAD_FORWARD: 1.7, // 산개 진형: 앞뒤 거리 배율
+  SPREAD_JITTER: 55, // 산개 진형: 자리마다 어긋나는 정도(px)
   DEFEND_LEASH_MULT: 1.8, // 주인공 호위(기본)에서 용병이 진형 자리를 벗어나 적을 쫓을 수 있는 거리 배율(기병 제외)
   HERO_SHIELD_MAX: 240, // 주인공이 검을 들었을 때 방패 체력(정면 공격을 먼저 받아 낸다)
   HERO_SHIELD_REGEN_DELAY: 5, // 맞지 않고 이만큼(초) 지나면 방패가 차오르기 시작한다
@@ -305,7 +308,8 @@ export const STANCE_DEFEND = 0;
 export const STANCE_ASSAULT = 1;
 export const STANCE_HOLD = 2; // 지정한 지점에 진형을 펴고 지킨다(주인공이 떠나도 그 자리에 남는다)
 export const STANCE_PROTECT = 3; // 보호 진형: 검방병이 도형(2명 양쪽, 3명 정삼각형, 4명 정사각형…)으로 둘러싸고 창병·궁병·마법사는 그 안에 들어간다. 기병·둔기병은 자유롭게 싸운다
-export const STANCE_NAMES = ["기본(주인공 수비)", "돌격", "지점 방어", "보호 진형"] as const;
+export const STANCE_SPREAD = 4; // 산개: 주인공 둘레에 넓게 흩어져 서서 범위 공격에 한꺼번에 맞지 않는다(싸우는 방식은 기본 진형과 같다)
+export const STANCE_NAMES = ["기본(주인공 수비)", "돌격", "지점 방어", "보호 진형", "산개"] as const;
 export const PROTECT_RADIUS_BASE = 84; // 보호 진형 도형의 기본 반지름(주인공에서 검방병 자리까지)
 export const PROTECT_RADIUS_PER_RANGED = 13; // 안에 들어오는 궁병·마법사 한 명당 늘어나는 반지름
 export const PROTECT_RADIUS_MAX = 230;

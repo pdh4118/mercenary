@@ -122,3 +122,42 @@ test("조정 API: 조회·저장·적용 알림·기본값 복원, 저장 파일
   }
   assert.ok(existsSync(process.env.MERC_TUNING_FILE!));
 });
+
+test("카드 수치를 조정하면 카드 이름·설명·가중치가 다시 만들어지고, 되돌리면 원래대로 돌아온다", async () => {
+  const { CARDS } = await import("@mercenary/shared");
+  const find = (prefix: string) => CARDS.find((c) => c.name.startsWith(prefix))!;
+  const before = { name: find("용병 공격력").name, weight: find("용병 공격력").weight, legend: find("[전설] 주인공 피의 갈증").desc, len: CARDS.length };
+  try {
+    applyTuning({ "CARD_TUNE.globalFactor": 0.7, "CARD_TUNE.globalWeight": 12, "LEGEND_CONST.bloodthirstFrac": 0.02 });
+    assert.notEqual(find("용병 공격력").name, before.name, "이름에 들어 있는 효과 수치가 바뀐다");
+    assert.equal(find("용병 공격력").weight, before.weight * 2, "가중치도 바뀐다");
+    assert.ok(find("[전설] 주인공 피의 갈증").desc.includes("2%"), find("[전설] 주인공 피의 갈증").desc);
+    assert.equal(CARDS.length, before.len, "카드 개수·순서는 그대로");
+    applyTuning({ "RARITY.1.minLevel": 9 });
+    assert.ok(CARDS.filter((c) => c.rarity === 1).every((c) => (c.minLevel ?? 1) >= 9));
+  } finally {
+    resetTuning();
+  }
+  assert.equal(find("용병 공격력").name, before.name);
+  assert.equal(find("용병 공격력").weight, before.weight);
+  assert.equal(find("[전설] 주인공 피의 갈증").desc, before.legend);
+});
+
+test("조정 목록에 탭·표 정보가 붙어 있고 보스 스킬 수치도 조정할 수 있다", () => {
+  const defs = tuneDefs();
+  assert.ok(defs.every((d) => d.tab), "모든 항목에 탭이 있다");
+  const unit = defs.find((d) => d.key === "MERC_STATS.1.hp")!;
+  assert.deepEqual([unit.sheet, unit.row, unit.col], ["용병 능력치", "창병", "체력"]);
+  const diff = defs.find((d) => d.key === "DIFFICULTY_REDUCTION.0")!;
+  assert.equal(diff.scale, 100);
+  assert.ok(defs.some((d) => d.key.startsWith("BOSS_CAV.") && d.tab === "보스"));
+  assert.ok(defs.filter((d) => d.key.startsWith("BOSS_")).length > 250);
+  try {
+    applyTuning({ "BOSS_SHIELD.invCd": 3, "SUPPLY.healFlat": 40, "TENT.lifeSec": 30, "DIFFICULTY_REDUCTION.1": 0.7 });
+    assert.equal(tuneValues()["BOSS_SHIELD.invCd"], 3);
+    assert.equal(tuneValues()["SUPPLY.healFlat"], 40);
+  } finally {
+    resetTuning();
+  }
+  assert.deepEqual(tuneOverrides(), {});
+});

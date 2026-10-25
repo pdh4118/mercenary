@@ -883,7 +883,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 주인공 호위 · F2 위치 고수 · F3 돌격 · F4 보호 진형(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 주인공 호위 · F2 위치 고수 · F3 돌격 · F4 보호 진형 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1579,7 +1579,7 @@ async function main() {
     }
   };
   // 용병 진형 모드: 기본 진형(주인공 주변을 지킨다) / 돌격 진형(대열이 앞으로 나가 더 멀리 쫓는다). V 키로 바꾼다.
-  const stanceBtns = [document.getElementById("stance0")!, document.getElementById("stance1")!, document.getElementById("stance2")!, document.getElementById("stance3")!];
+  const stanceBtns = [document.getElementById("stance0")!, document.getElementById("stance1")!, document.getElementById("stance2")!, document.getElementById("stance3")!, document.getElementById("stance4")!];
   const setStance = (v: number) => send({ t: "stance", v, types: typesField() });
   // 지점 방어: 버튼을 누르면 지점 지정 모드(다음 클릭한 곳을 지킨다), T 키는 마우스 위치를 바로 지킨다
   let pickingHold = false;
@@ -1624,7 +1624,7 @@ async function main() {
     if (tag === "INPUT" || tag === "SELECT") return; // 이름·간격 입력 중에는 게임 키로 쓰지 않는다
     const k = e.key.toLowerCase();
     // F1 주인공 호위 · F2 위치 고수(지금 주인공이 서 있는 곳에 깃발을 꽂는다) · F3 돌격 · F4 보호 진형
-    if (/^F[1-4]$/.test(e.key) && !e.repeat) {
+    if (/^F[1-5]$/.test(e.key) && !e.repeat) {
       e.preventDefault();
       const me = latest?.players.find((p) => p.id === myId);
       if (e.key === "F1") setStance(0);
@@ -1632,6 +1632,7 @@ async function main() {
         if (me) send({ t: "hold", x: me.x, y: me.y, types: typesField() });
       } else if (e.key === "F3") setStance(1);
       else if (e.key === "F4") setStance(3);
+      else if (e.key === "F5") setStance(4); // 산개(F5는 브라우저 새로고침 키라 preventDefault로 막는다)
       return;
     }
     // 스페이스: 살아 있으면 지금 든 무기의 스킬(쿨타임은 무기를 바꿔도 공유). 쓰러져 있으면 아래의 관전 전환.
@@ -1677,7 +1678,7 @@ async function main() {
     }
     if (k === "v" && !e.repeat) {
       const cur = selectedStance(latest?.players.find((p) => p.id === myId));
-      setStance(cur === 0 ? 2 : cur === 2 ? 1 : cur === 1 ? 3 : 0); // 주인공 호위 → 위치 고수(마지막으로 정한 지점) → 돌격 → 보호 진형 → 주인공 호위
+      setStance(cur === 0 ? 2 : cur === 2 ? 1 : cur === 1 ? 3 : cur === 3 ? 4 : 0); // 주인공 호위 → 위치 고수(마지막으로 정한 지점) → 돌격 → 보호 진형 → 산개 → 주인공 호위
       return;
     }
     if (k === "t" && !e.repeat) {
@@ -1714,7 +1715,7 @@ async function main() {
         if (slot >= 0) send({ t: "buy", camp: nearCampId, slot });
         else {
           selMask = d === 1 ? ALL_MASK : 1 << (d - 2);
-          toast.text = `선택: ${d === 1 ? "모든 병종" : UNIT_NAMES[d - 2]} (우클릭 지시 · F1~F4 진형)`;
+          toast.text = `선택: ${d === 1 ? "모든 병종" : UNIT_NAMES[d - 2]} (우클릭 지시 · F1~F5 진형)`;
           toastLeft = 1.6;
         }
       }

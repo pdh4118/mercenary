@@ -150,3 +150,25 @@ test("서버: 보호 진형을 고르면 검방병이 주인공 둘레 도형에
   assert.deepEqual(slots.get(cav), before, "기병은 기본 자리 그대로");
   assert.equal(g.setStance(a, 99), false);
 });
+
+test("산개 진형: 용병 자리가 기본 진형보다 넓게 흩어진다", async () => {
+  const { Game } = await import("../src/game.js");
+  const { STANCE_SPREAD, STANCE_DEFEND, SPEAR, ARCHER, SHIELD } = await import("@mercenary/shared");
+  const g = new Game();
+  g.autoSpawn = false;
+  const id = g.addPlayer("p")!;
+  const ids = [SPEAR, SPEAR, ARCHER, ARCHER, SHIELD, SHIELD].map((t) => g.addMerc(id, t, 0, 0));
+  const spread = (): number => {
+    const slots = g.formationSlots(id);
+    const p = g.getPlayer(id)!;
+    return ids.reduce((s, i) => s + Math.hypot(slots.get(i)![0] - p.x, slots.get(i)![1] - p.y), 0) / ids.length;
+  };
+  g.setStance(id, STANCE_DEFEND);
+  const normal = spread();
+  assert.equal(g.setStance(id, STANCE_SPREAD), true);
+  assert.equal(g.getPlayer(id)!.stance, STANCE_SPREAD);
+  assert.ok(spread() > normal * 1.4, `${spread()} vs ${normal}`);
+  // 같은 자리에 겹치지 않는다
+  const slots = [...g.formationSlots(id).values()];
+  for (let i = 0; i < slots.length; i++) for (let j = i + 1; j < slots.length; j++) assert.ok(Math.hypot(slots[i]![0] - slots[j]![0], slots[i]![1] - slots[j]![1]) > 30);
+});

@@ -2,7 +2,11 @@
 // 값을 바꿔도 이 파일의 기본값(def)은 처음 읽을 때 기억해 두므로 언제든 "기본값으로"를 누를 수 있다.
 import { TUNE, MERC_STATS, ENEMY_STATS, MERC_BASE_PRICE, MERC_RESPAWN_SEC, ENEMY_XP, ENEMY_GOLD, SHIELD_DAMAGE_FACTOR, UNIT_COST, ENEMY_SPAWN_WEIGHTS, WARD_WEIGHT, CAV_TARGET_WEIGHT, UNIT_NAMES } from "./rules.js";
 import { MERC_XP_NEED, TIER_HP, TIER_DMG } from "./tiers.js";
-import { WEAPONS } from "./index.js";
+import { WEAPONS, DIFFICULTY_REDUCTION, DIFFICULTY_NAMES } from "./index.js";
+import { CARD_TUNE, HERO_STATS, LEGEND_CONST, MERC_STAT_BASE, MERC_STAT_LABEL, RARITY, RARITY_NAMES, SCALE_CARD, rebuildCards, type MercStat } from "./cards.js";
+import { SUPPLY, BOSS_CAV, BOSS_SPEAR, BOSS_ARCHER, BOSS_SHIELD, BOSS_BLUNT, BOSS_MAGE, BOSS_MOUNT, BOSS_CHARIOT, BOSS_NECRO } from "./bossskill.js";
+import { BOSS_LABELS } from "./bosslabels.js";
+import { TENT } from "./rules.js";
 
 export interface TuneDef {
   key: string;
@@ -13,12 +17,22 @@ export interface TuneDef {
   step: number;
   def: number;
   hint?: string;
+  /** 수치 조정 화면의 위쪽 탭 */
+  tab?: string;
+  /** 표로 묶어 보여 줄 때: 표 이름·행 이름·열 이름(같은 표의 항목끼리 행×열 격자가 된다) */
+  sheet?: string;
+  row?: string;
+  col?: string;
+  /** 화면에 보이는 단위(예: "%", "초", "px")와, 저장 값에 곱해 보여 줄 배수(비율을 %로 보여 줄 때 100) */
+  unit?: string;
+  scale?: number;
 }
 
 interface Entry {
   def: TuneDef;
   get(): number;
   set(v: number): void;
+  cards?: boolean; // 바꾸면 카드 목록을 다시 만들어야 하는 값
 }
 
 const G = {
@@ -90,6 +104,9 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   CAV_DAMAGE_PER_SPEED: ["기병 속도당 돌격 추가 피해", G.combat, 0, 1, 0.005],
   CAV_RAMP_SEC: ["기병이 최고 속도까지 걸리는 시간(초)", G.combat, 0.2, 10, 0.1],
   KNOCK_MAX: ["넉백 최대 거리(px)", G.combat, 0, 600, 5],
+  SPREAD_LATERAL: ["산개 진형: 좌우 간격 배율", G.ai, 1, 5, 0.1],
+  SPREAD_FORWARD: ["산개 진형: 앞뒤 거리 배율", G.ai, 1, 5, 0.1],
+  SPREAD_JITTER: ["산개 진형: 자리마다 어긋나는 정도(px)", G.ai, 0, 200, 5],
   DEFEND_LEASH_MULT: ["주인공 호위에서 용병이 자리를 벗어나 쫓는 거리 배율", G.ai, 1, 5, 0.1],
   HERO_SHIELD_MAX: ["주인공 검 방패 체력", G.combat, 0, 2000, 10],
   HERO_SHIELD_REGEN_DELAY: ["주인공 방패: 맞지 않아야 차오르기 시작하는 시간(초)", G.combat, 0, 30, 0.5],
@@ -189,11 +206,25 @@ const WEAPON_FIELDS: [string, string, number, number, number][] = [
   ["splash", "범위 반경", 0, 300, 1],
 ];
 
+/** 묶음 이름으로 화면 탭을 정한다 */
+const TABS = ["용병", "적", "주인공", "카드", "보스", "스테이지·규칙", "AI·진형", "전투·난이도"] as const;
+export const TUNE_TABS = TABS;
+const tabOfGroup = (g: string): string => {
+  if (g.startsWith(G.merc) || g === G.hire) return "용병";
+  if (g.startsWith(G.enemy)) return "적";
+  if (g.startsWith(G.weapon)) return "주인공";
+  if (g === G.boss) return "보스";
+  if (g === G.ai) return "AI·진형";
+  if (g === G.combat) return "전투·난이도";
+  if (g === G.hero) return "주인공";
+  return "스테이지·규칙"; // 스테이지·토너먼트·경험치·지형
+};
+
 let registry: Map<string, Entry> | null = null;
 
 function build(): Map<string, Entry> {
   const reg = new Map<string, Entry>();
-  const add = (def: Omit<TuneDef, "def">, get: () => number, set: (v: number) => void) => reg.set(def.key, { def: { ...def, def: get() }, get, set });
+  const add = (def: Omit<TuneDef, "def">, get: () => number, set: (v: number) => void, cards = false) => reg.set(def.key, { def: { ...def, tab: def.tab ?? tabOfGroup(def.group), def: get() }, get, set, cards });
   const T = TUNE as Record<string, number>;
   for (const key of Object.keys(T)) {
     const meta = SCALARS[key];
@@ -228,6 +259,149 @@ function build(): Map<string, Entry> {
   table("TIER_DMG", TIER_DMG, "단계별 공격력 배율", G.merc, ["0단계", "1단계", "2단계", "3단계", "4단계"], 0.5, 10, 0.05);
   table("WARD_WEIGHT", WARD_WEIGHT, "검방병이 지킬 우선도", G.ai, UNIT_NAMES, 0, 10, 0.1);
   table("CAV_TARGET_WEIGHT", CAV_TARGET_WEIGHT, "기병이 노릴 우선도", G.ai, UNIT_NAMES, 0, 10, 0.1);
+
+  // --- 표로 보여 주는 항목: 위에서 만든 항목에 표 이름·행·열을 붙인다 ---
+  const sheetOf = (key: string, sheet: string, row: string, col: string, extra: Partial<TuneDef> = {}) => {
+    const e = reg.get(key);
+    if (e) e.def = { ...e.def, sheet, row, col, ...extra };
+  };
+  const fieldLabel = (f: string) => UNIT_FIELDS.find((x) => x[0] === f)?.[1] ?? f;
+  UNIT_NAMES.forEach((un, t) => {
+    for (const [f] of UNIT_FIELDS) {
+      sheetOf(`MERC_STATS.${t}.${f}`, "용병 능력치", un, fieldLabel(f));
+      sheetOf(`ENEMY_STATS.${t}.${f}`, "적 능력치", un, fieldLabel(f));
+    }
+  });
+  WEAPONS.forEach((w, i) => {
+    for (const [f, fl] of WEAPON_FIELDS) sheetOf(`WEAPONS.${i}.${f}`, "주인공 무기", w.name, fl);
+  });
+  UNIT_NAMES.forEach((un, t) => {
+    sheetOf(`MERC_BASE_PRICE.${t}`, "용병 고용·부활", un, "고용 가격");
+    sheetOf(`UNIT_COST.${t}`, "용병 고용·부활", un, "통솔력 비용");
+    sheetOf(`MERC_RESPAWN_SEC.${t}`, "용병 고용·부활", un, "부활 시간(초)");
+    sheetOf(`ENEMY_XP.${t}`, "적 처치 보상·생성", un, "경험치");
+    sheetOf(`ENEMY_GOLD.${t}`, "적 처치 보상·생성", un, "금화");
+    sheetOf(`ENEMY_SPAWN_WEIGHTS.${t}`, "적 처치 보상·생성", un, "생성 비율");
+    sheetOf(`SHIELD_DAMAGE_FACTOR.${t}`, "병종 상성·우선도", un, "방패가 받는 피해 배율");
+    sheetOf(`WARD_WEIGHT.${t}`, "병종 상성·우선도", un, "검방병이 지킬 우선도");
+    sheetOf(`CAV_TARGET_WEIGHT.${t}`, "병종 상성·우선도", un, "기병이 노릴 우선도");
+  });
+  for (let i = 0; i < 5; i++) {
+    sheetOf(`TIER_HP.${i}`, "용병 강화 단계", `${i}단계`, "체력 배율");
+    sheetOf(`TIER_DMG.${i}`, "용병 강화 단계", `${i}단계`, "공격력 배율");
+  }
+  ["0→1단계", "1→2단계", "2→3단계", "3→4단계"].forEach((n, i) => sheetOf(`MERC_XP_NEED.${i}`, "용병 강화 단계", n.replace("→", "→"), "필요 경험치"));
+
+  // --- 난이도: 받는 피해 감소율 ---
+  const reduction = DIFFICULTY_REDUCTION as unknown as number[];
+  DIFFICULTY_NAMES.forEach((n, i) => {
+    add({ key: `DIFFICULTY_REDUCTION.${i}`, label: `${n} 난이도: 받는 피해 감소`, group: G.combat, tab: "전투·난이도", min: 0, max: 1, step: 0.01, sheet: "난이도", row: n, col: "받는 피해 감소", unit: "%", scale: 100, hint: "주인공·용병이 적에게 받는 피해가 이만큼 줄어듭니다(0%면 그대로)" }, () => reduction[i]!, (v) => (reduction[i] = v));
+  });
+
+  // --- 군량병·휴식 텐트 ---
+  const objEntries = (name: string, obj: object, tab: string, group: string, specs: Record<string, [label: string, min: number, max: number, step: number, unit?: string, scale?: number]>) => {
+    const o = obj as Record<string, number>;
+    for (const [k, [label, min, max, step, unit, scale]] of Object.entries(specs)) {
+      add({ key: `${name}.${k}`, label, group, tab, min, max, step, unit, scale }, () => o[k]!, (v) => (o[k] = v));
+    }
+  };
+  objEntries("SUPPLY", SUPPLY, "전투·난이도", "군량병", {
+    hp: ["체력(1스테이지)", 1, 1000, 1],
+    hpGrow: ["스테이지당 체력 증가", 0, 2, 0.01, "%", 100],
+    speed: ["도망 속도", 10, 400, 1],
+    fleeRange: ["아군이 이 거리 안에 오면 도망", 100, 1500, 10, "px"],
+    firstSec: ["첫 등장까지", 0, 300, 1, "초"],
+    gapMin: ["등장 간격 최소", 3, 600, 1, "초"],
+    gapMax: ["등장 간격 최대", 3, 600, 1, "초"],
+    max: ["동시에 나오는 최대 수(1명일 때)", 1, 20, 1],
+    lifeSec: ["못 잡으면 사라지는 시간", 5, 300, 1, "초"],
+    riceSec: ["쌀이 남아 있는 시간", 3, 120, 1, "초"],
+    riceRadius: ["쌀을 먹는 거리", 10, 200, 1, "px"],
+    healFrac: ["쌀 회복: 최대 체력의 비율", 0, 1, 0.01, "%", 100],
+    healFlat: ["쌀 회복: 고정 회복량", 0, 500, 1],
+  });
+  objEntries("TENT", TENT, "전투·난이도", "휴식 텐트", {
+    useRadius: ["텐트에 들어갈 수 있는 거리", 20, 400, 5, "px"],
+    lifeSec: ["텐트가 남아 있는 시간", 10, 600, 5, "초"],
+    firstSec: ["첫 텐트가 나오기까지", 0, 300, 1, "초"],
+    intervalSec: ["텐트 생성 간격", 5, 600, 1, "초"],
+    max: ["동시에 있는 텐트 최대 수", 1, 10, 1],
+    healPerSec: ["쉬는 동안 초당 회복(최대 체력 비율)", 0, 1, 0.01, "%", 100],
+    respawnBoost: ["쉬는 동안 용병 부활 속도 배수", 1, 10, 0.1, "배"],
+  });
+
+  // --- 보스 스킬 수치(자동 이름표: shared/src/bosslabels.ts) ---
+  const bossObjs: Record<string, object> = { BOSS_CAV, BOSS_SPEAR, BOSS_ARCHER, BOSS_SHIELD, BOSS_BLUNT, BOSS_MAGE, BOSS_MOUNT, BOSS_CHARIOT, BOSS_NECRO };
+  for (const [key, info] of Object.entries(BOSS_LABELS)) {
+    const [objName, field] = key.split(".") as [string, string];
+    const o = bossObjs[objName] as Record<string, number> | undefined;
+    if (!o || typeof o[field] !== "number") continue;
+    const cur = o[field]!;
+    const isTime = info.label.includes("(초)");
+    const step = Math.abs(cur) < 1 ? 0.01 : Math.abs(cur) < 10 ? 0.05 : 1;
+    const max = cur === 0 ? 10 : Math.max(1, Math.ceil(Math.abs(cur) * 5));
+    add({ key, label: `${info.skill} · ${info.label}`, group: `보스 · ${info.boss}`, tab: "보스", min: 0, max, step: isTime ? Math.min(step, 0.1) : step, hint: info.hint || undefined, sheet: info.boss, row: info.skill, col: info.label }, () => o[field]!, (v) => (o[field] = v));
+  }
+
+  // --- 카드 ---
+  RARITY.forEach((r, i) => {
+    const n = RARITY_NAMES[i]!;
+    add({ key: `RARITY.${i}.mult`, label: `${n} 카드 효과 배율`, group: "카드 등급", tab: "카드", min: 0.1, max: 10, step: 0.05, sheet: "카드 등급", row: n, col: "효과 배율", hint: "일반 등급 카드를 1로 봤을 때 효과의 크기" }, () => r.mult, (v) => (r.mult = v), true);
+    add({ key: `RARITY.${i}.weight`, label: `${n} 카드가 나올 확률 배율`, group: "카드 등급", tab: "카드", min: 0, max: 5, step: 0.01, sheet: "카드 등급", row: n, col: "나올 확률 배율", hint: "클수록 자주 나옵니다" }, () => r.weight, (v) => (r.weight = v), true);
+    add({ key: `RARITY.${i}.minLevel`, label: `${n} 카드가 나오기 시작하는 레벨`, group: "카드 등급", tab: "카드", min: 1, max: 30, step: 1, sheet: "카드 등급", row: n, col: "등장 레벨" }, () => r.minLevel, (v) => (r.minLevel = v), true);
+  });
+  const stats = Object.keys(MERC_STAT_BASE) as MercStat[];
+  for (const st of stats) {
+    const fmt = st === "pierce" || st === "multi" || st === "armor" || st === "thorns" || st === "knock" ? undefined : st === "poison" ? undefined : "%";
+    add({ key: `MERC_STAT_BASE.${st}`, label: `용병 ${MERC_STAT_LABEL[st]} 카드(일반 등급) 기준 효과`, group: "용병 능력치 카드", tab: "카드", min: 0, max: Math.max(2, MERC_STAT_BASE[st] * 5), step: MERC_STAT_BASE[st] < 0.05 ? 0.0005 : MERC_STAT_BASE[st] < 1 ? 0.005 : 0.5, sheet: "용병 능력치 카드", row: MERC_STAT_LABEL[st], col: "병종 전용 카드 기준 효과", unit: fmt, scale: fmt ? 100 : undefined, hint: "공용 카드는 이 값에 아래 '공용 카드 효율'을 곱합니다" }, () => MERC_STAT_BASE[st], (v) => (MERC_STAT_BASE[st] = v), true);
+  }
+  const ct = CARD_TUNE as Record<string, number>;
+  const cardList: [string, string, number, number, number, string?, number?][] = [
+    ["globalFactor", "용병 공용 카드 효율(전용 카드 대비)", 0.05, 2, 0.01, "%", 100],
+    ["globalLifesteal", "공용 흡혈 카드 추가 배수", 1, 20, 0.5, "배"],
+    ["globalWeight", "공용 카드가 나올 가중치(일반 등급)", 0, 50, 0.5],
+    ["legendWeight", "전설 카드가 나올 가중치", 0, 10, 0.05],
+    ["bloodthirstWeight", "전설 '피의 갈증'이 나올 가중치", 0, 10, 0.05],
+    ["legendMinLevel", "전설 카드가 나오기 시작하는 레벨", 1, 30, 1],
+  ];
+  for (const [k, label, min, max, step, unit, scale] of cardList) add({ key: `CARD_TUNE.${k}`, label, group: "카드 공통", tab: "카드", min, max, step, unit, scale, sheet: "카드 공통 설정", row: label, col: "값" }, () => ct[k]!, (v) => (ct[k] = v), true);
+  const sc = SCALE_CARD as Record<string, number>;
+  const scaleList: [string, string, number, number, number, string?, number?][] = [
+    ["leadWeight", "통솔력 +N 카드가 나올 가중치", 0, 200, 1],
+    ["leadPctBase", "통솔력 % 카드 효과(일반)", 0, 1, 0.01, "%", 100],
+    ["leadPctWeight", "통솔력 % 카드 가중치", 0, 200, 1],
+    ["priceBase", "고용 비용 할인 카드 효과(일반)", 0, 0.5, 0.01, "%", 100],
+    ["priceWeight", "고용 비용 카드 가중치", 0, 200, 1],
+    ["xpBase", "경험치 카드 효과(일반)", 0, 1, 0.01, "%", 100],
+    ["xpWeight", "경험치 카드 가중치", 0, 200, 1],
+    ["luckBase", "행운 카드 효과(일반)", 0, 1, 0.01, "%", 100],
+    ["luckWeight", "행운 카드 가중치", 0, 200, 1],
+    ["bountyBase", "보상금 카드 효과(일반)", 0, 2, 0.01, "%", 100],
+    ["bountyWeight", "보상금 카드 가중치", 0, 200, 1],
+    ["goldBase", "전리품 카드 효과(일반)", 0, 2, 0.01, "%", 100],
+    ["goldWeight", "전리품 카드 가중치", 0, 200, 1],
+  ];
+  for (const [k, label, min, max, step, unit, scale] of scaleList) add({ key: `SCALE_CARD.${k}`, label, group: "규모 카드", tab: "카드", min, max, step, unit, scale, sheet: "규모 카드", row: label.replace(/ \(.*$/, ""), col: k.endsWith("Weight") ? "가중치" : "효과" }, () => sc[k]!, (v) => (sc[k] = v), true);
+  HERO_STATS.forEach((h, i) => {
+    const pct = h.fmt === "pct" || h.fmt === "regen" ? (h.fmt === "pct" ? "%" : undefined) : undefined;
+    add({ key: `HERO_STATS.${i}.base`, label: `주인공 ${h.label} 카드(일반) 효과`, group: "주인공 카드", tab: "카드", min: 0, max: Math.max(1, h.base * 6), step: h.base < 0.05 ? 0.0005 : h.base < 1 ? 0.005 : 0.5, sheet: "주인공 카드", row: h.label, col: "일반 등급 효과", unit: pct, scale: pct ? 100 : undefined }, () => h.base, (v) => (h.base = v), true);
+    add({ key: `HERO_STATS.${i}.weight`, label: `주인공 ${h.label} 카드 가중치`, group: "주인공 카드", tab: "카드", min: 0, max: 50, step: 0.5, sheet: "주인공 카드", row: h.label, col: "나올 가중치" }, () => h.weight, (v) => (h.weight = v), true);
+    add({ key: `HERO_STATS.${i}.minLevel`, label: `주인공 ${h.label} 카드 등장 레벨`, group: "주인공 카드", tab: "카드", min: 1, max: 30, step: 1, sheet: "주인공 카드", row: h.label, col: "등장 레벨" }, () => h.minLevel ?? 1, (v) => (h.minLevel = v), true);
+  });
+  const lc = LEGEND_CONST as Record<string, number>;
+  const legendList: [string, string, number, number, number, string?, number?][] = [
+    ["bloodthirstFrac", "피의 갈증: 준 피해의 회복 비율", 0, 0.1, 0.0005, "%", 100],
+    ["pierceRamp", "관통 증폭: 관통마다 피해 배율", 1, 3, 0.05, "배"],
+    ["executeBelow", "처형: 이 체력 비율 이하 적에게", 0, 1, 0.01, "%", 100],
+    ["executeMult", "처형: 피해 배율", 1, 10, 0.1, "배"],
+    ["chargeMult", "돌격 가속: 돌격 피해 배율", 1, 10, 0.1, "배"],
+    ["undyingChance", "불사: 되살아날 확률", 0, 1, 0.01, "%", 100],
+    ["splashMult", "광역 증폭: 범위 피해 배율", 1, 10, 0.1, "배"],
+    ["warcryStep", "전장의 함성: 처치당 공격 속도", 0, 0.5, 0.005, "%", 100],
+    ["warcryMax", "전장의 함성: 최대 중첩", 1, 30, 1],
+    ["warcrySec", "전장의 함성: 중첩 유지 시간", 1, 60, 1, "초"],
+  ];
+  for (const [k, label, min, max, step, unit, scale] of legendList) add({ key: `LEGEND_CONST.${k}`, label, group: "전설 카드", tab: "카드", min, max, step, unit, scale, sheet: "전설 카드", row: label.split(":")[0]!, col: label.includes(":") ? label.split(":")[1]!.trim() : "값" }, () => lc[k]!, (v) => (lc[k] = v), true);
   return reg;
 }
 
@@ -263,18 +437,32 @@ export function tuneOverrides(): Record<string, number> {
 /** 값들을 적용한다. 알 수 없는 이름·숫자가 아닌 값은 무시하고, 범위를 벗어나면 범위 안으로 맞춘다. replace면 먼저 모두 기본값으로 되돌린다. 적용한 개수를 돌려준다. */
 export function applyTuning(values: unknown, replace = false): number {
   const r = reg();
-  if (replace) for (const e of r.values()) e.set(e.def.def);
-  if (!values || typeof values !== "object") return 0;
+  let cardsTouched = false;
+  if (replace) for (const e of r.values()) {
+    e.set(e.def.def);
+    if (e.cards) cardsTouched = true;
+  }
+  if (!values || typeof values !== "object") {
+    if (cardsTouched) rebuildCards();
+    return 0;
+  }
   let n = 0;
   for (const [k, v] of Object.entries(values as Record<string, unknown>)) {
     const e = r.get(k);
     if (!e || typeof v !== "number" || !Number.isFinite(v)) continue;
     e.set(Math.max(e.def.min, Math.min(e.def.max, v)));
+    if (e.cards) cardsTouched = true;
     n++;
   }
+  if (cardsTouched) rebuildCards(); // 카드 수치가 바뀌었으면 카드 목록(이름·설명·효과량·가중치)을 다시 만든다
   return n;
 }
 
 export function resetTuning(): void {
-  for (const e of reg().values()) e.set(e.def.def);
+  let cards = false;
+  for (const e of reg().values()) {
+    e.set(e.def.def);
+    if (e.cards) cards = true;
+  }
+  if (cards) rebuildCards();
 }
