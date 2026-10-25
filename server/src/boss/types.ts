@@ -61,6 +61,10 @@ export interface KitDef {
   speedMult?: (c: Ctx) => number;
   /** 클라이언트로 보내는 상태 비트 */
   flags?: (c: Ctx) => number;
+  /** 매 틱 한 번(보스가 있는 동안 늘, 보스가 굳어 있어도): 장판처럼 보스와 따로 도는 것 */
+  global?: (sys: BossSystem, friendlies: any[], dt: number) => void;
+  /** 적·용병이 죽었을 때(안개 속 시체 만들기) */
+  onDeath?: (sys: BossSystem, x: number, y: number, type: number, owner: number, skel: boolean) => void;
   /** 스킬을 쓰지 않을 때도 계속 보여 줄 예고(퍼지는 불꽃 고리 등) */
   teleAlways?: (c: Ctx) => TeleWire[];
 }

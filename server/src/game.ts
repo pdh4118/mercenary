@@ -168,6 +168,8 @@ import {
   TELE_LINE,
   type TeleWire,
   type MatchRecord,
+  BOSS_NECRO,
+  EF_SKEL,
   ST_BIT_STUN,
   ST_BIT_ROOT,
   ST_BIT_SLOW,
@@ -433,6 +435,7 @@ export interface Enemy extends Fighter {
   poisonAcc?: number; // 아직 숫자로 띄우지 않은 독 피해
   venom?: boolean; // 독 화살을 쏘는 궁병(맞은 아군이 중독된다)
   stunT?: number; // 경직(움직이지도 공격하지도 못하는) 남은 시간
+  skel?: boolean; // 안개 속 시체에서 되살아난 스켈레톤
   bk?: BossKitState; // 장군의 스킬 상태
   invulnT?: number; // 무적 남은 시간(운석 맞춤 무적 등)
   buffT?: number; // 돌격 함성(보스군 강화)이 남은 시간
@@ -480,6 +483,8 @@ export interface Bullet {
   hitIds: Set<number>; // 이미 맞힌 적(관통 중 중복 피해 방지)
   poison?: number; // 독 피해 비율(화살 피해 대비, 지속 POISON_SEC초)
   merc?: Merc; // 쏜 용병(경험치를 받는다)
+  steal?: number; // 장군 투사체: 몸에 들어간 피해의 이 비율만큼 쏜 장군이 회복한다
+  srcId?: number; // 장군 투사체를 쏜 장군 번호
   kind?: number; // 1이면 던진 철퇴(맞거나 다 날아가면 터진다). 2 이상은 장군 투사체 그림 종류(BUL_*)
   fx?: number; // 맞은 아군에게 거는 상태이상(ST_*)
   fxSec?: number;
@@ -1180,7 +1185,7 @@ export class Game {
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
       e.bk?.show ?? 0,
-      e.boss ? this.boss.flagsOf(e) : (e.invulnT ?? 0) > 0 ? 8 : 0,
+      e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0),
     ]);
   }
 
@@ -2049,6 +2054,7 @@ export class Game {
       e.army = false;
       e.boss = false;
     }
+    for (const q of [...this.enemies.values()]) if (q.skel) this.enemies.delete(q.id); // 네크로맨서가 쓰러지면 스켈레톤도 사라진다
     this.army = null;
     this.clears.push([this.stage, this.time]);
     this.dropChests(at.x, at.y);
@@ -2078,7 +2084,7 @@ export class Game {
   private skipBoss(): void {
     this.skips.push(this.stage);
     this.boss.reset();
-    for (const e of [...this.enemies.values()]) if (e.army) this.enemies.delete(e.id);
+    for (const e of [...this.enemies.values()]) if (e.army || e.skel) this.enemies.delete(e.id);
     this.army = null;
     for (const s of this.slots.values()) if (s.state.down) this.standUp(s);
     this.phase = "break";
@@ -3018,6 +3024,7 @@ export class Game {
       this.pushEvent(EVT_REVIVE, m.x, m.y, 0);
       return;
     }
+    this.boss.onDeath(m.x, m.y, m.type, m.owner, false); // 안개 속이면 시체가 남는다
     m.hp = 0;
     m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * respawnTimeMult(owner ? mstat(owner.mods, m.type, "respawn") : 0) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
     if (owner) {
@@ -3916,7 +3923,7 @@ export class Game {
 
   /** 적의 현재 최대 이동 속도(보스·격노 반영) */
   private enemySpeed(e: Enemy): number {
-    return ENEMY_STATS[e.type]!.speed * (e.boss ? BOSS_SPEED_MULT : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0));
+    return ENEMY_STATS[e.type]!.speed * (e.boss ? BOSS_SPEED_MULT : 1) * (e.skel ? BOSS_NECRO.skelSpeed : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0));
   }
 
   /** 독: total만큼의 피해를 POISON_SEC초에 걸쳐 준다. 다시 맞으면 시간이 새로 시작하고 더 센 쪽을 따른다. */
@@ -4215,6 +4222,7 @@ export class Game {
 
   private killEnemy(e: Enemy, ownerId: number, src?: Merc): void {
     if (!this.enemies.delete(e.id)) return; // 이미 쓰러짐
+    if (!e.boss) this.boss.onDeath(e.x, e.y, e.type, 0, !!e.skel); // 안개 속이면 시체가 남는다
     const owner = this.slots.get(ownerId);
     if (src) this.gainMercXp(src, MERC_XP_KILL * (e.boss ? 4 : 1)); // 막타는 경험치를 크게 준다
     const wscope = String(src ? src.type : "hero");
@@ -5070,6 +5078,7 @@ export class Game {
             b.hitIds.add(key);
             f.lastBody = 0;
             f.hit({ damage: b.damage * this.arrowTerrainMult(b, f.x, f.y), charge: 0, srcType: b.srcType, fromAngle: Math.atan2(-b.vy, -b.vx), poison: b.poison ? b.damage * b.poison : 0 }); // 날아온 쪽이 정면인지 본다. 독 궁병의 화살은 독을 건다
+            if (b.steal && b.srcId && (f.lastBody ?? 0) > 0) this.boss.healFromBullet(b.srcId, (f.lastBody ?? 0) * b.steal); // 영혼 구슬: 몸에 들어간 피해만큼 회복(막히면 회복 없음)
             if (b.fx && (f.lastBody ?? 0) > 0) f.status(b.fx, b.fxSec ?? 1, b.fxMult); // 방패에 막히지 않고 몸에 맞았을 때만 상태이상
             this.pushEvent(EVT_ENEMY_ARROW_HIT, px, py, Math.atan2(b.vy, b.vx));
             if (b.pierce > 0) {

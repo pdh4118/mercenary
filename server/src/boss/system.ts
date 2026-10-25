@@ -1,6 +1,8 @@
 import {
   BFX_ICEBREAK,
+  BFX_HEAL,
   BFX_IMPACT,
+  HZ_CORPSE,
   BFX_THRUST,
   BFX_SHIELDBREAK,
   BOSS_SKILL_NAMES,
@@ -319,7 +321,7 @@ export class BossSystem {
   }
 
   /** 장군이 쏘는 탄: 맞은 아군에게 피해(와 상태이상). vis면 그림만 날아가고 피해는 서버가 따로 준다. */
-  bullet(e: Enemy, o: { x?: number; y?: number; ang: number; speed: number; range: number; mult?: number; kind?: number; pierce?: number; radius?: number; fx?: number; fxSec?: number; fxMult?: number; vis?: boolean }): void {
+  bullet(e: Enemy, o: { x?: number; y?: number; ang: number; speed: number; range: number; mult?: number; kind?: number; pierce?: number; radius?: number; fx?: number; fxSec?: number; fxMult?: number; vis?: boolean; steal?: number }): void {
     this.g.bullets.push({
       id: this.g.nextEntityId++,
       x: o.x ?? e.x,
@@ -340,7 +342,24 @@ export class BossSystem {
       fxSec: o.fxSec,
       fxMult: o.fxMult,
       vis: o.vis,
+      steal: o.steal,
+      srcId: e.id,
     });
+  }
+
+  /** 영혼 구슬이 몸에 들어간 피해만큼 보스가 회복한다 */
+  healFromBullet(srcId: number, amount: number): void {
+    const e = this.g.enemies.get(srcId) as Enemy | undefined;
+    if (!e || amount <= 0 || e.hp <= 0) return;
+    const before = e.hp;
+    e.hp = Math.min(e.maxHp, e.hp + amount);
+    if (e.hp - before >= 1) this.g.pushEvent(EVT_BOSSFX, e.x, e.y - 60, 0, BFX_HEAL, Math.round(e.hp - before));
+  }
+
+  /** 적·용병이 죽었다(안개 속 시체) */
+  onDeath(x: number, y: number, type: number, owner: number, skel: boolean): void {
+    if (this.g.phase !== "boss") return;
+    this.def()?.onDeath?.(this, x, y, type, owner, skel);
   }
 
   /** 장판·장애물을 만든다 */
@@ -361,6 +380,7 @@ export class BossSystem {
     for (const e of this.g.enemies.values() as Iterable<Enemy>) {
       if (e.invulnT && e.invulnT > 0) e.invulnT = Math.max(0, e.invulnT - dt);
     }
+    this.def()?.global?.(this, friendlies, dt);
     if (this.hazards.length === 0) return;
     const src = (id: number): Enemy | undefined => this.g.enemies.get(id);
     for (const h of this.hazards) {
@@ -568,9 +588,23 @@ export class BossSystem {
     }
   }
 
+  private hitCorpse(h: Hazard, all = false): void {
+    h.hp -= all ? h.hp + 1 : 1;
+    h.b = Math.max(0, h.hp);
+    if (h.hp <= 0) {
+      h.t = 0;
+      this.g.pushEvent(EVT_BOSSFX, h.x, h.y, 0, BFX_IMPACT);
+    }
+  }
+
   /** 아군의 근접 공격이 사거리 안의 장애물을 때린다 */
   strikeBarriers(x: number, y: number, reach: number, dmg: number): void {
     for (const h of this.hazards) {
+      if (h.kind === HZ_CORPSE && h.t > 0) {
+        // 시체는 근접 공격 3번이면 부서진다(소생할 수 없다)
+        if (Math.hypot(x - h.x, y - h.y) <= reach + 18) this.hitCorpse(h);
+        continue;
+      }
       if (h.delay > 0 || (h.kind !== HZ_SHIELD && h.kind !== HZ_ICE)) continue;
       const dx = x - h.x;
       const dy = y - h.y;
@@ -585,6 +619,11 @@ export class BossSystem {
   /** 아군 운석이 얼음벽을 때린다(범위 공격은 맞은 조각마다 1회) */
   meteorBarriers(x: number, y: number, radius: number): void {
     for (const h of this.hazards) {
+      if (h.kind === HZ_CORPSE && h.t > 0 && Math.hypot(h.x - x, h.y - y) <= radius + 14) {
+        h.hp = 0;
+        this.hitCorpse(h, true); // 범위 공격은 시체를 한꺼번에 부순다
+        continue;
+      }
       if (h.delay > 0 || h.kind !== HZ_ICE) continue;
       if (Math.hypot(h.x - x, h.y - y) > radius + h.a) continue;
       this.damageBarrier(h, 0);
@@ -640,7 +679,7 @@ export class BossSystem {
 
   snapshotHazards(): HazardWire[] {
     const r = Math.round;
-    return this.hazards.map((h): HazardWire => [h.id, h.kind, r(h.x), r(h.y), Math.round(h.ang * 100) / 100, r(h.a), h.kind === HZ_RING ? r(h.b * 100) : r(h.b), Math.max(0, r((h.delay > 0 ? h.delay : h.t) * 10)), Math.max(1, r(h.total * 10)), h.delay > 0 ? 0 : 1]);
+    return this.hazards.filter((h) => h.t > 0 || h.delay > 0).map((h): HazardWire => [h.id, h.kind, r(h.x), r(h.y), Math.round(h.ang * 100) / 100, r(h.a), h.kind === HZ_RING ? r(h.b * 100) : r(h.b), Math.max(0, r((h.delay > 0 ? h.delay : h.t) * 10)), Math.max(1, r(h.total * 10)), h.delay > 0 ? 0 : 1]);
   }
 
   /** 장군의 화면 표시 상태 비트 */

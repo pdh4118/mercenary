@@ -37,7 +37,17 @@ export const BSK_ACCEL = 30; // 전차: 가속 돌진
 export const BSK_SCYTHE = 31; // 전차: 낫 바퀴
 export const BSK_DRIFT = 32; // 전차: 급선회 파쇄
 export const BSK_RAMPAGE = 33; // 전차: 폭주
+export const BSK_FOG = 34; // 네크로맨서: 암흑 안개
+export const BSK_REVIVE = 35; // 네크로맨서: 뼈 소생(안개가 걷힐 때 자동으로 이어진다)
+export const BSK_DRAIN = 36; // 네크로맨서: 생명 흡수
+export const BSK_CHAIN = 37; // 네크로맨서: 영혼 사슬
+export const BSK_ORB = 38; // 네크로맨서: 영혼 구슬(흡혈 평타, 쏠 때 자세만 바뀐다)
 export const BOSS_SKILL_NAMES: Record<number, string> = {
+  [BSK_FOG]: "암흑 안개",
+  [BSK_REVIVE]: "뼈 소생",
+  [BSK_DRAIN]: "생명 흡수!",
+  [BSK_CHAIN]: "영혼 사슬",
+  [BSK_ORB]: "영혼 구슬",
   [BSK_SPRINT]: "질주",
   [BSK_CHARGE]: "돌진",
   [BSK_KICK]: "뒷발차기",
@@ -82,6 +92,7 @@ export const EF_CORNERED = 16; // 궁지에 몰림
 export const EF_BUBBLE = 32; // 매직 쉴드
 export const EF_STUN = 64; // 기절·그로기
 export const EF_MAD = 128; // 광분(바퀴가 붉게 달아오름)
+export const EF_SKEL = 1024; // (일반 적) 안개 속 시체에서 되살아난 스켈레톤
 export const EF_SCYTHE = 256; // 낫 바퀴
 export const EF_WHIRL = 512; // 휠윈드로 도는 중(칼날바람 소용돌이)
 
@@ -93,6 +104,11 @@ export const HZ_SHIELD = 4; // 거대 방패 벽: a = 반길이, b = 남은 체�
 export const HZ_ICE = 5; // 얼음벽 조각: a = 반길이, b = 남은 횟수
 export const HZ_RAIN = 6; // 화살비: a = 반지름(떨어지기 전에는 예고 원)
 export const HZ_GHOST = 7; // 분신: a = 보스 그림 번호
+export const HZ_FOG = 9; // 암흑 안개: a = 반지름(고정)
+export const HZ_CORPSE = 10; // 시체: a = 병종, b = 남은 공격 횟수, 방향 = 1이면 소생 중
+export const HZ_LEECH = 11; // 생명 흡수 선: 위치 = 보스, 방향 = 대상 쪽, a = 길이
+export const HZ_CHAIN = 12; // 영혼 사슬: 위치 = 보스, 방향 = 대상 쪽, a = 길이, b = 남은 끊기 횟수
+export const HZ_DRAINRING = 13; // 생명 흡수 범위 고리: a = 반지름(예고 중에는 state 0)
 export const HZ_RING = 8; // 퍼지는 불꽃 고리: a = 현재 반지름, b = 틈 반각(라디안), 방향 = 틈 중심
 export type HazardWire = [id: number, kind: number, x: number, y: number, ang: number, a: number, b: number, left: number, total: number, state: number];
 
@@ -104,6 +120,7 @@ export const BUL_MACE = 5; // 던진 거대 철퇴(그림만, 피해는 서버�
 export const BUL_LASSO = 6; // 올가미 화살
 export const BUL_SHARD = 7; // 철퇴 파편
 export const BUL_BOSSARROW = 8; // 기마궁수의 화살
+export const BUL_ORB = 9; // 네크로맨서의 영혼 구슬
 
 /** 아군 상태이상 종류 */
 export const ST_STUN = 1; // 기절: 움직이지도 공격하지도 못한다
@@ -127,6 +144,9 @@ export const BFX_CRASH = 4; // 돌진이 방벽·바위에 부딪힘
 export const BFX_ICEBREAK = 5; // 얼음벽 조각이 부서짐
 export const BFX_SHIELDBREAK = 6; // 거대 방패가 부서짐
 export const BFX_BLINK = 7; // 순간이동(마법진 섬광)
+export const BFX_RISE = 12; // 스켈레톤이 일어남(푸른 불기둥)
+export const BFX_HEAL = 13; // 보스가 체력을 회복함(길이 값 = 회복량)
+export const BFX_CHAINBREAK = 14; // 영혼 사슬이 끊어짐(ang = 사슬 방향)
 export const BFX_BACKSTEP = 11; // 뒤로 훌쩍 물러나는 먼지(ang = 물러나는 방향)
 export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)
 export const BFX_MACEBOOM = 9; // 점프 쿵: 던진 철퇴가 땅에 닿는 폭발 그림(ang x 100 = 반경)
@@ -320,7 +340,7 @@ export const BOSS_BLUNT = {
   jumpStun: 1.5,
   jumpCd: 13,
   throwTele: 1.2,
-  throwSpeed: 500,
+  throwSpeed: 900,
   throwRange: 600,
   throwRadius: 140,
   throwDmg: 5,
@@ -481,3 +501,51 @@ export const BOSS_CHARIOT = {
 
 /** 보스 메테오 폭발 가장자리의 피해 감소 비율(적 마법사와 같다) */
 export const MAGE_FALLOFF_FALLBACK = 0.4;
+
+/** 네크로맨서(스테이지 9) 수치. 제안값이라 플레이하며 조정한다. */
+export const BOSS_NECRO = {
+  firstDelay: 1,
+  idleMin: 0.8,
+  idleMax: 1.8,
+  // 평타: 영혼 구슬(사거리가 길고, 입힌 피해만큼 보스가 회복한다)
+  orbCd: 1.9,
+  orbSpeed: 560,
+  orbRange: 1000,
+  orbMult: 0.9,
+  orbSteal: 1, // 몸에 들어간 피해의 이 비율만큼 회복
+  keepMin: 300, // 대상과 이 거리보다 가까우면 물러난다
+  keepMax: 520, // 이 거리보다 멀면 다가간다
+  // 암흑 안개
+  fogTele: 0.6,
+  fogRadius: 260, // 원거리 용병(사거리 280)이 안개 밖에서 보스를 칠 수 있게 사거리보다 조금 작게
+  fogSec: 15,
+  fogCd: 25,
+  fogDps: 15, // 안개 안의 모든 아군이 입는 초당 고정 피해(용병 체력 기준)
+  fogTick: 0.5,
+  fogMax: 30, // 시체 수 상한
+  // 뼈 소생
+  reviveLead: 2.5, // 안개가 걷히기 이만큼 전부터 시체 위에 푸른 불꽃이 켜진다
+  corpseHits: 3,
+  corpseSec: 90,
+  skelHp: 1.3,
+  skelDmg: 1.2,
+  skelSpeed: 1.1,
+  skelMax: 40, // 동시에 있는 스켈레톤 상한
+  // 생명 흡수(체력 50% 이하)
+  drainTele: 2,
+  drainRadius: 450,
+  drainSec: 4,
+  drainTick: 0.5,
+  drainMult: 0.2, // 한 번에 보스 기본 피해의 이만큼을 흡수
+  drainHeal: 1.5, // 흡수한 피해의 이 배만큼 보스가 회복(보스 체력이 커서 체감을 맞춘다)
+  drainCd: 18,
+  // 영혼 사슬(체력 50% 이하)
+  chainTele: 0.9,
+  chainSec: 4,
+  chainRange: 1100,
+  chainWidth: 26, // 사슬을 가로지르는 판정 폭
+  chainHits: 5,
+  chainStun: 2,
+  chainRecoil: 2, // 사슬이 끊기면 보스가 경직하는 시간
+  chainCd: 20,
+} as const;

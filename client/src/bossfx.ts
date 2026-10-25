@@ -1,4 +1,4 @@
-import { Assets, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
+import { Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture } from "pixi.js";
 import {
   BFX_BLINK,
   BFX_CRASH,
@@ -17,6 +17,10 @@ import {
   BSK_BLINK,
   BSK_CLONE,
   BSK_FLURRY,
+  BSK_CHAIN,
+  BSK_DRAIN,
+  BSK_FOG,
+  BSK_ORB,
   BSK_GUARD,
   BSK_JUMP,
   BSK_MACETHROW,
@@ -33,6 +37,15 @@ import {
   BSK_WHIRL,
   BUL_BOSSARROW,
   BUL_ICE,
+  BUL_ORB,
+  BFX_CHAINBREAK,
+  BFX_HEAL,
+  BFX_RISE,
+  HZ_CHAIN,
+  HZ_CORPSE,
+  HZ_DRAINRING,
+  HZ_FOG,
+  HZ_LEECH,
   BUL_LASSO,
   BUL_MACE,
   BUL_SHARD,
@@ -102,6 +115,7 @@ const BOSS_UNIT_TEX = [
   "boss6_idle", "boss6_cast", "boss6_blink",
   "boss7_gallop", "boss7_shoot",
   "boss8_normal", "boss8_mad",
+  "boss9_idle", "boss9_cast", "boss9_drain",
 ] as const;
 
 /**
@@ -144,10 +158,23 @@ export async function createBossFx(d: BossFxDeps) {
     dazed: await seq("boss8_dazed", [0, 1, 2, 3]),
     scythe: await seq("boss8_scythe", [0, 1, 2, 3]),
     crash: await seq("boss8_crash", [1, 2, 3, 4]),
+    fogBurst: await seq("boss9_fog_burst", [0, 1, 2, 3]),
+    fog: await seq("boss9_fog", [0, 1, 2, 3]),
+    corpse: await fx("boss9_corpse"),
+    revive: await seq("boss9_revive", [0, 1, 2, 3]),
+    rise: await seq("boss9_rise", [0, 1, 2, 3]),
+    drainRing: await seq("boss9_drain_ring", [0, 1, 2, 3]),
+    drainBeam: await fx("boss9_drain_beam"),
+    chainLink: await fx("boss9_chain_link"),
+    chainMark: await seq("boss9_chain_mark", [0, 1, 2]),
+    chainBreak: await seq("boss9_chain_break", [0, 1, 2]),
+    orb: await seq("boss9_orb", [0, 1, 2]),
   };
   const first = (a: Tex[]): Tex => a.find((t) => t !== null) ?? null;
   const pick = (a: Tex[], i: number): Tex => a[Math.max(0, Math.min(a.length - 1, i))] ?? first(a);
   const u = (n: string): Tex => unit[n] ?? null;
+  /** 스켈레톤 그림(병종 번호 순서: 기병·창병·궁병·검방병·둔기병·마법사) */
+  const skelTex: Tex[] = await Promise.all(["cavalry", "spear", "archer", "sword", "blunt", "mage"].map(async (n) => Assets.load<Texture>(`assets/units/skel_${n}.png`).catch(() => null)));
 
   /** 스테이지 1~8 장군 그림과 자세 */
   const art: BossArt[] = [
@@ -159,6 +186,7 @@ export async function createBossFx(d: BossFxDeps) {
     { idle: u("boss6_idle"), scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_BLINK ? u("boss6_blink") : sk > 0 || atk ? u("boss6_cast") : u("boss6_idle")) },
     { idle: u("boss7_gallop"), scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")) },
     { idle: u("boss8_normal"), scale: 0.75, pose: (sk, fl) => (sk === BSK_ACCEL ? u("boss8_normal") : fl & EF_MAD || sk === BSK_RAMPAGE ? u("boss8_mad") : u("boss8_normal")) },
+    { idle: u("boss9_idle"), scale: 0.42, pose: (sk) => (sk === BSK_DRAIN ? u("boss9_drain") : sk === BSK_FOG || sk === BSK_CHAIN || sk === BSK_ORB ? u("boss9_cast") : u("boss9_idle")) },
   ];
   void BSK_STEALTH;
 
@@ -209,6 +237,14 @@ export async function createBossFx(d: BossFxDeps) {
       playSeq(T.impact, x, y, 0.55, val === BFX_CRASH ? 1 : 0.7, 0);
       d.sound("knockback", x, y);
       if (val === BFX_CRASH) d.spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
+    } else if (val === BFX_RISE) {
+      playSeq(T.rise, x, y - 20, 0.6, 1.3, 0);
+      d.sound("skill_wall_break", x, y, 0.5);
+    } else if (val === BFX_HEAL) {
+      d.spawnFloat(`+${Math.round(len)}`, x, y, { fill: 0x7dff8a, fontSize: 24, fontWeight: "800", stroke: { color: 0x0a3a14, width: 4 } }, 0.9, 0.2);
+    } else if (val === BFX_CHAINBREAK) {
+      playSeq(T.chainBreak, x, y, 0.45, 1.3, 0);
+      d.sound("shield_break", x, y, 0.7);
     } else if (val === BFX_BACKSTEP) {
       // 뒤로 훌쩍 물러나는 먼지: 물러나는 쪽을 향해 퍼진다
       playSeq(T.dust, x, y + 6, 0.4, 1.1, 0);
@@ -498,6 +534,111 @@ export async function createBossFx(d: BossFxDeps) {
   };
   const guardWalls: { x: number; y: number; ang: number }[] = [];
 
+  // --- 네크로맨서: 안개·시체·생명 흡수 선·영혼 사슬 ---------------------------------------
+  const necroG = new Graphics();
+  d.fxLayer.addChild(necroG);
+  const necroViews = new Map<number, { sprites: Sprite[] }>();
+  const necroSprite = (id: number, i: number, layer: Container, tex: Tex, anchorX = 0.5, anchorY = 0.5): Sprite | null => {
+    if (!tex) return null;
+    let v = necroViews.get(id);
+    if (!v) {
+      v = { sprites: [] };
+      necroViews.set(id, v);
+    }
+    let sp = v.sprites[i];
+    if (!sp) {
+      sp = new Sprite(tex);
+      layer.addChild(sp);
+      v.sprites[i] = sp;
+    }
+    sp.texture = tex;
+    sp.anchor.set(anchorX, anchorY);
+    sp.visible = true;
+    return sp;
+  };
+  /** 네크로맨서 장판 하나를 그린다. 이 종류가 아니면 false */
+  const necroHz = (h: HazardWire, now: number): boolean => {
+    const [id, kind, x, y, ang, a, b, left, total, state] = h;
+    if (kind === HZ_FOG) {
+      const age = total / 10 - left / 10;
+      const tex = age < 0.5 ? pick(T.fogBurst, Math.floor(age / 0.125)) : pick(T.fog, Math.floor(now / 180) % 4);
+      const sp = necroSprite(id, 0, d.groundFx, tex);
+      if (sp) {
+        const sc = (a * 2.15) / 450;
+        sp.scale.set(sc);
+        sp.position.set(x, y);
+        sp.alpha = 0.82 * Math.min(1, left / 10 / 1.2); // 걷힐 때 서서히 옅어진다
+      }
+    } else if (kind === HZ_CORPSE) {
+      const sp = necroSprite(id, 0, d.standLayer, T.corpse, 0.5, 0.7);
+      if (sp) {
+        sp.scale.set(1.1);
+        sp.position.set(x, y);
+        sp.zIndex = y - 3;
+        sp.alpha = 0.6 + 0.4 * (b / 3);
+      }
+      const rev = ang > 0.5;
+      const fl = necroSprite(id, 1, d.standLayer, rev ? pick(T.revive, Math.floor(now / 110) % 4) : null, 0.5, 0.75);
+      if (fl) {
+        fl.visible = rev;
+        fl.scale.set(1.5);
+        fl.position.set(x, y + 4);
+        fl.zIndex = y - 2;
+        fl.alpha = 0.7 + 0.3 * Math.sin(now / 120);
+      }
+    } else if (kind === HZ_DRAINRING) {
+      const sp = necroSprite(id, 0, d.groundFx, pick(T.drainRing, Math.floor(now / 150) % 4));
+      if (sp) {
+        const w = pick(T.drainRing, 0)?.width ?? 450;
+        sp.scale.set((a * 2.05) / w, (a * 2.05 * 0.8) / w);
+        sp.position.set(x, y + 12);
+        sp.alpha = state === 0 ? 0.3 + 0.3 * (0.5 + 0.5 * Math.sin(now / 110)) : 0.85; // 징조 동안은 맥박치고, 시작하면 또렷하다
+      }
+    } else if (kind === HZ_LEECH) {
+      const bm = necroSprite(id, 0, d.fxLayer, T.drainBeam, 0, 0.5);
+      if (bm) {
+        bm.position.set(x, y);
+        bm.rotation = ang;
+        bm.width = a;
+        bm.height = 22;
+        bm.alpha = 0.5 + 0.25 * Math.sin(now / 90 + id);
+      }
+      // 보스 쪽으로 빨려 가는 빛 알갱이
+      for (let j = 0; j < 4; j++) {
+        const p = 1 - (((now / 700 + j / 4 + id * 0.13) % 1 + 1) % 1);
+        necroG.circle(x + Math.cos(ang) * a * p, y + Math.sin(ang) * a * p, 4).fill({ color: 0xd8ffd0, alpha: 0.9 });
+      }
+    } else if (kind === HZ_CHAIN) {
+      let v = necroViews.get(id);
+      if (!v) {
+        v = { sprites: [] };
+        necroViews.set(id, v);
+      }
+      if (!v.sprites[0] && T.chainLink) {
+        const ts = new TilingSprite({ texture: T.chainLink, width: a, height: 30 });
+        ts.anchor.set(0, 0.5);
+        d.fxLayer.addChild(ts);
+        v.sprites[0] = ts as unknown as Sprite;
+      }
+      const ch = v.sprites[0] as unknown as TilingSprite | undefined;
+      if (ch) {
+        ch.position.set(x, y);
+        ch.rotation = ang;
+        ch.width = a;
+        ch.height = 30;
+        ch.tileScale.set(30 / (T.chainLink?.height || 68));
+        ch.alpha = 0.55 + 0.45 * (b / 5); // 끊기기 직전일수록 옅어진다
+        ch.tint = b <= 2 ? 0xffc0c0 : 0xffffff;
+      }
+      const mk = necroSprite(id, 1, d.fxLayer, pick(T.chainMark, Math.floor(now / 150) % 3), 0.5, 1);
+      if (mk) {
+        mk.scale.set(0.9);
+        mk.position.set(x + Math.cos(ang) * a, y + Math.sin(ang) * a - 40);
+      }
+    } else return false;
+    return true;
+  };
+
   /** 한 프레임: 예고·장판을 그린다 */
   /**
    * 휠윈드: 몸 둘레를 크게 도는 속이 빈 소용돌이 고리(회전 4컷)를 두 겹 그린다 — 바닥에 넓은 고리 하나(장군 뒤), 몸통 높이에 작은 고리 하나(장군 앞).
@@ -559,6 +700,7 @@ export async function createBossFx(d: BossFxDeps) {
   const frame = (bt: TeleWire[], hz: HazardWire[], stage: number, dtMs: number, now: number) => {
     drawWhirls(now);
     drawThrustCores(dtMs);
+    necroG.clear();
     wallG.clear();
     for (const gw of guardWalls) drawCurvedWall(gw.x + Math.cos(gw.ang) * 48, gw.y + 8 + Math.sin(gw.ang) * 48 * 0.6, gw.ang + Math.PI / 2, gw.ang, 96, 44, 104, 0.95, 100, now);
     guardWalls.length = 0;
@@ -619,6 +761,7 @@ export async function createBossFx(d: BossFxDeps) {
         } else if (v.sp) v.sp.visible = false;
         continue;
       }
+      if (necroHz(h, now)) continue;
       if (kind === HZ_SHIELD) {
         // 거대 방패: 그림 없이 하늘색 곡면 판으로 그린다(벽 방향 ang, 볼록한 쪽은 장군이 바라보는 쪽 = ang - 90도)
         drawCurvedWall(x, y + 4, ang, ang - Math.PI / 2, a, 46, 92, Math.min(1, left / 10 / 0.5 + 0.05) * (state === 0 ? 0.5 : 1), b, now);
@@ -632,6 +775,11 @@ export async function createBossFx(d: BossFxDeps) {
         continue;
       }
       if (v.sp) hzSprite(h, v, now, stage);
+    }
+    for (const [id, nvw] of necroViews) {
+      if (seen.has(id)) continue;
+      for (const sp of nvw.sprites) sp.destroy();
+      necroViews.delete(id);
     }
     for (const [id, v] of hzViews) {
       if (seen.has(id)) continue;
@@ -736,6 +884,8 @@ export async function createBossFx(d: BossFxDeps) {
         return { tex: T.maceFly, scale: 0.8, anchorX: 0.5 };
       case BUL_LASSO:
         return { tex: T.lasso, scale: 0.55, anchorX: 0.92 };
+      case BUL_ORB:
+        return { tex: pick(T.orb, 1), scale: 0.7, anchorX: 0.5 };
       case BUL_SHARD:
         return { tex: pick(T.shard, 0), scale: 0.35, anchorX: 0.5 };
       case BUL_BOSSARROW:
@@ -745,6 +895,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, playFx, enemyMarks, stunMark, endEnemies, bulletLook, T };
+  return { art, frame, playFx, enemyMarks, stunMark, endEnemies, bulletLook, skelTex, T };
 }
 

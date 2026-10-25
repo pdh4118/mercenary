@@ -40,6 +40,7 @@ import {
   EVT_KNOCK,
   EVT_BOSSFX,
   EF_STEALTH,
+  EF_SKEL,
   ST_BIT_STUN,
   EVT_REFLECT,
   EVT_COUNTER,
@@ -226,7 +227,7 @@ async function main() {
   const CAV_SCALE = 0.72 * SPRITE_SCALE * 2 * 0.5 * 1.4; // 말 탄 병사가 다른 병종과 비슷한 크기로 보이도록 1.4배
   const CAV_ANCHOR: [number, number] = [0.483, 0.72];
   /** 스테이지 보스 이름(스테이지 표시줄용). 1~8스테이지만 정해져 있다. */
-  const BOSS_TITLES = ["기병 장군", "창병 장군", "궁병 장군", "검방병 장군", "둔기병 장군", "마법사 장군", "기마궁수", "전차"] as const;
+  const BOSS_TITLES = ["기병 장군", "창병 장군", "궁병 장군", "검방병 장군", "둔기병 장군", "마법사 장군", "기마궁수", "전차", "네크로맨서"] as const;
   // 주인공(무기별), 캠프, 바닥, 화살(기본·속도선 3단계·명중 순)
   // 여성 주인공 그림(없으면 기본 그림으로 대신한다)
   const heroTexF = await Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_f_${f}.png`).catch(() => null)));
@@ -1919,6 +1920,13 @@ async function main() {
         if ((w[13] ?? 0) > 0 || ((w[14] ?? 0) & 4) !== 0) v.face = Math.cos(w[8] ?? 0) >= 0 ? 1 : -1;
         v.sprite.texture = v.art.pose(w[13] ?? 0, w[14] ?? 0, w[5] > 0) ?? v.art.idle!;
         v.sprite.scale.set(v.art.scale * v.face, v.art.scale);
+      } else if (((w[14] ?? 0) & EF_SKEL) !== 0 && bossFx.skelTex[w[4]]) {
+        // 안개 속 시체에서 되살아난 스켈레톤: 병종별 스켈레톤 그림(방향은 좌우만)
+        faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
+        v.sprite.texture = bossFx.skelTex[w[4]]!;
+        v.sprite.anchor.set(0.5, 0.8);
+        v.sprite.scale.set(SPRITE_SCALE * 1.05 * v.face, SPRITE_SCALE * 1.05);
+        v.lastX = v.x;
       } else if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
         const fr = cavGait(v, ticker.deltaMS, w[5] > 0, CAV_SCALE * size);
