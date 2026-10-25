@@ -296,7 +296,7 @@ export const CAV_SELF_DEFENSE = 70; // 창병 적이 이 거리 안으로 오면
 export const CAV_RETREAT_HP = 0.4; // 체력이 이 비율 아래면 모험을 멈추고 복귀한다
 export const SPEAR_AVOID_RADIUS = 150; // 기병이 창병 적을 피해 도는 거리
 // 우클릭 돌격 지시
-export const CHARGE_DURATION_SEC = 6;
+export const CHARGE_DURATION_SEC = 10; // 우클릭 공격 지시가 이어지는 시간(느린 병종도 멀리 있는 적에게 닿을 수 있게)
 export const CHARGE_TARGET_RADIUS = 300; // 돌격 지점 주변에서 대상을 찾는 반경
 
 // 궁병 카이팅: 근접 적이 (적 사거리 + 이 여유) 안으로 들어오면 뒤로 물러나며 쏜다

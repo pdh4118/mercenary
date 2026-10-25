@@ -135,8 +135,31 @@
       const dirtyKeys = () => defs.filter((d) => draft[d.key] !== saved[d.key]).map((d) => d.key);
       const isChanged = (d) => Math.abs(draft[d.key] - d.def) > 1e-12;
 
+      /** 서버에 연결하지 못했을 때의 안내(파일을 직접 열었거나 서버가 꺼져 있을 때 "Failed to fetch"만 뜨지 않게) */
+      function connectHelp() {
+        const box = document.createElement("div");
+        box.className = "note";
+        const local = location.protocol === "file:";
+        box.innerHTML =
+          "<b>서버에 연결하지 못했습니다.</b><br>" +
+          (local
+            ? "이 파일(tuning.html)을 폴더에서 직접 열어서 그렇습니다. 서버를 켠 뒤 <b>브라우저 주소창에 아래 주소</b>를 입력해서 여세요."
+            : "서버가 켜져 있는지, 주소가 맞는지 확인하세요. (지금 주소: <code></code>)") +
+          '<br>· 서버를 켠 컴퓨터: <a href="http://localhost:8080/tuning.html">http://localhost:8080/tuning.html</a> (개발 중에는 <a href="http://localhost:5173/tuning.html">http://localhost:5173/tuning.html</a>)' +
+          "<br>· 서버가 이미 켜져 있는데도 안 되면 서버를 껐다 켜거나(<code>서버시작.bat</code>) 새로 빌드한 뒤 다시 여세요.";
+        const code = box.querySelector("code");
+        if (code) code.textContent = location.href;
+        return box;
+      }
+
       async function api(path, body) {
-        const res = await fetch(path, { method: body ? "POST" : "GET", headers, body: body ? JSON.stringify(body) : undefined });
+        let res;
+        try {
+          res = await fetch(path, { method: body ? "POST" : "GET", headers, body: body ? JSON.stringify(body) : undefined });
+        } catch (e) {
+          $("view").replaceChildren(connectHelp());
+          throw new Error("서버에 연결하지 못했습니다 (" + (e && e.message ? e.message : "Failed to fetch") + ")");
+        }
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "요청에 실패했습니다 (" + res.status + ")");
         return data;

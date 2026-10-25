@@ -472,6 +472,13 @@ export interface Merc extends Fighter {
   slowMult?: number; // 둔화 중 이동 속도 배율
   runId?: number; // 기병이 마지막으로 친 대상(그 뒤로 돌아 들어간다)
   stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
+  lockId?: number; // 기병이 노리기로 정한 대상(잠시 유지한다)
+  lockT?: number;
+  skipId?: number; // 접근하지 못해 포기한 대상(잠시 건너뛴다)
+  skipT?: number;
+  stuckT?: number; // 대상에게 다가가지 못한 시간
+  winX?: number; // 접근 관찰 구간의 시작 자리
+  winY?: number;
   brawl?: boolean; // 기병이 마무리 싸움 중(대상 체력이 얼마 안 남아 치고 빠지지 않는다)
   tier: number; // 강화 단계 0~4
   nameId: number;
@@ -575,6 +582,7 @@ interface AiCtx {
   guard: boolean; // 주인공 호위(기본) 명령 중
   fort: boolean; // 보호 진형 도형 안팎의 자리를 지키는 중(검방병은 자리를 지키고, 궁병·마법사는 도형 밖으로 나가지 않는다)
   widthMult: number; // 창병 범위 증가 배율
+  ordered?: boolean; // 우클릭 지시·돌격으로 움직이는 중(물러나기·지키기보다 지시가 앞선다)
 }
 
 interface Chest {
@@ -3537,6 +3545,8 @@ export class Game {
       let home = slotsByOwner.get(m.owner)?.get(m.id) ?? [m.x, m.y];
       let leash = this.leashOf(st, m.type, ownerSlot);
       let assault = this.effStance(ownerSlot, m.type) === STANCE_ASSAULT;
+      const trueAssault = ownerSlot?.stances[m.type] === STANCE_ASSAULT; // 보호 진형에서 자유롭게 싸우는 병종은 해당하지 않는다
+      if (trueAssault && m.type === CAVALRY) leash = 1e6; // 돌격 진형: 기병은 주인공과의 거리와 상관없이 쫓는다
       let guard = this.effStance(ownerSlot, m.type) === STANCE_DEFEND;
       let fort = ownerSlot?.stances[m.type] === STANCE_PROTECT && m.type !== CAVALRY && m.type !== BLUNT; // 보호 진형 도형 안팎의 자리를 지킨다
       const ord = m.type === CAVALRY ? null : ownerSlot?.orders[m.type];
@@ -3571,13 +3581,24 @@ export class Game {
         fort,
         widthMult: boxWidthMult(m.type, st.arc),
       };
-      switch (m.type) {
-        case CAVALRY: this.aiCavalry(c); break;
-        case SHIELD: this.aiShield(c); break;
-        case ARCHER: this.aiArcher(c); break;
-        case BLUNT: this.aiBlunt(c); break;
-        case MAGE: this.aiMage(c); break;
-        default: this.aiSpear(c);
+      const ordNow = m.type === CAVALRY ? null : ownerSlot?.orders[m.type] ?? null;
+      if (ordNow) {
+        c.ordered = true;
+        this.aiOrdered(c, ordNow); // 우클릭 지시는 어떤 병종 AI(아군 지키기·물러나기·진형 복귀)보다 앞선다
+      } else if (m.type !== CAVALRY && trueAssault && !duel) {
+        c.ordered = true;
+        this.aiAssault(c); // 돌격 진형: 주인공과의 거리와 상관없이 가장 가까운 적에게 곧장 달려가 친다
+      } else if (m.type !== CAVALRY && m.type !== MAGE && this.autoStrike(c)) {
+        // 사거리 안에 적이 있으면 진형·지키기 동작보다 먼저 때린다
+      } else {
+        switch (m.type) {
+          case CAVALRY: this.aiCavalry(c); break;
+          case SHIELD: this.aiShield(c); break;
+          case ARCHER: this.aiArcher(c); break;
+          case BLUNT: this.aiBlunt(c); break;
+          case MAGE: this.aiMage(c); break;
+          default: this.aiSpear(c);
+        }
       }
       if (duel) {
         const r = Math.hypot(m.x, m.y);
@@ -3663,6 +3684,130 @@ export class Game {
       if (d <= limit && (!best || d < best.d)) best = { t, d };
     }
     return best;
+  }
+
+  /** 이 병종이 지금 선 자리에서 이 대상을 칠 수 있는가(창병은 직사각형 범위, 원거리는 사거리, 근접은 사거리+대상 크기) */
+  private canStrike(c: AiCtx, t: Target): boolean {
+    const { m, st } = c;
+    if (m.type === SPEAR) return inSpearBox(m.x, m.y, Math.atan2(t.y - m.y, t.x - m.x), t.x, t.y, t.r, st.reach, c.widthMult);
+    const d = Math.hypot(t.x - m.x, t.y - m.y);
+    return st.ranged ? d <= st.reach : d <= st.reach + t.r;
+  }
+
+  /** 칠 수 있는 대상 중 병종 성향(둔기병은 방패 든 적, 창병은 기병, 궁병은 방패 정면이 아닌 적)을 반영해 가장 알맞은 것 */
+  private pickStrike(c: AiCtx): Target | null {
+    const { m } = c;
+    let best: Target | null = null;
+    let bs = Infinity;
+    for (const t of c.targets) {
+      if (!this.canStrike(c, t)) continue;
+      let sc = Math.hypot(t.x - m.x, t.y - m.y);
+      if (m.type === BLUNT && t.type === SHIELD && t.shield > 0) sc /= BLUNT_SHIELD_PREF;
+      if (m.type === SPEAR && t.type === CAVALRY) sc /= 2;
+      if (m.type === ARCHER) sc *= (this.frontalShield(t, m) ? 3 : 1) * (t.ranged ? 0.85 : 1);
+      if (m.type === SHIELD && this.frontalShield(t, m)) sc *= 1.6;
+      if (sc < bs) {
+        bs = sc;
+        best = t;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * 사거리 안에 적이 있고 공격할 수 있으면 곧바로 친다(진형·지키기·후퇴 동작보다 먼저). 쳤으면 true.
+   * 궁병은 근접 적이 몸에 거의 붙었을 때만 쏘지 않고 물러난다.
+   */
+  private autoStrike(c: AiCtx): boolean {
+    const { m, st } = c;
+    if (m.cd > 0 || m.atkT > 0) return false;
+    if (m.type === ARCHER) {
+      for (const t of c.targets) {
+        if (t.ranged) continue;
+        if (Math.hypot(t.x - m.x, t.y - m.y) < t.r + st.radius + 14) return false; // 코앞의 근접 적: 쏘지 말고 거리를 벌린다
+      }
+    }
+    const t = this.pickStrike(c);
+    if (!t) return false;
+    if (m.type === BLUNT && !(t.type === SHIELD && t.shield > 0)) {
+      // 둔기병은 방패 든 검방병을 먼저 노린다: 조금만 더 가면 칠 수 있는 방패병이 있으면 다른 적을 치지 않고 그쪽으로 간다(AI에 맡긴다)
+      const pref = c.targets.find((q) => q.type === SHIELD && q.shield > 0 && Math.hypot(q.x - m.x, q.y - m.y) <= st.reach + q.r + 50);
+      if (pref) return false;
+    }
+    this.startAttack(m, st, Math.atan2(t.y - m.y, t.x - m.x));
+    return true;
+  }
+
+  /** 사거리에 들어오려고 목표 쪽으로 가는 거리(병종마다 적당한 거리에 선다) */
+  private engageDist(c: AiCtx): number {
+    const { m, st } = c;
+    if (m.type === ARCHER) return st.reach * TUNE.ARCHER_REACH_FRAC;
+    if (m.type === MAGE) return st.reach * 0.85;
+    return st.reach * 0.6;
+  }
+
+  /** 대상에게 다가가 치는 공통 동작(우클릭 공격 지시·돌격 진형). 사거리 안이면 치고, 아니면 곧장 간다. */
+  private attackMove(c: AiCtx, target: Target): void {
+    const { m, st, dt } = c;
+    const d = Math.hypot(target.x - m.x, target.y - m.y);
+    m.face = Math.atan2(target.y - m.y, target.x - m.x);
+    if (m.type === MAGE) {
+      if (d <= st.reach) return this.aiMage(c);
+    } else if (this.canStrike(c, target)) {
+      if (m.cd <= 0) this.startAttack(m, st, m.face);
+      return;
+    }
+    const speed = d > 300 ? st.speed * Math.min(TUNE.CATCHUP_MAX, 1.3) : st.speed;
+    this.moveToward(m, target.x, target.y, speed, dt, Math.max(4, this.engageDist(c)));
+  }
+
+  /** 우클릭 지시(이동·공격): 최우선 명령. 다른 판단 없이 그대로 따른다. */
+  private aiOrdered(c: AiCtx, ord: { kind: number; x: number; y: number }): void {
+    const { m, st, dt } = c;
+    if (ord.kind === 1) {
+      // 이동: 지점(둘레에 흩어진 자리)으로 간다. 도착한 뒤에야 사거리 안의 적과 싸운다.
+      if (c.homeDist > 18) {
+        const speed = c.homeDist > 120 ? st.speed * Math.min(TUNE.CATCHUP_MAX, 1 + c.homeDist / 160) : st.speed;
+        this.moveToward(m, c.home[0], c.home[1], speed, dt, 6);
+        m.face = Math.atan2(c.home[1] - m.y, c.home[0] - m.x);
+        return;
+      }
+      if (m.type === MAGE) return this.aiMage(c);
+      this.autoStrike(c);
+      return;
+    }
+    // 공격: 지시 지점 일대의 적을 쫓아 친다. 이미 사거리에 든 적이 있으면 그 적부터 친다.
+    if (m.type !== MAGE && this.autoStrike(c)) return;
+    let target: Target | null = null;
+    let best = Infinity;
+    for (const t of c.targets) {
+      const dg = Math.hypot(t.x - ord.x, t.y - ord.y);
+      if (dg > TUNE.ORDER_GROUP_RADIUS * 1.4) continue;
+      const sc = Math.hypot(t.x - m.x, t.y - m.y) * (m.type === BLUNT && t.type === SHIELD && t.shield > 0 ? 1 / BLUNT_SHIELD_PREF : 1);
+      if (sc < best) {
+        best = sc;
+        target = t;
+      }
+    }
+    if (target) return this.attackMove(c, target);
+    if (c.homeDist > 18) this.moveToward(m, c.home[0], c.home[1], st.speed, dt, 6); // 대상이 없으면 지점으로 가서 기다린다
+  }
+
+  /** 돌격 진형: 주인공과의 거리와 상관없이 가장 가까운 적에게 곧장 달려가 친다. 적이 없으면 진형으로 돌아온다. */
+  private aiAssault(c: AiCtx): void {
+    const { m } = c;
+    if (m.type !== MAGE && this.autoStrike(c)) return;
+    let target: Target | null = null;
+    let best = Infinity;
+    for (const t of c.targets) {
+      const sc = Math.hypot(t.x - m.x, t.y - m.y) * (m.type === BLUNT && t.type === SHIELD && t.shield > 0 ? 1 / BLUNT_SHIELD_PREF : 1) * (m.type === ARCHER && this.frontalShield(t, m) ? 2 : 1);
+      if (sc < best) {
+        best = sc;
+        target = t;
+      }
+    }
+    if (target) return this.attackMove(c, target);
+    this.aiGoHome(c);
   }
 
   /** 검방병: 다른 병종에 붙어서 가장 취약한 아군(궁병·주인공 순)을 지킨다. 그 아군과 위협 사이에 서서 방패 정면으로 막는다. */
@@ -3955,6 +4100,9 @@ export class Game {
     const { m, st, dt } = c;
     const owner = c.owner;
     const spears = c.targets.filter((t) => t.type === SPEAR);
+    if (m.lockT) m.lockT = Math.max(0, m.lockT - dt);
+    if (m.skipT) m.skipT = Math.max(0, m.skipT - dt);
+    if (owner?.orders[CAVALRY]?.kind === 1) m.evadeT = 0; // 이동 지시는 치고 빠지기보다 앞선다
     if (m.evadeT > 0) {
       // 한 대 치고 빠진다: 대상에서 떨어져 후방으로 돌아 들어가며 속도를 다시 붙인다
       const prey = c.targets.find((t) => t.id === m.runId);
@@ -3988,7 +4136,7 @@ export class Game {
     }
     const healthy = m.hp > st.hp * CAV_RETREAT_HP; // 체력이 낮으면 모험을 멈추고 복귀한다
     const ord = owner?.orders[CAVALRY] ?? null;
-    const charging = healthy && !!ord;
+    const charging = !!ord; // 우클릭 지시는 체력이 낮아도 따른다(대상을 찾아 싸우는 것만 체력이 받쳐 줄 때 한다)
     const anchor: [number, number] = charging ? [ord!.x, ord!.y] : c.home;
     const moveOrder = charging && ord!.kind === 1; // 이동 지시: 그곳까지 싸우지 않고 가서 자리를 지킨다
     const arrived = moveOrder && Math.hypot(m.x - anchor[0], m.y - anchor[1]) <= TUNE.MOVE_ENGAGE_RADIUS + 60;
@@ -3998,13 +4146,25 @@ export class Game {
       const radius = charging ? (moveOrder ? TUNE.MOVE_ENGAGE_RADIUS : CHARGE_TARGET_RADIUS) : c.leash;
       for (const t of c.targets) {
         if (Math.hypot(t.x - anchor[0], t.y - anchor[1]) > radius) continue;
+        if (t.id === m.skipId && (m.skipT ?? 0) > 0) continue; // 접근하지 못해 포기한 대상
         const d = Math.hypot(t.x - m.x, t.y - m.y);
         if (t.type === SPEAR && d > CAV_SELF_DEFENSE) continue; // 창병은 상대하지 않는다
-        const score = d / (t.hero ? 1.2 : CAV_TARGET_WEIGHT[t.type] ?? 1);
+        // 창병 적이 곁에 붙어 있는 대상은 접근하기 어려우므로 점수를 깎는다(창병이 없는 대상을 먼저)
+        let guards = 0;
+        for (const sp of spears) if (sp !== t && Math.hypot(sp.x - t.x, sp.y - t.y) < 130) guards++;
+        const score = (d / (t.hero ? 1.2 : CAV_TARGET_WEIGHT[t.type] ?? 1)) * (1 + 0.8 * guards) * (t.type === SPEAR ? 4 : 1); // 몸에 붙은 창병은 다른 대상이 없을 때만 상대한다
         if (score < best) {
           best = score;
           target = t;
         }
+      }
+      // 한 번 정한 대상은 잠깐 유지해 이쪽저쪽으로 왔다갔다 하지 않는다(대상이 사라졌거나 범위를 벗어나면 다시 고른다)
+      const locked = m.lockId && (m.lockT ?? 0) > 0 ? c.targets.find((t) => t.id === m.lockId && !(t.id === m.skipId && (m.skipT ?? 0) > 0) && Math.hypot(t.x - anchor[0], t.y - anchor[1]) <= radius) : undefined;
+      if (locked && !(locked.type === SPEAR && Math.hypot(locked.x - m.x, locked.y - m.y) > CAV_SELF_DEFENSE)) target = locked;
+      else if (target) {
+        m.lockId = target.id;
+        m.lockT = 2;
+        m.winX = undefined;
       }
     }
     const speed = cavSpeed(st.speed, m.momentum);
@@ -4022,6 +4182,23 @@ export class Game {
           m.brawl = target.hpFrac <= TUNE.CAV_FINISH_HP || target.ranged; // 지시받은 적은 끝까지. 상대가 거의 죽었거나 궁병이면 빠지지 않고 끝까지 쫓아 싸운다
         }
         return;
+      }
+      // 1.5초 동안 거의 제자리였다면(창병·아군에 막혀 왔다갔다) 이 대상을 잠시 포기하고 다른 대상을 찾는다
+      if (m.winX === undefined) {
+        m.winX = m.x;
+        m.winY = m.y;
+        m.stuckT = 0;
+      }
+      m.stuckT = (m.stuckT ?? 0) + dt;
+      if (m.stuckT >= 1.5) {
+        const moved = Math.hypot(m.x - m.winX, m.y - (m.winY ?? m.y));
+        m.winX = undefined;
+        if (moved < st.speed * 1.5 * 0.3) {
+          m.skipId = target.id;
+          m.skipT = 3;
+          m.lockId = 0;
+          return;
+        }
       }
       // 대상의 정면에서는 곧장 들어가지 않고, 대상 둘레를 돌아 옆·뒤로 접근한다(너무 오래 걸리면 돌격)
       let gx = target.x;
@@ -4059,6 +4236,9 @@ export class Game {
       if (sp === ignore) continue;
       const sd = Math.hypot(m.x - sp.x, m.y - sp.y);
       if (sd >= SPEAR_AVOID_RADIUS || sd < 0.001) continue;
+      // 가려는 쪽 앞에 있는 창병만 피한다(뒤나 옆의 창병 때문에 밀려나 제자리에서 떨지 않게). 목표가 창병 바로 곁이면 피하지 않고 들어간다.
+      if (((sp.x - m.x) / sd) * dx + ((sp.y - m.y) / sd) * dy < 0.25) continue;
+      if (Math.hypot(sp.x - gx, sp.y - gy) < 110) continue;
       const w = (1 - sd / SPEAR_AVOID_RADIUS) * 1.5;
       dx += ((m.x - sp.x) / sd) * w;
       dy += ((m.y - sp.y) / sd) * w;
@@ -4385,7 +4565,7 @@ export class Game {
       threat = t;
       gapBest = d - danger;
     }
-    if (threat) {
+    if (threat && !c.ordered) {
       m.face = Math.atan2(threat.y - m.y, threat.x - m.x);
       let ax = m.x - threat.x;
       let ay = m.y - threat.y;

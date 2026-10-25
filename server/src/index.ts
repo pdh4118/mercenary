@@ -147,6 +147,7 @@ setInterval(() => manager.step(), 1000 / TICK_RATE);
 
 http.listen(PORT, HOST, () => {
   console.log(`[mercenary] http://${HOST}:${PORT}  (게임 접속: /ws, 상태 확인: /healthz)`);
+  console.log(`[mercenary] 수치 조정 화면: http://localhost:${PORT}/tuning.html  (이 컴퓨터에서, 파일을 직접 열지 말고 이 주소로 여세요)`);
   if (!hasClient) console.log(`[mercenary] 경고: ${STATIC_DIR} 가 없습니다. 클라이언트를 서비스하려면 'npm run build'를 실행하세요.`);
   if (ALLOWED_ORIGINS.length) console.log(`[mercenary] 허용 출처: ${ALLOWED_ORIGINS.join(", ")}`);
 });

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { WORLD_SIZE, CAVALRY, MAGE, SHIELD, SPEAR, STANCE_ASSAULT, STANCE_DEFEND, STANCE_HOLD, TICK_RATE, TUNE, WEAPONS, CAV_MOMENTUM_AFTER_HIT } from "@mercenary/shared";
+import { WORLD_SIZE, CHARGE_DURATION_SEC, CAVALRY, MAGE, SHIELD, SPEAR, STANCE_ASSAULT, STANCE_DEFEND, STANCE_HOLD, TICK_RATE, TUNE, WEAPONS, CAV_MOMENTUM_AFTER_HIT } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -197,7 +197,7 @@ test("우클릭 지시: 빈 땅을 찍으면 기병이 그곳으로 가서 자�
   const foe = dummy(g2, p2.x + 500, p2.y, 4);
   g2.charge(a2, p2.x + 500 + 40, p2.y);
   assert.equal(p2.chargeKind, 0);
-  assert.equal(p2.chargeLeft, 6);
+  assert.equal(p2.chargeLeft, CHARGE_DURATION_SEC);
   run(g2, 5);
   assert.ok(foe.hp < foe.maxHp, "적 주변을 찍으면 그 일대의 적을 공격한다");
 });
