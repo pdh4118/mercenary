@@ -1938,8 +1938,8 @@ async function main() {
         sv.hurtT = Math.max(0, (sv.hurtT ?? 0) - ticker.deltaMS / 1000);
         sv.runT = moved ? (sv.runT ?? 0) + ticker.deltaMS / 1000 : 0;
         faceFrom(v, v.x, null);
-        v.sprite.texture = ((sv.hurtT ?? 0) > 0 && bossFx.supply.hurt) || (moved ? bossFx.supply.run[Math.floor((sv.runT ?? 0) * 12) % 5] : null) || bossFx.supply.idle;
-        v.sprite.anchor.set(0.5, 0.8);
+        v.sprite.texture = ((sv.hurtT ?? 0) > 0 && bossFx.supply.hurt) || (moved ? bossFx.supply.run[Math.floor((sv.runT ?? 0) * 12) % bossFx.supply.run.length] : null) || bossFx.supply.idle;
+        v.sprite.anchor.set(0.5, 0.88);
         v.sprite.scale.set(SPRITE_SCALE * 1.4 * v.face, SPRITE_SCALE * 1.4);
         v.lastX = v.x;
       } else if (((w[14] ?? 0) & EF_SKEL) !== 0 && bossFx.skelTex[w[4]]) {
@@ -2880,7 +2880,7 @@ async function main() {
           .roundRect(14, 75, (HUD_W - 28) * sf, 7, 3)
           .fill(sf > 0 ? 0x5aa9ff : 0x1b2433);
       }
-      mercPanel.update(latest.mercs, myId, meState.gold, meState.leadership - used);
+      mercPanel.update(latest.mercs, myId, meState.gold, meState.leadership - used, nearCampId >= 0);
       const hv = mercs.views.get(mercPanel.hovered());
       if (hv) fxLayer.circle(hv.x, hv.y, 26).stroke({ width: 3, color: 0xffe08a, alpha: 0.9 });
       showOffer(meState.offer, meState.pending, meState.rerolls, meState.box ?? 0);

@@ -360,6 +360,7 @@ export interface Slot {
   dashVx: number;
   dashVy: number;
   dashStrike: boolean; // 돌진이 끝나면 찌른다(창)
+  dashHit: Set<number>; // 이번 돌진에서 이미 지나가며 벤 적(번호)
   chargeT: number; // 철퇴를 꾹 누르고 모은 시간(초). 0이면 모으는 중이 아니다
   mom: number; // 기마 주인공의 속도(0~1). 달리면 오르고 멈추면 줄어든다
   stances: number[]; // 병종별 진형 모드
@@ -902,6 +903,7 @@ export class Game {
       dashVx: 0,
       dashVy: 0,
       dashStrike: false,
+      dashHit: new Set(),
       chargeT: 0,
       mom: 0,
       stances: UNIT_TYPES.map(() => STANCE_DEFEND),
@@ -975,14 +977,14 @@ export class Game {
   }
 
   /** 캠프 근처에서 용병 1명을 해고하고 지불한 금화의 일부를 돌려받는다. 쓰러진 용병, 체력이 낮은 용병 순으로 내보낸다. */
-  dismiss(playerId: number, type: number): BuyResult {
+  dismiss(playerId: number, type: number, mercId?: number): BuyResult {
     const s = this.slots.get(playerId);
     if (!s || s.state.down) return { ok: false, reason: "지금은 해고할 수 없습니다" };
     const nearCamp = [...this.camps.values()].some((c) => Math.hypot(c.x - s.state.x, c.y - s.state.y) <= CAMP_USE_RADIUS);
     if (!nearCamp) return { ok: false, reason: "캠프 근처에서만 해고할 수 있습니다" };
     let pick: Merc | null = null;
     for (const m of this.mercs.values()) {
-      if (m.owner !== playerId || m.type !== type) continue;
+      if (m.owner !== playerId || m.type !== type || (mercId !== undefined && m.id !== mercId)) continue;
       const rank = (x: Merc) => (x.respawn > 0 ? -1 : x.tier * 100000 + x.hp); // 쓰러진 용병, 낮은 단계, 체력 낮은 순
       if (!pick || rank(m) < rank(pick)) pick = m;
     }
@@ -2364,6 +2366,7 @@ export class Game {
         p.x = clampToWorld(p.x + s.dashVx * step, PLAYER_RADIUS);
         p.y = clampToWorld(p.y + s.dashVy * step, PLAYER_RADIUS);
         s.dashT -= dt;
+        if (s.dashStrike && WEAPONS[p.weapon]!.type === SPEAR && !p.down) this.dashSweep(s); // 지나가는 길의 적도 벤다
         if (s.dashT <= 0 && s.dashStrike) {
           s.dashStrike = false;
           if (WEAPONS[p.weapon]!.type === SPEAR && !p.down) this.strikeHero(s); // 돌진 끝에 찌른다
@@ -2498,6 +2501,35 @@ export class Game {
   }
 
   /** 주인공 공격이 실제로 나가는 순간 */
+  /** 창 돌진: 지나가는 길에 닿은 적(토너먼트에서는 상대)에게 창 피해를 한 번씩 준다 */
+  private dashSweep(s: Slot): void {
+    const p = s.state;
+    const w = WEAPONS[p.weapon]!;
+    const reach = PLAYER_RADIUS + 14;
+    const dmg = () => {
+      const crit = this.rollCrit(s.mods.heroCrit);
+      return { damage: w.damage * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1), crit };
+    };
+    let reflected = 0;
+    if (this.phase === "tournament") {
+      for (const f of this.duelFoes(p.id)) {
+        const key = f.merc ? f.merc.id : -f.ownerId; // 용병은 번호, 주인공은 -주인 번호
+        if (s.dashHit.has(key) || Math.hypot(f.x - p.x, f.y - p.y) > reach + f.radius) continue;
+        s.dashHit.add(key);
+        const d = dmg();
+        reflected += f.hit({ damage: d.damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit: d.crit });
+      }
+    } else {
+      for (const e of [...this.enemies.values()]) {
+        if (s.dashHit.has(e.id) || Math.hypot(e.x - p.x, e.y - p.y) > reach + radiusOf(e)) continue;
+        s.dashHit.add(e.id);
+        const d = dmg();
+        reflected += this.damageEnemy(e, { damage: d.damage, charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x), crit: d.crit }, p.id);
+      }
+    }
+    this.hurtHeroReflect(s, reflected);
+  }
+
   private strikeHero(s: Slot, power = 1): void {
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
@@ -2640,6 +2672,7 @@ export class Game {
         s.dashVx = (Math.cos(ang) * dist) / sec;
         s.dashVy = (Math.sin(ang) * dist) / sec;
         s.dashStrike = !back;
+        s.dashHit.clear();
         break;
       }
       case SHIELD:
@@ -2945,7 +2978,7 @@ export class Game {
         ownerId: p.id,
         status: (kind, sec, mult = 0.6) => this.statusHero(s, kind, sec, mult),
         hit: (h) => {
-          if (p.invuln > 0 || (s.dashT > 0 && s.dashStrike)) {
+          if (p.invuln > 0 || (s.dashT > 0 && s.dashStrike) || (s.boostT > 0 && h.srcType === ARCHER && !h.dot)) {
             // 부활 직후·검 스킬·창 돌진 중에는 맞아도 피해가 없고 "무적!"만 띄운다(연속 피격은 0.4초에 한 번만).
             // 창 돌진은 p.invuln을 쓰지 않아 무적 링이 그려지지 않는다.
             if (this.tick - (this.invulnPop.get(p.id) ?? -99) >= 8) {

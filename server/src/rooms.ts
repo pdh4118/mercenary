@@ -179,7 +179,7 @@ export class RoomManager {
         return;
       }
       case "dismiss": {
-        const r = room.game.dismiss(id, Number(msg.type));
+        const r = room.game.dismiss(id, Number(msg.type), typeof msg.merc === "number" ? msg.merc : undefined);
         if (!r.ok) conn.send({ t: "notice", text: r.reason });
         return;
       }

@@ -66,3 +66,33 @@ test("쌀은 시간이 지나면 사라지고, 군량병은 드물게 나온다(
   }
   assert.ok(max >= 1 && max <= SUPPLY.max, `최대 ${max}`);
 });
+
+test("창 돌진은 지나가는 길의 적도 벤다(한 번씩)", async () => {
+  const { SPEAR: SP, WEAPONS } = await import("@mercenary/shared");
+  const { g, p, id } = setup();
+  p.weapon = WEAPONS.findIndex((w) => w.type === SP);
+  const slot = (g as any).slots.get(id);
+  const e = (g as any).makeEnemy(120, 0, 1);
+  e.hp = e.maxHp = 1e6;
+  slot.input.aim = 0;
+  p.aim = 0;
+  assert.equal(g.useSkill(id), true);
+  run(g, 0.4);
+  assert.ok(e.hp < e.maxHp, "길목의 적이 맞았다");
+  assert.ok(e.maxHp - e.hp < (WEAPONS[p.weapon]!.damage * slot.mods.heroDmg) * 6, "여러 번 맞지 않는다");
+});
+
+test("기마 가속 중에는 궁병의 화살을 맞아도 피해가 없다", async () => {
+  const { ARCHER: AR, CAVALRY: CV, WEAPONS } = await import("@mercenary/shared");
+  const { g, p, id } = setup();
+  p.invuln = 0;
+  p.weapon = WEAPONS.findIndex((w) => w.type === CV);
+  const slot = (g as any).slots.get(id);
+  const fr = (g as any).collectFriendlies().find((f: any) => f.ownerId === id);
+  const hit = { damage: 20, charge: 0, srcType: AR, fromAngle: 0, crit: false };
+  assert.ok(fr.hit(hit) === 0 && p.hp < p.maxHp, "가속 전에는 맞는다");
+  p.hp = p.maxHp;
+  slot.boostT = 2;
+  fr.hit(hit);
+  assert.equal(p.hp, p.maxHp);
+});

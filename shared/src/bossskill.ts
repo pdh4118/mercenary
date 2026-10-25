@@ -559,9 +559,9 @@ export const SUPPLY = {
   hpGrow: 0.1,
   speed: 70,
   fleeRange: 520, // 이 안에 아군이 있으면 도망친다
-  firstSec: 25, // 첫 등장까지
-  gapMin: 45, // 다음 등장까지(초)
-  gapMax: 80,
+  firstSec: 15, // 첫 등장까지
+  gapMin: 30, // 다음 등장까지(초)
+  gapMax: 55,
   max: 2,
   lifeSec: 70, // 이만큼 지나면 달아나 사라진다
   riceSec: 25, // 쌀이 남아 있는 시간

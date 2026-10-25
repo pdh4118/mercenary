@@ -189,7 +189,7 @@ export async function createBossFx(d: BossFxDeps) {
   /** 군량병 그림: 서 있기·달리기 5컷·피격 */
   const supply = {
     idle: await Assets.load<Texture>("assets/units/supply_idle.png").catch(() => null),
-    run: await Promise.all([0, 1, 2, 3, 4].map(async (i) => Assets.load<Texture>(`assets/units/supply_run_${i}.png`).catch(() => null))),
+    run: await Promise.all([0, 1, 3, 4].map(async (i) => Assets.load<Texture>(`assets/units/supply_run_${i}.png`).catch(() => null))),
     hurt: await Assets.load<Texture>("assets/units/supply_hurt.png").catch(() => null),
   };
 

@@ -7,7 +7,7 @@ export interface MercPanel {
   isOpen(): boolean;
   show(visible: boolean): void;
   /** 매 프레임 호출해도 된다. 내용이 바뀌었을 때만 다시 그린다. */
-  update(mercs: readonly MercWire[], myId: number, gold: number, freeLeadership: number): void;
+  update(mercs: readonly MercWire[], myId: number, gold: number, freeLeadership: number, nearCamp: boolean): void;
   /** 목록에서 가리키고 있는 용병(월드에서 강조 표시) */
   hovered(): number;
 }
@@ -25,6 +25,8 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
   let visible = false;
   let ready = new Set<number>();
   let first = true;
+  let confirm = -1; // 해고 확인 중인 용병(한 번 더 누르면 해고)
+  let confirmT = 0;
   const hex = (c: number) => "#" + c.toString(16).padStart(6, "0");
 
   return {
@@ -39,7 +41,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       }
     },
     hovered: () => hover,
-    update(mercs, myId, gold, freeLeadership) {
+    update(mercs, myId, gold, freeLeadership, nearCamp) {
       if (!visible) return;
       const mine = mercs.filter((w) => w[5] === myId);
       // 경험치를 다 채운 용병이 새로 생기면 알려 준다
@@ -49,7 +51,8 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       first = false;
       if (!panel.classList.contains("open")) return;
       mine.sort((a, b) => Number(isReady(b)) - Number(isReady(a)) || a[4] - b[4] || b[15] - a[15] || a[0] - b[0]);
-      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${w[8] > 0 ? 1 : 0}:${w[17]}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}`).join("|");
+      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${Math.ceil(w[8])}:${w[17]}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}`;
+      if (confirm >= 0 && performance.now() - confirmT > 2500) confirm = -1;
       if (next === sig) return;
       sig = next;
       title.textContent = `내 용병 ${mine.length}명 · 금화 ${gold}G · 강화 가능 ${nowReady.size}`;
@@ -70,7 +73,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
         nm.textContent = `${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}`;
         const sub = document.createElement("div");
         sub.className = "stat";
-        sub.textContent = respawn > 0 ? `쓰러짐 (${Math.ceil(respawn)}초)` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${unitCost(type, tier)}`;
+        sub.textContent = respawn > 0 ? `쓰러짐 · 부활까지 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${unitCost(type, tier)}`;
         name.append(nm, sub);
         const need = mercXpNeed(tier);
         if (Number.isFinite(need)) {
@@ -111,6 +114,23 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           t.textContent = `경험치 ${xp}/${need}`;
           row.append(t);
         }
+        const dm = document.createElement("button");
+        const asking = confirm === id;
+        dm.textContent = asking ? "정말 해고?" : "해고";
+        dm.className = asking ? "danger" : "";
+        dm.disabled = !nearCamp;
+        dm.title = nearCamp ? "낸 금화의 절반을 돌려받고 해고합니다" : "캠프 근처에서만 해고할 수 있습니다";
+        dm.onclick = () => {
+          if (confirm === id) {
+            confirm = -1;
+            opts.send({ t: "dismiss", type, merc: id });
+          } else {
+            confirm = id;
+            confirmT = performance.now();
+          }
+          sig = ""; // 바로 다시 그린다
+        };
+        row.append(dm);
         list.append(row);
       }
       if (mine.length === 0) {
