@@ -22,9 +22,9 @@ test("흡혈·체력 재생 카드: 효과는 낮추고 뽑힐 확률은 높였�
   const blood = CARDS.find((c) => c.effect.k === "legend" && c.effect.id === "bloodthirst")!;
   assert.ok(blood.weight > otherLegend.weight, "피의 갈증은 더 자주 나온다");
   assert.ok(LEGENDS.bloodthirst.desc.includes("0.6%"));
-  // 병종 전용 흡혈 카드는 있고, 전체 용병용은 없다
-  assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "lifesteal" && c.effect.type !== undefined));
-  assert.ok(!CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "lifesteal" && c.effect.type === undefined));
+  // 용병 흡혈 카드는 공용만 있다(궁병은 절반, 마법사는 1/4만 적용된다)
+  assert.ok(!CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "lifesteal" && c.effect.type !== undefined));
+  assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "lifesteal" && c.effect.type === undefined));
 });
 
 test("흡혈 카드: 주인공이 준 피해의 일부만큼 체력을 회복한다", () => {

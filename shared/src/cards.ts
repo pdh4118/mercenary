@@ -174,8 +174,8 @@ export const ARCHER_KNOCK_FACTOR = 0.5;
 
 const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 };
 
-/** 병종 전용 카드로만 나오는 능력치(그 병종의 특화): 관통·발사 수·독은 궁병, 방어구·가시는 몸으로 싸우는 병종, 흡혈, 시전 시간은 마법사, 넉백은 창병·궁병 */
-const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "armor", "thorns", "lifesteal", "cast", "knock"]);
+/** 병종 전용 카드로만 나오는 능력치(그 병종의 특화): 관통·발사 수·독은 궁병, 방어구·가시는 몸으로 싸우는 병종, 시전 시간은 마법사, 넉백은 창병·궁병 */
+const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "armor", "thorns", "cast", "knock"]);
 
 const statCards = (): CardDef[] => {
   const out: CardDef[] = [];
@@ -200,7 +200,7 @@ const statCards = (): CardDef[] => {
     }
   }
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
-    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "thorns" || stat === "lifesteal" || stat === "cast" || stat === "knock") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
+    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "thorns" || stat === "cast" || stat === "knock") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
     for (let r = 0; r < 3; r++) {
       const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR);
       out.push({
@@ -208,7 +208,7 @@ const statCards = (): CardDef[] => {
         desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""} (병종 전용 카드의 ${GLOBAL_CARD_FACTOR * 100}%)`,
         category: 1,
         rarity: r as 0 | 1 | 2,
-        weight: 6 * RARITY[r]!.weight, // 병종 전용 카드가 줄어든 만큼 공용 카드가 더 자주 나온다
+        weight: (STAT_WEIGHT[stat] ?? 6) * RARITY[r]!.weight, // 병종 전용 카드가 줄어든 만큼 공용 카드가 더 자주 나온다
         stars: r + 1,
         minLevel: RARITY[r]!.minLevel,
         effect: { k: "mercStat", stat, v },
