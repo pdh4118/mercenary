@@ -127,6 +127,7 @@ export const BFX_CRASH = 4; // 돌진이 방벽·바위에 부딪힘
 export const BFX_ICEBREAK = 5; // 얼음벽 조각이 부서짐
 export const BFX_SHIELDBREAK = 6; // 거대 방패가 부서짐
 export const BFX_BLINK = 7; // 순간이동(마법진 섬광)
+export const BFX_BACKSTEP = 11; // 뒤로 훌쩍 물러나는 먼지(ang = 물러나는 방향)
 export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)
 export const BFX_MACEBOOM = 9; // 점프 쿵: 던진 철퇴가 땅에 닿는 폭발 그림(ang x 100 = 반경)
 
@@ -160,7 +161,7 @@ export const BOSS_CAV = {
   kickRest: 0.6,
   kickCd: 8,
   // 선회 베기: 대상 둘레의 원 궤도를 크고 빠르게 돈다
-  slashTele: 1.6,
+  slashTele: 1.4,
   slashRadius: 350,
   slashBand: 70, // 궤도 안팎 폭의 절반
   slashSec: 2.5,
@@ -207,12 +208,13 @@ export const BOSS_SPEAR = {
   guardSec: 5,
   guardHalf: (Math.PI * 100) / 180 / 2,
   guardRange: 200,
-  guardDmg: 3,
-  guardKnock: 80,
+  guardStep: 0.1, // 태세 중 이 간격으로 쉬지 않고 찌른다(아주 빠른 연속 찌르기)
+  guardDmg: 0.45,
+  guardKnock: 18,
   guardRest: 1,
   guardCd: 14,
   // 장창 3연 찌르기
-  tripleTele: 1.4,
+  tripleTele: 1.3,
   tripleLen: 420,
   tripleWidth: 50,
   tripleGap: (Math.PI * 25) / 180,
@@ -223,7 +225,7 @@ export const BOSS_SPEAR = {
   tripleCd: 8,
   // 창 던지기: 가장 먼 주인공에게, 관통
   throwTele: 1.4,
-  throwSpeed: 1100,
+  throwSpeed: 1800,
   throwWidth: 40,
   throwLen: 1300,
   throwDmg: 5,
@@ -253,13 +255,17 @@ export const BOSS_ARCHER = {
   iceTele: 1.2,
   iceCount: 10,
   iceFan: (Math.PI * 70) / 180,
-  iceSpeed: 650,
+  iceSpeed: 1100,
+  iceBackSec: 0.3, // 쏘기 시작할 때 뒤로 훌쩍 물러나는 시간(주인공 궁수의 후퇴처럼)
+  iceBackSpeed: 950,
   iceRange: 950,
   iceDmg: 1.6,
   iceSlowSec: 2.5,
   iceSlowMult: 0.6,
   // 화살비
   rainTele: 1,
+  rainFall: 0.55, // 화살이 하늘에서 떨어지는 시간(예고 원이 차오르는 시간)
+  rainGap: 0.04, // 화살 사이 간격
   rainArea: 260,
   rainR: 60,
   rainDmg: 3,

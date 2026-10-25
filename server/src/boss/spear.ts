@@ -46,22 +46,31 @@ const guard: SkillDef = {
     k.t = k.total = C.guardTele;
   },
   run: (c) => {
-    const { e, k, foes, sys } = c;
+    const { e, k, foes, sys, dt } = c;
     const g = sys.g as any;
     e.face = k.ang;
     if (k.ph === 0 && k.t <= 0) {
       k.ph = 1;
+      k.d.next = 0;
       k.t = C.guardSec;
     }
     if (k.ph === 1) {
-      const now = g.time as number;
-      for (const f of foes) {
-        if (!sys.inCone(f, e.x, e.y, k.ang, C.guardHalf, C.guardRange)) continue;
-        const key = sys.foeKey(f);
-        if (now - (k.hitAt.get(key) ?? -9) < 0.7) continue;
-        k.hitAt.set(key, now);
-        sys.hitFoe(e, f, C.guardDmg, C.guardKnock);
-        sys.fx(f.x, f.y, k.ang, BFX_IMPACT);
+      // 정면 부채꼴 안의 대상을 아주 빠르게 연달아 찌른다(guardStep마다 한 번씩, 부채꼴 안 대상은 모두 맞고 가장 가까운 쪽으로 줄기가 나간다)
+      k.d.next = (k.d.next ?? 0) - dt;
+      if (k.d.next! <= 0) {
+        k.d.next = C.guardStep;
+        let near: (typeof foes)[number] | null = null;
+        let bd = Infinity;
+        for (const f of foes) {
+          if (!sys.inCone(f, e.x, e.y, k.ang, C.guardHalf, C.guardRange)) continue;
+          sys.hitFoe(e, f, C.guardDmg, C.guardKnock);
+          const d = sys.dist(f, e);
+          if (d < bd) {
+            bd = d;
+            near = f;
+          }
+        }
+        if (near) sys.fx(e.x, e.y, Math.atan2(near.y - e.y, near.x - e.x) + (Math.random() - 0.5) * 0.24, BFX_THRUST, C.guardRange);
       }
       // 부채꼴 안으로 날아오는 아군 화살·투척류를 쓸어서 떨어뜨린다
       g.bullets = (g.bullets as any[]).filter((b) => b.hostile || !sys.inCone({ x: b.x, y: b.y, r: 0 }, e.x, e.y, k.ang, C.guardHalf, C.guardRange));

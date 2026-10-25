@@ -1,6 +1,7 @@
 import {
   BOSS_ARCHER as C,
   BSK_ICEARROW,
+  BFX_BACKSTEP,
   BSK_RAIN,
   BSK_SNIPE,
   BSK_STEALTH,
@@ -113,12 +114,17 @@ const iceArrow: SkillDef = {
       k.ph = 1;
       k.d.n = 0;
       k.d.next = 0;
+      k.d.back = C.iceBackSec;
       k.t = 0.9;
+      sys.fx(e.x, e.y, k.ang + Math.PI, BFX_BACKSTEP); // 주인공 궁수의 후퇴처럼 먼지를 일으키며 훌쩍 물러난다
     }
     if (k.ph === 1) {
-      // 뒤로 빠지면서
-      const back = k.ang + Math.PI;
-      g.moveToward(e, e.x + Math.cos(back) * 300, e.y + Math.sin(back) * 300, g.enemySpeed(e) * 1.2, dt, 1);
+      // 쏘면서 뒤로 빠진다(처음 짧은 시간만 빠르게)
+      if (k.d.back! > 0) {
+        k.d.back! -= dt;
+        const back = k.ang + Math.PI;
+        g.moveToward(e, e.x + Math.cos(back) * 400, e.y + Math.sin(back) * 400, C.iceBackSpeed, dt, 1);
+      }
       k.d.next! -= dt;
       while (k.d.next! <= 0 && k.d.n! < C.iceCount) {
         const a = k.ang + (-C.iceFan / 2 + (C.iceFan * k.d.n!) / (C.iceCount - 1));
@@ -160,7 +166,7 @@ const rain: SkillDef = {
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2;
         const r = C.rainArea * Math.sqrt(Math.random());
-        sys.addHazard({ kind: HZ_RAIN, x: clampToWorld(k.x + Math.cos(a) * r, 20), y: clampToWorld(k.y + Math.sin(a) * r, 20), a: C.rainR, delay: 0.9 + i * 0.07, t: 0.35, total: 0.35, src: e.id, dmg: C.rainDmg });
+        sys.addHazard({ kind: HZ_RAIN, x: clampToWorld(k.x + Math.cos(a) * r, 20), y: clampToWorld(k.y + Math.sin(a) * r, 20), a: C.rainR, delay: C.rainFall + i * C.rainGap, t: 0.35, total: 0.35, src: e.id, dmg: C.rainDmg });
       }
       k.ph = 2;
       k.t = 0.4;

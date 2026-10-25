@@ -5,6 +5,7 @@ import {
   BFX_ICEBREAK,
   BFX_IMPACT,
   BFX_THRUST,
+  BFX_BACKSTEP,
   BOSS_SPEAR,
   BOSS_BLUNT,
   BFX_MACEBOOM,
@@ -114,6 +115,7 @@ export async function createBossFx(d: BossFxDeps) {
   const T = {
     impact: await seq("boss1_impact", [0, 1, 2, 3]),
     thrust: await seq("boss2_thrust", [0, 1, 2]),
+    dust: await seq("boss3_dust", [0, 1, 2, 3]),
     slash: await seq("boss1_slash", [1, 2, 3]),
     cry: await seq("boss1_cry", [0, 1, 2]),
     spearStuck: await fx("boss2_spear_stuck"),
@@ -174,6 +176,8 @@ export async function createBossFx(d: BossFxDeps) {
     seqFx.push({ sp, frames, age: 0, dur });
   };
 
+  const now0 = (): number => performance.now();
+  let lastThrustSound = 0;
   /** 창 찌르기 줄기의 밝은 심: 앞으로 뻗으며 가늘어지는 흰 초록 선이 0.2초 동안 사라진다(그림 컷 위에 겹쳐 더 또렷하게 보인다) */
   const thrustG = new Graphics();
   d.fxLayer.addChild(thrustG);
@@ -205,12 +209,19 @@ export async function createBossFx(d: BossFxDeps) {
       playSeq(T.impact, x, y, 0.55, val === BFX_CRASH ? 1 : 0.7, 0);
       d.sound("knockback", x, y);
       if (val === BFX_CRASH) d.spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
+    } else if (val === BFX_BACKSTEP) {
+      // 뒤로 훌쩍 물러나는 먼지: 물러나는 쪽을 향해 퍼진다
+      playSeq(T.dust, x, y + 6, 0.4, 1.1, 0);
+      d.sound("skill_backstep", x, y, 0.8);
     } else if (val === BFX_THRUST) {
       // 창을 앞으로 찌르는 줄기: 몸 앞에서 시작해 길이만큼 뻗는다(그림 길이 약 190px을 늘려 맞춘다)
       const L = Math.max(60, len || 300);
       playSeq(T.thrust, x + Math.cos(ang) * 26, y - 26 + Math.sin(ang) * 26, 0.22, L / 190, ang, 0.02);
       thrustCores.push({ x: x + Math.cos(ang) * 26, y: y - 26 + Math.sin(ang) * 26, ang, len: L, age: 0 });
-      d.sound("spear_thrust", x, y, 0.8);
+      if (now0() - lastThrustSound > 140) {
+        lastThrustSound = now0();
+        d.sound("spear_thrust", x, y, 0.8); // 방어 태세의 연속 찌르기는 소리를 겹쳐 내지 않는다
+      }
     } else if (val === BFX_MACEBOOM) {
       if (!d.maceBoom(x, y, ang * 100)) playSeq(T.impact, x, y, 0.55, 1, 0);
       d.sound("skill_mace_hit", x, y);

@@ -174,3 +174,46 @@ test("창병 장군 3연 찌르기: 터지는 효과 대신 찌르기 줄기 이
   assert.equal(thrusts, 3);
   assert.equal(impacts, 0, "펑 터지는 효과는 더 쓰지 않는다");
 });
+
+test("창병 장군 창 방어 태세: 부채꼴 안의 대상을 쉬지 않고 아주 빠르게 연달아 찌른다(찌르기 줄기 이벤트가 초당 10번 안팎)", () => {
+  const { g, b, ids } = setup(2, BSK_GUARD);
+  const p = hero(g, ids[0]!);
+  place(p, b.x, b.y + 250);
+  run(g, 0.1);
+  assert.equal(b.bk.cur?.id, BSK_GUARD);
+  run(g, BOSS_SPEAR.guardTele + 0.1);
+  const takeEvents = (g as any).takeEvents.bind(g) as () => number[][];
+  takeEvents();
+  let thrusts = 0;
+  const sec = 2;
+  for (let i = 0; i < TICK_RATE * sec; i++) {
+    place(p, b.x, b.y + 140); // 밀려나도 부채꼴 안에 다시 서 있게 한다
+    g.step();
+    p.hp = p.maxHp;
+    for (const ev of takeEvents()) if (ev[0] === 22 && ev[4] === 10) thrusts++;
+  }
+  assert.ok(thrusts >= sec / BOSS_SPEAR.guardStep - 2, `${sec}초 동안 ${thrusts}번 찔렀다`);
+});
+
+import { BFX_BACKSTEP, BOSS_ARCHER, BSK_ICEARROW } from "@mercenary/shared";
+
+test("궁수 장군 얼음 화살: 쏘기 시작할 때 먼지를 일으키며 뒤로 빠르게 물러난다", () => {
+  const { g, b, ids } = setup(3, BSK_ICEARROW);
+  const p = hero(g, ids[0]!);
+  place(b, 0, 0);
+  place(p, 0, 400);
+  const takeEvents = (g as any).takeEvents.bind(g) as () => number[][];
+  const y0 = b.y;
+  let back = 0;
+  let began = false;
+  for (let i = 0; i < TICK_RATE * (BOSS_ARCHER.iceTele + 1.2); i++) {
+    // 위협: 아군 기병이 바싹 붙은 상태를 만든다
+    if (!began) g.addMerc(ids[0]!, 0, b.x, b.y + 100);
+    began = true;
+    g.step();
+    p.hp = p.maxHp;
+    for (const ev of takeEvents()) if (ev[0] === 22 && ev[4] === BFX_BACKSTEP) back++;
+  }
+  assert.ok(back >= 1, "물러나는 먼지 효과 이벤트");
+  assert.ok(y0 - b.y > 120, `뒤로(대상 반대쪽) 물러났다 ${y0 - b.y}`);
+});
