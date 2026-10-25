@@ -312,6 +312,7 @@ export interface RoomMember {
 
 export type ClientMsg =
   // 로비
+  | { t: "chat"; text: string } // 방 채팅(엔터). 주인공 머리 위에 말풍선으로 뜬다
   | { t: "active" } // 키·마우스 입력이 있었다는 신호(자리 비움 판정용). 클라이언트가 가끔 보낸다
   | { t: "list" }
   | { t: "create"; name: string; room?: string; private?: boolean; rush?: number } // 비공개 방은 목록에 안 나오고 코드로만 입장
@@ -350,6 +351,7 @@ export type ServerMsg =
   | { t: "left"; reason: string } // 방에서 나왔다(스스로, 내보내짐, 방 종료)
   | { t: "error"; text: string }
   | { t: "notice"; text: string }
+  | { t: "chat"; id: number; name: string; text: string } // 같은 방 사람의 채팅
   | { t: "result"; status: GameStatus; stage: number; time: number; players: ResultPlayer[]; partial?: boolean } // 게임이 끝났다. partial이면 진행 중에 요청한 중간 기록
   | {
       t: "state";
@@ -389,3 +391,6 @@ export function clampToWorld(v: number, radius: number): number {
   const half = WORLD_SIZE / 2 - radius;
   return Math.max(-half, Math.min(half, v));
 }
+
+export const CHAT_MAX_LEN = 60;
+export const CHAT_BUBBLE_SEC = 5;

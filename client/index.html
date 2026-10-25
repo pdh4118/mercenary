@@ -112,6 +112,11 @@
       #mercPanel { position: fixed; left: 340px; top: 30px; width: 320px; max-height: calc(100vh - 170px); display: none; flex-direction: column; background: rgba(15,16,21,.88); border: 1px solid #343949; border-radius: 10px; z-index: 6; color: #e6e9f0; }
       #mercPanel.open { display: flex; }
       #mercPanel header { padding: 8px 12px; font-size: 13px; color: #ffe08a; border-bottom: 1px solid #262a37; display: flex; justify-content: space-between; }
+      #chatLog { position: fixed; left: 340px; bottom: 215px; width: min(340px, 40vw); display: flex; flex-direction: column; gap: 2px; pointer-events: none; z-index: 20; font-size: 13px; }
+      #chatLog .line { background: rgba(10,12,18,.55); color: #f1f3f8; padding: 2px 8px; border-radius: 6px; text-shadow: 0 1px 2px #000; transition: opacity .6s; word-break: break-all; }
+      #chatLog .line b { color: #ffd45d; margin-right: 6px; }
+      #chatInput { position: fixed; left: 340px; bottom: 176px; width: min(340px, 40vw); display: none; z-index: 21; padding: 6px 10px; font-size: 14px; border-radius: 8px; border: 1px solid #7a8499; background: rgba(12,14,20,.92); color: #fff; }
+      #chatInput.open { display: block; }
       #mercList { overflow: auto; }
       .mrow { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #1f2330; font-size: 13px; }
       .mrow:hover { background: rgba(224,192,93,.12); }
@@ -242,6 +247,8 @@
       </div>
     </div>
 
+    <div id="chatLog"></div>
+    <input id="chatInput" type="text" maxlength="60" placeholder="채팅 (Enter 보내기 · Esc 취소)" autocomplete="off" />
     <div id="mercPanel"><header><span id="mercTitle">내 용병</span><span class="stat" style="color:#9aa1b0">U 닫기</span></header><div id="mercList"></div></div>
     <div id="formBar"></div>
     <div id="stanceBar"><b>용병 [V]</b><button id="stance0" title="진형이 주인공 주변을 지키며 싸운다 (F1)"><b>F1</b> 주인공 호위</button><button id="stance2" title="F2: 지금 주인공이 선 곳을 지킨다 · 버튼을 누르고 클릭하거나 T: 가리킨 곳을 지킨다"><b>F2</b> 위치 고수</button><button id="stance1" title="대열이 앞으로 나가 더 멀리 쫓는다 (F3)"><b>F3</b> 돌격</button><button id="stance3" title="검방병이 도형으로 둘러싸고 창병·궁병·마법사는 그 안에 들어간다. 기병·둔기병은 자유롭게 싸운다 (F4)"><b>F4</b> 보호 진형</button></div>

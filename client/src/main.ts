@@ -44,6 +44,7 @@ import {
   EF_SUPPLY,
   EVT_RICE,
   EVT_TENT,
+  CHAT_BUBBLE_SEC,
   ST_BIT_REST,
   TENT,
   type TentWire,
@@ -1379,7 +1380,9 @@ async function main() {
       }
       if (msg.t === "left" && msg.reason.includes("아무 조작이 없어")) idleKicked = true;
       if (lobby.handle(msg)) return;
-      if (msg.t === "notice") {
+      if (msg.t === "chat") {
+        addChat(msg.id, msg.name, msg.text);
+      } else if (msg.t === "notice") {
         toast.text = msg.text;
         toastLeft = 2.5;
       } else if (msg.t === "state") {
@@ -1526,6 +1529,36 @@ async function main() {
     if (cur === undefined) return;
     send({ t: "weapon", index: (cur + dir + WEAPONS.length) % WEAPONS.length });
   };
+  // --- 채팅: Enter로 열어 보내면 같은 방 모두에게 보이고, 보낸 사람 머리 위에 말풍선이 뜬다 ---
+  const chatInput = document.getElementById("chatInput") as HTMLInputElement;
+  const chatLog = document.getElementById("chatLog") as HTMLDivElement;
+  const bubbleOf = new Map<number, { text: string; until: number }>();
+  const addChat = (id: number, name: string, text: string) => {
+    bubbleOf.set(id, { text, until: performance.now() + CHAT_BUBBLE_SEC * 1000 });
+    const line = document.createElement("div");
+    line.className = "line";
+    const b = document.createElement("b");
+    b.textContent = name;
+    line.append(b, document.createTextNode(text)); // textContent로만 넣는다(HTML을 해석하지 않는다)
+    chatLog.append(line);
+    while (chatLog.childElementCount > 6) chatLog.firstElementChild?.remove();
+    setTimeout(() => (line.style.opacity = "0"), 8000);
+    setTimeout(() => line.remove(), 8700);
+  };
+  const closeChat = () => {
+    chatInput.classList.remove("open");
+    chatInput.blur();
+    chatInput.value = "";
+  };
+  chatInput.addEventListener("keydown", (e) => {
+    e.stopPropagation(); // 채팅 중 입력은 게임 키로 쓰지 않는다
+    if (e.key === "Enter") {
+      const text = chatInput.value.trim();
+      if (text) send({ t: "chat", text });
+      closeChat();
+    } else if (e.key === "Escape") closeChat();
+  });
+  chatInput.addEventListener("keyup", (e) => e.stopPropagation());
   const keys = new Set<string>();
   let firing = false;
   let mouseX = app.screen.width / 2 + 1;
@@ -1579,6 +1612,14 @@ async function main() {
       return;
     }
     if (lobby.blocksGameInput()) return;
+    if (e.key === "Enter" && !e.repeat && lobby.inRoom() && (e.target as HTMLElement | null)?.tagName !== "INPUT") {
+      e.preventDefault();
+      keys.clear();
+      pushInput();
+      chatInput.classList.add("open");
+      chatInput.focus();
+      return;
+    }
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === "INPUT" || tag === "SELECT") return; // 이름·간격 입력 중에는 게임 키로 쓰지 않는다
     const k = e.key.toLowerCase();
@@ -2137,6 +2178,31 @@ async function main() {
     players.update(latest.players, k, (v, p) => {
       const dead = p.down;
       v.node.visible = !p.rest; // 텐트에서 쉬는 동안은 보이지 않는다
+      // 채팅 말풍선: 이름표 위에 잠깐 떠 있다가 사라진다
+      const bb = bubbleOf.get(p.id);
+      const bv = v as unknown as { bubble?: Container; bubbleText?: string };
+      if (bb && bb.until > performance.now()) {
+        if (!bv.bubble || bv.bubbleText !== bb.text) {
+          bv.bubble?.destroy({ children: true });
+          const box = new Container();
+          const t = new Text({ text: bb.text, style: { fill: 0x1a1d26, fontSize: 14, fontWeight: "600", wordWrap: true, wordWrapWidth: 170, align: "center" } });
+          t.anchor.set(0.5, 1);
+          const w = t.width + 16;
+          const h = t.height + 10;
+          const bg = new Graphics().roundRect(-w / 2, -h - 3, w, h, 8).fill({ color: 0xffffff, alpha: 0.95 }).stroke({ width: 2, color: 0x2a2f3d }).poly([-6, -3, 6, -3, 0, 5]).fill(0xffffff);
+          t.position.set(0, -8);
+          box.addChild(bg, t);
+          box.y = HERO_TOP - 34;
+          v.node.addChild(box);
+          bv.bubble = box;
+          bv.bubbleText = bb.text;
+        }
+        bv.bubble.alpha = Math.min(1, (bb.until - performance.now()) / 500);
+      } else if (bv.bubble) {
+        bv.bubble.destroy({ children: true });
+        bv.bubble = undefined;
+        bv.bubbleText = undefined;
+      }
       if (!dead && ((p.status ?? 0) & ST_BIT_STUN) !== 0) bossFx.stunMark(`p${p.id}`, v.x, v.y - 84, 0.6, performance.now()); // 기절한 주인공: 머리 위에 별
       paintRing(v, ownerColor(p.id), teamSide(p.id) !== null);
       const side = teamSide(p.id);

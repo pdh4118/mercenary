@@ -653,3 +653,24 @@ test("접속한 사람이 없는 방(재접속 대기 중)은 방 목록에서 �
   m.handle(b, { t: "list" });
   assert.equal(b.last("rooms")!.rooms.length, 0);
 });
+
+test("채팅은 같은 방 사람에게만 가고, 길이·연타가 제한된다", () => {
+  const { m, conn } = setup();
+  const a = conn();
+  const b = conn();
+  const c = conn();
+  m.handle(a, { t: "create", name: "A" });
+  m.handle(b, { t: "join", name: "B", code: a.last("welcome")!.code });
+  m.handle(c, { t: "create", name: "C" });
+  m.handle(a, { t: "chat", text: "  안녕\n하세요  " });
+  assert.equal(b.last("chat")!.text, "안녕 하세요");
+  assert.equal(b.last("chat")!.name, "A");
+  assert.equal(a.last("chat")!.id, a.last("welcome")!.id);
+  assert.equal(c.last("chat"), undefined, "다른 방에는 가지 않는다");
+  const n = b.msgs.filter((s) => s.t === "chat").length;
+  m.handle(a, { t: "chat", text: "연타" });
+  assert.equal(b.msgs.filter((s) => s.t === "chat").length, n, "너무 빠른 연타는 무시");
+  seconds(m, 1);
+  m.handle(a, { t: "chat", text: "x".repeat(200) });
+  assert.equal(b.last("chat")!.text.length, 60);
+});

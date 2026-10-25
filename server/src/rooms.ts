@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import {
   type MatchRecord,
   STAGE_COUNT,
+  CHAT_MAX_LEN,
   DIFFICULTY_REDUCTION,
   IDLE_KICK_SEC,
   JOIN_FAIL_BLOCK_SEC,
@@ -114,6 +115,9 @@ export class RoomManager {
     if (this.idle.has(conn)) this.idle.set(conn, 0); // 무슨 메시지든 보냈다면 자리에 있는 것(클라이언트는 키·마우스 입력 때 "active"를 보낸다)
     switch (msg.t) {
       case "active":
+        return;
+      case "chat":
+        this.chat(conn, msg.text);
         return;
       case "list":
         conn.send({ t: "rooms", rooms: this.list() });
@@ -411,6 +415,22 @@ export class RoomManager {
     this.broadcastRoom(room);
     this.broadcastLobby();
   }
+
+  /** 채팅: 같은 방 모두에게 보낸다. 길이를 자르고 제어 문자를 지우며, 너무 빠른 연타는 무시한다. */
+  private chat(conn: Conn, raw: unknown): void {
+    const at = this.where.get(conn);
+    if (!at || typeof raw !== "string") return;
+    const last = this.chatAt.get(conn) ?? -99;
+    if (this.clock - last < 0.6) return;
+    // eslint-disable-next-line no-control-regex
+    const text = raw.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, CHAT_MAX_LEN);
+    if (!text) return;
+    this.chatAt.set(conn, this.clock);
+    const m = at.room.members.get(at.id);
+    const msg: ServerMsg = { t: "chat", id: at.id, name: m?.name ?? "", text };
+    for (const x of at.room.members.values()) x.conn?.send(msg);
+  }
+  private chatAt = new Map<Conn, number>();
 
   /** 방에서 한 명을 뺀다. 방장이면 다른 사람에게 넘기고, 아무도 안 남으면 방을 없앤다. */
   private removeMember(room: Room, id: number, reason: string): void {
