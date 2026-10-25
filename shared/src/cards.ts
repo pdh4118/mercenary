@@ -122,6 +122,8 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 export const MERC_STAT_BASE: Record<MercStat, number> = {
   hp: 0.375, dmg: 0.3, atkSpeed: 0.225, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.1,
 };
+/** 용병 공용 흡혈 카드는 효과가 작아 다른 공용 카드의 5배로 준다(궁병 50%·마법사 25%는 따로 적용) */
+export const GLOBAL_LIFESTEAL_BOOST = 5;
 export const GLOBAL_CARD_FACTOR = 0.35; // 병종 전용 카드가 없어지고 용병 공용 카드가 그 자리를 대신하므로 예전(0.2)보다 올렸다
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
@@ -202,7 +204,7 @@ const statCards = (): CardDef[] => {
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
     if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "armor" || stat === "thorns" || stat === "cast" || stat === "knock") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
     for (let r = 0; r < 3; r++) {
-      const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR);
+      const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * GLOBAL_CARD_FACTOR * (stat === "lifesteal" ? GLOBAL_LIFESTEAL_BOOST : 1));
       out.push({
         name: `용병 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`,
         desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""} (병종 전용 카드의 ${GLOBAL_CARD_FACTOR * 100}%)`,
