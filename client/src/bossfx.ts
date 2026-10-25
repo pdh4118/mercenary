@@ -692,7 +692,7 @@ export async function createBossFx(d: BossFxDeps) {
   const enemyMarks = (id: number, x: number, y: number, flags: number, boss: boolean, stage: number, size: number, now: number, faceAng = 0): { alpha: number; tint: number } => {
     let alpha = 1;
     let tint = 0xffffff;
-    if (flags & EF_STEALTH) alpha = 0.12;
+    if (flags & EF_STEALTH) alpha = 0.05;
     if (flags & EF_INVULN) {
       tint = 0xffe9a0;
       if (boss) mark(id, "inv", pick(T.inv, 1 + (Math.floor(now / 140) % 2)), x, y + 6, 1.7, 0.6, true, 0.7);
