@@ -191,8 +191,9 @@ export const shieldKit: KitDef = {
     const { e, k, dt, sys } = c;
     const g = sys.g as any;
     if ((k.v.reflect ?? 0) > 0) k.v.reflect = Math.max(0, k.v.reflect! - dt);
+    if ((k.v.invCd ?? 0) > 0) k.v.invCd = Math.max(0, k.v.invCd! - dt);
     // 운석 맞춤 무적: 날아드는 아군 운석이 장군 근처에 떨어지는 순간 앞뒤 0.75초 동안, 장군과 가까운 보스군이 모두 무적이 된다
-    for (const [key, cast] of g.casts as Map<number, { x: number; y: number; radius: number }>) {
+    if ((k.v.invCd ?? 0) <= 0) for (const [key, cast] of g.casts as Map<number, { x: number; y: number; radius: number }>) {
       const merc = key > 0 ? g.mercs.get(key) : undefined;
       if (key > 0 && !merc) continue; // 적 마법사의 시전이다
       const left = key < 0 ? (g.slots.get(-key)?.windT ?? 0) : (merc?.atkT ?? 0);
@@ -202,6 +203,8 @@ export const shieldKit: KitDef = {
         if (Math.hypot(o.x - e.x, o.y - e.y) > C.invRadius) continue;
         o.invulnT = Math.max(o.invulnT ?? 0, left + C.invHalf);
       }
+      k.v.invCd = C.invCd + left + C.invHalf; // 한 번 쓰면 무적이 끝난 뒤에도 재사용 대기시간이 지나야 한다
+      break;
     }
   },
   /** 반사 태세: 받는 피해가 줄고 맞은 피해의 몇 배가 때린 쪽에게 돌아간다 */

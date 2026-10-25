@@ -364,6 +364,7 @@ export interface Slot {
   dashVx: number;
   dashVy: number;
   dashStrike: boolean; // 돌진이 끝나면 찌른다(창)
+  offerBoxed: boolean; // 지금 떠 있는 선택지가 상자 보너스로 뽑힌 것인가
   restTent: number; // 쉬고 있는 텐트 번호(0이면 쉬지 않음)
   dashHit: Set<number>; // 이번 돌진에서 이미 지나가며 벤 적(번호)
   chargeT: number; // 철퇴를 꾹 누르고 모은 시간(초). 0이면 모으는 중이 아니다
@@ -917,6 +918,7 @@ export class Game {
       dashStrike: false,
       dashHit: new Set(),
       restTent: 0,
+      offerBoxed: false,
       chargeT: 0,
       mom: 0,
       stances: UNIT_TYPES.map(() => STANCE_DEFEND),
@@ -1519,7 +1521,7 @@ export class Game {
           this.enrageArmy();
         }
         // 격노해도 끝내 못 잡으면 강제로 다음 스테이지로(마지막 스테이지는 끝까지 잡아야 한다)
-        if (TUNE.BOSS_HARD_TIMEOUT_SEC > 0 && this.bossT >= TUNE.BOSS_HARD_TIMEOUT_SEC && this.stage < STAGE_COUNT) this.skipBoss();
+        if (TUNE.BOSS_HARD_TIMEOUT_SEC > 0 && this.bossT >= TUNE.BOSS_HARD_TIMEOUT_SEC && this.stage < STAGE_COUNT) this.skipBoss(); // 기본은 꺼져 있다(0): 보스는 잡아야 끝난다
       }
     } else if (this.phase === "tournament") {
       this.stepTournament(dt);
@@ -1667,7 +1669,7 @@ export class Game {
   private marchArmy(a: Army, dt: number, speedMult: number): void {
     let near: PlayerState | null = null;
     let best = Infinity;
-    for (const s of this.alivePlayers()) {
+    for (const s of this.presentPlayers()) {
       const d = Math.hypot(s.state.x - a.x, s.state.y - a.y);
       if (d < best) {
         best = d;
@@ -1699,7 +1701,7 @@ export class Game {
 
   /** 소대 한 개를 먼 곳에서 진형을 갖춘 채 등장시킨다. kind를 주면 그 구성(테스트용), 없으면 무작위. */
   spawnSquad(kindIndex?: number): number {
-    const alive = this.alivePlayers();
+    const alive = this.presentPlayers();
     if (alive.length === 0) return 0;
     const kind = SQUAD_KINDS[kindIndex ?? Math.floor(this.rng() * SQUAD_KINDS.length)]!;
     const layout = squadLayout(squadComposition(kind, squadSize(this.stage, this.slots.size)));
@@ -2109,12 +2111,16 @@ export class Game {
       return;
     }
     // 3·6·9·10 스테이지: 보스를 잡으면 남은 적을 모두 없애고 플레이어끼리 토너먼트를 연다(2명 이상일 때). 끝난 뒤에 승리 판정이 난다.
-    if (isTournamentStage(this.stage) && this.slots.size >= 2) {
-      this.tourCountdown = Math.max(0.05, TUNE.TOURNAMENT_NOTICE_SEC);
-      this.phaseT = Math.max(this.phaseT, TUNE.TOURNAMENT_NOTICE_SEC + 1); // 예고 중에 다음 스테이지로 넘어가지 않게
-      return;
-    }
+    if (this.openTournamentIfDue()) return;
     if (this.stage >= STAGE_COUNT) this.status = "victory";
+  }
+
+  /** 토너먼트 스테이지(2명 이상)이면 곧 대결이 열리도록 예고를 시작한다 */
+  private openTournamentIfDue(): boolean {
+    if (!isTournamentStage(this.stage) || this.slots.size < 2) return false;
+    this.tourCountdown = Math.max(0.05, TUNE.TOURNAMENT_NOTICE_SEC);
+    this.phaseT = Math.max(this.phaseT, TUNE.TOURNAMENT_NOTICE_SEC + 1); // 예고 중에 다음 스테이지로 넘어가지 않게
+    return true;
   }
 
   /** 보스를 못 잡고 제한 시간이 지났다: 보스군은 사라지고 보상 없이 다음 스테이지로 넘어간다 */
@@ -2126,6 +2132,7 @@ export class Game {
     for (const s of this.slots.values()) if (s.state.down) this.standUp(s);
     this.phase = "break";
     this.phaseT = TUNE.STAGE_BREAK_SEC;
+    if (!this.rush) this.openTournamentIfDue(); // 보스를 못 잡고 넘어가도 토너먼트 스테이지면 대결은 연다
   }
 
   /** 보스를 쓰러뜨린 자리 둘레에 접속한 인원 수만큼 상자를 떨어뜨린다. 상자마다 주인이 있다. */
@@ -2163,7 +2170,7 @@ export class Game {
       this.chests.delete(c.id);
       p.pending++;
       p.box++;
-      p.offer = this.rollOffer(s); // 지금 떠 있던 선택지가 있어도 상자 카드로 다시 뽑는다
+      if (p.offer.length === 0) p.offer = this.rollOffer(s); // 이미 레벨업 선택지가 떠 있으면 그대로 두고, 그 선택이 끝난 뒤 이어서 상자 카드가 나온다
       this.pushEvent(EVT_REVIVE, c.x, c.y, 0);
     }
   }
@@ -2425,6 +2432,11 @@ export class Game {
 
   private alivePlayers(): Slot[] {
     return [...this.slots.values()].filter((s) => !s.state.down);
+  }
+
+  /** 적이 노리고 찾아오는 사람: 쓰러지지 않았고 텐트에서 쉬는 중도 아니다(텐트 안은 아무도 없는 것처럼 본다) */
+  private presentPlayers(): Slot[] {
+    return [...this.slots.values()].filter((s) => !s.state.down && s.restTent === 0);
   }
 
   private stepPlayers(dt: number): void {
@@ -2988,7 +3000,7 @@ export class Game {
 
   private spawnEnemies(dt: number): void {
     if (!this.autoSpawn) return;
-    const alive = this.alivePlayers();
+    const alive = this.presentPlayers(); // 모두 텐트에서 쉬는 동안은 새 적이 찾아오지 않는다
     if (alive.length === 0) return;
     if (this.phase === "break") return;
     const stageMult = (1 + TUNE.STAGE_SPAWN_GROWTH * (this.stage - 1)) * (this.phase === "boss" ? 0.25 : 1);
@@ -4592,7 +4604,7 @@ export class Game {
     s.detail.cards[card.name] = (s.detail.cards[card.name] ?? 0) + 1;
     s.state.rerolls = Math.min(REROLL_MAX, s.state.rerolls + REROLL_PER_PICK); // 고를 때마다 새로고침 1회 적립
     s.state.pending--;
-    if (s.state.box > 0) s.state.box--; // 상자 카드가 먼저 나온다
+    if (s.offerBoxed && s.state.box > 0) s.state.box--; // 상자 보너스로 뽑힌 선택지를 골랐을 때만 상자를 쓴 것으로 센다
     s.state.offer = s.state.pending > 0 ? this.rollOffer(s) : [];
     return true;
   }
@@ -4608,6 +4620,7 @@ export class Game {
 
   /** 서로 다른 카드 3장. 가중치로 뽑되, 가진 병종만 해당 카드가 나오고 세 장이 모두 같은 종류가 되지는 않게 한다. */
   private rollOffer(s: Slot, exclude: readonly number[] = []): number[] {
+    s.offerBoxed = s.state.box > 0;
     const owned = new Set<number>();
     for (const m of this.mercs.values()) if (m.owner === s.state.id) owned.add(m.type);
     const count = (t: number) => [...this.mercs.values()].filter((m) => m.owner === s.state.id && m.type === t).length;
@@ -4793,24 +4806,6 @@ export class Game {
     }
   }
 
-  /** 쉬는 사람이 있는 텐트 가까이의 적은 공격을 멈추고 멀어진다 */
-  private repelFromTent(e: Enemy, speed: number, dt: number): boolean {
-    for (const t of this.tents.values()) {
-      const d = Math.hypot(e.x - t.x, e.y - t.y);
-      if (d >= TENT.repelRadius) continue;
-      let occupied = false;
-      for (const s of this.slots.values()) if (s.restTent === t.id) occupied = true;
-      if (!occupied) continue;
-      e.atkT = 0;
-      const a = d > 1 ? Math.atan2(e.y - t.y, e.x - t.x) : Math.cos(e.id) * Math.PI;
-      e.face = a;
-      e.x = clampToWorld(e.x + Math.cos(a) * speed * TUNE.ENEMY_SPEED_MULT * TENT.repelSpeed * dt, 14);
-      e.y = clampToWorld(e.y + Math.sin(a) * speed * TUNE.ENEMY_SPEED_MULT * TENT.repelSpeed * dt, 14);
-      return true;
-    }
-    return false;
-  }
-
   private stepEnemies(dt: number, friendlies: Friendly[]): void {
     const foes = this.buildFoes(friendlies, dt);
     const archers: Enemy[] = [];
@@ -4834,7 +4829,6 @@ export class Game {
         continue;
       }
       const st = ENEMY_STATS[e.type]!;
-      if (!e.boss && this.repelFromTent(e, st.speed, dt)) continue; // 누군가 쉬는 텐트 근처에서는 물러난다
       this.regenShield(e, e.shieldMax, dt);
       e.cd = Math.max(0, e.cd - dt);
 

@@ -31,7 +31,7 @@ export const TUNE = {
   BOSS_HP_PER_STAGE: 5,
   BOSS_DMG_MULT: 2,
   BOSS_TIMEOUT_SEC: 90, // 보스군이 등장한 뒤 이 시간(1분 30초) 안에 장군을 못 잡으면 보스군이 격노해 점점 강해진다
-  BOSS_HARD_TIMEOUT_SEC: 240, // 그래도 못 잡고 이 시간이 지나면 보스군이 물러나고 다음 스테이지로 넘어간다(마지막 스테이지 제외, 0이면 없음)
+  BOSS_HARD_TIMEOUT_SEC: 0, // 0이면 보스를 잡을 때까지 이어진다. 양수면 이 시간(초)이 지나 못 잡았을 때 보스군이 물러나고 다음 스테이지로 넘어간다(마지막 스테이지 제외)
   BOSS_RAGE_INTERVAL_SEC: 20, // 격노 단계가 올라가는 간격
   BOSS_RAGE_REINFORCE: 0.1, // 단계마다 늘어나는 병력(처음 병력 대비 비율, 최소 3명)
   BOSS_RAGE_POWER: 0.08, // 단계마다 보스군의 체력·방패·공격력이 곱해지는 비율
@@ -450,11 +450,9 @@ export const meleeArc = (type: number, baseArc: number, area: number): number =>
 export const meleeReach = (type: number, reach: number, area: number): number => (lengthensOnArea(type) ? reach * area : reach);
 export const AREA_ARC_MAX = 2.4; // 범위 증가로 넓어지는 근접 부채꼴 반각 상한(라디안)
 
-/** 휴식 텐트: 가까이에서 스페이스를 누르면 주인공과 용병이 들어가 쉬고(체력 회복), 적은 물러난다. 다시 누르면 나온다. */
+/** 휴식 텐트: 가까이에서 스페이스를 누르면 주인공과 용병이 들어가 쉬고(체력 회복), 적에게는 아무도 없는 것처럼 보인다. 다시 누르면 나온다. */
 export const TENT = {
   useRadius: 110,
-  repelRadius: 420, // 누군가 쉬는 동안 이 안의 적은 물러난다
-  repelSpeed: 1.3, // 물러나는 속도(적 이동 속도 배율)
   lifeSec: 80,
   firstSec: 25,
   intervalSec: 30,

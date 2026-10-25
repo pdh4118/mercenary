@@ -122,7 +122,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 export const MERC_STAT_BASE: Record<MercStat, number> = {
   hp: 0.375, dmg: 0.3, atkSpeed: 0.225, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.1,
 };
-export const GLOBAL_CARD_FACTOR = 0.2;
+export const GLOBAL_CARD_FACTOR = 0.35; // 병종 전용 카드가 없어지고 용병 공용 카드가 그 자리를 대신하므로 예전(0.2)보다 올렸다
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
   ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "area", "xp"], // 기병
@@ -171,18 +171,20 @@ const statDesc = (t: number, stat: MercStat, v: number): string =>
 /** 잘 나오게 하고 싶은 능력치의 뽑힐 확률 가중치(일반 5). 체력 재생·흡혈은 한 장의 효과를 낮추는 대신 자주 나온다. */
 /** 궁병은 화살마다 밀어서 연사·다중 발사와 겹치면 강하므로, 넉백 카드 효과를 창병의 이 비율만큼만 준다 */
 export const ARCHER_KNOCK_FACTOR = 0.5;
-/** 궁병 전용 공격력 카드의 효과량 배율(원거리라 같은 수치면 너무 강하다) */
-export const ARCHER_DMG_FACTOR = 2 / 3;
 
 const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 };
+
+/** 병종 전용 카드로만 나오는 능력치(그 병종의 특화): 관통·발사 수·독은 궁병, 방어구·가시는 몸으로 싸우는 병종, 흡혈, 시전 시간은 마법사, 넉백은 창병·궁병 */
+const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "armor", "thorns", "lifesteal", "cast", "knock"]);
 
 const statCards = (): CardDef[] => {
   const out: CardDef[] = [];
   for (const t of UNIT_TYPES) {
     for (const stat of MERC_TYPE_FOCUS[t]!) {
+      if (!TYPE_ONLY_STATS.has(stat)) continue; // 그 병종만의 특화 능력이 아니면 용병 공용 카드로만 나온다
       const special = stat === "pierce" || stat === "multi" || stat === "poison" || stat === "critMult" || stat === "thorns";
       for (let r = stat === "armor" ? 1 : 0; r < 3; r++) {
-        const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * (stat === "knock" && t === ARCHER ? ARCHER_KNOCK_FACTOR : stat === "dmg" && t === ARCHER ? ARCHER_DMG_FACTOR : 1));
+        const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * (stat === "knock" && t === ARCHER ? ARCHER_KNOCK_FACTOR : 1));
         out.push({
           name: `${UNIT_NAMES[t]} ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`,
           desc: statDesc(t, stat, v),
@@ -206,7 +208,7 @@ const statCards = (): CardDef[] => {
         desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""} (병종 전용 카드의 ${GLOBAL_CARD_FACTOR * 100}%)`,
         category: 1,
         rarity: r as 0 | 1 | 2,
-        weight: 3 * RARITY[r]!.weight,
+        weight: 6 * RARITY[r]!.weight, // 병종 전용 카드가 줄어든 만큼 공용 카드가 더 자주 나온다
         stars: r + 1,
         minLevel: RARITY[r]!.minLevel,
         effect: { k: "mercStat", stat, v },

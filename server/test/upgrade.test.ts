@@ -11,6 +11,7 @@ import {
   MERC_STATS,
   MERC_TYPE_FOCUS,
   RARITY,
+  MERC_STAT_BASE,
   RARITY_NAMES,
   OFFER_SIZE,
   REROLL_MAX,
@@ -35,19 +36,19 @@ const quiet = () => {
   return g;
 };
 
-test("전체 용병 카드는 병종 전용 카드의 20% 효과다", () => {
+test("용병 공용 카드가 기본이고, 병종 전용 카드는 그 병종의 특화 능력치에만 남는다", () => {
   const globals = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.type === undefined);
   const types = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.type !== undefined);
-  assert.ok(globals.length >= 30 && types.length >= 60);
+  assert.ok(globals.length >= 30 && types.length >= 20);
   for (const c of globals) {
     if (c.effect.k !== "mercStat") continue;
-    const stat = c.effect.stat;
-    const typed = types.find((t) => t.effect.k === "mercStat" && t.effect.stat === stat && t.rarity === c.rarity)!;
-    if (typed.effect.k !== "mercStat") continue;
-    assert.ok(Math.abs(c.effect.v - typed.effect.v * GLOBAL_CARD_FACTOR) < 1e-3, c.name);
+    const base = MERC_STAT_BASE[c.effect.stat];
+    assert.ok(Math.abs(c.effect.v - base * RARITY[c.rarity as 0 | 1 | 2].mult * GLOBAL_CARD_FACTOR) < 2e-3, c.name);
   }
-  // 병종마다 전용 능력치마다 일반/희귀/영웅 세 등급이 있고, 모두 그 병종을 가진 사람에게만 나온다
-  for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.reduce((n, st) => n + (st === "armor" ? 2 : 3), 0));
+  const special = new Set(["pierce", "multi", "poison", "armor", "thorns", "lifesteal", "cast", "knock"]);
+  for (const c of types) assert.ok(c.effect.k === "mercStat" && special.has(c.effect.stat), `${c.name}은 특화 능력치가 아니다`);
+  // 병종마다 특화 능력치마다 일반/희귀/영웅 세 등급(방어구는 두 등급)이 있고, 모두 그 병종을 가진 사람에게만 나온다
+  for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.filter((st) => special.has(st)).reduce((n, st) => n + (st === "armor" ? 2 : 3), 0));
 });
 
 test("카드를 고를 때마다 새로고침이 1회씩 쌓이고 상한이 있다", () => {
@@ -417,14 +418,14 @@ test("전설 효과: 관통 증폭·돌격 가속·광역 증폭·폭풍 연사�
 });
 
 test("모든 병종은 공격 속도 카드를 가진다(화살이 범위가 없는 궁병은 범위 제외)", () => {
-  const has = (t: number, stat: string) => CARDS.some((c) => c.effect.k === "mercStat" && c.effect.type === t && c.effect.stat === stat);
-  for (const t of UNIT_TYPES) assert.ok(has(t, "atkSpeed"), UNIT_NAMES_T[t]);
-  for (const t of UNIT_TYPES) if (t !== ARCHER_T) assert.ok(has(t, "area"));
+  const has = (stat: string) => CARDS.some((c) => c.effect.k === "mercStat" && c.effect.type === undefined && c.effect.stat === stat);
+  assert.ok(has("atkSpeed") && has("area"), "용병 공용 카드가 모든 병종에 적용된다");
+  void UNIT_NAMES_T;
   assert.ok(CARDS.some((c) => c.effect.k === "heroFireRate") && CARDS.some((c) => c.effect.k === "heroArea"));
 });
 
 test("수치 카드 등급: 같은 능력치라도 희귀·영웅은 효과가 크고 드물며 늦게 나온다", () => {
-  const byRarity = (stat: string, r: number) => CARDS.find((c) => c.effect.k === "mercStat" && c.effect.type === SPEAR && c.effect.stat === stat && c.rarity === r)!;
+  const byRarity = (stat: string, r: number) => CARDS.find((c) => c.effect.k === "mercStat" && c.effect.type === undefined && c.effect.stat === stat && c.rarity === r)!;
   const [c0, c1, c2] = [0, 1, 2].map((r) => byRarity("hp", r));
   const v = (c: (typeof CARDS)[number]) => (c.effect.k === "mercStat" ? c.effect.v : 0);
   assert.ok(v(c0!) < v(c1!) && v(c1!) < v(c2!));
@@ -531,7 +532,7 @@ test("용병 경험치 카드: 병종 전용은 그 병종만, 전체는 모두(
   g.grantMercXpForTest(sh, 10);
   assert.ok(Math.abs(g.getMerc(sh)!.xp - 20.6) < 1e-9);
   assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "xp" && c.effect.type === undefined));
-  for (const t of UNIT_TYPES) assert.ok(CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "xp" && c.effect.type === t));
+  assert.ok(!CARDS.some((c) => c.effect.k === "mercStat" && c.effect.stat === "xp" && c.effect.type !== undefined), "경험치 카드는 공용만 있다");
 });
 
 test("보상금 카드: 소대·스테이지 클리어 금화가 늘어난다", () => {

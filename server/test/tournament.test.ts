@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -62,8 +63,15 @@ test("보스를 1분 안에 못 잡으면 보스군이 격노해 병력이 늘�
   run(g, TUNE.BOSS_RAGE_INTERVAL_SEC * 2);
   assert.ok(g.info().rage >= 3, "시간이 갈수록 격노 단계가 오른다");
   assert.equal(g.info().phase, "boss", "격노 중에는 다음 스테이지로 넘어가지 않는다");
-  // 끝내 못 잡으면 강제로 넘어간다
-  for (let i = 0; i < TICK_RATE * TUNE.BOSS_HARD_TIMEOUT_SEC && g.info().phase === "boss"; i++) g.step();
+  // 기본은 아무리 오래 걸려도 강제로 넘어가지 않는다
+  assert.equal(TUNE.BOSS_HARD_TIMEOUT_SEC, 0);
+  run(g, 300);
+  assert.equal(g.info().phase, "boss", "보스를 잡을 때까지 이어진다");
+  // 제한을 켜면(관리자 수치) 끝내 못 잡았을 때 강제로 넘어간다
+  const tune = TUNE as { BOSS_HARD_TIMEOUT_SEC: number };
+  tune.BOSS_HARD_TIMEOUT_SEC = 240;
+  for (let i = 0; i < TICK_RATE * 300 && g.info().phase === "boss"; i++) g.step();
+  tune.BOSS_HARD_TIMEOUT_SEC = 0;
   assert.equal(g.info().phase, "break");
   assert.equal(g.info().armyLeft, 0, "보스군이 물러났다");
   assert.equal(g.info().stage, 1);
@@ -105,8 +113,8 @@ test("보스를 잡으면 접속 인원만큼 상자가 떨어지고, 주인이 
   assert.equal(p.box, 1);
   assert.equal(p.offer.length, 3);
   assert.equal(g.snapshotChests().length, 1, "내 상자만 사라진다");
-  assert.ok(g.pick(a, 0));
-  assert.equal(p.pending, base.pending);
+  while (p.pending > 0) assert.ok(g.pick(a, 0)); // 떠 있던 레벨업 선택지가 있으면 먼저 고르고, 이어서 상자 카드를 고른다
+  assert.equal(p.pending, 0);
   assert.equal(p.box, 0);
 });
 
@@ -313,4 +321,42 @@ test("시간 초과 판정은 마지막 순간이 아니라 경기 내내의 평
   const done = g.info().tour!;
   assert.equal(done.step, "outro");
   assert.equal(done.winner, done.an, "경기 내내 앞선 선수가 이긴다");
+});
+
+test("레벨업 선택지가 떠 있을 때 상자를 열어도 그 선택지는 그대로이고, 고른 뒤에 상자 카드가 이어진다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  g.addPlayer("b");
+  const p = g.getPlayer(a)!;
+  g.giveXp(a, 1e6); // 레벨업 → 선택지가 뜬다
+  const before = [...p.offer];
+  assert.equal(before.length, 3);
+  bossDown(g, 100, 100);
+  const mine = g.snapshotChests().find((c) => c[3] === a)!;
+  p.x = mine[1];
+  p.y = mine[2];
+  g.step();
+  assert.deepEqual(p.offer, before, "떠 있던 선택지가 초기화되지 않는다");
+  assert.equal(p.box, 1);
+  const pend = p.pending;
+  assert.ok(g.pick(a, 0));
+  assert.equal(p.pending, pend - 1);
+  assert.equal(p.box, 1, "상자 보너스는 아직 쓰지 않았다");
+  assert.equal(p.offer.length, 3, "이어서 다음 선택지(상자 보너스)가 뜬다");
+});
+
+test("보스를 못 잡고 제한 시간 때문에 넘어가도(제한을 켠 경우) 토너먼트 스테이지면 대결이 열린다", () => {
+  const g = quiet();
+  g.addPlayer("a");
+  g.addPlayer("b");
+  g.jumpToStage(3);
+  g.forceBoss();
+  g.autoSpawn = true; // 시간 제한은 자동 진행에서만 적용된다
+  const tune = TUNE as { BOSS_HARD_TIMEOUT_SEC: number };
+  tune.BOSS_HARD_TIMEOUT_SEC = 100;
+  for (const sl of (g as any).slots.values()) sl.state.invuln = 1e6;
+  for (let i = 0; i < TICK_RATE * 130 && g.info().phase === "boss"; i++) g.step();
+  tune.BOSS_HARD_TIMEOUT_SEC = 0;
+  run(g, TUNE.TOURNAMENT_NOTICE_SEC + 0.5);
+  assert.equal(g.info().phase, "tournament");
 });

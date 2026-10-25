@@ -35,6 +35,8 @@ import {
   chargeBonus,
   SWARM_PER_MERC,
   TUNE,
+  MERC_STAT_BASE,
+  GLOBAL_CARD_FACTOR,
 } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -692,11 +694,12 @@ test("카드 효과: 용병 체력 강화는 이미 있는 용병의 체력도 �
   const m = g.addMerc(a, SHIELD, 0, 0);
   const before = MERC_STATS[SHIELD]!.hp;
   forceCard(g, a, "mercStat", (e) => e.stat === "hp" && e.type === undefined);
-  assert.equal(g.getMerc(m)!.hp, Math.round(before * 1.075));
+  const k = 1 + Math.round(MERC_STAT_BASE.hp * GLOBAL_CARD_FACTOR * 1000) / 1000; // 일반 등급 용병 공용 체력 카드
+  assert.equal(g.getMerc(m)!.hp, Math.round(before * k));
   const wire = g.snapshotMercs().find((w) => w[0] === m)!;
-  assert.equal(wire[9], Math.round(before * 1.075)); // 최대 체력
+  assert.equal(wire[9], Math.round(before * k)); // 최대 체력
   const m2 = g.addMerc(a, SHIELD, 0, 0); // 새로 고용한 용병도 강화된 체력으로 시작
-  assert.equal(g.getMerc(m2)!.hp, Math.round(before * 1.075));
+  assert.equal(g.getMerc(m2)!.hp, Math.round(before * k));
 });
 
 test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
@@ -704,7 +707,7 @@ test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
   const a = g.addPlayer("a")!;
   const spear = g.addMerc(a, SPEAR, 0, 0);
   const shield = g.addMerc(a, SHIELD, 0, 0);
-  forceCard(g, a, "mercStat", (e) => e.stat === "hp" && e.type === SPEAR);
+  g.applyCardForTest(a, { k: "mercStat", stat: "hp", v: 0.375, type: SPEAR }); // 병종 지정 효과(전용 카드는 특화 능력치에만 남았지만 효과 자체는 그대로 동작한다)
   assert.equal(g.getMerc(spear)!.hp, Math.round(MERC_STATS[SPEAR]!.hp * 1.375));
   assert.equal(g.getMerc(shield)!.hp, MERC_STATS[SHIELD]!.hp);
 });

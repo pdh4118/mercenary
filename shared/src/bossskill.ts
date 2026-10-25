@@ -309,7 +309,8 @@ export const BOSS_SHIELD = {
   reflectMult: 2, // 맞은 피해의 몇 배를 되돌리나
   reflectCd: 16,
   invHalf: 0.75, // 운석이 떨어지는 순간 앞뒤로 이만큼 무적
-  invRadius: 300, // 무적이 되는 범위(보스 중심)
+  invRadius: 170, // 무적이 되는 범위(보스 중심)
+  invCd: 8, // 운석 맞춤 무적의 재사용 대기시간(초)
   rushTele: 1.2,
   rushLen: 600,
   rushWidth: 90,
