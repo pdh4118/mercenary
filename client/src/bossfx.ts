@@ -4,6 +4,7 @@ import {
   BFX_CRASH,
   BFX_ICEBREAK,
   BFX_IMPACT,
+  BFX_THRUST,
   BOSS_SPEAR,
   BOSS_BLUNT,
   BFX_MACEBOOM,
@@ -112,6 +113,7 @@ export async function createBossFx(d: BossFxDeps) {
   await Promise.all(BOSS_UNIT_TEX.map(async (n) => (unit[n] = await Assets.load<Texture>(`assets/units/${n}.png`).catch(() => null))));
   const T = {
     impact: await seq("boss1_impact", [0, 1, 2, 3]),
+    thrust: await seq("boss2_thrust", [0, 1, 2]),
     slash: await seq("boss1_slash", [1, 2, 3]),
     cry: await seq("boss1_cry", [0, 1, 2]),
     spearStuck: await fx("boss2_spear_stuck"),
@@ -160,11 +162,11 @@ export async function createBossFx(d: BossFxDeps) {
 
   // --- 효과 컷(순서대로) ---------------------------------------------------------
   const seqFx: { sp: Sprite; frames: Tex[]; age: number; dur: number }[] = [];
-  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number) => {
+  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5) => {
     const f = first(frames);
     if (!f || seqFx.length > 60) return;
     const sp = new Sprite(f);
-    sp.anchor.set(0.5);
+    sp.anchor.set(anchorX, 0.5);
     sp.scale.set(scale);
     sp.rotation = rot;
     sp.position.set(x, y);
@@ -172,12 +174,43 @@ export async function createBossFx(d: BossFxDeps) {
     seqFx.push({ sp, frames, age: 0, dur });
   };
 
+  /** 창 찌르기 줄기의 밝은 심: 앞으로 뻗으며 가늘어지는 흰 초록 선이 0.2초 동안 사라진다(그림 컷 위에 겹쳐 더 또렷하게 보인다) */
+  const thrustG = new Graphics();
+  d.fxLayer.addChild(thrustG);
+  const thrustCores: { x: number; y: number; ang: number; len: number; age: number }[] = [];
+  const drawThrustCores = (dtMs: number) => {
+    thrustG.clear();
+    for (let i = thrustCores.length - 1; i >= 0; i--) {
+      const c = thrustCores[i]!;
+      c.age += dtMs / 1000;
+      if (c.age >= 0.2) {
+        thrustCores.splice(i, 1);
+        continue;
+      }
+      const k = c.age / 0.2;
+      const reach = c.len * Math.min(1, 0.35 + k * 3); // 앞으로 쭉 뻗는다
+      const w = 9 * (1 - k);
+      const px = -Math.sin(c.ang);
+      const py = Math.cos(c.ang);
+      const ex = c.x + Math.cos(c.ang) * reach;
+      const ey = c.y + Math.sin(c.ang) * reach;
+      thrustG.poly([c.x + px * w, c.y + py * w, ex, ey, c.x - px * w, c.y - py * w]).fill({ color: 0xe8ffe0, alpha: 0.75 * (1 - k) });
+      thrustG.moveTo(c.x, c.y).lineTo(ex, ey).stroke({ width: 2, color: 0xffffff, alpha: 0.9 * (1 - k) });
+    }
+  };
+
   /** 장군 효과 이벤트(EVT_BOSSFX) */
-  const playFx = (val: number, x: number, y: number, ang: number) => {
+  const playFx = (val: number, x: number, y: number, ang: number, len = 0) => {
     if (val === BFX_IMPACT || val === BFX_CRASH) {
       playSeq(T.impact, x, y, 0.55, val === BFX_CRASH ? 1 : 0.7, 0);
       d.sound("knockback", x, y);
       if (val === BFX_CRASH) d.spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
+    } else if (val === BFX_THRUST) {
+      // 창을 앞으로 찌르는 줄기: 몸 앞에서 시작해 길이만큼 뻗는다(그림 길이 약 190px을 늘려 맞춘다)
+      const L = Math.max(60, len || 300);
+      playSeq(T.thrust, x + Math.cos(ang) * 26, y - 26 + Math.sin(ang) * 26, 0.22, L / 190, ang, 0.02);
+      thrustCores.push({ x: x + Math.cos(ang) * 26, y: y - 26 + Math.sin(ang) * 26, ang, len: L, age: 0 });
+      d.sound("spear_thrust", x, y, 0.8);
     } else if (val === BFX_MACEBOOM) {
       if (!d.maceBoom(x, y, ang * 100)) playSeq(T.impact, x, y, 0.55, 1, 0);
       d.sound("skill_mace_hit", x, y);
@@ -203,11 +236,15 @@ export async function createBossFx(d: BossFxDeps) {
     kind: number;
     sp: Sprite | null;
     t0: number; // 처음 본 남은 시간(예고 진행도 계산용)
+    lx?: number; // 분신 잔상을 마지막으로 남긴 자리
+    ly?: number;
     sx?: number; // 서버 위치가 마지막으로 바뀐 때의 값과 시각(빠르게 움직이는 분신을 매끄럽게 그리려고)
     sy?: number;
     st?: number;
   }
   const hzViews = new Map<number, HzView>();
+  /** 분신이 달려간 길에 남는 어두운 잔상(0.32초 동안 옅어지며 사라진다) */
+  const trails: { sp: Sprite; age: number }[] = [];
   const stood = (sp: Sprite) => {
     sp.anchor.set(0.5, 0.9);
     d.standLayer.addChild(sp);
@@ -297,13 +334,38 @@ export async function createBossFx(d: BossFxDeps) {
         break;
       }
       case HZ_GHOST: {
-        const tex = (art[stage - 1]?.pose(BSK_CLONE, 0, true)) ?? art[stage - 1]?.idle;
+        // a=1 달리는 중(찌르며 달려가는 자세 + 지나온 길에 어두운 잔상), a=2 서 있음, a=3 방금 찔렀음(찌르는 자세)
+        const ba = art[stage - 1];
+        const lunge = ba?.pose(BSK_CLONE, 0, true) ?? ba?.idle;
+        const tex = a === 2 ? ba?.idle ?? lunge : lunge;
         if (tex) sp.texture = tex;
-        const s = art[stage - 1]?.scale ?? 0.6;
+        const s = ba?.scale ?? 0.6;
         sp.scale.set(s * (Math.cos(ang) >= 0 ? 1 : -1), s);
         sp.tint = 0x9fe8c0;
-        sp.alpha = 0.7;
+        sp.alpha = a === 1 ? 0.78 : Math.min(0.78, sec / 0.4); // 멈춘 뒤 마지막 0.4초에 걸쳐 사라진다
         sp.anchor.set(0.5, 0.88);
+        if (a === 1 && tex) {
+          if (v.lx === undefined || v.ly === undefined) {
+            v.lx = px;
+            v.ly = py;
+          }
+          let dd = Math.hypot(px - v.lx, py - v.ly);
+          while (dd >= 36) {
+            const k = 36 / dd;
+            v.lx += (px - v.lx) * k;
+            v.ly! += (py - v.ly!) * k;
+            const ghost = new Sprite(tex);
+            ghost.anchor.set(0.5, 0.88);
+            ghost.scale.set(s * (Math.cos(ang) >= 0 ? 1 : -1), s);
+            ghost.tint = 0x2c3a40;
+            ghost.alpha = 0.55;
+            ghost.position.set(v.lx, v.ly!);
+            ghost.zIndex = v.ly! - 1;
+            d.standLayer.addChild(ghost);
+            trails.push({ sp: ghost, age: 0 });
+            dd = Math.hypot(px - v.lx, py - v.ly!);
+          }
+        }
         break;
       }
       case HZ_FIRE: {
@@ -425,6 +487,7 @@ export async function createBossFx(d: BossFxDeps) {
 
   const frame = (bt: TeleWire[], hz: HazardWire[], stage: number, dtMs: number, now: number) => {
     drawWhirls(now);
+    drawThrustCores(dtMs);
     teleG.clear();
     for (let i = 0; i < bt.length; i++) drawTele(bt[i]!, now, i);
     for (let i = bt.length; i < labels.length; i++) labels[i]!.visible = false;
@@ -482,6 +545,15 @@ export async function createBossFx(d: BossFxDeps) {
       if (seen.has(id)) continue;
       v.sp?.destroy();
       hzViews.delete(id);
+    }
+    for (let i = trails.length - 1; i >= 0; i--) {
+      const tr = trails[i]!;
+      tr.age += dtMs / 1000;
+      tr.sp.alpha = 0.55 * Math.max(0, 1 - tr.age / 0.32);
+      if (tr.age >= 0.32) {
+        tr.sp.destroy();
+        trails.splice(i, 1);
+      }
     }
     // 컷 연출
     for (let i = seqFx.length - 1; i >= 0; i--) {

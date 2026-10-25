@@ -113,3 +113,64 @@ test("창병 장군 창 던지기: 가장 먼 주인공에게 관통하는 창�
   assert.ok(g.snapshotHazards().some((h) => h[1] === HZ_SPEAR), "박힌 창 장애물");
   void hp1;
 });
+
+test("창병 장군 분신: 달려와 멈춘 뒤 창을 여러 번 찌르고(찌르기 효과 이벤트) 사라진다", () => {
+  const { g, b, ids } = setup(2, BSK_CLONE);
+  const p = hero(g, ids[0]!);
+  place(p, b.x, b.y + 300);
+  run(g, 0.1);
+  assert.equal(b.bk.cur?.id, BSK_CLONE);
+  const thrusts: number[] = [];
+  const takeEvents = (g as any).takeEvents.bind(g) as () => number[][];
+  const stateOf = () => g.snapshotHazards().find((h) => h[1] === HZ_GHOST);
+  const seen = new Set<number>();
+  let gone = false;
+  const maxHp = p.maxHp;
+  for (let i = 0; i < TICK_RATE * 6; i++) {
+    g.step();
+    p.hp = maxHp;
+    for (const ev of takeEvents()) if (ev[0] === 22 && ev[4] === 10) thrusts.push(ev[5]!);
+    const gh = stateOf();
+    if (gh) seen.add(gh[5]!); // a: 1 달림 / 2 서 있음 / 3 찌름
+    else if (seen.size > 0) gone = true;
+  }
+  assert.ok(seen.has(1) && seen.has(3), `달리고 찌른다 ${[...seen]}`);
+  assert.equal(thrusts.length, BOSS_SPEAR.cloneStrikes, "정해진 횟수만 찌른다");
+  assert.ok(thrusts.every((len) => len === BOSS_SPEAR.cloneStrikeLen), "찌르기 길이가 이벤트로 전해진다");
+  assert.ok(gone, "다 찌른 뒤 사라진다");
+});
+
+test("창병 장군 창 던지기: 월드 가장자리 가까이서 바깥으로 던져도 창은 월드 안에서 멈추고 장애물도 월드 안에 박힌다", () => {
+  const { g, b, ids } = setup(2, BSK_THROW);
+  const p = hero(g, ids[0]!);
+  place(b, 1500, 0);
+  b.bk.cds[BSK_THROW] = 0;
+  place(p, 1900, 0); // 보스보다 바깥쪽(월드 가장자리 쪽)
+  b.face = 0;
+  run(g, 0.1);
+  assert.equal(b.bk.cur?.id, BSK_THROW);
+  const tele = g.snapshotBossTele().find((t) => t[0] === TELE_LINE)!;
+  assert.ok(tele[4]! <= 2000 - 1500, `예고 길이가 월드 안쪽까지만(${tele[4]})`);
+  run(g, BOSS_SPEAR.throwTele + 0.3);
+  const sp = g.snapshotHazards().find((h) => h[1] === HZ_SPEAR);
+  assert.ok(sp, "박힌 창이 만들어진다");
+  assert.ok(Math.abs(sp![2]!) <= 2000 && Math.abs(sp![3]!) <= 2000, "월드 안");
+});
+
+test("창병 장군 3연 찌르기: 터지는 효과 대신 찌르기 줄기 이벤트가 세 번 나간다", () => {
+  const { g, b, ids } = setup(2, BSK_TRIPLE);
+  const p = hero(g, ids[0]!);
+  place(p, b.x, b.y + 300);
+  run(g, 0.1);
+  assert.equal(b.bk.cur?.id, BSK_TRIPLE);
+  const takeEvents = (g as any).takeEvents.bind(g) as () => number[][];
+  let thrusts = 0;
+  let impacts = 0;
+  for (let i = 0; i < TICK_RATE * (BOSS_SPEAR.tripleTele + 1.2); i++) {
+    g.step();
+    p.hp = p.maxHp;
+    for (const ev of takeEvents()) if (ev[0] === 22) ev[4] === 10 ? thrusts++ : ev[4] === 1 && impacts++;
+  }
+  assert.equal(thrusts, 3);
+  assert.equal(impacts, 0, "펑 터지는 효과는 더 쓰지 않는다");
+});

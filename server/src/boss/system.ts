@@ -1,6 +1,7 @@
 import {
   BFX_ICEBREAK,
   BFX_IMPACT,
+  BFX_THRUST,
   BFX_SHIELDBREAK,
   BOSS_SKILL_NAMES,
   ENEMY_STATS,
@@ -214,8 +215,9 @@ export class BossSystem {
     return ENEMY_STATS[e.type]!.damage * e.dmgMult;
   }
 
-  fx(x: number, y: number, ang: number, kind: number): void {
-    this.g.pushEvent(EVT_BOSSFX, x, y, ang, kind);
+  /** 장군 효과 컷 이벤트. len은 찌르기 줄기 같은 길이가 있는 효과의 길이(px) */
+  fx(x: number, y: number, ang: number, kind: number, len = 0): void {
+    this.g.pushEvent(EVT_BOSSFX, x, y, ang, kind, Math.round(len));
   }
 
   /** 아군 한 명(또는 한 마리)을 친다: 피해(창 든 주인공·창병은 돌격을 되돌린다), 뒤로 밀어내기 */
@@ -393,26 +395,61 @@ export class BossSystem {
           break;
         }
         case HZ_GHOST: {
-          const px = h.x;
-          const py = h.y;
-          h.x += h.vx * dt;
-          h.y += h.vy * dt;
+          // 분신: a=1 달리는 중, a=2 멈춰 서 있음, a=3 방금 찔렀음. 달려가며 지나친 대상을 치고, 멈춘 뒤 가까운 대상을 여러 번 찌르고 사라진다.
           const boss = src(h.src);
           if (!boss) {
             h.t = 0;
             break;
           }
-          // 분신이 한 틱에 수십~백 픽셀을 달리므로, 지난 위치에서 지금 위치까지 이은 선분과의 거리로 맞았는지 본다(대상을 건너뛰지 않게)
-          const sx = h.x - px;
-          const sy = h.y - py;
-          const sl = sx * sx + sy * sy || 1;
-          for (const f of friendlies) {
-            const key = f.merc ? f.merc.id : -f.ownerId;
-            const u = Math.max(0, Math.min(1, ((f.x - px) * sx + (f.y - py) * sy) / sl));
-            if (h.hit.has(key) || Math.hypot(f.x - (px + sx * u), f.y - (py + sy * u)) > h.b / 2 + f.radius) continue;
-            h.hit.add(key);
-            this.hitFriendly(boss, f, h.dmg, h.d.knock ?? 90, 0, Math.atan2(-h.vy, -h.vx));
-            this.g.pushEvent(EVT_BOSSFX, f.x, f.y, h.ang, BFX_IMPACT);
+          if (h.a === 1) {
+            const step = h.t > 0 ? dt : dt + h.t; // 도착 시간을 넘긴 만큼은 덜 달린다
+            const px = h.x;
+            const py = h.y;
+            h.x += h.vx * step;
+            h.y += h.vy * step;
+            // 분신이 한 틱에 수십~백 픽셀을 달리므로, 지난 위치에서 지금 위치까지 이은 선분과의 거리로 맞았는지 본다(대상을 건너뛰지 않게)
+            const sx = h.x - px;
+            const sy = h.y - py;
+            const sl = sx * sx + sy * sy || 1;
+            for (const f of friendlies) {
+              const key = f.merc ? f.merc.id : -f.ownerId;
+              const u = Math.max(0, Math.min(1, ((f.x - px) * sx + (f.y - py) * sy) / sl));
+              if (h.hit.has(key) || Math.hypot(f.x - (px + sx * u), f.y - (py + sy * u)) > h.b / 2 + f.radius) continue;
+              h.hit.add(key);
+              this.hitFriendly(boss, f, h.dmg, h.d.knock ?? 90, 0, Math.atan2(-h.vy, -h.vx));
+            }
+            if (h.t <= 0) {
+              h.a = 2;
+              h.vx = h.vy = 0;
+              h.t = h.total = h.d.strikes! * h.d.step! + 0.2 + h.d.fade!;
+              h.d.n = 0;
+              h.d.next = 0.2;
+              h.d.flash = 0;
+            }
+            break;
+          }
+          h.d.flash! -= dt;
+          if (h.a === 3 && h.d.flash! <= 0) h.a = 2;
+          h.d.next! -= dt;
+          if (h.d.next! <= 0 && h.d.n! < h.d.strikes!) {
+            let tgt: Friendly | null = null;
+            let bd = h.d.range!;
+            for (const f of friendlies) {
+              const d = Math.hypot(f.x - h.x, f.y - h.y);
+              if (d < bd) {
+                bd = d;
+                tgt = f;
+              }
+            }
+            if (tgt) h.ang = Math.atan2(tgt.y - h.y, tgt.x - h.x);
+            for (const f of friendlies) {
+              if (this.inLine(f, h.x, h.y, h.ang, h.d.len!, h.d.width!)) this.hitFriendly(boss, f, h.d.sdmg!, h.d.sknock ?? 0, 0, Math.atan2(h.y - f.y, h.x - f.x));
+            }
+            this.g.pushEvent(EVT_BOSSFX, h.x, h.y, h.ang, BFX_THRUST, Math.round(h.d.len!));
+            h.a = 3;
+            h.d.flash = 0.16;
+            h.d.n!++;
+            h.d.next = h.d.step!;
           }
           break;
         }

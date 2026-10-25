@@ -1408,7 +1408,7 @@ async function main() {
             dashFx.set(owner, { t0: performance.now(), lx: x, ly: y });
             spawnDashGhost(owner, x, y);
           }
-          else if (kind === EVT_BOSSFX) bossFx.playFx(val, x, y, ang); // 장군 스킬 효과 컷
+          else if (kind === EVT_BOSSFX) bossFx.playFx(val, x, y, ang, owner); // 장군 스킬 효과 컷
           else if (kind === EVT_SKILL) {
             // 주인공 스킬: 무기 색의 고리. 던진 철퇴가 터지면 폭발 반경만큼 크게, 벽이 부서지면 작게
             const col = TYPE_COLORS[WEAPONS[Math.round(ang)]?.type ?? 0]!;

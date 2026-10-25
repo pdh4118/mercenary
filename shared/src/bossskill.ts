@@ -127,6 +127,7 @@ export const BFX_CRASH = 4; // 돌진이 방벽·바위에 부딪힘
 export const BFX_ICEBREAK = 5; // 얼음벽 조각이 부서짐
 export const BFX_SHIELDBREAK = 6; // 거대 방패가 부서짐
 export const BFX_BLINK = 7; // 순간이동(마법진 섬광)
+export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)
 export const BFX_MACEBOOM = 9; // 점프 쿵: 던진 철퇴가 땅에 닿는 폭발 그림(ang x 100 = 반경)
 
 /** 기병 장군(스테이지 1) 수치 */
@@ -191,10 +192,19 @@ export const BOSS_SPEAR = {
   cloneWidth: 40,
   cloneDmg: 4,
   cloneKnock: 90,
+  // 분신은 달려와 멈춘 뒤 창을 여러 번 찌르고 사라진다
+  cloneStrikes: 4,
+  cloneStrikeStep: 0.3,
+  cloneStrikeRange: 260, // 멈춘 자리에서 이 안의 가장 가까운 아군을 향해 찌른다
+  cloneStrikeLen: 170,
+  cloneStrikeWidth: 60,
+  cloneStrikeDmg: 1.5,
+  cloneStrikeKnock: 35,
+  cloneFade: 0.4,
   cloneCd: 16,
   // 창 방어 태세: 정면 부채꼴로 들어오는 대상을 찌르고 화살을 쓸어 낸다
   guardTele: 1.2,
-  guardSec: 3,
+  guardSec: 5,
   guardHalf: (Math.PI * 100) / 180 / 2,
   guardRange: 200,
   guardDmg: 3,
