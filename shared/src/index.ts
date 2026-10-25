@@ -193,6 +193,7 @@ export const EVT_DMG_POISON = 16; // 독이 적에게 준 피해(보라색 숫�
 export const EVT_DMG_POISON_ALLY = 17; // 독이 아군(주인공·용병)에게 준 피해(보라색 숫자)
 export const EVT_COUNTER = 15; // 달려오던 기병이 창에 먼저 맞아 속도를 잃고 카운터를 입음(val = 카운터 피해)
 export const EVT_METEOR = 13; // 운석이 떨어져 폭발함(val = 반경, owner = 쏜 플레이어(0이면 적), ang = 1이면 보스의 마법, 2이면 주인공이 직접 쏜 마법)
+export const EVT_RICE = 23; // 군량병(val 0 = 쓰러져 쌀 자루가 터짐 / 1 = 쌀을 먹어 회복함, owner = 먹은 쪽 주인공)
 export const EVT_BOSSFX = 22; // 보스 스킬 효과(val = BFX_*, ang = 방향). 충돌 섬광·호·함성 오라를 그린다
 export const EVT_HEAL = 21; // 체력 재생·흡혈로 회복함(val = 회복량, owner = 주인. 0.6초 모아서 한 번에 보낸다. 밝은 초록 숫자)
 export const EVT_WALL_HIT = 20; // 방벽이 적 투사체를 막음(소리용)
@@ -268,6 +269,7 @@ export type WallWire = [id: number, x: number, y: number, ang: number, hl: numbe
 /** 보스 보상 상자: id, x, y, 주인 번호, 남은 초 */
 /** 마법사가 주문을 외우는 중인 운석: 시전자 키(용병 번호, 주인공은 -번호), x, y, 진행도(0~100), 반경, 주인 번호(0이면 적), 전체 주문 시간(0.1초 단위) */
 export type MeteorWire = [key: number, x: number, y: number, progress: number, radius: number, owner: number, total: number];
+export type RiceWire = [id: number, x: number, y: number, left: number];
 export type ChestWire = [id: number, x: number, y: number, owner: number, left: number];
 export type CampWire = [id: number, x: number, y: number, left: number, offer0: number, offer1: number, offer2: number];
 
@@ -357,6 +359,7 @@ export type ServerMsg =
       ev: EventWire[];
       camps: CampWire[];
       chests: ChestWire[];
+      rice?: RiceWire[]; // 군량병이 떨군 쌀(없으면 생략)
       meteors?: MeteorWire[];
       walls?: WallWire[];
       bt?: TeleWire[]; // 보스 스킬 예고(없으면 생략)

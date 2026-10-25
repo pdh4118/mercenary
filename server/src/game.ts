@@ -29,6 +29,9 @@ import {
   EVT_INVULN,
   EVT_WALL_HIT,
   EVT_HEAL,
+  EVT_RICE,
+  EF_SUPPLY,
+  SUPPLY,
   critDamageMult,
   castTimeMult,
   mageAreaMult,
@@ -123,6 +126,7 @@ import {
   type BulletWire,
   type CampWire,
   type ChestWire,
+  type RiceWire,
   type TourInfo,
   type TourMatchInfo,
   type EnemyWire,
@@ -435,6 +439,7 @@ export interface Enemy extends Fighter {
   poisonAcc?: number; // 아직 숫자로 띄우지 않은 독 피해
   venom?: boolean; // 독 화살을 쏘는 궁병(맞은 아군이 중독된다)
   stunT?: number; // 경직(움직이지도 공격하지도 못하는) 남은 시간
+  supply?: number; // 군량병이 남은 시간(있으면 군량병)
   skel?: boolean; // 안개 속 시체에서 되살아난 스켈레톤
   bk?: BossKitState; // 장군의 스킬 상태
   invulnT?: number; // 무적 남은 시간(운석 맞춤 무적 등)
@@ -661,6 +666,8 @@ export class Game {
   private mercs = new Map<number, Merc>();
   private camps = new Map<number, Camp>();
   private chests = new Map<number, Chest>();
+  private rice = new Map<number, { id: number; x: number; y: number; left: number }>(); // 군량병이 떨군 쌀
+  private supplyCd: number = SUPPLY.firstSec;
   private foePos = new Map<string, [number, number]>(); // 적 AI가 아군의 이동 속도를 구하려고 기억하는 지난 위치
   private tour: Tournament | null = null;
   private tourCountdown = 0; // 보스를 잡은 뒤 토너먼트가 시작되기까지 남은 초(0이면 예고 중이 아니다)
@@ -1079,6 +1086,8 @@ export class Game {
       this.mercs.clear();
       this.camps.clear();
       this.chests.clear();
+      this.rice.clear();
+      this.supplyCd = SUPPLY.firstSec;
       this.tour = null;
       this.tourCountdown = 0;
       this.bossT = 0;
@@ -1105,6 +1114,7 @@ export class Game {
     this.stepPlayers(dt);
     this.stepStage(dt);
     this.stepChests(dt);
+    this.stepRice(dt);
     if (!duel) {
       this.stepCamps(dt);
       this.spawnEnemies(dt);
@@ -1185,7 +1195,7 @@ export class Game {
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
       e.bk?.show ?? 0,
-      e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0),
+      e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0),
     ]);
   }
 
@@ -2816,6 +2826,13 @@ export class Game {
     const weights = [...(ENEMY_SPAWN_WEIGHTS as readonly number[])];
     if (this.stage < TUNE.ENEMY_MAGE_FROM_STAGE) weights[MAGE] = 0;
     const totalWeight = weights.reduce((a, b) => a + b, 0);
+    this.supplyCd -= dt;
+    if (this.supplyCd <= 0) {
+      this.supplyCd = SUPPLY.gapMin + this.rng() * (SUPPLY.gapMax - SUPPLY.gapMin);
+      let n = 0;
+      for (const o of this.enemies.values()) if (o.supply) n++;
+      if (n < SUPPLY.max && this.phase !== "boss") this.spawnSupply(alive[Math.floor(this.rng() * alive.length)]!.state);
+    }
     while (this.spawnBudget >= 1) {
       this.spawnBudget -= 1;
       if (this.enemies.size >= ENEMY_MAX) continue;
@@ -2830,6 +2847,89 @@ export class Game {
         type,
       );
     }
+  }
+
+  /** 군량병: 플레이어에게서 조금 떨어진 곳에 나타나 곧바로 도망치기 시작한다 */
+  private spawnSupply(near: PlayerState): void {
+    const angle = this.rng() * Math.PI * 2;
+    const hp = SUPPLY.hp * (1 + SUPPLY.hpGrow * (this.stage - 1));
+    const e = this.makeEnemy(clampToWorld(near.x + Math.cos(angle) * 420, 14), clampToWorld(near.y + Math.sin(angle) * 420, 14), SPEAR, { supply: SUPPLY.lifeSec });
+    e.hp = e.maxHp = hp;
+    e.shield = e.shieldMax = 0;
+  }
+
+  /** 군량병의 움직임: 가장 가까운 아군에게서 멀어진다. 공격은 하지 않는다. */
+  private stepSupply(e: Enemy, dt: number, friendlies: Friendly[]): void {
+    e.supply = (e.supply ?? 0) - dt;
+    if (e.supply <= 0) {
+      this.enemies.delete(e.id); // 끝까지 도망쳐 사라졌다
+      return;
+    }
+    let nd = Infinity;
+    let nx = 0;
+    let ny = 0;
+    for (const f of friendlies) {
+      const d = Math.hypot(f.x - e.x, f.y - e.y);
+      if (d < nd) {
+        nd = d;
+        nx = f.x;
+        ny = f.y;
+      }
+    }
+    const speed = SUPPLY.speed * TUNE.ENEMY_SPEED_MULT;
+    if (nd > SUPPLY.fleeRange) return;
+    let ang = Math.atan2(e.y - ny, e.x - nx);
+    // 벽에 몰리면 중앙 쪽으로 비껴 달아난다
+    const edge = 90;
+    const lim = WORLD_SIZE / 2 - edge;
+    if (Math.abs(e.x) > lim || Math.abs(e.y) > lim) {
+      const toC = Math.atan2(-e.y, -e.x);
+      let diff = toC - ang;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      ang += Math.sign(diff || 1) * Math.PI * 0.45;
+    }
+    e.face = ang;
+    const tx = clampToWorld(e.x + Math.cos(ang) * 200, 14);
+    const ty = clampToWorld(e.y + Math.sin(ang) * 200, 14);
+    this.moveToward(e, tx, ty, speed, dt, 0);
+  }
+
+  /** 쌀: 주인공이나 살아 있는 용병이 다가가면 먹고, 최대 체력의 20%+15만큼 회복한다 */
+  private stepRice(dt: number): void {
+    for (const r of [...this.rice.values()]) {
+      r.left -= dt;
+      if (r.left <= 0) {
+        this.rice.delete(r.id);
+        continue;
+      }
+      let eater: { x: number; y: number; hp: number; max: number; owner: number; key: number; set: (v: number) => void } | null = null;
+      for (const s of this.slots.values()) {
+        const p = s.state;
+        if (p.down || s.away || Math.hypot(p.x - r.x, p.y - r.y) > SUPPLY.riceRadius + PLAYER_RADIUS) continue;
+        eater = { x: p.x, y: p.y, hp: p.hp, max: p.maxHp, owner: p.id, key: -p.id, set: (v) => (p.hp = v) };
+        break;
+      }
+      if (!eater) {
+        for (const m of this.mercs.values()) {
+          if (m.respawn > 0 || Math.hypot(m.x - r.x, m.y - r.y) > SUPPLY.riceRadius + 14) continue;
+          const max = this.mercStats(m).hp;
+          eater = { x: m.x, y: m.y, hp: m.hp, max, owner: m.owner, key: m.id, set: (v) => (m.hp = v) };
+          break;
+        }
+      }
+      if (!eater) continue;
+      this.rice.delete(r.id);
+      const amount = eater.max * SUPPLY.healFrac + SUPPLY.healFlat;
+      eater.set(Math.min(eater.max, eater.hp + amount));
+      this.pushEvent(EVT_RICE, r.x, r.y, 0, 1, eater.owner);
+      this.pushEvent(EVT_HEAL, eater.x, eater.y, 0, Math.round(Math.min(amount, eater.max - eater.hp) * 10) / 10, eater.owner);
+    }
+  }
+
+  snapshotRice(): RiceWire[] | undefined {
+    if (this.rice.size === 0) return undefined;
+    return [...this.rice.values()].map((r) => [r.id, round(r.x), round(r.y), Math.ceil(r.left)]);
   }
 
   private collectFriendlies(): Friendly[] {
@@ -4222,6 +4322,11 @@ export class Game {
 
   private killEnemy(e: Enemy, ownerId: number, src?: Merc): void {
     if (!this.enemies.delete(e.id)) return; // 이미 쓰러짐
+    if (e.supply) {
+      const id = this.nextEntityId++;
+      this.rice.set(id, { id, x: e.x, y: e.y, left: SUPPLY.riceSec });
+      this.pushEvent(EVT_RICE, e.x, e.y, 0, 0, ownerId);
+    }
     if (!e.boss) this.boss.onDeath(e.x, e.y, e.type, 0, !!e.skel); // 안개 속이면 시체가 남는다
     const owner = this.slots.get(ownerId);
     if (src) this.gainMercXp(src, MERC_XP_KILL * (e.boss ? 4 : 1)); // 막타는 경험치를 크게 준다
@@ -4507,6 +4612,10 @@ export class Game {
       if (e.stunT && e.stunT > 0) {
         e.stunT -= dt;
         continue; // 경직: 움직이지도 공격하지도 못한다
+      }
+      if (e.supply) {
+        this.stepSupply(e, dt, friendlies);
+        continue;
       }
       const st = ENEMY_STATS[e.type]!;
       this.regenShield(e, e.shieldMax, dt);

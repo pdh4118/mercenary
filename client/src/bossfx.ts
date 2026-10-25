@@ -171,12 +171,23 @@ export async function createBossFx(d: BossFxDeps) {
     chainMark: await seq("boss9_chain_mark", [0, 1, 2]),
     chainBreak: await seq("boss9_chain_break", [0, 1, 2]),
     orb: await seq("boss9_orb", [0, 1, 2]),
+    riceDrop: await fx("rice_drop"),
+    riceGlint: await seq("rice_glint", [0, 1]),
+    riceEat: await seq("rice_eat", [0, 1, 2]),
+    supplyBurst: await seq("supply_burst", [0, 1, 2]),
   };
   const first = (a: Tex[]): Tex => a.find((t) => t !== null) ?? null;
   const pick = (a: Tex[], i: number): Tex => a[Math.max(0, Math.min(a.length - 1, i))] ?? first(a);
   const u = (n: string): Tex => unit[n] ?? null;
   /** 스켈레톤 그림(병종 번호 순서: 기병·창병·궁병·검방병·둔기병·마법사) */
   const skelTex: Tex[] = await Promise.all(["cavalry", "spear", "archer", "sword", "blunt", "mage"].map(async (n) => Assets.load<Texture>(`assets/units/skel_${n}.png`).catch(() => null)));
+
+  /** 군량병 그림: 서 있기·달리기 5컷·피격 */
+  const supply = {
+    idle: await Assets.load<Texture>("assets/units/supply_idle.png").catch(() => null),
+    run: await Promise.all([0, 1, 2, 3, 4].map(async (i) => Assets.load<Texture>(`assets/units/supply_run_${i}.png`).catch(() => null))),
+    hurt: await Assets.load<Texture>("assets/units/supply_hurt.png").catch(() => null),
+  };
 
   /** 스테이지 1~8 장군 그림과 자세 */
   const art: BossArt[] = [
@@ -873,6 +884,21 @@ export async function createBossFx(d: BossFxDeps) {
     playSeq(T.shellHit, x, y - 4, 0.35, 1.15, 0);
   };
 
+  /** 군량병이 떨군 쌀: 바닥의 쌀 자루가 반짝인다. 사라질 때가 가까우면 깜박인다 */
+  const riceFrame = (rice: readonly (readonly number[])[], now: number): void => {
+    for (const r of rice) {
+      const blink = r[3]! <= 5 && Math.floor(now / 200) % 2 === 0;
+      const tex = Math.floor(now / 450 + r[0]!) % 3 === 0 ? pick(T.riceGlint, Math.floor(now / 450) % 2) : T.riceDrop;
+      mark(`rice${r[0]}`, "rice", tex, r[1]!, r[2]!, 0.6, blink ? 0.45 : 1, true, 0.6);
+    }
+  };
+
+  /** 군량병 이벤트: 0 = 쌀 자루가 터짐, 1 = 쌀을 먹음 */
+  const riceEvent = (val: number, x: number, y: number): void => {
+    if (val === 0) playSeq(T.supplyBurst, x, y - 10, 0.45, 0.8, 0);
+    else playSeq(T.riceEat, x, y - 30, 0.6, 1, 0);
+  };
+
   /** 이번 프레임에 표시를 갱신하지 않은 것(사라진 적)을 치운다 */
   const endEnemies = () => {
     for (const [key, sp] of marks) {
@@ -907,6 +933,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, playFx, enemyMarks, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, T };
+  return { art, frame, playFx, enemyMarks, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T };
 }
 

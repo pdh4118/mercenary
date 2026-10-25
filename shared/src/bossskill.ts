@@ -92,6 +92,7 @@ export const EF_CORNERED = 16; // 궁지에 몰림
 export const EF_BUBBLE = 32; // 매직 쉴드
 export const EF_STUN = 64; // 기절·그로기
 export const EF_MAD = 128; // 광분(바퀴가 붉게 달아오름)
+export const EF_SUPPLY = 2048; // (일반 적) 군량병: 공격 없이 도망만 치고, 쓰러지면 쌀을 떨군다
 export const EF_SKEL = 1024; // (일반 적) 안개 속 시체에서 되살아난 스켈레톤
 export const EF_SCYTHE = 256; // 낫 바퀴
 export const EF_WHIRL = 512; // 휠윈드로 도는 중(칼날바람 소용돌이)
@@ -548,4 +549,21 @@ export const BOSS_NECRO = {
   chainStun: 2,
   chainRecoil: 2, // 사슬이 끊기면 보스가 경직하는 시간
   chainCd: 20,
+} as const;
+
+/** 군량병: 공격하지 않고 느리게 도망만 치는 드문 적. 잡으면 쌀을 떨구고, 쌀을 먹으면 체력이 찬다. */
+export const SUPPLY = {
+  hp: 35, // 스테이지가 오를수록 hpGrow만큼 늘어난다
+  hpGrow: 0.1,
+  speed: 70,
+  fleeRange: 520, // 이 안에 아군이 있으면 도망친다
+  firstSec: 25, // 첫 등장까지
+  gapMin: 45, // 다음 등장까지(초)
+  gapMax: 80,
+  max: 2,
+  lifeSec: 70, // 이만큼 지나면 달아나 사라진다
+  riceSec: 25, // 쌀이 남아 있는 시간
+  riceRadius: 36,
+  healFrac: 0.2, // 회복량 = 최대 체력의 20% + healFlat
+  healFlat: 15,
 } as const;

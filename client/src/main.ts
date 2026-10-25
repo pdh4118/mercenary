@@ -41,6 +41,8 @@ import {
   EVT_BOSSFX,
   EF_STEALTH,
   EF_SKEL,
+  EF_SUPPLY,
+  EVT_RICE,
   ST_BIT_STUN,
   EVT_REFLECT,
   EVT_COUNTER,
@@ -1410,6 +1412,7 @@ async function main() {
             dashFx.set(owner, { t0: performance.now(), lx: x, ly: y });
             spawnDashGhost(owner, x, y);
           }
+          else if (kind === EVT_RICE) bossFx.riceEvent(val, x, y);
           else if (kind === EVT_BOSSFX) bossFx.playFx(val, x, y, ang, owner); // 장군 스킬 효과 컷
           else if (kind === EVT_SKILL) {
             // 주인공 스킬: 무기 색의 고리. 던진 철퇴가 터지면 폭발 반경만큼 크게, 벽이 부서지면 작게
@@ -1851,6 +1854,7 @@ async function main() {
       if (w[11] === 1) {
         if (((w[14] ?? 0) & EF_STEALTH) === 0) g.circle(sx(w[1]), sy(w[2]), 4.2).fill(0xff8a2a).stroke({ width: 1, color: 0xffffff }); // 은신 중에는 미니맵에서 숨는다
       }
+      else if (((w[14] ?? 0) & EF_SUPPLY) !== 0) g.circle(sx(w[1]), sy(w[2]), 2.4).fill(0xffd45d); // 군량병
       else g.rect(sx(w[1]) - 0.9, sy(w[2]) - 0.9, 1.8, 1.8).fill({ color: 0xe0504a, alpha: 0.9 });
     }
     // 아군 용병: 주인 색 점. 쓰러진 용병은 X
@@ -1923,6 +1927,21 @@ async function main() {
         if ((w[13] ?? 0) > 0 || ((w[14] ?? 0) & 4) !== 0 || w[4] === SHIELD) v.face = Math.cos(w[8] ?? 0) >= 0 ? 1 : -1; // 방패 장군은 늘 방패 호(서버 방향)와 같은 쪽을 본다
         v.sprite.texture = v.art.pose(w[13] ?? 0, w[14] ?? 0, w[5] > 0) ?? v.art.idle!;
         v.sprite.scale.set(v.art.scale * v.face, v.art.scale);
+      } else if (((w[14] ?? 0) & EF_SUPPLY) !== 0 && bossFx.supply.idle) {
+        // 군량병: 도망칠 때는 달리는 그림, 멈추면 서 있는 그림, 맞은 직후에는 놀란 그림
+        const sv = v as unknown as { px?: number; py?: number; hp?: number; hurtT?: number; runT?: number };
+        const moved = Math.hypot(v.x - (sv.px ?? v.x), v.y - (sv.py ?? v.y)) > 0.25;
+        sv.px = v.x;
+        sv.py = v.y;
+        if (sv.hp !== undefined && w[3] < sv.hp) sv.hurtT = 0.3;
+        sv.hp = w[3];
+        sv.hurtT = Math.max(0, (sv.hurtT ?? 0) - ticker.deltaMS / 1000);
+        sv.runT = moved ? (sv.runT ?? 0) + ticker.deltaMS / 1000 : 0;
+        faceFrom(v, v.x, null);
+        v.sprite.texture = ((sv.hurtT ?? 0) > 0 && bossFx.supply.hurt) || (moved ? bossFx.supply.run[Math.floor((sv.runT ?? 0) * 12) % 5] : null) || bossFx.supply.idle;
+        v.sprite.anchor.set(0.5, 0.8);
+        v.sprite.scale.set(SPRITE_SCALE * 1.15 * v.face, SPRITE_SCALE * 1.15);
+        v.lastX = v.x;
       } else if (((w[14] ?? 0) & EF_SKEL) !== 0 && bossFx.skelTex[w[4]]) {
         // 안개 속 시체에서 되살아난 스켈레톤: 병종별 스켈레톤 그림(방향은 좌우만)
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
@@ -1953,6 +1972,7 @@ async function main() {
     });
     // 장군 스킬 예고·장판·효과 컷
     bossFx.frame(latest.bt ?? [], latest.hz ?? [], latest.g?.stage ?? 1, ticker.deltaMS, performance.now());
+    bossFx.riceFrame(latest.rice ?? [], performance.now());
     bossFx.endEnemies();
     bullets.update(latest.bullets, k, (v, w) => {
       if (v.bossKind) {
