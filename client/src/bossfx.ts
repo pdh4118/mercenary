@@ -4,6 +4,8 @@ import {
   BFX_CRASH,
   BFX_ICEBREAK,
   BFX_IMPACT,
+  BFX_SWING,
+  BFX_FLURRYHIT,
   BFX_THRUST,
   BFX_BACKSTEP,
   BOSS_SPEAR,
@@ -171,6 +173,8 @@ export async function createBossFx(d: BossFxDeps) {
     chainMark: await seq("boss9_chain_mark", [0, 1, 2]),
     chainBreak: await seq("boss9_chain_break", [0, 1, 2]),
     orb: await seq("boss9_orb", [0, 1, 2]),
+    flurryArc: await seq("boss5_flurry_arc", [0, 1, 2]),
+    flurryHit: await seq("boss5_flurry_hit", [0, 1, 2]),
     riceDrop: await fx("rice_drop"),
     riceGlint: await seq("rice_glint", [0, 1]),
     riceEat: await seq("rice_eat", [0, 1, 2]),
@@ -205,12 +209,12 @@ export async function createBossFx(d: BossFxDeps) {
 
   // --- 효과 컷(순서대로) ---------------------------------------------------------
   const seqFx: { sp: Sprite; frames: Tex[]; age: number; dur: number }[] = [];
-  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5) => {
+  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5, flipY = false) => {
     const f = first(frames);
     if (!f || seqFx.length > 60) return;
     const sp = new Sprite(f);
     sp.anchor.set(anchorX, 0.5);
-    sp.scale.set(scale);
+    sp.scale.set(scale, flipY ? -scale : scale);
     sp.rotation = rot;
     sp.position.set(x, y);
     d.fxLayer.addChild(sp);
@@ -250,6 +254,12 @@ export async function createBossFx(d: BossFxDeps) {
       playSeq(T.impact, x, y, 0.55, val === BFX_CRASH ? 1 : 0.7, 0);
       d.sound("knockback", x, y);
       if (val === BFX_CRASH) d.spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
+    } else if (val === BFX_SWING) {
+      // 철퇴 난타: 몸 중심에서 앞으로 휘두르는 호(좌우로 번갈아 뒤집는다)
+      playSeq(T.flurryArc, x, y - 12, 0.28, 1.2, ang, 0.53, len === 1);
+      d.sound("skill_mace_hit", x, y, 0.5);
+    } else if (val === BFX_FLURRYHIT) {
+      playSeq(T.flurryHit, x, y, 0.4, 1.1, 0);
     } else if (val === BFX_RISE) {
       playSeq(T.rise, x, y - 20, 0.6, 1.3, 0);
       d.sound("skill_wall_break", x, y, 0.5);

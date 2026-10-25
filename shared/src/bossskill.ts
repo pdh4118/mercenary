@@ -147,6 +147,8 @@ export const BFX_SHIELDBREAK = 6; // 거대 방패가 부서짐
 export const BFX_BLINK = 7; // 순간이동(마법진 섬광)
 export const BFX_RISE = 12; // 스켈레톤이 일어남(푸른 불기둥)
 export const BFX_HEAL = 13; // 보스가 체력을 회복함(길이 값 = 회복량)
+export const BFX_SWING = 15; // 철퇴 난타의 휘두르는 궤적(ang = 방향, 길이 값 0/1 = 휘두르는 쪽)
+export const BFX_FLURRYHIT = 16; // 철퇴 난타가 땅을 때리는 충격
 export const BFX_CHAINBREAK = 14; // 영혼 사슬이 끊어짐(ang = 사슬 방향)
 export const BFX_BACKSTEP = 11; // 뒤로 훌쩍 물러나는 먼지(ang = 물러나는 방향)
 export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)

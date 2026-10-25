@@ -1,6 +1,8 @@
 import {
   BOSS_BLUNT as C,
   BSK_FLURRY,
+  BFX_SWING,
+  BFX_FLURRYHIT,
   BSK_JUMP,
   BSK_MACETHROW,
   BSK_WHIRL,
@@ -128,7 +130,10 @@ const flurry: SkillDef = {
           k.hit.add(key);
           sys.hitFoe(e, f, C.flurryDmg, C.flurryKnock);
         }
-        sys.fx(e.x + Math.cos(k.ang) * 90, e.y + Math.sin(k.ang) * 90, k.ang + (k.d.n! % 2 ? 0.5 : -0.5), BFX_IMPACT);
+        const side = k.d.n! % 2;
+        sys.fx(e.x, e.y, k.ang, BFX_SWING, side);
+        const ha = k.ang + (side ? 0.45 : -0.45);
+        sys.fx(e.x + Math.cos(ha) * 110, e.y + Math.sin(ha) * 110, ha, BFX_FLURRYHIT);
         k.d.n!++;
         k.d.next = C.flurryStep;
         if (k.d.n! >= C.flurryHits) {
