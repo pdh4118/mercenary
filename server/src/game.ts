@@ -2826,12 +2826,13 @@ export class Game {
     const weights = [...(ENEMY_SPAWN_WEIGHTS as readonly number[])];
     if (this.stage < TUNE.ENEMY_MAGE_FROM_STAGE) weights[MAGE] = 0;
     const totalWeight = weights.reduce((a, b) => a + b, 0);
-    this.supplyCd -= dt;
+    const crowd = Math.pow(alive.length, 0.75); // 인원이 늘수록 일반 적처럼 더 자주·더 많이 나온다
+    this.supplyCd -= dt * crowd;
     if (this.supplyCd <= 0) {
       this.supplyCd = SUPPLY.gapMin + this.rng() * (SUPPLY.gapMax - SUPPLY.gapMin);
       let n = 0;
       for (const o of this.enemies.values()) if (o.supply) n++;
-      if (n < SUPPLY.max && this.phase !== "boss") this.spawnSupply(alive[Math.floor(this.rng() * alive.length)]!.state);
+      if (n < Math.ceil(SUPPLY.max * crowd) && this.phase !== "boss") this.spawnSupply(alive[Math.floor(this.rng() * alive.length)]!.state);
     }
     while (this.spawnBudget >= 1) {
       this.spawnBudget -= 1;
