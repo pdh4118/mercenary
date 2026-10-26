@@ -2655,7 +2655,7 @@ export class Game {
     const rate = s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0));
     if (w.type === MAGE) {
       // 주문: 외우는 동안 움직일 수 없고, 끝나는 순간 지정한 곳에 운석이 떨어진다
-      s.windT = (w.windup * castTimeMult(s.mods.heroCast)) / rate;
+      s.windT = w.windup * castTimeMult(s.mods.heroCast); // 주문 시간은 시전 속도만 줄인다(공격 속도는 후딜레이에만)
       p.wind = s.windT;
       s.fireCd = s.windT + w.cooldown / rate;
       const [x, y] = this.heroSpot(s, w);
