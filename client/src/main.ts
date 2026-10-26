@@ -324,10 +324,13 @@ async function main() {
   const chargeLabel = new Text({ text: "돌격", style: { fill: 0xffc27a, fontSize: 13 } });
   chargeLabel.anchor.set(0.5, 1);
   chargeMark.visible = chargeLabel.visible = false;
+  const recoverLabel = new Text({ text: "", style: { fill: 0xffc27a, fontSize: 15, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
+  recoverLabel.anchor.set(0.5, 1);
+  recoverLabel.visible = false;
   const dmgLayer = new Container(); // 피해 숫자는 모든 그림 위에
   const terrainHigh = new Container(); // 유닛이 뒤에 서 있는 바위·나무: 유닛을 가린다
   terrainHigh.sortableChildren = true;
-  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, dmgLayer);
+  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, dmgLayer);
   // 장군 스킬 표현(예고·장판·상태 표시·효과 컷). 서 있는 물건은 적과 함께 깊이 정렬된다.
   const bossFx = await createBossFx({
     groundFx,
@@ -2918,6 +2921,13 @@ async function main() {
     const me = players.views.get(myId);
     const meState = latest.players.find((p) => p.id === myId);
     if (meState) audio.setListener(meState.x, meState.y);
+    // 후딜레이: 주문·공격이 끝난 뒤 다시 쏠 수 있을 때까지. 왜 발사가 안 되는지 머리 위에 알려 준다.
+    const recovering = !!meState && !meState.down && meState.wind <= 0 && meState.fcd >= 0.4;
+    recoverLabel.visible = recovering;
+    if (recovering && meState) {
+      recoverLabel.text = `후딜레이 ${meState.fcd.toFixed(1)}초`;
+      recoverLabel.position.set(meState.x, meState.y - 78);
+    }
     const charging = !!meState && meState.chargeLeft > 0;
     chargeMark.visible = chargeLabel.visible = charging;
     if (charging && meState) {

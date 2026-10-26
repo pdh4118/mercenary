@@ -123,6 +123,7 @@ export interface PlayerState {
   down: boolean; // 쓰러짐(스스로 일어나지 못하고, 동료가 부활시켜야 한다)
   revive: number; // 부활 진행도 0..1
   invuln: number; // 부활 직후·스킬 무적 남은 시간(초)
+  fcd: number; // 다음 공격까지 남은 후딜레이(초, 주문·휘두르기가 끝난 뒤). 0이면 바로 쏠 수 있다
   sk: number; // 스페이스 스킬 쿨타임이 남은 시간(초, 무기를 바꿔도 공유)
   skMax: number; // 마지막으로 쓴 스킬의 전체 쿨타임(초)
   lk?: number; // 주인공 외형(0 = 기본, 1 = 여성). 처음 들어갈 때 고른다

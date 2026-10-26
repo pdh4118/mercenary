@@ -908,6 +908,7 @@ export class Game {
         down: false,
         revive: 0,
         invuln: 0,
+        fcd: 0,
         sk: 0,
         skMax: 0,
         bst: 0,
@@ -2525,6 +2526,7 @@ export class Game {
       p.sk = Math.round(s.skillCd * 10) / 10;
       p.skMax = s.skillMax;
       s.fireCd = Math.max(0, s.fireCd - dt);
+      p.fcd = Math.round(Math.max(0, s.fireCd - s.windT) * 10) / 10;
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
       const hpBefore = p.hp;
