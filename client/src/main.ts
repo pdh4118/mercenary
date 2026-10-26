@@ -1,3 +1,4 @@
+import { warmAssets } from "./assets.js";
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
@@ -206,6 +207,10 @@ async function main() {
   const app = new Application();
   await app.init({ resizeTo: window, background: 0x14161c, antialias: true, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true }); // 고해상도 화면에서도 선명하게(최대 2배)
   document.body.appendChild(app.canvas);
+  await warmAssets((done, total) => {
+    const el = document.getElementById("loadingMsg");
+    if (el) el.textContent = `그림을 불러오는 중... ${Math.round((100 * done) / total)}%`;
+  }); // 핵심 그림을 한꺼번에 받아 둔다(뒤의 하나씩 기다리는 코드가 바로 지나간다)
 
   const world = new Container();
   app.stage.addChild(world);
@@ -346,8 +351,7 @@ async function main() {
   // --- 지형: 서버가 판마다 보내 준다 ---
   const terrainTex = new Map<number, Texture>();
   const terrainFile = (id: number) => `assets/terrain/t${String(id).padStart(2, "0")}.png`;
-  // 지형 그림을 전부 미리 불러온다(게임이 시작된 뒤 지형이 늦게 뜨지 않게)
-  await Promise.all([...SPRITE_BY_ID.keys()].map(async (id) => terrainTex.set(id, await Assets.load<Texture>(terrainFile(id)))));
+  // 지형 그림은 판이 시작될 때 서버가 보낸 지형에 쓰이는 것만 받는다(setTerrain). 전부 미리 받으면 시작이 느려진다.
   interface TView {
     sp: Sprite;
     obj: number;
@@ -1996,6 +2000,14 @@ async function main() {
 
     enemies.update(latest.enemies, k, (v, w) => {
       const size = w[11] === 1 ? BOSS_SIZE : 1;
+      if (!v.art && w[11] === 1 && (latest?.g?.stage ?? 99) <= BOSS_ART_STAGES) {
+        // 장군 그림이 뒤늦게 도착했으면 이제 장군 그림으로 바꾼다(장군 그림은 시작을 늦추지 않으려고 뒤에서 받는다)
+        const late = bossFx.art[(latest?.g?.stage ?? 1) - 1] ?? null;
+        if (late?.idle) {
+          v.art = late;
+          v.sprite.anchor.set(0.5, 0.88);
+        }
+      }
       if (v.art) {
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
         // 스킬을 쓰는 중에는 장군이 바라보는 쪽(서버 방향)으로 그림을 돌린다: 방패·창이 엉뚱한 쪽에 보이지 않게

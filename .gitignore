@@ -6,3 +6,4 @@ dist/
 tools/__pycache__/
 tuning.json
 stats.jsonl
+client/public/assets/manifest.json

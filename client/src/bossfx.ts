@@ -127,86 +127,102 @@ const BOSS_UNIT_TEX = [
 let lastSwingAt = 0;
 
 export async function createBossFx(d: BossFxDeps) {
-  const fx = async (name: string): Promise<Tex> => Assets.load<Texture>(`assets/fx/${name}.png`).catch(() => null);
-  const seq = (name: string, idx: number[]) => Promise.all(idx.map((i) => fx(`${name}_${i}`)));
+  const pendingLoads: Promise<unknown>[] = []; // 뒤에서 받는 그림들(전부 끝나면 ready)
   const unit: Record<string, Tex> = {};
-  await Promise.all(BOSS_UNIT_TEX.map(async (n) => (unit[n] = await Assets.load<Texture>(`assets/units/${n}.png`).catch(() => null))));
-  const T = {
-    impact: await seq("boss1_impact", [0, 1, 2, 3]),
-    thrust: await seq("boss2_thrust", [0, 1, 2]),
-    dust: await seq("boss3_dust", [0, 1, 2, 3]),
-    slash: await seq("boss1_slash", [1, 2, 3]),
-    cry: await seq("boss1_cry", [0, 1, 2]),
-    spearStuck: await fx("boss2_spear_stuck"),
-    spearFly: await fx("boss2_spear_fly"),
-    ice: await seq("boss3_ice", [0, 1, 2, 3, 4]),
-    snipe: await fx("boss3_snipe"),
-    rain: await seq("boss3_rain", [0, 1]),
-    rainStuck: await fx("boss3_rain_stuck"),
-    shield: await seq("boss4_shield", [0, 1, 2]),
-    reflect: await seq("boss4_reflect", [0, 1, 2, 3]),
-    inv: await seq("boss4_inv", [0, 1, 2, 3]),
-    bash: await seq("boss4_bash", [1, 2, 3]),
-    maceFly: await fx("boss5_mace_fly"),
-    maceStuck: await fx("boss5_mace_stuck"),
-    shard: await seq("boss5_shard", [0, 1, 2]),
-    quake: await seq("boss5_quake", [0, 1, 2, 3, 4]),
-    spinRing: await seq("boss5_spin", [0, 1, 2, 3]),
-    iceWall: await seq("boss6_ice", [0, 1, 2]),
-    iceBreak: await seq("boss6_break", [0, 1, 2, 3]),
-    bubble: await seq("boss6_shield", [0, 1, 2]),
-    tele: await seq("boss6_tele", [0, 1, 2, 3]),
-    fire: await seq("boss7_fire", [0, 1, 2]),
-    fireOut: await fx("boss7_fire_out"),
-    lasso: await fx("boss7_lasso"),
-    cornered: await seq("boss7_cornered", [0, 1, 2]),
-    dazed: await seq("boss8_dazed", [0, 1, 2, 3]),
-    scythe: await seq("boss8_scythe", [0, 1, 2, 3]),
-    crash: await seq("boss8_crash", [1, 2, 3, 4]),
-    shell: await seq("boss4_shell", [0, 1, 2, 3, 4]),
-    shellHit: await seq("boss4_shell_hit", [0, 1, 2]),
-    fogBurst: await seq("boss9_fog_burst", [0, 1, 2, 3]),
-    fog: await seq("boss9_fog", [0, 1, 2, 3]),
-    corpse: await fx("boss9_corpse"),
-    revive: await seq("boss9_revive", [0, 1, 2, 3]),
-    rise: await seq("boss9_rise", [0, 1, 2, 3]),
-    drainRing: await seq("boss9_drain_ring", [0, 1, 2, 3]),
-    drainBeam: await fx("boss9_drain_beam"),
-    chainLink: await fx("boss9_chain_link"),
-    chainMark: await seq("boss9_chain_mark", [0, 1, 2]),
-    chainBreak: await seq("boss9_chain_break", [0, 1, 2]),
-    orb: await seq("boss9_orb", [0, 1, 2]),
-    flurryArc: await seq("boss5_flurry_arc", [0, 1, 2]),
-    flurryHit: await seq("boss5_flurry_hit", [0, 1, 2]),
-    riceDrop: await fx("rice_drop"),
-    riceGlint: await seq("rice_glint", [0, 1]),
-    riceEat: await seq("rice_eat", [0, 1, 2]),
-    supplyBurst: await seq("supply_burst", [0, 1, 2]),
-  };
+  const unitLoads = Promise.all(BOSS_UNIT_TEX.map(async (n) => (unit[n] = await Assets.load<Texture>(`assets/units/${n}.png`).catch(() => null))));
+  pendingLoads.push(unitLoads);
+  // 장군·군량병 이펙트 그림: 시작을 늦추지 않도록 뒤에서(백그라운드로) 받는다. 연속 컷(seq)은 배열이 바로 만들어지고 컷이 도착하는 대로 채워지며,
+  // 한 장짜리(one)는 읽을 때 도착했는지 본다. 아직 도착하지 않은 그림은 null이라 그 효과만 잠깐 건너뛴다.
+  const SEQ = {
+    impact: ["boss1_impact", [0, 1, 2, 3]],
+    thrust: ["boss2_thrust", [0, 1, 2]],
+    dust: ["boss3_dust", [0, 1, 2, 3]],
+    slash: ["boss1_slash", [1, 2, 3]],
+    cry: ["boss1_cry", [0, 1, 2]],
+    ice: ["boss3_ice", [0, 1, 2, 3, 4]],
+    rain: ["boss3_rain", [0, 1]],
+    shield: ["boss4_shield", [0, 1, 2]],
+    reflect: ["boss4_reflect", [0, 1, 2, 3]],
+    inv: ["boss4_inv", [0, 1, 2, 3]],
+    bash: ["boss4_bash", [1, 2, 3]],
+    shard: ["boss5_shard", [0, 1, 2]],
+    quake: ["boss5_quake", [0, 1, 2, 3, 4]],
+    spinRing: ["boss5_spin", [0, 1, 2, 3]],
+    iceWall: ["boss6_ice", [0, 1, 2]],
+    iceBreak: ["boss6_break", [0, 1, 2, 3]],
+    bubble: ["boss6_shield", [0, 1, 2]],
+    tele: ["boss6_tele", [0, 1, 2, 3]],
+    fire: ["boss7_fire", [0, 1, 2]],
+    cornered: ["boss7_cornered", [0, 1, 2]],
+    dazed: ["boss8_dazed", [0, 1, 2, 3]],
+    scythe: ["boss8_scythe", [0, 1, 2, 3]],
+    crash: ["boss8_crash", [1, 2, 3, 4]],
+    shell: ["boss4_shell", [0, 1, 2, 3, 4]],
+    shellHit: ["boss4_shell_hit", [0, 1, 2]],
+    fogBurst: ["boss9_fog_burst", [0, 1, 2, 3]],
+    fog: ["boss9_fog", [0, 1, 2, 3]],
+    revive: ["boss9_revive", [0, 1, 2, 3]],
+    rise: ["boss9_rise", [0, 1, 2, 3]],
+    drainRing: ["boss9_drain_ring", [0, 1, 2, 3]],
+    chainMark: ["boss9_chain_mark", [0, 1, 2]],
+    chainBreak: ["boss9_chain_break", [0, 1, 2]],
+    orb: ["boss9_orb", [0, 1, 2]],
+    flurryArc: ["boss5_flurry_arc", [0, 1, 2]],
+    flurryHit: ["boss5_flurry_hit", [0, 1, 2]],
+    riceGlint: ["rice_glint", [0, 1]],
+    riceEat: ["rice_eat", [0, 1, 2]],
+    supplyBurst: ["supply_burst", [0, 1, 2]],
+  } as const;
+  const ONE = {
+    spearStuck: "boss2_spear_stuck",
+    spearFly: "boss2_spear_fly",
+    snipe: "boss3_snipe",
+    rainStuck: "boss3_rain_stuck",
+    maceFly: "boss5_mace_fly",
+    maceStuck: "boss5_mace_stuck",
+    fireOut: "boss7_fire_out",
+    lasso: "boss7_lasso",
+    corpse: "boss9_corpse",
+    drainBeam: "boss9_drain_beam",
+    chainLink: "boss9_chain_link",
+    riceDrop: "rice_drop",
+  } as const;
+  const loadTex = (url: string): Promise<Tex> => Assets.load<Texture>(url).catch(() => null);
+  const oneLoaded = new Map<string, Tex>();
+  const T = {} as { [K in keyof typeof SEQ]: Tex[] } & { [K in keyof typeof ONE]: Tex };
+  for (const [key, [name, idx]] of Object.entries(SEQ) as [keyof typeof SEQ, readonly [string, readonly number[]]][]) {
+    const arr: Tex[] = idx.map(() => null);
+    (T as unknown as Record<string, Tex[]>)[key] = arr;
+    idx.forEach((i, k) => pendingLoads.push(loadTex(`assets/fx/${name}_${i}.png`).then((t) => (arr[k] = t))));
+  }
+  for (const [key, name] of Object.entries(ONE) as [keyof typeof ONE, string][]) {
+    pendingLoads.push(loadTex(`assets/fx/${name}.png`).then((t) => oneLoaded.set(key, t)));
+    Object.defineProperty(T, key, { get: () => oneLoaded.get(key) ?? null, enumerable: true });
+  }
   const first = (a: Tex[]): Tex => a.find((t) => t !== null) ?? null;
   const pick = (a: Tex[], i: number): Tex => a[Math.max(0, Math.min(a.length - 1, i))] ?? first(a);
   const u = (n: string): Tex => unit[n] ?? null;
   /** 스켈레톤 그림(병종 번호 순서: 기병·창병·궁병·검방병·둔기병·마법사) */
-  const skelTex: Tex[] = await Promise.all(["cavalry", "spear", "archer", "sword", "blunt", "mage"].map(async (n) => Assets.load<Texture>(`assets/units/skel_${n}.png`).catch(() => null)));
+  const skelTex: Tex[] = ["cavalry", "spear", "archer", "sword", "blunt", "mage"].map(() => null);
+  ["cavalry", "spear", "archer", "sword", "blunt", "mage"].forEach((n, i) => pendingLoads.push(loadTex(`assets/units/skel_${n}.png`).then((t) => (skelTex[i] = t))));
 
   /** 군량병 그림: 서 있기·달리기 5컷·피격 */
-  const supply = {
-    idle: await Assets.load<Texture>("assets/units/supply_idle.png").catch(() => null),
-    run: await Promise.all([0, 1, 3, 4].map(async (i) => Assets.load<Texture>(`assets/units/supply_run_${i}.png`).catch(() => null))),
-    hurt: await Assets.load<Texture>("assets/units/supply_hurt.png").catch(() => null),
-  };
+  const supply: { idle: Tex; run: Tex[]; hurt: Tex } = { idle: null, run: [null, null, null, null], hurt: null };
+  pendingLoads.push(loadTex("assets/units/supply_idle.png").then((t) => (supply.idle = t)));
+  [0, 1, 3, 4].forEach((n, k) => pendingLoads.push(loadTex(`assets/units/supply_run_${n}.png`).then((t) => (supply.run[k] = t))));
+  pendingLoads.push(loadTex("assets/units/supply_hurt.png").then((t) => (supply.hurt = t)));
 
   /** 스테이지 1~8 장군 그림과 자세 */
   const art: BossArt[] = [
-    { idle: u("boss1_idle"), scale: 0.5, pose: (sk, _fl, atk) => ((atk || sk > 0) && u("boss1_attack")) || u("boss1_idle") },
-    { idle: u("boss2_idle"), scale: 0.6, pose: (sk, _fl, atk) => (sk === BSK_GUARD ? u("boss2_guard") : sk === BSK_CLONE || sk === BSK_TRIPLE || sk === BSK_THROW || atk ? u("boss2_thrust") : u("boss2_idle")) },
-    { idle: u("boss3_idle"), scale: 0.4, pose: (sk, _fl, atk) => (sk === BSK_RAIN ? u("boss3_sky") : sk === BSK_SNIPE || sk === BSK_ICEARROW || atk ? u("boss3_aim") : u("boss3_idle")) },
-    { idle: u("boss4_idle"), scale: 0.42, pose: (sk, fl) => (sk === BSK_REFLECT || fl & EF_GUARD ? u("boss4_reflect") : sk === BSK_SHIELDRUSH ? u("boss4_charge") : u("boss4_idle")) },
-    { idle: u("boss5_idle"), scale: 0.42, pose: (sk, fl, atk) => (fl & EF_WHIRL ? u(`boss5_whirlpose_${Math.floor(performance.now() / WHIRL_FRAME_MS) % 4}`) : sk === BSK_JUMP ? u("boss5_jump") : sk === BSK_FLURRY ? (performance.now() - lastSwingAt < 170 ? u("boss5_swing_b") : u("boss5_swing_a")) : sk === BSK_MACETHROW || sk === BSK_WHIRL || atk ? u("boss5_smash") : u("boss5_idle")) },
-    { idle: u("boss6_idle"), scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_BLINK ? u("boss6_blink") : sk > 0 || atk ? u("boss6_cast") : u("boss6_idle")) },
-    { idle: u("boss7_gallop"), scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")) },
-    { idle: u("boss8_normal"), scale: 0.75, pose: (sk, fl) => (sk === BSK_ACCEL ? u("boss8_normal") : fl & EF_MAD || sk === BSK_RAMPAGE ? u("boss8_mad") : u("boss8_normal")) },
-    { idle: u("boss9_idle"), scale: 0.42, pose: (sk) => (sk === BSK_DRAIN ? u("boss9_drain") : sk === BSK_FOG || sk === BSK_CHAIN || sk === BSK_ORB ? u("boss9_cast") : u("boss9_idle")) },
+    { get idle() { return u("boss1_idle"); }, scale: 0.5, pose: (sk, _fl, atk) => ((atk || sk > 0) && u("boss1_attack")) || u("boss1_idle") },
+    { get idle() { return u("boss2_idle"); }, scale: 0.6, pose: (sk, _fl, atk) => (sk === BSK_GUARD ? u("boss2_guard") : sk === BSK_CLONE || sk === BSK_TRIPLE || sk === BSK_THROW || atk ? u("boss2_thrust") : u("boss2_idle")) },
+    { get idle() { return u("boss3_idle"); }, scale: 0.4, pose: (sk, _fl, atk) => (sk === BSK_RAIN ? u("boss3_sky") : sk === BSK_SNIPE || sk === BSK_ICEARROW || atk ? u("boss3_aim") : u("boss3_idle")) },
+    { get idle() { return u("boss4_idle"); }, scale: 0.42, pose: (sk, fl) => (sk === BSK_REFLECT || fl & EF_GUARD ? u("boss4_reflect") : sk === BSK_SHIELDRUSH ? u("boss4_charge") : u("boss4_idle")) },
+    { get idle() { return u("boss5_idle"); }, scale: 0.42, pose: (sk, fl, atk) => (fl & EF_WHIRL ? u(`boss5_whirlpose_${Math.floor(performance.now() / WHIRL_FRAME_MS) % 4}`) : sk === BSK_JUMP ? u("boss5_jump") : sk === BSK_FLURRY ? (performance.now() - lastSwingAt < 170 ? u("boss5_swing_b") : u("boss5_swing_a")) : sk === BSK_MACETHROW || sk === BSK_WHIRL || atk ? u("boss5_smash") : u("boss5_idle")) },
+    { get idle() { return u("boss6_idle"); }, scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_BLINK ? u("boss6_blink") : sk > 0 || atk ? u("boss6_cast") : u("boss6_idle")) },
+    { get idle() { return u("boss7_gallop"); }, scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")) },
+    { get idle() { return u("boss8_normal"); }, scale: 0.75, pose: (sk, fl) => (sk === BSK_ACCEL ? u("boss8_normal") : fl & EF_MAD || sk === BSK_RAMPAGE ? u("boss8_mad") : u("boss8_normal")) },
+    { get idle() { return u("boss9_idle"); }, scale: 0.42, pose: (sk) => (sk === BSK_DRAIN ? u("boss9_drain") : sk === BSK_FOG || sk === BSK_CHAIN || sk === BSK_ORB ? u("boss9_cast") : u("boss9_idle")) },
   ];
   void BSK_STEALTH;
 
@@ -947,6 +963,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, playFx, enemyMarks, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T };
+  return { art, frame, playFx, enemyMarks, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
 }
 
