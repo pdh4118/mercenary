@@ -594,7 +594,7 @@ export async function createBossFx(d: BossFxDeps) {
         const sc = (a * 2.15) / 450;
         sp.scale.set(sc);
         sp.position.set(x, y);
-        sp.alpha = 0.82 * Math.min(1, left / 10 / 1.2); // 걷힐 때 서서히 옅어진다
+        sp.alpha = 0.45 * Math.min(1, left / 10 / 1.2); // 걷힐 때 서서히 옅어진다
       }
     } else if (kind === HZ_CORPSE) {
       const sp = necroSprite(id, 0, d.standLayer, T.corpse, 0.5, 0.7);
