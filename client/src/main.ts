@@ -2921,11 +2921,11 @@ async function main() {
     const me = players.views.get(myId);
     const meState = latest.players.find((p) => p.id === myId);
     if (meState) audio.setListener(meState.x, meState.y);
-    // 후딜레이: 주문·공격이 끝난 뒤 다시 쏠 수 있을 때까지. 왜 발사가 안 되는지 머리 위에 알려 준다.
+    // 쿨타임: 주문·공격이 끝난 뒤 다시 쏠 수 있을 때까지. 왜 발사가 안 되는지 머리 위에 알려 준다.
     const recovering = !!meState && !meState.down && meState.wind <= 0 && meState.fcd >= 0.4;
     recoverLabel.visible = recovering;
     if (recovering && meState) {
-      recoverLabel.text = `후딜레이 ${meState.fcd.toFixed(1)}초`;
+      recoverLabel.text = `쿨타임 ${meState.fcd.toFixed(1)}초`;
       recoverLabel.position.set(meState.x, meState.y - 78);
     }
     const charging = !!meState && meState.chargeLeft > 0;
