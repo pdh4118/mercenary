@@ -26,7 +26,10 @@ npm run dev:client   # http://localhost:5173
 ```sh
 npm run typecheck
 npm test
+TEST_SEED=7 npm test -w server   # 다른 시드로(난수에 기대는 약한 시험을 찾을 때 여러 값으로 돌려 본다)
 ```
+
+서버 시험은 `server/test/setup-seed.ts`가 `Math.random`을 시드 고정 난수로 바꿔서 돌아가므로(기본 시드 20260101), 난수를 따로 넘기지 않는 `new Game()` 시험도 매번 같은 결과가 나온다.
 
 ## 규칙 요약
 
