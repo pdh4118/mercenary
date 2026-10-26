@@ -541,7 +541,7 @@ export const BOSS_NECRO = {
   drainSec: 4,
   drainTick: 0.5,
   drainMult: 0.2, // 한 번에 보스 기본 피해의 이만큼을 흡수
-  drainHeal: 1.5, // 흡수한 피해의 이 배만큼 보스가 회복(보스 체력이 커서 체감을 맞춘다)
+  drainHeal: 4.5, // 흡수한 피해의 이 배만큼 보스가 회복(보스 체력이 커서 체감을 맞춘다. 1.5에서 3배로 올림)
   drainCd: 18,
   // 영혼 사슬(체력 50% 이하)
   chainTele: 0.9,

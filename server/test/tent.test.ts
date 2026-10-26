@@ -66,3 +66,7 @@ test("쉬는 동안 쓰러진 용병은 더 빨리 일어난다", () => {
   run(g, 3);
   assert.ok(m.respawn <= 10 - 3 * TENT.respawnBoost + 0.2, `${m.respawn}`);
 });
+
+test("텐트는 한 번에 하나만 생긴다", () => {
+  assert.equal(TENT.max, 1);
+});

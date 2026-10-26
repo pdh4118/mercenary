@@ -58,7 +58,7 @@ export const WEAPONS: readonly WeaponDef[] = [
   { name: "창", type: SPEAR, ranged: false, reach: 112, arc: rad(11), damage: 18, cooldown: 0.9, windup: 0, splash: 0, note: "기병 돌격 무효 · 달려오는 기병을 먼저 찌르면 속도를 잃고 카운터 · 아주 긴 사거리" },
   { name: "검", type: SHIELD, ranged: false, reach: 46, arc: rad(75), damage: 8, cooldown: 0.35, windup: 0, splash: 0, note: "방패 체력이 정면 공격을 먼저 받아 냄 · 빠른 공격" },
   { name: "철퇴", type: BLUNT, ranged: false, reach: 52, arc: rad(100), damage: 30, cooldown: 1.2, windup: 1, splash: 46, note: "방패 파괴(300%) · 범위 공격 · 꾹 누르면 1초간 힘을 모으고, 떼는 순간 모은 만큼 피해" },
-  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 100, cooldown: 1.5, windup: 2.5, splash: 130, note: "마우스 위치에 운석 · 2.5초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
+  { name: "지팡이", type: MAGE, ranged: false, reach: 300, arc: 0, damage: 80, cooldown: 3, windup: 2.5, splash: 130, note: "마우스 위치에 운석 · 2.5초 주문(움직일 수 없음) · 매우 넓은 범위 · 방패 무시" },
   { name: "기마", type: CAVALRY, ranged: false, reach: 80, arc: rad(80), damage: 11, cooldown: 0.65, windup: 0, splash: 0, note: "달릴수록 빨라지고 속도만큼 돌격 피해 · 공격하면 속도를 잃음 · 창에 먼저 맞으면 속도를 잃고 카운터" },
 ];
 /** 스페이스 스킬(WEAPONS와 같은 순서). 쿨타임은 모든 무기가 공유해서, 무기를 바꿔도 남은 시간이 이어진다. */

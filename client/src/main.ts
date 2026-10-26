@@ -360,6 +360,9 @@ async function main() {
     footY: number;
     halfW: number;
     top: number;
+    minX: number; // 그림이 실제로 차지하는 범위(고지대는 기준점이 윗면이라 그림이 아래로 길게 뻗는다)
+    maxX: number;
+    maxY: number;
     high: boolean;
   }
   /** 로딩 화면: 처음 그림을 불러오는 동안과 판이 시작될 때 지형이 준비될 때까지 */
@@ -392,7 +395,7 @@ async function main() {
       const solid = s.kind !== TK_PLATEAU && s.kind !== TK_DECOR;
       sp.zIndex = it[2];
       (solid ? terrainLow : terrainFlat).addChild(sp);
-      tviews.push({ sp, obj: n, solid, x: it[1], footY: it[2], halfW: (s.w / 2) * it[3], top: it[2] - ay * it[3], high: false });
+      tviews.push({ sp, obj: n, solid, x: it[1], footY: it[2], halfW: (s.w / 2) * it[3], top: it[2] - ay * it[3], minX: Math.min(it[1] - ax * it[3] * (it[4] ? -1 : 1), it[1] + (s.w - ax) * it[3] * (it[4] ? -1 : 1)), maxX: Math.max(it[1] - ax * it[3] * (it[4] ? -1 : 1), it[1] + (s.w - ax) * it[3] * (it[4] ? -1 : 1)), maxY: it[2] + (s.h - ay) * it[3], high: false });
     });
   };
 
@@ -2430,13 +2433,16 @@ async function main() {
       const fallFrom = Math.max(0.3, Math.min(0.95, 1 - 0.6 / Math.max(0.6, (total ?? 30) / 10))); // 폭발 약 0.6초 전부터 낙하(소리의 충돌 시점과 맞춘다)
       const p = prog / 100;
       const pulse = 0.5 + 0.5 * Math.sin(now / 130);
-      const friendly = owner > 0; // 아군의 운석: 용병 마법사는 옅은 초록, 주인공(시전자 번호가 음수)은 파랑
+      // 토너먼트의 상대편 운석은 적처럼 진하게: 상대 주인공은 빨강, 상대 용병은 주황(내 편은 파랑·초록 그대로)
+      const foeSide = owner > 0 && teamSide(owner) === "red";
+      const friendly = owner > 0 && !foeSide; // 아군의 운석: 용병 마법사는 옅은 초록, 주인공(시전자 번호가 음수)은 파랑
       const heroMeteor = friendly && key < 0;
+      const foeHero = foeSide && key < 0;
       const bossMeteor = owner === 0 && (latest.enemies.find((q) => q[0] === key)?.[11] ?? 0) === 1; // 보스의 마법: 붉은 주황
       // 운석 그림(낙하·폭발·그을음)은 누가 쏘든 같은 원본 색이고, 낙하 지점 위험 표시만 적(주황)·보스(붉은 주황)·아군(옅은 초록·파랑)으로 나눈다. 적의 마법은 피하라고 진하게 표시한다.
-      const cFill = heroMeteor ? 0x8ec8ff : friendly ? 0xa8e8b4 : bossMeteor ? 0xff4a1a : 0xff9a2a;
-      const cEdge = heroMeteor ? 0x9fd2ff : friendly ? 0xb4f0bf : bossMeteor ? 0xff5a2a : 0xff8a3a;
-      const cSweep = heroMeteor ? 0x6aaaf0 : friendly ? 0x8fdca0 : bossMeteor ? 0xe03a10 : 0xff8a1a;
+      const cFill = heroMeteor ? 0x8ec8ff : friendly ? 0xa8e8b4 : foeHero ? 0xff2a2a : bossMeteor ? 0xff4a1a : 0xff9a2a;
+      const cEdge = heroMeteor ? 0x9fd2ff : friendly ? 0xb4f0bf : foeHero ? 0xff4a4a : bossMeteor ? 0xff5a2a : 0xff8a3a;
+      const cSweep = heroMeteor ? 0x6aaaf0 : friendly ? 0x8fdca0 : foeHero ? 0xe01818 : bossMeteor ? 0xe03a10 : 0xff8a1a;
       const strong = !friendly;
       // 낙하 예고: 원 안의 음영이 시계처럼(위에서 시계 방향) 차올라, 한 바퀴를 다 돌면 운석이 떨어진다
       const a0 = -Math.PI / 2;
@@ -2890,7 +2896,9 @@ async function main() {
       const cx = -world.x + app.screen.width / 2;
       const cy = -world.y + app.screen.height / 2;
       for (const tv of tviews) {
-        const vis = Math.abs(tv.x - cx) < app.screen.width / 2 + tv.halfW + 80 && Math.abs(tv.footY - cy) < app.screen.height / 2 + 400 && terrain.liveObj(tv.obj);
+        const hw = app.screen.width / 2 + 80;
+        const hh = app.screen.height / 2 + 80;
+        const vis = tv.maxX > cx - hw && tv.minX < cx + hw && tv.maxY > cy - hh && tv.top < cy + hh && terrain.liveObj(tv.obj);
         tv.sp.visible = vis;
         if (!vis || !tv.solid) continue;
         let behind = false;

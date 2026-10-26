@@ -21,7 +21,7 @@ const dummy = (g: Game, x: number, y: number): number => {
   return id;
 };
 
-test("무기 수치: 활 0.5초·8, 검 8, 철퇴 30·준비 1초, 지팡이 100, 기마 80·준비 없음, 용병 마법사 70", () => {
+test("무기 수치: 활 0.5초·8, 검 8, 철퇴 30·준비 1초, 지팡이 80, 기마 80·준비 없음, 용병 마법사 56", () => {
   assert.equal(FIRE_COOLDOWN_SEC, 0.5);
   assert.equal(BULLET_DAMAGE, 8);
   assert.equal(WEAPONS[0]!.cooldown, 0.5);
@@ -31,10 +31,10 @@ test("무기 수치: 활 0.5초·8, 검 8, 철퇴 30·준비 1초, 지팡이 100
   assert.equal(WEAPONS[1]!.cooldown, 0.9);
   assert.equal(WEAPONS[3]!.damage, 30);
   assert.equal(WEAPONS[3]!.windup, 1);
-  assert.equal(WEAPONS[4]!.damage, 100);
+  assert.equal(WEAPONS[4]!.damage, 80);
   assert.equal(WEAPONS[5]!.reach, 80);
   assert.equal(WEAPONS[5]!.windup, 0);
-  assert.equal(MERC_STATS[MAGE]!.damage, 70);
+  assert.equal(MERC_STATS[MAGE]!.damage, 56);
   assert.equal(BULLET_RANGE, 400);
 });
 

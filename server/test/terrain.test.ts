@@ -230,3 +230,36 @@ test("올라가는 길이 있는 고지대는 길 밖에서(특히 뒤쪽에서)
     assert.equal(leak, 0, `${id}: 길 밖에서 윗면에 닿는 칸 ${leak}`);
   }
 });
+
+test("적은 산·바위에 정면으로 막혀도 비껴 돌아서 주인공에게 도달한다", () => {
+  for (const [name, wall] of [["산", [[PLATEAU, 0, 0, 1.6, 0]]], ["바위 줄", [-120, -60, 0, 60, 120].map((y) => rockAt(0, y))]] as [string, TerrainWire[]][]) {
+    const g = new Game();
+    g.autoSpawn = false;
+    g.setTerrain(wall);
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    p.x = 420;
+    p.y = 0;
+    p.invuln = 1e9;
+    const e = g.getEnemy(g.spawnEnemyAt(-420, 0, 0))!; // 기병: 사이에 지형이 있어도 정면으로 달려든다
+    let best = Infinity;
+    for (let i = 0; i < 20 * TICK_RATE; i++) {
+      g.step();
+      best = Math.min(best, Math.hypot(e.x - p.x, e.y - p.y));
+    }
+    assert.ok(best < 120, `${name}: 돌아가서 다가가야 한다(가장 가까웠던 거리 ${Math.round(best)})`);
+  }
+});
+
+test("토너먼트가 끝나면 선수가 지형 위·안이 아니라 설 수 있는 자리로 옮겨진다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  g.setTerrain([[PLATEAU, 0, 0, 1.6, 0]]);
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  p.x = 0;
+  p.y = 0; // 산 한가운데(경기 중에는 지형이 사라져 있어서 설 수 있었다)
+  const spot = (g as unknown as { freeSpot(x: number, y: number, r: number): [number, number] }).freeSpot(p.x, p.y, 14);
+  assert.equal(g.terrain!.blocked(spot[0], spot[1], 14), false);
+  assert.ok(Math.hypot(spot[0], spot[1]) > 100, "산 밖으로 나왔다");
+});

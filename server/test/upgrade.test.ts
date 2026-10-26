@@ -619,7 +619,7 @@ test("단계 특화: 창병은 카운터 피해, 기병은 돌격 피해, 마법
   const mage = g.addMerc(a, MAGE, p.x + 50, p.y);
   const w0 = g.mercStatsForTest(mage).windup;
   (g.getMerc(mage) as { tier: number }).tier = 4;
-  assert.ok(g.mercStatsForTest(mage).windup < w0 * 0.85, "시전 시간이 줄어든다");
+  assert.ok(g.mercStatsForTest(mage).windup < w0 * 0.95, "시전 시간이 줄어든다");
   assert.equal(g.mercStatsForTest(mage).reach, MERC_STATS[MAGE]!.reach, "마법사 사거리는 늘지 않는다");
   assert.ok(TIER_COUNTER[SPEAR]! > 0 && TIER_CHARGE[0]! > 0);
 });

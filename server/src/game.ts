@@ -2060,8 +2060,28 @@ export class Game {
   }
 
   /** 토너먼트를 마치고 모두를 회복시킨 뒤 쉬는 시간으로 돌아간다. 마지막 스테이지라면 이것으로 승리한다. */
+  /** (x,y)에서 가장 가까운, 단단한 지형·고지대·비탈이 아닌 자리. 지형이 없거나 이미 괜찮으면 그대로. */
+  private freeSpot(x: number, y: number, r: number): [number, number] {
+    const t = this.terrain;
+    if (!t) return [x, y];
+    const ok = (px: number, py: number) => !t.blocked(px, py, r + 20);
+    if (ok(x, y)) return [x, y];
+    for (let d = 40; d <= 2000; d += 40) {
+      const n = Math.max(8, Math.round((d * Math.PI * 2) / 60));
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const px = clampToWorld(x + Math.cos(a) * d, 40);
+        const py = clampToWorld(y + Math.sin(a) * d, 40);
+        if (ok(px, py)) return [px, py];
+      }
+    }
+    return [x, y];
+  }
+
   private tourEnd(): void {
+    this.terrain?.setDuel(false); // 경기장에 걸쳐 사라졌던 지형이 다시 나타난다: 그 위나 안에 서 있던 사람은 옮긴다
     for (const s of this.slots.values()) {
+      [s.state.x, s.state.y] = this.freeSpot(s.state.x, s.state.y, PLAYER_RADIUS);
       this.tourRestore(s);
       s.state.invuln = 2;
     }
@@ -4248,8 +4268,9 @@ export class Game {
     }
     const len = Math.hypot(dx, dy) || 1;
     const step = Math.min(speed * dt, dist - stop);
-    m.x += (dx / len) * step;
-    m.y += (dy / len) * step;
+    const [ux, uy] = this.detour(m, dx / len, dy / len, step, dt);
+    m.x += ux * step;
+    m.y += uy * step;
     return true;
   }
 
@@ -4264,9 +4285,54 @@ export class Game {
     const d = Math.hypot(tx - f.x, ty - f.y);
     if (d <= stop) return false;
     const step = Math.min(speed * dt, d - stop);
-    f.x += ((tx - f.x) / d) * step;
-    f.y += ((ty - f.y) / d) * step;
+    const [ux, uy] = this.detour(f, (tx - f.x) / d, (ty - f.y) / d, step, dt);
+    f.x += ux * step;
+    f.y += uy * step;
     return true;
+  }
+
+  private detours = new WeakMap<object, { side: number; lx: number; ly: number; t: number; commit: number }>();
+
+  /**
+   * 가려는 방향 앞에 바위·나무·절벽이 있으면 비껴가는 방향을 고른다. 정면으로 부딪혀 미끄러지지도 못하고 서 있거나,
+   * 벽처럼 늘어선 지형 앞에서 좌우로 떠는 일이 없도록, 막히면 한쪽 방향을 정해 한동안 그쪽으로 돌아간다.
+   */
+  private detour(f: { x: number; y: number }, ux: number, uy: number, step: number, dt: number): [number, number] {
+    const t = this.terrain;
+    if (!t || t.solids.length === 0) return [ux, uy];
+    let st = this.detours.get(f);
+    if (!st) this.detours.set(f, (st = { side: this.rng() < 0.5 ? 1 : -1, lx: f.x, ly: f.y, t: 0, commit: 0 }));
+    // 제대로 못 나아가고 있으면(기대한 거리의 30% 미만) 막힌 시간을 쌓는다
+    st.t += dt;
+    if (st.t >= 0.5) {
+      const moved = Math.hypot(f.x - st.lx, f.y - st.ly);
+      if (moved < step * (st.t / dt) * 0.15) {
+        st.side = -st.side; // 갇혔으면 반대쪽으로 돌아가 본다
+        st.commit = 1.5;
+      }
+      st.lx = f.x;
+      st.ly = f.y;
+      st.t = 0;
+    }
+    const clear = (dx: number, dy: number): boolean => {
+      for (const k of [26, 52, 80]) if (t.hitsSolid(f.x + dx * k, f.y + dy * k, 12)) return false;
+      return true;
+    };
+    st.commit = Math.max(0, st.commit - dt);
+    if (st.commit <= 0 && clear(ux, uy)) return [ux, uy];
+    const base = Math.atan2(uy, ux);
+    for (const deg of [35, 70, 105, 140]) {
+      for (const sgn of [st.side, -st.side]) {
+        const a = base + (sgn * deg * Math.PI) / 180;
+        const dx = Math.cos(a);
+        const dy = Math.sin(a);
+        if (clear(dx, dy)) {
+          if (sgn !== st.side) st.side = sgn; // 돌아가는 쪽을 유지한다
+          return [dx, dy];
+        }
+      }
+    }
+    return [ux, uy];
   }
 
   private resolveMercAttack(m: Merc, st: UnitStats): void {
@@ -4763,6 +4829,8 @@ export class Game {
     while (p.xp >= p.xpNeed) {
       p.xp -= p.xpNeed;
       p.level++;
+      p.maxHp += TUNE.HERO_HP_PER_LEVEL;
+      p.hp += TUNE.HERO_HP_PER_LEVEL;
       p.xpNeed = xpNeeded(p.level);
       p.pending++;
       leveled = true;
@@ -5290,8 +5358,9 @@ export class Game {
     }
     const len = Math.hypot(dx, dy) || 1;
     const step = Math.min(cavSpd * dt, dist);
-    e.x += (dx / len) * step;
-    e.y += (dy / len) * step;
+    const [ux, uy] = this.detour(e, dx / len, dy / len, step, dt);
+    e.x += ux * step;
+    e.y += uy * step;
     this.updateMomentum(e, true, dt);
   }
 

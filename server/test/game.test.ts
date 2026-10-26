@@ -716,9 +716,12 @@ test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
 test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
+  const lvHp = (TUNE.HERO_HP_PER_LEVEL) * (g.getPlayer(a)!.level - 1); // 레벨업마다 최대 체력이 오른다
   forceCard(g, a, "heroMaxHp");
-  assert.equal(g.getPlayer(a)!.maxHp, TUNE.PLAYER_MAX_HP + 19);
-  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 19);
+  const lvHp2 = TUNE.HERO_HP_PER_LEVEL * (g.getPlayer(a)!.level - 1);
+  assert.equal(g.getPlayer(a)!.maxHp, TUNE.PLAYER_MAX_HP + 19 + lvHp2);
+  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 19 + lvHp2);
+  void lvHp;
   forceCard(g, a, "priceMult");
   assert.ok(Math.abs(g.getPlayer(a)!.priceMult - 0.85) < 1e-9);
   const p = me(g, a);
@@ -883,7 +886,7 @@ test("레벨업하면 주변 적이 밀려나고 하던 공격이 끊기며 잠�
   assert.ok(e.cd >= LEVELUP_STUN_SEC - 1e-9);
   assert.equal(g.getEnemy(far)!.x, farX, "범위 밖의 적은 그대로");
   run(g, 0.5);
-  assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP, "그 사이 피해를 입지 않는다");
+  assert.equal(me(g, a).hp, TUNE.PLAYER_MAX_HP + TUNE.HERO_HP_PER_LEVEL, "그 사이 피해를 입지 않는다(레벨업으로 체력이 올랐다)");
 });
 
 // --- 새 병종 규칙(방패·돌격·반사·범위) ---------------------------------------------

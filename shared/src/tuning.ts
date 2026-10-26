@@ -153,6 +153,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   SPEAR_HALF_WIDTH_NEAR: ["창 찌르기 폭(몸 앞, 반폭 px)", G.combat, 2, 150, 1],
   SPEAR_HALF_WIDTH_FAR: ["창 찌르기 폭(끝, 반폭 px)", G.combat, 2, 150, 1],
   CAV_HALF_WIDTH: ["기병 찌르기 폭(반폭 px)", G.combat, 2, 150, 1],
+  HERO_HP_PER_LEVEL: ["주인공 레벨업당 최대 체력", G.hero, 0, 200, 1],
   PLAYER_MAX_HP: ["주인공 기본 체력", G.hero, 10, 2000, 5],
   PLAYER_SPEED: ["주인공 이동 속도", G.hero, 50, 800, 5],
   BOW_FIRE_SLOW: ["활 연사 중 이동 속도 감소 비율", G.hero, 0, 0.9, 0.05],

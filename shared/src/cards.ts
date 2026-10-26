@@ -116,7 +116,7 @@ export interface CardDef {
 export const MERC_STAT_LABEL: Record<MercStat, string> = {
   hp: "체력",
   dmg: "공격력",
-  atkSpeed: "공격 속도",
+  atkSpeed: "공격 템포",
   speed: "이동 속도",
   range: "사거리",
   area: "범위",
@@ -138,7 +138,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 };
 /** 병종 전용 일반 카드 한 장의 효과량(이전의 1.5배: 후반에는 용병술이 더 중요하도록). 관통·발사 수는 개수라 그대로다. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.375, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.1,
+  hp: 0.375, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.04,
 };
 /** 수치 조정 도구로 바꿀 수 있는 카드 설정 */
 export const CARD_TUNE = { globalFactor: 0.35, globalLifesteal: 5, globalWeight: 6, legendWeight: 0.6, bloodthirstWeight: 1.6, legendMinLevel: 6 };
@@ -194,6 +194,7 @@ const EFFICIENCY_NOTE: Partial<Record<string, string>> = {
   defense: " (받는 피해가 1/(1+합)배 — 쌓아도 체력 증가와 같은 효율, 상한 없음)",
   dodge: " (회피 확률 합/(1+합) — 쌓아도 체력 증가와 같은 효율, 상한 없음)",
   respawn: " (부활 시간 1/(1+합)배 — 상한 없음)",
+  atkSpeed: " (공격 사이의 대기가 짧아짐 — 마법사는 주문 뒤 후딜레이가 짧아짐)",
   cast: " (주문 시간 1/(1+합)배 — 상한 없음)",
   skill: " (스페이스 스킬 쿨타임 1/(1+합)배 — 쌓아도 체력 증가와 같은 효율, 상한 없음)",
 };
@@ -276,7 +277,7 @@ export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "
   { k: "heroDodge", label: "회피율", base: 0.18, weight: 5, fmt: "pct" },
   { k: "heroRegen", label: "체력 재생", base: 0.12, weight: 9, fmt: "regen" },
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
-  { k: "heroCast", label: "시전 속도", base: 0.075, weight: 4, fmt: "pct" },
+  { k: "heroCast", label: "시전 속도", base: 0.03, weight: 4, fmt: "pct" },
   { k: "heroSkill", label: "스킬 가속", base: 0.06, weight: 5, fmt: "pct" }, // 일반 +4%(희귀 x1.6, 영웅 x2.4), 쿨타임 1/(1+합)배
   { k: "heroSkillPow", label: "스킬 효과", base: 0.12, weight: 5, fmt: "pct" }, // 일반 +8%(희귀 x1.6, 영웅 x2.4)
   { k: "heroShield", label: "방패 체력", base: 60, weight: 5, fmt: "flat" },

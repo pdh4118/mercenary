@@ -109,6 +109,7 @@ export const TUNE = {
   SPEAR_HALF_WIDTH_NEAR: 15, // 몸 바로 앞의 반폭(px)
   SPEAR_HALF_WIDTH_FAR: 15, // 사거리 끝의 반폭(px)
   CAV_HALF_WIDTH: 20, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
+  HERO_HP_PER_LEVEL: 10, // 주인공 레벨업 1회당 최대 체력 증가
   PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s
   SKILL_CD_BOW: 10, // 스페이스 스킬 쿨타임(초, 모두 10초로 통일): 활(후퇴)
@@ -255,7 +256,7 @@ export const MERC_STATS: readonly UnitStats[] = [
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 225, speed: 75, reach: 40, damage: 32.4, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
   // 마법사: 느리고 약하지만 2초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
-  { hp: 88, speed: 65, reach: 280, damage: 70, windup: 3, cooldown: 1.5, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 120 },
+  { hp: 88, speed: 65, reach: 280, damage: 56, windup: 3, cooldown: 3, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 96 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
@@ -461,7 +462,7 @@ export const TENT = {
   lifeSec: 80,
   firstSec: 25,
   intervalSec: 30,
-  max: 2,
+  max: 1,
   healPerSec: 0.1, // 최대 체력의 비율(초당)
   respawnBoost: 2, // 쓰러진 용병은 부활 시간이 이 배수만큼 더 빨리 준다
 } as const;

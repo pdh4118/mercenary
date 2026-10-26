@@ -18,9 +18,9 @@ export const TIER_REACH = [0, 0, 0.1, 0, 0, 0] as const;
 /** 창병: 카운터 피해 배율(단계마다), 기병: 돌격 피해 배율(단계마다), 마법사: 시전 시간 감소(단계마다) */
 export const TIER_COUNTER = [0, 0.1, 0, 0, 0, 0] as const;
 export const TIER_CHARGE = [0.1, 0, 0, 0, 0, 0] as const;
-export const TIER_CAST = [0, 0, 0, 0, 0, 0.05] as const;
+export const TIER_CAST = [0, 0, 0, 0, 0, 0.02] as const;
 export const TIER_SHIELD = [0, 0, 0, 0.15, 0, 0] as const;
-export const TIER_AREA = [0, 0, 0, 0, 0.08, 0.05] as const;
+export const TIER_AREA = [0, 0, 0, 0, 0.08, 0.125] as const;
 /** 강화 비용 = 고용 기본 가격 x 이 배율(현재 단계 → 다음 단계) */
 export const UPGRADE_COST_MULT = [1.2, 2.2, 3.6, 5.5] as const;
 
