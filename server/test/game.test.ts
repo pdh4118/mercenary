@@ -147,10 +147,11 @@ test("적은 플레이어 둘레 화면 밖에서 생성되고 상한을 넘지 
 
 test("적은 여러 병종으로 생성된다", () => {
   const g = new Game(() => Math.random());
-  g.addPlayer("a");
-  run(g, 60);
+  const a = g.addPlayer("a")!;
+  g.getPlayer(a)!.invuln = 1e9; // 오래 지켜보는 동안 쓰러지지 않게
+  run(g, 120);
   const types = new Set(g.snapshotEnemies().map((e) => e[4]));
-  assert.ok(types.size >= 4);
+  assert.ok(types.size >= 4, `병종 ${types.size}종`);
 });
 
 // --- 주인공 공격과 골드 -------------------------------------------------------

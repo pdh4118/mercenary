@@ -24,6 +24,8 @@ import {
   WEAPONS,
   ENEMY_STATS,
   BOSS_SIZE,
+  BOSS_SIZE_BASE,
+  bossBasicStats,
   EVT_ARROW_HIT,
   EVT_ENEMY_ARROW_HIT,
   EVT_REVIVE,
@@ -1999,7 +2001,8 @@ async function main() {
         // 스킬을 쓰는 중에는 장군이 바라보는 쪽(서버 방향)으로 그림을 돌린다: 방패·창이 엉뚱한 쪽에 보이지 않게
         if ((w[13] ?? 0) > 0 || ((w[14] ?? 0) & 4) !== 0 || w[4] === SHIELD) v.face = Math.cos(w[8] ?? 0) >= 0 ? 1 : -1; // 방패 장군은 늘 방패 호(서버 방향)와 같은 쪽을 본다
         v.sprite.texture = v.art.pose(w[13] ?? 0, w[14] ?? 0, w[5] > 0) ?? v.art.idle!;
-        v.sprite.scale.set(v.art.scale * v.face, v.art.scale);
+        const as = v.art.scale * (BOSS_SIZE / BOSS_SIZE_BASE); // 장군 크기 배율이 바뀐 만큼 그림도 키운다
+        v.sprite.scale.set(as * v.face, as);
       } else if (((w[14] ?? 0) & EF_SUPPLY) !== 0 && bossFx.supply.idle) {
         // 군량병: 도망칠 때는 달리는 그림, 멈추면 서 있는 그림, 맞은 직후에는 놀란 그림
         const sv = v as unknown as { px?: number; py?: number; hp?: number; hurtT?: number; runT?: number };
@@ -2297,7 +2300,8 @@ async function main() {
       if (w[5] <= 0) continue;
       const v = enemies.views.get(w[0]);
       const st = ENEMY_STATS[w[4]]!;
-      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[6], st.reach, st.arc, st.ranged, w[5], 0xff3b3b, w[4] === 0 || w[4] === SPEAR_TYPE ? w[4] : -1, ENEMY_BOX_WIDTH_MULT[w[4]!]); // 적 마법사의 예고는 낙하 지점 표시가 대신한다
+      const bst = w[11] === 1 ? bossBasicStats(w[4]!) : st; // 장군은 기본 공격 사거리·각도가 더 크다
+      if (v && w[4] !== MAGE_TYPE) drawTelegraph(v.x, v.y, w[6], bst.reach, bst.arc, bst.ranged, w[5], 0xff3b3b, w[4] === 0 || w[4] === SPEAR_TYPE ? w[4] : -1, ENEMY_BOX_WIDTH_MULT[w[4]!]); // 적 마법사의 예고는 낙하 지점 표시가 대신한다
     }
     for (const w of latest.mercs) {
       if (w[5] === undefined || w[6] <= 0) continue;

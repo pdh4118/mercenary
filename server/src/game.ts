@@ -51,6 +51,8 @@ import {
   EVT_DMG_ENEMY_CRIT,
   EVT_DMG_SHIELD,
   BOSS_SIZE,
+  BOSS_BASIC,
+  bossBasicStats,
   BOSS_SPEED_MULT,
   EVT_ARROW_HIT,
   EVT_ENEMY_ARROW_HIT,
@@ -1859,6 +1861,7 @@ export class Game {
     t.step = "intro";
     t.t = TUNE.TOURNAMENT_INTRO_SEC;
     t.winner = "";
+    this.duelPoison.clear(); // 이전 전투에서 걸린 독이 경기에 이어지지 않게 한다
     let spectator = 0;
     const spectators = [...this.slots.values()].filter((s) => s.state.id !== mt.a && s.state.id !== mt.b);
     for (const s of this.slots.values()) {
@@ -5018,7 +5021,7 @@ export class Game {
         this.stepSupply(e, dt, friendlies);
         continue;
       }
-      const st = ENEMY_STATS[e.type]!;
+      const st = e.boss ? bossBasicStats(e.type) : ENEMY_STATS[e.type]!; // 장군의 기본 공격은 더 멀리·넓게·세게 나간다
       this.regenShield(e, e.shieldMax, dt);
       e.cd = Math.max(0, e.cd - dt);
 
@@ -5311,8 +5314,8 @@ export class Game {
         id: this.nextEntityId++,
         x: e.x,
         y: e.y,
-        vx: Math.cos(e.atkAng) * ENEMY_ARROW_SPEED,
-        vy: Math.sin(e.atkAng) * ENEMY_ARROW_SPEED,
+        vx: Math.cos(e.atkAng) * ENEMY_ARROW_SPEED * (e.boss ? BOSS_BASIC.arrowSpeed : 1),
+        vy: Math.sin(e.atkAng) * ENEMY_ARROW_SPEED * (e.boss ? BOSS_BASIC.arrowSpeed : 1),
         left: st.reach * ENEMY_ARROW_RANGE_FACTOR,
         hostile: true,
         damage: st.damage * e.dmgMult,

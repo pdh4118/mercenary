@@ -390,7 +390,8 @@ export const SQUAD_SPAWN_DISTANCE = 700;
 export const SQUAD_MARCH_MULT = 1.3; // 보스군보다 빠르게 행군한다
 export const SQUAD_CLEAR_GOLD = 4; // 소대를 전멸시키면 병사 1명당 모든 플레이어가 받는 금화
 export const BOSS_TYPES = [CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, ARCHER, CAVALRY, SPEAR, BLUNT] as const;
-export const BOSS_SIZE = 1.7; // 반경·그림 크기 배율
+export const BOSS_SIZE_BASE = 1.7; // 장군 그림 크기를 정할 때 기준이 된 예전 배율(그림 배율은 BOSS_SIZE / 이 값만큼 키운다)
+export const BOSS_SIZE = 2.1; // 반경·그림 크기 배율
 export const BOSS_SPEED_MULT = 0.9;
 
 // 보스를 못 잡아도 보스군이 나타난 지 이만큼 지나면 다음 스테이지로 넘어간다(보스군은 사라지고 보상은 없다). 마지막 스테이지는 예외.
@@ -464,3 +465,19 @@ export const TENT = {
   healPerSec: 0.1, // 최대 체력의 비율(초당)
   respawnBoost: 2, // 쓰러진 용병은 부활 시간이 이 배수만큼 더 빨리 준다
 } as const;
+
+/** 장군의 기본 공격: 같은 병종의 일반 적보다 사거리·범위·피해가 크고 대기시간이 짧으며, 화살은 더 빠르다. 궁수 계열은 사거리가 특히 길다. */
+export const BOSS_BASIC = {
+  meleeReach: 1.4, // 근접 사거리 배율
+  rangedReach: 1.6, // 원거리(궁병·마법사) 사거리 배율
+  arc: 1.3, // 부채꼴 각도 배율
+  splash: 1.3, // 범위 공격 반경 배율
+  damage: 1.25, // 기본 공격 피해 배율(보스 피해 배율에 더해서)
+  cooldown: 0.85, // 공격 대기시간 배율
+  arrowSpeed: 1.5, // 화살 속도 배율
+};
+export function bossBasicStats(type: number): UnitStats {
+  const base = ENEMY_STATS[type]!;
+  const B = BOSS_BASIC;
+  return { ...base, reach: base.reach * (base.ranged ? B.rangedReach : B.meleeReach), arc: Math.min(Math.PI, base.arc * B.arc), splash: base.splash * B.splash, damage: base.damage * B.damage, cooldown: base.cooldown * B.cooldown };
+}

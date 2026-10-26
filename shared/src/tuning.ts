@@ -6,7 +6,7 @@ import { WEAPONS, DIFFICULTY_REDUCTION, DIFFICULTY_NAMES } from "./index.js";
 import { CARD_TUNE, HERO_STATS, LEGEND_CONST, MERC_STAT_BASE, MERC_STAT_LABEL, RARITY, RARITY_NAMES, SCALE_CARD, rebuildCards, type MercStat } from "./cards.js";
 import { SUPPLY, BOSS_CAV, BOSS_SPEAR, BOSS_ARCHER, BOSS_SHIELD, BOSS_BLUNT, BOSS_MAGE, BOSS_MOUNT, BOSS_CHARIOT, BOSS_NECRO } from "./bossskill.js";
 import { BOSS_LABELS } from "./bosslabels.js";
-import { TENT } from "./rules.js";
+import { TENT, BOSS_BASIC } from "./rules.js";
 
 export interface TuneDef {
   key: string;
@@ -328,6 +328,16 @@ function build(): Map<string, Entry> {
     max: ["동시에 있는 텐트 최대 수", 1, 10, 1],
     healPerSec: ["쉬는 동안 초당 회복(최대 체력 비율)", 0, 1, 0.01, "%", 100],
     respawnBoost: ["쉬는 동안 용병 부활 속도 배수", 1, 10, 0.1, "배"],
+  });
+
+  objEntries("BOSS_BASIC", BOSS_BASIC, "보스", "장군 기본 공격", {
+    meleeReach: ["근접 사거리 배율", 0.5, 4, 0.05, "배"],
+    rangedReach: ["원거리(궁병·마법사) 사거리 배율", 0.5, 4, 0.05, "배"],
+    arc: ["부채꼴 각도 배율", 0.5, 3, 0.05, "배"],
+    splash: ["범위 공격 반경 배율", 0.5, 4, 0.05, "배"],
+    damage: ["기본 공격 피해 배율", 0.2, 5, 0.05, "배"],
+    cooldown: ["공격 대기시간 배율(작을수록 빠름)", 0.2, 2, 0.05, "배"],
+    arrowSpeed: ["화살 속도 배율", 0.5, 4, 0.05, "배"],
   });
 
   // --- 보스 스킬 수치(자동 이름표: shared/src/bosslabels.ts) ---
