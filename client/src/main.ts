@@ -885,7 +885,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 주인공 호위 · F2 위치 고수 · F3 돌격 · F4 보호 진형 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1625,7 +1625,7 @@ async function main() {
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === "INPUT" || tag === "SELECT") return; // 이름·간격 입력 중에는 게임 키로 쓰지 않는다
     const k = e.key.toLowerCase();
-    // F1 주인공 호위 · F2 위치 고수(지금 주인공이 서 있는 곳에 깃발을 꽂는다) · F3 돌격 · F4 보호 진형
+    // F1 기본 · F2 수비(지금 주인공이 서 있는 곳에 깃발을 꽂는다) · F3 돌격 · F4 호위 · F5 산개
     if (/^F[1-5]$/.test(e.key) && !e.repeat) {
       e.preventDefault();
       const me = latest?.players.find((p) => p.id === myId);
@@ -1680,7 +1680,7 @@ async function main() {
     }
     if (k === "v" && !e.repeat) {
       const cur = selectedStance(latest?.players.find((p) => p.id === myId));
-      setStance(cur === 0 ? 2 : cur === 2 ? 1 : cur === 1 ? 3 : cur === 3 ? 4 : 0); // 주인공 호위 → 위치 고수(마지막으로 정한 지점) → 돌격 → 보호 진형 → 산개 → 주인공 호위
+      setStance(cur === 0 ? 2 : cur === 2 ? 1 : cur === 1 ? 3 : cur === 3 ? 4 : 0); // 기본 → 수비(마지막으로 정한 지점) → 돌격 → 호위 → 산개 → 기본
       return;
     }
     if (k === "t" && !e.repeat) {
