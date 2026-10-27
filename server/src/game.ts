@@ -177,6 +177,9 @@ import {
   TELE_CIRCLE,
   TELE_CONE,
   TELE_LINE,
+  HZ_FIRE,
+  HZ_RAIN,
+  HZ_DRAINRING,
   type TeleWire,
   type MatchRecord,
   BOSS_NECRO,
@@ -1145,6 +1148,10 @@ export class Game {
       }
     }
     const duel = this.phase === "tournament";
+    this.navBudget = 24;
+    this.dbg.length = 0;
+    this.trackEnemyVel(dt);
+    this.updateDanger();
     this.terrainBegin();
     this.stepPlayers(dt);
     this.stepStage(dt);
@@ -3607,6 +3614,16 @@ export class Game {
         widthMult: boxWidthMult(m.type, st.arc),
       };
       const ordNow = m.type === CAVALRY ? null : ownerSlot?.orders[m.type] ?? null;
+      if (!duel && this.danger.length > 0 && !ordNow) {
+        // 보스의 위험 구역(예고 모양·불길·고리)에 걸쳐 있으면 하던 일보다 먼저 벗어난다(우클릭 지시는 그대로 따른다)
+        const esc = this.dangerEscape(m.x, m.y, st.radius, m.id);
+        if (esc) {
+          m.x += esc[0] * st.speed * 1.15 * dt;
+          m.y += esc[1] * st.speed * 1.15 * dt;
+          if (this.dbgOn) this.dbg.push([4, Math.round(m.x), Math.round(m.y), 0, 0]);
+          continue;
+        }
+      }
       if (ordNow) {
         c.ordered = true;
         this.aiOrdered(c, ordNow); // 우클릭 지시는 어떤 병종 AI(아군 지키기·물러나기·진형 복귀)보다 앞선다
@@ -3716,7 +3733,36 @@ export class Game {
     const { m, st } = c;
     if (m.type === SPEAR) return inSpearBox(m.x, m.y, Math.atan2(t.y - m.y, t.x - m.x), t.x, t.y, t.r, st.reach, c.widthMult);
     const d = Math.hypot(t.x - m.x, t.y - m.y);
+    if (m.type === ARCHER) return d <= st.reach && this.arrowClear(m, t);
     return st.ranged ? d <= st.reach : d <= st.reach + t.r;
+  }
+
+  /** 화살이 바위·폐허에 막히지 않고 대상까지 가는가 */
+  private arrowClear(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+    return !this.terrain || this.terrain.lineClear(a.x, a.y, b.x, b.y, 3, true);
+  }
+
+  /** 궁병: 더 높은 곳(고지대 윗면)이 가까이 있으면 올라가 쏜다(높은 곳에서 아래로 쏘면 화살이 세다). 길은 moveToward가 올라가는 길로 안내한다. */
+  private seekHighGround(c: AiCtx, target: Target): boolean {
+    const t = this.terrain;
+    const { m, st } = c;
+    if (!t || t.plateaus.length === 0 || t.elevated(m.x, m.y) || c.assault || c.fort) return false;
+    let best: { x: number; y: number } | null = null;
+    let bd = 230;
+    for (const p of t.plateaus) {
+      if (!t.liveObj(p.obj)) continue;
+      for (const top of p.tops) {
+        const d = Math.hypot(top.x - m.x, top.y - m.y);
+        if (d >= bd) continue;
+        if (Math.hypot(top.x - target.x, top.y - target.y) > st.reach * 0.9) continue; // 올라가서도 쏠 수 있는 거리여야 한다
+        if (Math.hypot(top.x - c.home[0], top.y - c.home[1]) > c.leash + 120) continue;
+        bd = d;
+        best = top;
+      }
+    }
+    if (!best) return false;
+    this.moveToward(m, best.x, best.y, st.speed, c.dt, 18);
+    return true;
   }
 
   /** 칠 수 있는 대상 중 병종 성향(둔기병은 방패 든 적, 창병은 기병, 궁병은 방패 정면이 아닌 적)을 반영해 가장 알맞은 것 */
@@ -4000,7 +4046,12 @@ export class Game {
       m.y += Math.sin(ang + Math.PI) * st.speed * 1.05 * dt;
       return;
     }
+    if (!this.arrowClear(m, target)) {
+      this.moveToward(m, target.x, target.y, st.speed, dt, desired * 0.5); // 바위·폐허가 화살을 막으면 사선이 트이는 곳으로 돌아간다
+      return;
+    }
     if (m.cd <= 0) this.startAttack(m, st, ang);
+    else if (this.seekHighGround(c, target)) return;
   }
 
   /** 둔기병: 방패 든 검방병을 먼저 노린다(방패 특화). 준비 동작이 길어 가까이 붙은 뒤 한 방을 내리친다. */
@@ -4270,7 +4321,14 @@ export class Game {
     }
     const len = Math.hypot(dx, dy) || 1;
     const step = Math.min(speed * dt, dist - stop);
-    const [ux, uy] = this.detour(m, dx / len, dy / len, step, dt);
+    const [wx, wy] = this.navGoal(m, gx, gy);
+    let [ux, uy] = [dx / len, dy / len];
+    if (wx !== gx || wy !== gy) {
+      const wl = Math.hypot(wx - m.x, wy - m.y) || 1; // 길을 돌아가야 하면 그 방향으로(창병 회피는 접어 둔다)
+      [ux, uy] = [(wx - m.x) / wl, (wy - m.y) / wl];
+    }
+    [ux, uy] = this.detour(m, ux, uy, step, dt);
+    this.dbgGoal(m, gx, gy);
     m.x += ux * step;
     m.y += uy * step;
     return true;
@@ -4287,10 +4345,164 @@ export class Game {
     const d = Math.hypot(tx - f.x, ty - f.y);
     if (d <= stop) return false;
     const step = Math.min(speed * dt, d - stop);
-    const [ux, uy] = this.detour(f, (tx - f.x) / d, (ty - f.y) / d, step, dt);
+    const [wx, wy] = this.navGoal(f, tx, ty);
+    const wd = Math.hypot(wx - f.x, wy - f.y) || 1;
+    const [ux, uy] = this.detour(f, (wx - f.x) / wd, (wy - f.y) / wd, step, dt);
+    this.dbgGoal(f, tx, ty);
     f.x += ux * step;
     f.y += uy * step;
     return true;
+  }
+
+  // --- AI 보조: 위험 구역 회피 · 적 속도 추적 · 디버그 ------------------------------------
+
+  /** 개발용 AI 표시(F9). 켜져 있으면 개체의 목표 지점·길·위험 구역을 상태에 실어 보낸다. */
+  dbgOn = false;
+  private dbg: number[][] = [];
+  private dbgKind(f: object): number {
+    const id = (f as { id?: number }).id;
+    return id !== undefined && this.mercs.has(id) ? 0 : 1;
+  }
+  private dbgGoal(f: { x: number; y: number }, tx: number, ty: number): void {
+    if (this.dbgOn && this.dbg.length < 600) this.dbg.push([this.dbgKind(f), Math.round(f.x), Math.round(f.y), Math.round(tx), Math.round(ty)]);
+  }
+  private dbgPath(f: { x: number; y: number }, wx: number, wy: number): void {
+    if (this.dbgOn && this.dbg.length < 600) this.dbg.push([2, Math.round(f.x), Math.round(f.y), Math.round(wx), Math.round(wy)]);
+  }
+  snapshotDebug(): number[][] | undefined {
+    return this.dbgOn ? this.dbg : undefined;
+  }
+
+  /** 적의 이동 속도(px/s, 부드럽게): 마법사가 움직이는 적 앞을 겨누는 데 쓴다 */
+  private eVel = new Map<number, [number, number, number, number]>();
+  private trackEnemyVel(dt: number): void {
+    for (const e of this.enemies.values()) {
+      const old = this.eVel.get(e.id);
+      if (!old) {
+        this.eVel.set(e.id, [e.x, e.y, 0, 0]);
+        continue;
+      }
+      let vx = (e.x - old[0]) / dt;
+      let vy = (e.y - old[1]) / dt;
+      const sp = Math.hypot(vx, vy);
+      if (sp > 400) {
+        vx = (vx / sp) * 400; // 순간이동 같은 큰 변화는 속도로 보지 않는다
+        vy = (vy / sp) * 400;
+      }
+      old[2] += (vx - old[2]) * 0.25;
+      old[3] += (vy - old[3]) * 0.25;
+      old[0] = e.x;
+      old[1] = e.y;
+    }
+    if (this.eVel.size > this.enemies.size + 50) for (const id of [...this.eVel.keys()]) if (!this.enemies.has(id)) this.eVel.delete(id);
+  }
+
+  /** 보스의 위험 구역(불길·화살비 예고·생명 흡수 고리와 스킬 예고 모양). 용병이 피해 서기 위한 목록으로, 매 틱 다시 만든다. */
+  private danger: ({ k: "c"; x: number; y: number; r: number } | { k: "l"; x: number; y: number; ang: number; len: number; w: number } | { k: "s"; x: number; y: number; ang: number; half: number; r: number } | { k: "b"; x: number; y: number; r0: number; r1: number })[] = [];
+  private updateDanger(): void {
+    this.danger.length = 0;
+    if (this.phase !== "boss" && this.boss.hazards.length === 0) return;
+    for (const h of this.boss.hazards) {
+      if (h.t <= 0 && h.delay <= 0) continue;
+      if (h.kind === HZ_FIRE || h.kind === HZ_DRAINRING || (h.kind === HZ_RAIN && h.delay > 0)) this.danger.push({ k: "c", x: h.x, y: h.y, r: h.a });
+    }
+    if (this.phase === "boss") {
+      for (const w of this.boss.snapshotTele()) {
+        const [kind, x, y, ang, a, b] = w as unknown as number[];
+        if (kind === TELE_CIRCLE) this.danger.push({ k: "c", x: x!, y: y!, r: a! });
+        else if (kind === TELE_LINE) this.danger.push({ k: "l", x: x!, y: y!, ang: ang!, len: a!, w: b! });
+        else if (kind === TELE_CONE) this.danger.push({ k: "s", x: x!, y: y!, ang: ang!, half: a!, r: b! });
+        else if (kind === TELE_BAND) this.danger.push({ k: "b", x: x!, y: y!, r0: a!, r1: b! });
+      }
+    }
+    if (this.dbgOn) for (const z of this.danger) if (z.k === "c") this.dbg.push([3, Math.round(z.x), Math.round(z.y), Math.round(z.r), 0]);
+  }
+
+  /** (x,y)의 몸(반지름 r)이 위험 구역 안이거나 가까우면, 그곳에서 벗어나는 단위 방향을 돌려준다 */
+  private dangerEscape(x: number, y: number, r: number, id: number): [number, number] | null {
+    const M = 24; // 여유
+    let ex = 0;
+    let ey = 0;
+    let hit = false;
+    for (const z of this.danger) {
+      if (z.k === "c") {
+        const d = Math.hypot(x - z.x, y - z.y);
+        if (d >= z.r + r + M) continue;
+        const nx = d > 0.001 ? (x - z.x) / d : Math.cos(id);
+        const ny = d > 0.001 ? (y - z.y) / d : Math.sin(id);
+        ex += nx;
+        ey += ny;
+        hit = true;
+      } else if (z.k === "l") {
+        const cs = Math.cos(z.ang);
+        const sn = Math.sin(z.ang);
+        const u = (x - z.x) * cs + (y - z.y) * sn;
+        const v = -(x - z.x) * sn + (y - z.y) * cs;
+        if (u < -r || u > z.len + r || Math.abs(v) >= z.w / 2 + r + M) continue;
+        const sg = v === 0 ? (id & 1 ? 1 : -1) : Math.sign(v);
+        ex += -sn * sg;
+        ey += cs * sg;
+        hit = true;
+      } else if (z.k === "s") {
+        const d = Math.hypot(x - z.x, y - z.y);
+        if (d >= z.r + r + M) continue;
+        let da = Math.atan2(y - z.y, x - z.x) - z.ang;
+        while (da > Math.PI) da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        if (Math.abs(da) > z.half + (r + M) / Math.max(40, d)) continue;
+        const sg = da === 0 ? (id & 1 ? 1 : -1) : Math.sign(da);
+        const a2 = z.ang + sg * Math.PI / 2; // 부채꼴의 옆으로 빠진다
+        ex += Math.cos(a2);
+        ey += Math.sin(a2);
+        hit = true;
+      } else {
+        const d = Math.hypot(x - z.x, y - z.y);
+        if (d <= z.r0 - r - M || d >= z.r1 + r + M) continue;
+        const out = d > (z.r0 + z.r1) / 2 ? 1 : -1;
+        const nx = d > 0.001 ? (x - z.x) / d : 1;
+        const ny = d > 0.001 ? (y - z.y) / d : 0;
+        ex += nx * out;
+        ey += ny * out;
+        hit = true;
+      }
+    }
+    if (!hit) return null;
+    const l = Math.hypot(ex, ey);
+    return l < 0.001 ? [Math.cos(id), Math.sin(id)] : [ex / l, ey / l];
+  }
+
+  private navs = new WeakMap<object, { path: [number, number][]; tx: number; ty: number; age: number }>();
+  private navBudget = 0;
+
+  /**
+   * 길 찾기: 목표로 곧장 가는 길이 바위·산·절벽에 막혀 있으면 격자 A*로 찾은 다음 꺾이는 지점을 돌려준다(막히지 않았으면 목표 그대로).
+   * 개체마다 찾은 길을 기억하고, 1초가 지나거나 목표가 크게 움직이면 다시 찾는다. 한 틱에 찾는 횟수는 제한한다.
+   */
+  private navGoal(f: { x: number; y: number }, tx: number, ty: number): [number, number] {
+    const t = this.terrain;
+    if (!t || t.solids.length === 0) return [tx, ty];
+    const d = Math.hypot(tx - f.x, ty - f.y);
+    const look = Math.min(d, 420);
+    const lx = f.x + ((tx - f.x) / (d || 1)) * look;
+    const ly = f.y + ((ty - f.y) / (d || 1)) * look;
+    if (t.lineClear(f.x, f.y, lx, ly, 12)) {
+      this.navs.delete(f);
+      return [tx, ty];
+    }
+    let st = this.navs.get(f);
+    const stale = !st || st.age > 1 || Math.hypot(st.tx - tx, st.ty - ty) > 160;
+    if (stale && this.navBudget > 0) {
+      this.navBudget--;
+      const path = t.findPath(f.x, f.y, tx, ty, 12);
+      st = { path: path ?? [], tx, ty, age: 0 };
+      this.navs.set(f, st);
+    }
+    if (!st) return [tx, ty];
+    st.age += 1 / TICK_RATE;
+    while (st.path.length > 0 && Math.hypot(st.path[0]![0] - f.x, st.path[0]![1] - f.y) < 36) st.path.shift();
+    const w = st.path[0];
+    if (w) this.dbgPath(f, w[0], w[1]);
+    return w ? [w[0], w[1]] : [tx, ty];
   }
 
   private detours = new WeakMap<object, { side: number; lx: number; ly: number; t: number; commit: number }>();
@@ -4321,6 +4533,7 @@ export class Game {
       return true;
     };
     st.commit = Math.max(0, st.commit - dt);
+    if (this.dbgOn && st.commit > 0) this.dbg.push([5, Math.round(f.x), Math.round(f.y), 0, 0]);
     if (st.commit <= 0 && clear(ux, uy)) return [ux, uy];
     const base = Math.atan2(uy, ux);
     for (const deg of [35, 70, 105, 140]) {
@@ -4581,8 +4794,25 @@ export class Game {
     return [bx, by];
   }
 
-  private enemyPoints(): { x: number; y: number; w: number }[] {
-    return [...this.enemies.values()].map((e) => ({ x: e.x, y: e.y, w: e.boss ? 6 : e.type === ARCHER ? 1.4 : 1 }));
+  /** 적들의 위치(가중치 포함). lead초 뒤의 예상 위치로 치면 움직이는 적 앞을 겨눈다(한 번에 150px까지만 앞선다). */
+  private enemyPoints(lead = 0): { x: number; y: number; w: number }[] {
+    return [...this.enemies.values()].map((e) => {
+      let x = e.x;
+      let y = e.y;
+      const v = lead > 0 ? this.eVel.get(e.id) : undefined;
+      if (v) {
+        let dx = v[2] * lead;
+        let dy = v[3] * lead;
+        const dl = Math.hypot(dx, dy);
+        if (dl > 150) {
+          dx *= 150 / dl;
+          dy *= 150 / dl;
+        }
+        x += dx;
+        y += dy;
+      }
+      return { x, y, w: e.boss ? 6 : e.type === ARCHER ? 1.4 : 1 };
+    });
   }
 
   /** 용병 마법사가 주문을 외우는 동안(낙하 직전까지) 가장 빽빽한 곳으로 낙하 지점을 천천히 옮긴다 */
@@ -4592,7 +4822,7 @@ export class Game {
     cast.scanT = (cast.scanT ?? 0) - dt;
     if (cast.scanT > 0) return;
     cast.scanT = 0.3;
-    const spot = this.meteorSpot(m, st.reach, cast.radius, this.enemyPoints());
+    const spot = this.meteorSpot(m, st.reach, cast.radius, this.enemyPoints(Math.min(1.5, m.atkT)));
     if (!spot) return;
     const dx = spot[0] - cast.x;
     const dy = spot[1] - cast.y;
@@ -4652,8 +4882,9 @@ export class Game {
       m.y += (ay / ll) * step;
       return;
     }
+    const duel0 = this.phase === "tournament";
     if (m.cd <= 0 && c.targets.length > 0) {
-      const spot = this.meteorSpot(m, st.reach, st.splash, c.targets.map((t) => ({ x: t.x, y: t.y, w: t.hero ? 3 : 1 })));
+      const spot = this.meteorSpot(m, st.reach, st.splash, duel0 ? c.targets.map((t) => ({ x: t.x, y: t.y, w: t.hero ? 3 : 1 })) : this.enemyPoints(1.5));
       if (spot) {
         m.atkT = st.windup;
         m.atkAng = Math.atan2(spot[1] - m.y, spot[0] - m.x);
@@ -5073,6 +5304,9 @@ export class Game {
     const foes = this.buildFoes(friendlies, dt);
     const archers: Enemy[] = [];
     for (const o of this.enemies.values()) if (o.type === ARCHER) archers.push(o);
+    const load = new Map<Foe, number>(); // 근접 적이 한 대상에게만 몰리지 않도록, 이미 붙은 적의 수만큼 그 대상을 덜 노린다
+    const hardOf = new Map<number, number>(); // 플레이어별 난이도(받는 피해 감소가 적을수록 어렵다): 어려울수록 약한 원거리 아군을 노린다
+    for (const sl of this.slots.values()) hardOf.set(sl.state.id, 1 - (DIFFICULTY_REDUCTION[sl.difficulty] ?? 0));
     for (const e of [...this.enemies.values()]) {
       if (this.tickPoison(e, dt)) continue;
       if (e.buffT && e.buffT > 0) {
@@ -5119,7 +5353,10 @@ export class Game {
         for (const f of foes) {
           const d = Math.hypot(f.x - e.x, f.y - e.y);
           if (home !== null && d > aggro) continue;
-          const sc = d / this.enemyTargetWeight(e, f, d);
+          let w = this.enemyTargetWeight(e, f, d);
+          if (f.ranged && f.type !== NO_TYPE && !e.boss) w *= 1 + 0.5 * (hardOf.get(f.f.merc ? f.f.merc.owner : f.f.ownerId) ?? 0.5);
+          const crowd = !st.ranged && !e.boss ? 1 + 0.3 * (load.get(f) ?? 0) : 1;
+          const sc = (d / w) * crowd;
           if (sc < best) {
             best = sc;
             targetDist = d;
@@ -5127,6 +5364,7 @@ export class Game {
           }
         }
       }
+      if (target && !st.ranged && !e.boss) load.set(target, (load.get(target) ?? 0) + 1);
       if (!target) {
         // 진형 소속은 자리를 지키며 대열과 함께 움직인다
         if (home) {
@@ -5142,7 +5380,7 @@ export class Game {
       if (e.type === MAGE) {
         // 적 마법사: 쿨다운이 끝나면 사거리 안에서 아군이 가장 많이 모인 곳에 운석을 겨눈다(외우는 동안 멈춰 선다). 그 외에는 궁병처럼 거리를 유지한다.
         if (e.cd <= 0) {
-          const spot = this.meteorSpot(e, st.reach, st.splash, foes.map((f) => ({ x: f.x, y: f.y, w: f.type === NO_TYPE ? 3 : 1 })));
+          const spot = this.meteorSpot(e, st.reach, st.splash, foes.map((f) => ({ x: f.x + Math.max(-150, Math.min(150, f.vx * 1.5)), y: f.y + Math.max(-150, Math.min(150, f.vy * 1.5)), w: f.type === NO_TYPE ? 3 : 1 })));
           if (spot) {
             e.atkT = st.windup;
             e.atkAng = Math.atan2(spot[1] - e.y, spot[0] - e.x);
@@ -5152,6 +5390,10 @@ export class Game {
           }
         }
         this.enemyArcherMove(e, st, dt, foes, target, targetDist, speed);
+        continue;
+      }
+      if (st.ranged && !this.arrowClear(e, target) && targetDist <= st.reach * 1.2) {
+        this.moveToward(e, target.x, target.y, speed, dt, st.reach * 0.4); // 화살이 지형에 막히면 사선이 트일 때까지 돌아 들어간다
         continue;
       }
       const attackRange = st.ranged ? st.reach : st.reach + target.r * 0.5;
@@ -5360,7 +5602,14 @@ export class Game {
     }
     const len = Math.hypot(dx, dy) || 1;
     const step = Math.min(cavSpd * dt, dist);
-    const [ux, uy] = this.detour(e, dx / len, dy / len, step, dt);
+    let [ax, ay] = [dx / len, dy / len];
+    const [wx, wy] = this.navGoal(e, gx, gy);
+    if (wx !== gx || wy !== gy) {
+      const wl = Math.hypot(wx - e.x, wy - e.y) || 1;
+      [ax, ay] = [(wx - e.x) / wl, (wy - e.y) / wl];
+    }
+    const [ux, uy] = this.detour(e, ax, ay, step, dt);
+    this.dbgGoal(e, gx, gy);
     e.x += ux * step;
     e.y += uy * step;
     this.updateMomentum(e, true, dt);

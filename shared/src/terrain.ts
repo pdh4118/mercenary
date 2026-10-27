@@ -66,6 +66,11 @@ interface Plateau {
 }
 
 const CELL = 256;
+const NAV_CELL = 50; // 길 찾기 격자 한 칸(px)
+const NAV_WORLD = 4000; // 월드 한 변(WORLD_SIZE와 같다. index와 순환 참조가 생겨 따로 둔다)
+const NAV_HALF = NAV_WORLD / 2;
+const NAV_N = Math.ceil(NAV_WORLD / NAV_CELL);
+const NAV_BODY = 16; // 격자 칸이 막혔는지 볼 때 쓰는 몸 반지름
 const key = (cx: number, cy: number) => cx * 100003 + cy;
 
 /** 서버·클라이언트가 함께 쓰는 지형 조회·충돌 */
@@ -264,6 +269,140 @@ export class TerrainMap {
       }
     }
     return m;
+  }
+
+  /** 두 점 사이를 몸 반지름 r로 지나갈 수 있는가(단단한 지형에 걸리지 않는가) */
+  lineClear(x0: number, y0: number, x1: number, y1: number, r: number, arrowOnly = false): boolean {
+    if (this.solids.length === 0) return true;
+    const d = Math.hypot(x1 - x0, y1 - y0);
+    const n = Math.max(1, Math.ceil(d / 30));
+    for (let i = 1; i <= n; i++) if (this.hitsSolid(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n, r, arrowOnly)) return false;
+    return true;
+  }
+
+  private nav: { duel: boolean; blocked: Uint8Array } | null = null;
+  private navBlocked(): Uint8Array {
+    if (this.nav && this.nav.duel === this.duel) return this.nav.blocked;
+    const blocked = new Uint8Array(NAV_N * NAV_N);
+    for (let gy = 0; gy < NAV_N; gy++) for (let gx = 0; gx < NAV_N; gx++) if (this.hitsSolid((gx + 0.5) * NAV_CELL - NAV_HALF, (gy + 0.5) * NAV_CELL - NAV_HALF, NAV_BODY)) blocked[gy * NAV_N + gx] = 1;
+    this.nav = { duel: this.duel, blocked };
+    return blocked;
+  }
+
+  /**
+   * 단단한 지형을 피해 (x,y)에서 (tx,ty)로 가는 길을 격자 A*로 찾아, 꺾이는 지점(월드 좌표)들을 돌려준다. 곧장 갈 수 있으면 빈 배열, 길이 없으면 null.
+   * 곧장 가는 선이 막힌 경우에만 쓰도록 만든 것이라, 막히지 않았으면 바로 돌려준다.
+   */
+  findPath(x: number, y: number, tx: number, ty: number, r = 14): [number, number][] | null {
+    if (this.lineClear(x, y, tx, ty, r)) return [];
+    const blocked = this.navBlocked();
+    const cell = (v: number) => Math.max(0, Math.min(NAV_N - 1, Math.floor((v + NAV_HALF) / NAV_CELL)));
+    const sx = cell(x);
+    const sy = cell(y);
+    let gx = cell(tx);
+    let gy = cell(ty);
+    if (blocked[gy * NAV_N + gx]) {
+      // 목표가 지형 안이면 가장 가까운 빈 칸으로
+      let found = false;
+      for (let rad = 1; rad <= 6 && !found; rad++) {
+        for (let dy = -rad; dy <= rad && !found; dy++)
+          for (let dx = -rad; dx <= rad && !found; dx++) {
+            const nx = gx + dx;
+            const ny = gy + dy;
+            if (nx < 0 || ny < 0 || nx >= NAV_N || ny >= NAV_N || blocked[ny * NAV_N + nx]) continue;
+            gx = nx;
+            gy = ny;
+            found = true;
+          }
+      }
+      if (!found) return null;
+    }
+    const idx = (cx: number, cy: number) => cy * NAV_N + cx;
+    const g = new Float32Array(NAV_N * NAV_N).fill(Infinity);
+    const from = new Int32Array(NAV_N * NAV_N).fill(-1);
+    const closed = new Uint8Array(NAV_N * NAV_N);
+    const heap: [number, number][] = []; // [f, idx]
+    const push = (f: number, i: number) => {
+      heap.push([f, i]);
+      let k = heap.length - 1;
+      while (k > 0) {
+        const up = (k - 1) >> 1;
+        if (heap[up]![0] <= heap[k]![0]) break;
+        [heap[up], heap[k]] = [heap[k]!, heap[up]!];
+        k = up;
+      }
+    };
+    const pop = (): number => {
+      const top = heap[0]!;
+      const last = heap.pop()!;
+      if (heap.length > 0) {
+        heap[0] = last;
+        let k = 0;
+        for (;;) {
+          const l = k * 2 + 1;
+          const rr = l + 1;
+          let m = k;
+          if (l < heap.length && heap[l]![0] < heap[m]![0]) m = l;
+          if (rr < heap.length && heap[rr]![0] < heap[m]![0]) m = rr;
+          if (m === k) break;
+          [heap[m], heap[k]] = [heap[k]!, heap[m]!];
+          k = m;
+        }
+      }
+      return top[1];
+    };
+    const h = (cx: number, cy: number) => Math.hypot(cx - gx, cy - gy);
+    g[idx(sx, sy)] = 0;
+    push(h(sx, sy), idx(sx, sy));
+    const goal = idx(gx, gy);
+    let expanded = 0;
+    while (heap.length > 0 && expanded < 6000) {
+      const cur = pop();
+      if (closed[cur]) continue;
+      closed[cur] = 1;
+      expanded++;
+      if (cur === goal) break;
+      const cx = cur % NAV_N;
+      const cy = (cur / NAV_N) | 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= NAV_N || ny >= NAV_N) continue;
+          const ni = idx(nx, ny);
+          if (closed[ni] || (blocked[ni] && ni !== idx(sx, sy))) continue;
+          if (dx && dy && (blocked[idx(cx + dx, cy)] || blocked[idx(cx, cy + dy)])) continue; // 모서리를 비스듬히 스치지 않는다
+          const ng = g[cur]! + (dx && dy ? 1.414 : 1);
+          if (ng < g[ni]!) {
+            g[ni] = ng;
+            from[ni] = cur;
+            push(ng + h(nx, ny), ni);
+          }
+        }
+    }
+    if (!closed[goal]) return null;
+    const cells: [number, number][] = [];
+    for (let i = goal; i !== -1 && i !== idx(sx, sy); i = from[i]!) cells.push([(i % NAV_N + 0.5) * NAV_CELL - NAV_HALF, (((i / NAV_N) | 0) + 0.5) * NAV_CELL - NAV_HALF]);
+    cells.reverse();
+    // 곧게 이어지는 구간을 줄인다(가장 먼 보이는 지점으로 건너뛴다)
+    const out: [number, number][] = [];
+    let ax = x;
+    let ay = y;
+    let k = 0;
+    while (k < cells.length) {
+      let far = k;
+      for (let j = cells.length - 1; j > k; j--) {
+        if (this.lineClear(ax, ay, cells[j]![0], cells[j]![1], r)) {
+          far = j;
+          break;
+        }
+      }
+      out.push(cells[far]!);
+      [ax, ay] = cells[far]!;
+      k = far + 1;
+    }
+    return out;
   }
 
   /** 무엇이든 놓기 곤란한 곳인가(캠프·보상 상자 자리 고르기용): 단단한 지형이거나 고지대 */

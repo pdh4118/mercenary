@@ -327,10 +327,12 @@ async function main() {
   const recoverLabel = new Text({ text: "", style: { fill: 0xffc27a, fontSize: 15, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
   recoverLabel.anchor.set(0.5, 1);
   recoverLabel.visible = false;
+  const dbgG = new Graphics(); // 개발용 AI 표시(F9)
+  let dbgOn = false;
   const dmgLayer = new Container(); // 피해 숫자는 모든 그림 위에
   const terrainHigh = new Container(); // 유닛이 뒤에 서 있는 바위·나무: 유닛을 가린다
   terrainHigh.sortableChildren = true;
-  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, dmgLayer);
+  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, dbgG, dmgLayer);
   // 장군 스킬 표현(예고·장판·상태 표시·효과 컷). 서 있는 물건은 적과 함께 깊이 정렬된다.
   const bossFx = await createBossFx({
     groundFx,
@@ -1635,6 +1637,14 @@ async function main() {
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === "INPUT" || tag === "SELECT") return; // 이름·간격 입력 중에는 게임 키로 쓰지 않는다
     const k = e.key.toLowerCase();
+    if (e.key === "F9" && !e.repeat) {
+      // 개발용: AI가 노리는 목표(초록 = 용병, 빨강 = 적), 돌아가는 길(하늘색), 막혀 헤매는 곳(노란 점), 위험 구역(주황 원)을 그린다
+      e.preventDefault();
+      dbgOn = !dbgOn;
+      send({ t: "debug", on: dbgOn });
+      if (!dbgOn) dbgG.clear();
+      return;
+    }
     // F1 기본 · F2 수비(지금 주인공이 서 있는 곳에 깃발을 꽂는다) · F3 돌격 · F4 호위 · F5 산개
     if (/^F[1-5]$/.test(e.key) && !e.repeat) {
       e.preventDefault();
@@ -2893,6 +2903,16 @@ async function main() {
       fxLayer.circle(r.x, r.y, LEVELUP_PUSH_RADIUS * (0.25 + 0.75 * k2)).stroke({ width: 5 * (1 - k2) + 1, color: 0xffe08a, alpha: 0.8 * (1 - k2) });
     }
 
+    if (dbgOn) {
+      dbgG.clear();
+      for (const [k, x1, y1, x2, y2] of latest.dbg ?? []) {
+        if (k === 0 || k === 1) dbgG.moveTo(x1!, y1!).lineTo(x2!, y2!).stroke({ width: 1.5, color: k === 0 ? 0x66ff88 : 0xff6666, alpha: 0.55 });
+        else if (k === 2) dbgG.moveTo(x1!, y1!).lineTo(x2!, y2!).stroke({ width: 2.5, color: 0x66e0ff, alpha: 0.9 }).circle(x2!, y2!, 5).fill({ color: 0x66e0ff, alpha: 0.9 });
+        else if (k === 3) dbgG.circle(x1!, y1!, x2!).stroke({ width: 2, color: 0xffa043, alpha: 0.8 });
+        else if (k === 4) dbgG.circle(x1!, y1!, 7).stroke({ width: 2, color: 0xffa043, alpha: 0.95 });
+        else if (k === 5) dbgG.circle(x1!, y1!, 6).fill({ color: 0xffe14a, alpha: 0.95 });
+      }
+    }
     // 지형: 유닛이 바위·나무 뒤에 서 있으면 그것을 유닛 위에 그린다
     if (terrain) {
       terrain.setDuel(latest.g?.phase === "tournament");

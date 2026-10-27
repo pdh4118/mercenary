@@ -341,6 +341,7 @@ export type ClientMsg =
   | { t: "stance"; v: number; types?: number } // 용병 진형 모드(0 기본, 1 돌격, 2 수비, 3 호위, 4 산개). types는 병종 비트마스크(생략하면 전체)
   | { t: "hold"; x: number; y: number; types?: number } // 이 지점을 지키도록 지시(지점 방어 모드로 바꾼다)
   | { t: "order"; x: number; y: number; types?: number } // 병종 비트마스크(생략하면 전체)에 이동/공격 지시. 적 근처를 찍으면 공격, 빈 땅이면 이동
+  | { t: "debug"; on: boolean } // 개발용: AI 표시(목표·길·위험 구역)를 상태에 실어 달라는 요청(F9)
   | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)
 
 export type ServerMsg =
@@ -369,6 +370,7 @@ export type ServerMsg =
       tents?: TentWire[]; // 휴식 텐트(없으면 생략)
       rice?: RiceWire[]; // 군량병이 떨군 쌀(없으면 생략)
       meteors?: MeteorWire[];
+      dbg?: number[][]; // 개발용 AI 표시: [종류, x1, y1, x2, y2] (0 용병 목표, 1 적 목표, 2 길 지점, 3 위험 원(x1,y1,반지름=x2), 4 위험 회피 중, 5 막혀 돌아가는 중)
       walls?: WallWire[];
       bt?: TeleWire[]; // 보스 스킬 예고(없으면 생략)
       hz?: HazardWire[]; // 장군이 만든 장판·장애물(없으면 생략)

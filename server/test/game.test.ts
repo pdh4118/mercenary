@@ -431,8 +431,9 @@ test("용병도 체력이 0이면 쓰러졌다가 일정 시간 뒤 부활한다
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
+  (g.getPlayer(a) as { invuln: number }).invuln = 1e9; // 적이 나눠 몰려도 주인공이 먼저 쓰러져 판이 끝나지 않게
   const merc = g.addMerc(a, SHIELD, p.x + 300, p.y);
-  for (let i = 0; i < 400 && g.getMerc(merc)!.respawn === 0; i++) {
+  for (let i = 0; i < 900 && g.getMerc(merc)!.respawn === 0; i++) {
     if (i % 4 === 0) g.spawnEnemyAt(p.x + 300, p.y, BLUNT);
     g.step();
   }

@@ -175,6 +175,9 @@ export class RoomManager {
       case "order":
         room.game.order(id, msg.x, msg.y, msg.types);
         return;
+      case "debug":
+        room.game.dbgOn = msg.on === true;
+        return;
       case "record":
         conn.send({ t: "result", ...room.game.result(), partial: true });
         return;
@@ -541,6 +544,7 @@ export class RoomManager {
         rice: room.game.snapshotRice(),
         tents: room.game.snapshotTents(),
         meteors: room.game.snapshotMeteors(),
+        ...(room.game.dbgOn ? { dbg: room.game.snapshotDebug() } : {}),
         walls: room.game.snapshotWalls(),
         ...(bossTele.length > 0 ? { bt: bossTele } : {}),
         ...(hazards.length > 0 ? { hz: hazards } : {}),
