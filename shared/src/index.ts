@@ -188,6 +188,33 @@ export type MercWire = [
 /** 용병이 지금 하려는 일(머리 위 표시). 0은 표시 없음 */
 export const INTENT_NAMES = ["", "대기", "복귀", "추격", "공격", "돌격", "이동 지시", "공격 지시", "물러남", "위험 회피", "사선 확보", "고지대", "공포", "치고 빠짐", "수비", "마크"] as const;
 export const INTENT = { HOLD: 1, RETURN: 2, CHASE: 3, ATTACK: 4, CHARGE: 5, ORDER_MOVE: 6, ORDER_ATTACK: 7, KITE: 8, DANGER: 9, LOS: 10, HIGH: 11, FEAR: 12, EVADE: 13, GUARD: 14, MARK: 15 } as const;
+/** 끝 글자에 받침이 있으면 "을", 없으면 "를" */
+export const eulReul = (word: string): string => {
+  const c = word.charCodeAt(word.length - 1);
+  return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0 ? "을" : "를";
+};
+/** 의도를 혼잣말 문장으로: 머리 위 말풍선에 보여 줄 "지금 하려는 일"(target은 대상 병종 이름, 없으면 생략) */
+export function intentLine(code: number, target?: string): string {
+  const t = target ? `${target}${eulReul(target)}` : "";
+  switch (code) {
+    case INTENT.HOLD: return "여기서 대기한다";
+    case INTENT.RETURN: return "대열로 돌아가자";
+    case INTENT.CHASE: return `${t || "적을"} 쫓아간다`;
+    case INTENT.ATTACK: return `${t ? `${t} ` : ""}공격한다!`;
+    case INTENT.CHARGE: return "적에게 돌격한다!";
+    case INTENT.ORDER_MOVE: return "지정한 곳으로 이동한다";
+    case INTENT.ORDER_ATTACK: return t ? `명령대로 ${t} 공격한다` : "명령대로 공격하러 간다";
+    case INTENT.KITE: return "거리를 벌리자";
+    case INTENT.DANGER: return "위험하다, 피하자!";
+    case INTENT.LOS: return "시야가 막혔다, 옮기자";
+    case INTENT.HIGH: return "높은 곳으로 올라가자";
+    case INTENT.FEAR: return "무서워서 도망간다!";
+    case INTENT.EVADE: return "치고 빠지자";
+    case INTENT.GUARD: return "이 자리를 지킨다";
+    case INTENT.MARK: return t ? `${t} 계속 따라붙는다` : "마크할 적을 찾는다";
+    default: return INTENT_NAMES[code] ?? "";
+  }
+}
 /** 서버가 알려 주는 순간 효과(그 틱에 일어난 일): [종류, x, y, 방향] */
 export const EVT_ARROW_HIT = 0; // 아군 화살 명중
 export const EVT_ENEMY_ARROW_HIT = 1; // 적 화살 명중

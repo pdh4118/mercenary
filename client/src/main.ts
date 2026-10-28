@@ -85,6 +85,7 @@ import {
   tierName,
   UNIT_NAMES,
   INTENT_NAMES,
+  intentLine,
   parseVoiceBest,
   UNIT_TYPES,
   WORLD_SIZE,
@@ -2382,7 +2383,7 @@ async function main() {
           b.box.visible = code > 0;
           if (code > 0) {
             const arg = w[21] ?? -1;
-            const intentText = `${UNIT_NAMES[w[4]] ?? ""} ${INTENT_NAMES[code] ?? ""}${arg >= 0 ? ` → ${UNIT_NAMES[arg] ?? ""}` : ""}`; // 예) 궁병 공격 → 기병
+            const intentText = intentLine(code, arg >= 0 ? UNIT_NAMES[arg] : undefined); // 예) 기병을 공격한다!
             const sig = `${intentText}|${code}|${say?.text ?? ""}`;
             if (b.sig !== sig) {
               b.sig = sig;

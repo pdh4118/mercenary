@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TICK_RATE, TUNE, parseVoice, parseVoiceBest, koNumber, extractNumbers, toJamo, voiceTypes, CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, INTENT, INTENT_NAMES } from "@mercenary/shared";
+import { TICK_RATE, TUNE, intentLine, eulReul, parseVoice, parseVoiceBest, koNumber, extractNumbers, toJamo, voiceTypes, CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, INTENT, INTENT_NAMES } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -227,4 +227,18 @@ test("용병 번호: 1부터 비어 있는 가장 작은 번호를 받고, 해�
   (g as unknown as { mercs: Map<number, unknown> }).mercs.delete(m2);
   const m4 = g.addMerc(a, BLUNT, p.x, p.y + 160);
   assert.equal(nums()[m4], 2, "비어 있던 2번을 쓴다");
+});
+
+
+test("의도 문장: 혼잣말처럼 읽히고 조사가 맞는다", () => {
+  assert.equal(eulReul("기병"), "을");
+  assert.equal(eulReul("마법사"), "를");
+  assert.equal(intentLine(INTENT.ATTACK, "기병"), "기병을 공격한다!");
+  assert.equal(intentLine(INTENT.ATTACK, "마법사"), "마법사를 공격한다!");
+  assert.equal(intentLine(INTENT.ATTACK), "공격한다!");
+  assert.equal(intentLine(INTENT.CHASE, "궁병"), "궁병을 쫓아간다");
+  assert.equal(intentLine(INTENT.CHASE), "적을 쫓아간다");
+  assert.equal(intentLine(INTENT.MARK, "기병"), "기병을 계속 따라붙는다");
+  assert.equal(intentLine(INTENT.KITE), "거리를 벌리자");
+  for (let c = 1; c < INTENT_NAMES.length; c++) assert.ok(intentLine(c, "창병").length > 0, `의도 ${c}`);
 });
