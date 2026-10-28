@@ -241,5 +241,9 @@ test("의도 문장: 혼잣말처럼 읽히고 조사가 맞는다", () => {
   assert.equal(intentLine(INTENT.MARK, "기병"), "기병을 계속 따라붙어야 해");
   assert.equal(intentLine(INTENT.KITE), "거리를 벌려야 해");
   assert.equal(intentLine(INTENT.FEAR), "이길 수 없어…!");
-  for (let c = 1; c < INTENT_NAMES.length; c++) assert.ok(intentLine(c, "창병").length > 0, `의도 ${c}`);
+  for (let c = 1; c < INTENT_NAMES.length; c++) assert.ok(intentLine(c, "창병").length > 0 && intentLine(c, "창병", 1).length > 0, `의도 ${c}`);
+  assert.equal(intentLine(INTENT.ATTACK, "기병", 1), "기병을 공격해야겠어!");
+  assert.equal(intentLine(INTENT.GUARD, undefined, 1), "이 자리를 지켜야겠어");
+  const mixed = new Set([0, 1].map((v) => intentLine(INTENT.CHASE, "기병", v)));
+  assert.equal(mixed.size, 2, "말투가 두 가지로 섞인다");
 });

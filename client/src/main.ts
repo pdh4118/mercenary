@@ -2383,7 +2383,7 @@ async function main() {
           b.box.visible = code > 0;
           if (code > 0) {
             const arg = w[21] ?? -1;
-            const intentText = intentLine(code, arg >= 0 ? UNIT_NAMES[arg] : undefined); // 예) 기병을 공격한다!
+            const intentText = intentLine(code, arg >= 0 ? UNIT_NAMES[arg] : undefined, w[0] + code); // 예) 기병을 공격한다!
             const sig = `${intentText}|${code}|${say?.text ?? ""}`;
             if (b.sig !== sig) {
               b.sig = sig;

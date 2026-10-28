@@ -193,25 +193,30 @@ export const eulReul = (word: string): string => {
   const c = word.charCodeAt(word.length - 1);
   return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0 ? "을" : "를";
 };
-/** 의도를 혼잣말 문장으로: 머리 위 말풍선에 보여 줄 "지금 하려는 일"(target은 대상 병종 이름, 없으면 생략) */
-export function intentLine(code: number, target?: string): string {
+/**
+ * 의도를 혼잣말 문장으로: 머리 위 말풍선에 보여 줄 "지금 하려는 일"(target은 대상 병종 이름, 없으면 생략).
+ * variant가 0이면 "~해야 해", 1이면 "~해야겠어"처럼 말투가 달라진다(용병·의도마다 정해 두면 매 프레임 바뀌지 않는다).
+ */
+export function intentLine(code: number, target?: string, variant = 0): string {
   const t = target ? `${target}${eulReul(target)}` : "";
+  const v = variant & 1;
+  const pick = (a: string, b: string) => (v ? b : a);
   switch (code) {
-    case INTENT.HOLD: return "여기서 대기해야 해";
-    case INTENT.RETURN: return "대열로 돌아가야 해";
-    case INTENT.CHASE: return `${t || "적을"} 쫓아가야 해`;
-    case INTENT.ATTACK: return `${t ? `${t} ` : ""}공격해야 해!`;
-    case INTENT.CHARGE: return "적에게 돌격해야 해!";
-    case INTENT.ORDER_MOVE: return "지정한 곳으로 가야 해";
-    case INTENT.ORDER_ATTACK: return t ? `명령대로 ${t} 공격해야 해` : "명령대로 공격해야 해";
-    case INTENT.KITE: return "거리를 벌려야 해";
-    case INTENT.DANGER: return "위험해, 피해야 해!";
-    case INTENT.LOS: return "시야가 막혔어, 옮겨야 해";
-    case INTENT.HIGH: return "높은 곳으로 올라가야 해";
-    case INTENT.FEAR: return "이길 수 없어…!";
-    case INTENT.EVADE: return "치고 빠져야 해";
-    case INTENT.GUARD: return "이 자리를 지켜야 해";
-    case INTENT.MARK: return t ? `${t} 계속 따라붙어야 해` : "마크할 적을 찾아야 해";
+    case INTENT.HOLD: return pick("여기서 대기해야 해", "여기서 좀 대기해야겠어");
+    case INTENT.RETURN: return pick("대열로 돌아가야 해", "대열로 돌아가야겠어");
+    case INTENT.CHASE: return pick(`${t || "적을"} 쫓아가야 해`, `${t || "적을"} 쫓아가야겠어`);
+    case INTENT.ATTACK: return pick(`${t ? `${t} ` : ""}공격해야 해!`, `${t ? `${t} ` : ""}공격해야겠어!`);
+    case INTENT.CHARGE: return pick("적에게 돌격해야 해!", "돌격해야겠어!");
+    case INTENT.ORDER_MOVE: return pick("지정한 곳으로 가야 해", "지정한 곳으로 가야겠어");
+    case INTENT.ORDER_ATTACK: return pick(t ? `명령대로 ${t} 공격해야 해` : "명령대로 공격해야 해", t ? `명령이니 ${t} 공격해야겠어` : "명령이니 공격해야겠어");
+    case INTENT.KITE: return pick("거리를 벌려야 해", "거리를 좀 벌려야겠어");
+    case INTENT.DANGER: return pick("위험해, 피해야 해!", "위험해, 피해야겠어!");
+    case INTENT.LOS: return pick("시야가 막혔어, 옮겨야 해", "시야가 막혔네, 옮겨야겠어");
+    case INTENT.HIGH: return pick("높은 곳으로 올라가야 해", "높은 곳으로 올라가야겠어");
+    case INTENT.FEAR: return pick("이길 수 없어…!", "이건 못 이기겠어…!");
+    case INTENT.EVADE: return pick("치고 빠져야 해", "치고 빠져야겠어");
+    case INTENT.GUARD: return pick("이 자리를 지켜야 해", "이 자리를 지켜야겠어");
+    case INTENT.MARK: return pick(t ? `${t} 계속 따라붙어야 해` : "마크할 적을 찾아야 해", t ? `${t} 계속 따라붙어야겠어` : "마크할 적을 찾아야겠어");
     default: return INTENT_NAMES[code] ?? "";
   }
 }
