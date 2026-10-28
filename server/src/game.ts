@@ -377,6 +377,7 @@ export interface Slot {
   dashVy: number;
   dashStrike: boolean; // 돌진이 끝나면 찌른다(창)
   offerBoxed: boolean; // 지금 떠 있는 선택지가 상자 보너스로 뽑힌 것인가
+  picks: number[]; // 지금까지 고른 카드(CARDS 번호, 고른 순서). Tab 표에 보여 준다
   restTent: number; // 쉬고 있는 텐트 번호(0이면 쉬지 않음)
   dashHit: Set<number>; // 이번 돌진에서 이미 지나가며 벤 적(번호)
   chargeT: number; // 철퇴를 꾹 누르고 모은 시간(초). 0이면 모으는 중이 아니다
@@ -950,6 +951,7 @@ export class Game {
       dashHit: new Set(),
       restTent: 0,
       offerBoxed: false,
+      picks: [],
       chargeT: 0,
       mom: 0,
       stances: UNIT_TYPES.map(() => STANCE_DEFEND),
@@ -5280,12 +5282,18 @@ export class Game {
     const card = s.state.offer[index] !== undefined ? CARDS[s.state.offer[index]!] : undefined;
     if (!card) return false;
     this.applyCard(s, card.effect);
+    s.picks.push(s.state.offer[index]!);
     s.detail.cards[card.name] = (s.detail.cards[card.name] ?? 0) + 1;
     s.state.rerolls = Math.min(REROLL_MAX, s.state.rerolls + REROLL_PER_PICK); // 고를 때마다 새로고침 1회 적립
     s.state.pending--;
     if (s.offerBoxed && s.state.box > 0) s.state.box--; // 상자 보너스로 뽑힌 선택지를 골랐을 때만 상자를 쓴 것으로 센다
     s.state.offer = s.state.pending > 0 ? this.rollOffer(s) : [];
     return true;
+  }
+
+  /** 지금까지 고른 카드(CARDS 번호) */
+  getPicks(playerId: number): number[] {
+    return [...(this.slots.get(playerId)?.picks ?? [])];
   }
 
   /** 지금 제시된 카드를 새로 뽑는다(새로고침 1회 소모). 가능하면 지금 나온 카드는 제외한다. */

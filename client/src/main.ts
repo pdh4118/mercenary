@@ -85,6 +85,8 @@ import {
   tierName,
   UNIT_NAMES,
   INTENT_NAMES,
+  summarizePicks,
+  SUMMARY_COLUMNS,
   personalityOf,
   intentLine,
   parseVoiceBest,
@@ -905,7 +907,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 위치 지정 → E 이동 · Y 공격 · H 수비 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · O 혼잣말 끄고 켜기 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·카일 기병 마크해 등)",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 위치 지정 → E 이동 · Y 공격 · H 수비 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · Tab 누르고 있으면 고른 카드 표 · O 혼잣말 끄고 켜기 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·카일 기병 마크해 등)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1402,6 +1404,10 @@ async function main() {
       }
       if (msg.t === "left" && msg.reason.includes("아무 조작이 없어")) idleKicked = true;
       if (lobby.handle(msg)) return;
+      if (msg.t === "cards") {
+        renderCards(msg.picks);
+        return;
+      }
       if (msg.t === "chat") {
         addChat(msg.id, msg.name, msg.text);
       } else if (msg.t === "notice") {
@@ -1801,6 +1807,96 @@ async function main() {
     else if (k === "y") issueAtMarker("attack");
     else if (k === "h") issueAtMarker("hold");
   });
+  // Tab: 누르고 있는 동안 지금까지 고른 카드를 영웅 · 병종별 표로 보여 준다
+  const cardTable = document.getElementById("cardTable")!;
+  let cardTabOpen = false;
+  let cardTabTimer = 0;
+  const renderCards = (picks: number[]) => {
+    if (!cardTabOpen) return;
+    const sum = summarizePicks(picks);
+    cardTable.replaceChildren();
+    const h = document.createElement("h2");
+    h.textContent = "고른 카드";
+    const hs = document.createElement("span");
+    hs.textContent = `${sum.count}장 · Tab을 누르는 동안 표시`;
+    h.append(hs);
+    cardTable.append(h);
+    if (sum.count === 0) {
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = "아직 고른 카드가 없습니다. 레벨업하면 카드를 고를 수 있습니다.";
+      cardTable.append(e);
+      return;
+    }
+    const table = document.createElement("table");
+    const head = document.createElement("tr");
+    for (const c of ["", ...SUMMARY_COLUMNS]) {
+      const th = document.createElement("th");
+      th.textContent = c;
+      head.append(th);
+    }
+    table.append(head);
+    for (const r of sum.rows) {
+      const tr = document.createElement("tr");
+      const label = document.createElement("td");
+      label.textContent = r.label;
+      tr.append(label);
+      for (const cell of r.cells) {
+        const td = document.createElement("td");
+        td.textContent = cell || "·";
+        td.className = cell ? "has" : "dim";
+        tr.append(td);
+      }
+      table.append(tr);
+    }
+    if (sum.legends.some((l) => l.length > 0)) {
+      const tr = document.createElement("tr");
+      tr.className = "legend";
+      const label = document.createElement("td");
+      label.textContent = "전설";
+      tr.append(label);
+      for (const l of sum.legends) {
+        const td = document.createElement("td");
+        td.textContent = l.join(", ") || "·";
+        if (l.length === 0) td.className = "dim";
+        tr.append(td);
+      }
+      table.append(tr);
+    }
+    cardTable.append(table);
+    if (sum.extras.length > 0) {
+      const ex = document.createElement("div");
+      ex.className = "extras";
+      for (const x of sum.extras) {
+        const s = document.createElement("span");
+        const b = document.createElement("b");
+        b.textContent = x.label;
+        s.append(b, x.text);
+        ex.append(s);
+      }
+      cardTable.append(ex);
+    }
+  };
+  const closeCardTab = () => {
+    cardTabOpen = false;
+    cardTable.classList.remove("open");
+    clearInterval(cardTabTimer);
+  };
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") return;
+    const tag = (document.activeElement as HTMLElement | null)?.tagName;
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || myId < 0 || spectating || lobby.blocksGameInput()) return; // 쓰러져 관전 중에는 Tab이 다음 동료 보기다
+    e.preventDefault();
+    if (cardTabOpen) return;
+    cardTabOpen = true;
+    cardTable.classList.add("open");
+    send({ t: "cards" });
+    cardTabTimer = window.setInterval(() => send({ t: "cards" }), 1000);
+  });
+  window.addEventListener("keyup", (e) => {
+    if (e.key === "Tab") closeCardTab();
+  });
+  window.addEventListener("blur", closeCardTab);
   // 음성 지시: F를 누르고 있는 동안 듣고, 떼면 알아들은 말을 우클릭·진형 키와 같은 명령으로 보낸다(Chrome·Edge의 음성 인식 사용)
   const SpeechRec = (window as unknown as { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => any }).webkitSpeechRecognition; // eslint-disable-line @typescript-eslint/no-explicit-any
   let voiceRec: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any

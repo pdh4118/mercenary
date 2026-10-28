@@ -175,6 +175,9 @@ export class RoomManager {
       case "order":
         room.game.order(id, msg.x, msg.y, msg.types, msg.kind);
         return;
+      case "cards":
+        conn.send({ t: "cards", picks: room.game.getPicks(id) });
+        return;
       case "mercCmd":
         room.game.mercCmd(id, msg.ids, msg.kind, msg.type, msg.x, msg.y);
         return;

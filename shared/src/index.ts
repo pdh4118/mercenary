@@ -12,6 +12,7 @@ export * from "./personality.js";
 export * from "./audio.js";
 export * from "./terrain.js";
 export * from "./voice.js";
+export * from "./cardsummary.js";
 import { ARCHER, BLUNT, CAVALRY, MAGE, SHIELD, SPEAR } from "./rules.js";
 import type { HazardWire, TeleWire } from "./bossskill.js";
 
@@ -382,6 +383,7 @@ export type ClientMsg =
   | { t: "stance"; v: number; types?: number } // 용병 진형 모드(0 기본, 1 돌격, 2 수비, 3 호위, 4 산개). types는 병종 비트마스크(생략하면 전체)
   | { t: "hold"; x: number; y: number; types?: number } // 이 지점을 지키도록 지시(지점 방어 모드로 바꾼다)
   | { t: "order"; x: number; y: number; types?: number; kind?: "move" | "attack" } // kind를 주면 그대로(이동: 적 근처여도 이동, 공격: 지점 둘레 적에게), 생략하면 적 근처 여부로 자동 // 병종 비트마스크(생략하면 전체)에 이동/공격 지시. 적 근처를 찍으면 공격, 빈 땅이면 이동
+  | { t: "cards" } // 지금까지 고른 카드 목록 요청(Tab 표)
   | { t: "debug"; on: boolean } // 개발용: AI 표시(목표·길·위험 구역)를 상태에 실어 달라는 요청(F9)
   | { t: "mercCmd"; ids: number[]; kind: "mark" | "move" | "attack" | "clear"; type?: number; x?: number; y?: number } // 이름으로 고른 용병 개인에게 주는 명령(마크: 그 병종 적을 따라붙어 공격, 이동·공격: 지점, 해제)
   | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)
@@ -395,6 +397,7 @@ export type ServerMsg =
   | { t: "left"; reason: string } // 방에서 나왔다(스스로, 내보내짐, 방 종료)
   | { t: "error"; text: string }
   | { t: "notice"; text: string }
+  | { t: "cards"; picks: number[] } // 내가 지금까지 고른 카드(CARDS 번호, 고른 순서)
   | { t: "chat"; id: number; name: string; text: string } // 같은 방 사람의 채팅
   | { t: "result"; status: GameStatus; stage: number; time: number; players: ResultPlayer[]; partial?: boolean } // 게임이 끝났다. partial이면 진행 중에 요청한 중간 기록
   | {
