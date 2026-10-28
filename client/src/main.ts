@@ -2331,15 +2331,15 @@ async function main() {
       }
       v.node.zIndex = v.y;
       setPoison(v.sprite, w[18] === 1);
-      const mine = w[5] === myId && latest?.g?.phase !== "tournament";
+      const mine = w[5] === myId;
       v.label.visible = mine || showNames || mercPanel.hovered() === w[0]; // 내 용병은 이름을 항상 보여 준다(음성 지시로 이름을 부를 수 있다)
       const baseY = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y;
       const lift = isReady(w) ? 12 : 0; // 강화 가능 화살표가 있으면 그 위로
       v.label.y = baseY - 14 - lift + (mine ? 0 : 4); // 이름이 막대 바로 위, 그 위에 병종 + 의도
-      // 지금 하려는 일: 내 용병 머리 위에 항상 작게 보여 준다(토너먼트에서는 숨김)
+      // 지금 하려는 일: 내 용병 머리 위에 항상 작게 보여 준다(토너먼트에서도)
       {
         const iv = v as unknown as { intent?: Text; intentCode?: number };
-        const code = w[5] === myId && latest?.g?.phase !== "tournament" ? w[20] ?? 0 : 0;
+        const code = w[5] === myId ? w[20] ?? 0 : 0; // 토너먼트에서도 내 용병의 의도는 보인다
         if (code > 0 && !iv.intent) {
           iv.intent = new Text({ text: "", style: { fill: 0xffffff, fontSize: 10, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
           iv.intent.anchor.set(0.5, 1);

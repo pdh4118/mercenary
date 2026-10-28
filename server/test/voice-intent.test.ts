@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TICK_RATE, parseVoice, voiceTypes, CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, INTENT, INTENT_NAMES } from "@mercenary/shared";
+import { TICK_RATE, TUNE, parseVoice, voiceTypes, CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, INTENT, INTENT_NAMES } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -142,4 +142,24 @@ test("의도 표시: 대상 병종이 함께 실린다(마크·공격)", () => {
   const w = g.snapshotMercs().find((q) => q[0] === m)!;
   assert.ok(w[20] === INTENT.MARK || w[20] === INTENT.ATTACK);
   assert.equal(w[21], CAVALRY, "대상 병종이 기병");
+});
+
+test("의도 표시: 토너먼트 경기 중에도 싸우는 선수의 용병 의도가 나간다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const b = g.addPlayer("b")!;
+  g.addMerc(a, SPEAR, 0, 50);
+  g.addMerc(b, SPEAR, 0, 50);
+  g.jumpToStage(3);
+  (g as unknown as { onBossDown(at: { x: number; y: number }): void }).onBossDown({ x: 0, y: 0 });
+  for (let i = 0; i < Math.ceil((TUNE.TOURNAMENT_NOTICE_SEC + 0.2) * 20); i++) g.step(); // 예고
+  g.step();
+  assert.equal(g.info().phase, "tournament");
+  let tries = 0;
+  while (g.info().tour?.step !== "fight" && tries++ < 20 * 30) g.step();
+  assert.equal(g.info().tour?.step, "fight");
+  run(g, 1);
+  const mine = g.snapshotMercs().filter((w) => w[5] === a);
+  assert.ok(mine.length > 0 && mine.every((w) => (w[20] as number) > 0), "의도가 있다");
 });
