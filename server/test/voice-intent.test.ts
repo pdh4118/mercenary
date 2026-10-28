@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TICK_RATE, TUNE, parseVoice, voiceTypes, CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, INTENT, INTENT_NAMES } from "@mercenary/shared";
+import { TICK_RATE, TUNE, parseVoice, parseVoiceBest, koNumber, extractNumbers, toJamo, voiceTypes, CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, INTENT, INTENT_NAMES } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -162,4 +162,69 @@ test("의도 표시: 토너먼트 경기 중에도 싸우는 선수의 용병 �
   run(g, 1);
   const mine = g.snapshotMercs().filter((w) => w[5] === a);
   assert.ok(mine.length > 0 && mine.every((w) => (w[20] as number) > 0), "의도가 있다");
+});
+
+
+const roster2 = [
+  { id: 11, name: "붉은 카일", num: 1 },
+  { id: 12, name: "푸른 카일", num: 2 },
+  { id: 13, name: "날쌘 레온", num: 3 },
+  { id: 14, name: "늙은 볼프", num: 12 },
+];
+
+test("음성: 우리말 숫자를 번호로 읽는다(3번·삼번·세번·십이번·열두번)", () => {
+  assert.equal(koNumber("삼"), 3);
+  assert.equal(koNumber("십이"), 12);
+  assert.equal(koNumber("이십삼"), 23);
+  assert.equal(koNumber("열두"), 12);
+  assert.equal(koNumber("스물셋"), 23);
+  assert.equal(koNumber("세"), 3);
+  assert.deepEqual(extractNumbers("3번 기병 마크해").nums, [3]);
+  assert.deepEqual(extractNumbers("삼번이랑 십이번 공격").nums, [3, 12]);
+  assert.deepEqual(extractNumbers("세 번 마크").nums, [3]);
+});
+
+test("음성: 번호로 용병을 불러 개인 명령을 내린다", () => {
+  const mark = parseVoice("3번 기병 마크해", roster2) as { ids: number[]; action: string; markType: number };
+  assert.deepEqual(mark.ids, [13]);
+  assert.equal(mark.action, "mark");
+  assert.equal(mark.markType, CAVALRY);
+  assert.deepEqual((parseVoice("삼번이랑 십이번 공격", roster2) as { ids: number[] }).ids.sort(), [13, 14]);
+  assert.deepEqual((parseVoice("이번 제자리", roster2) as { ids: number[] }).ids, [12], "이번 = 2번");
+  assert.equal(parseVoice("9번 공격", roster2), null, "없는 번호는 모른다");
+});
+
+test("음성: 소리가 비슷하게 잘못 인식된 말도 알아듣는다(귀병·공병·수빈·공걱)", () => {
+  assert.equal((parseVoice("귀병 돌격", [], false) as { types: number }).types, 1 << CAVALRY, "별칭 사전");
+  assert.equal(parseVoice("공병 호위", [], false)?.kind, "stance");
+  assert.equal((parseVoice("궁병 수빈", [], false) as { at: string }).at, "hero");
+  assert.equal(parseVoice("창병 공곡", [], false), null, "정확 해석은 모른다");
+  const fz = parseVoice("창병 공곡", [], true);
+  assert.equal(fz?.kind, "order", "퍼지 해석으로 공격");
+  assert.equal(parseVoice("오늘 점심 뭐 먹지", [], true), null, "관계없는 말은 퍼지로도 모른다");
+  assert.ok(toJamo("귀병").length > 0);
+});
+
+test("음성: 후보 여러 개 중 알아듣는 것을 고른다(정확한 후보가 먼저, 없으면 비슷한 소리)", () => {
+  const r = parseVoiceBest(["날씨 좋다", "기병 돌격", "귀병 돌진"], roster2)!;
+  assert.equal(r.text, "기병 돌격");
+  assert.equal(r.fuzzy, false);
+  const f = parseVoiceBest(["기병 돌겹", "기병 도력"], roster2);
+  assert.ok(f && f.fuzzy && f.cmd.kind === "stance", "퍼지로 돌격");
+  assert.equal(parseVoiceBest(["음 어 그"], roster2), null);
+});
+
+test("용병 번호: 1부터 비어 있는 가장 작은 번호를 받고, 해고하면 그 번호를 다음 용병이 쓴다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const m1 = g.addMerc(a, SPEAR, p.x, p.y + 40);
+  const m2 = g.addMerc(a, ARCHER, p.x, p.y + 80);
+  const m3 = g.addMerc(a, SHIELD, p.x, p.y + 120);
+  const nums = () => Object.fromEntries(g.snapshotMercs().map((w) => [w[0], w[22]]));
+  assert.deepEqual([nums()[m1], nums()[m2], nums()[m3]], [1, 2, 3]);
+  (g as unknown as { mercs: Map<number, unknown> }).mercs.delete(m2);
+  const m4 = g.addMerc(a, BLUNT, p.x, p.y + 160);
+  assert.equal(nums()[m4], 2, "비어 있던 2번을 쓴다");
 });

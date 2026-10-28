@@ -85,7 +85,7 @@ import {
   tierName,
   UNIT_NAMES,
   INTENT_NAMES,
-  parseVoice,
+  parseVoiceBest,
   UNIT_TYPES,
   WORLD_SIZE,
   mercPrice,
@@ -1803,15 +1803,19 @@ async function main() {
   const SpeechRec = (window as unknown as { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => any }).webkitSpeechRecognition; // eslint-disable-line @typescript-eslint/no-explicit-any
   let voiceRec: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
   let voiceText = "";
+  let voiceAlts: string[] = []; // 인식기가 준 후보 문장들(가장 그럴듯한 순)
   let voiceOn = false;
   const say = (text: string, sec = 2.5) => {
     toast.text = text;
     toastLeft = sec;
   };
-  const runVoice = (text: string) => {
-    const roster = (latest?.mercs ?? []).filter((w) => w[5] === myId).map((w) => ({ id: w[0], name: mercName(w[16]) }));
-    const cmd = parseVoice(text, roster);
-    if (!cmd) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 카일 기병 마크해 · 카일 저기 공격)`, 4);
+  const runVoice = (alts: string[]) => {
+    const roster = (latest?.mercs ?? []).filter((w) => w[5] === myId).map((w) => ({ id: w[0], name: mercName(w[16]), num: w[22] }));
+    const best = parseVoiceBest(alts, roster);
+    const text = best?.text ?? alts[0] ?? "";
+    if (!best) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 3번 기병 마크해 · 카일 저기 공격)`, 4);
+    const cmd = best.cmd;
+    if (best.fuzzy) cmd.label += " (비슷한 소리로 해석)";
     if (cmd.kind === "merc") {
       const { x: wx, y: wy } = targetPoint();
       if (cmd.action === "stay") {
@@ -1838,12 +1842,19 @@ async function main() {
     voiceRec = rec;
     rec.lang = "ko-KR";
     rec.interimResults = true;
+    rec.maxAlternatives = 5;
     rec.continuous = true;
     rec.onresult = (ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
-      let t = "";
-      for (let i = 0; i < ev.results.length; i++) t += ev.results[i]![0]!.transcript;
-      voiceText = t;
-      say(`🎤 "${t}"`, 8);
+      // 후보는 인식 결과 조각마다 같은 순번끼리 이어 붙여 만든다(없는 순번은 첫 후보로 채운다)
+      const alts: string[] = [];
+      for (let k = 0; k < 5; k++) {
+        let t = "";
+        for (let i = 0; i < ev.results.length; i++) t += (ev.results[i]![k] ?? ev.results[i]![0]!).transcript;
+        if (!alts.includes(t)) alts.push(t);
+      }
+      voiceAlts = alts;
+      voiceText = alts[0] ?? "";
+      say(`🎤 "${voiceText}"`, 8);
     };
     rec.onerror = (ev: { error: string }) => {
       if (ev.error === "not-allowed" || ev.error === "service-not-allowed") say("마이크 권한이 필요합니다 (주소창 왼쪽 자물쇠에서 허용)", 4);
@@ -1852,11 +1863,14 @@ async function main() {
     rec.onend = () => {
       voiceOn = false;
       const t = voiceText.trim();
+      const alts = voiceAlts.filter((a) => a.trim());
       voiceText = "";
-      if (t) runVoice(t);
+      voiceAlts = [];
+      if (t) runVoice(alts.length > 0 ? alts : [t]);
       else if (toast.text.startsWith("🎤 듣는")) say("");
     };
     voiceText = "";
+    voiceAlts = [];
     voiceOn = true;
     try {
       rec.start();
@@ -1865,12 +1879,18 @@ async function main() {
       voiceOn = false;
     }
   };
+  // 키를 뗀 뒤에도 잠깐(0.4초) 더 들어, 끝 음절이 잘려 인식이 틀리는 일을 줄인다
+  let voiceStopTimer = 0;
   const stopVoice = () => {
-    try {
-      voiceRec?.stop();
-    } catch {
-      /* 이미 멈춤 */
-    }
+    if (!voiceOn || voiceStopTimer) return;
+    voiceStopTimer = window.setTimeout(() => {
+      voiceStopTimer = 0;
+      try {
+        voiceRec?.stop();
+      } catch {
+        /* 이미 멈춤 */
+      }
+    }, 400);
   };
   window.addEventListener("keydown", (e) => {
     const tag = (document.activeElement as HTMLElement | null)?.tagName;
@@ -2332,6 +2352,10 @@ async function main() {
       v.node.zIndex = v.y;
       setPoison(v.sprite, w[18] === 1);
       const mine = w[5] === myId;
+      if (mine) {
+        const text = `${w[22] ?? 0}번 ${mercName(w[16])}`; // 번호: 음성으로 \"3번 기병 마크해\"처럼 부른다
+        if (v.label.text !== text) v.label.text = text;
+      }
       v.label.visible = mine || showNames || mercPanel.hovered() === w[0]; // 내 용병은 이름을 항상 보여 준다(음성 지시로 이름을 부를 수 있다)
       const baseY = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y;
       const lift = isReady(w) ? 12 : 0; // 강화 가능 화살표가 있으면 그 위로

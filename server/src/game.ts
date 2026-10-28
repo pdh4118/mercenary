@@ -475,6 +475,7 @@ export interface Merc extends Fighter {
   flankT: number; // 기병이 우회 접근에 쓴 시간
   intent?: number; // 이번 틱에 하려는 일(INTENT). 머리 위 표시용
   intentArg?: number; // 의도의 대상 병종
+  num: number; // 주인별 용병 번호(1부터)
   cmd?: { kind: "mark" | "move" | "attack"; type: number; x: number; y: number; left: number }; // 이름으로 받은 개인 명령(병종 지시·진형을 새로 주면 풀린다)
   stunT?: number; // 기절·속박 남은 시간(움직이지도 공격하지도 못한다)
   slowT?: number; // 둔화 남은 시간
@@ -1352,6 +1353,7 @@ export class Game {
       ((m.stunT ?? 0) > 0 ? ST_BIT_STUN : 0) | ((m.slowT ?? 0) > 0 ? ST_BIT_SLOW : 0) | ((this.slots.get(m.owner)?.restTent ?? 0) > 0 ? ST_BIT_REST : 0),
       m.respawn > 0 ? 0 : m.intent ?? 0,
       m.respawn > 0 ? -1 : m.intentArg ?? -1,
+      m.num,
     ]);
   }
 
@@ -2312,7 +2314,11 @@ export class Game {
 
   addMerc(owner: number, type: number, x: number, y: number, paid = 0, tier = 0): number {
     const id = this.nextEntityId++;
-    const merc: Merc = { id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier, nameId: this.pickName(owner), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
+    const used = new Set<number>();
+    for (const o of this.mercs.values()) if (o.owner === owner) used.add(o.num);
+    let num = 1;
+    while (used.has(num)) num++;
+    const merc: Merc = { num, id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier, nameId: this.pickName(owner), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
     this.mercs.set(id, merc);
     merc.hp = this.mercStats(merc).hp; // 이미 받은 강화가 반영된 체력으로 시작한다
     merc.shield = this.mercStats(merc).shield;
