@@ -81,7 +81,7 @@ test("개인 명령: 마크를 받은 창병은 가까운 다른 적이 있어�
   g.spawnEnemyAt(p.x + 30, p.y + 260, SHIELD); // 더 가깝다(아래)
   const cav = g.spawnEnemyAt(p.x + 480, p.y + 100, CAVALRY); // 마크 대상(오른쪽 멀리)
   const e = g.getEnemy(cav)!;
-  e.cd = 1e9; // 움직이지 않게 공격을 막아 둔다
+  (e as { cd: number }).cd = 1e9; // 움직이지 않게 공격을 막아 둔다
   assert.equal(g.mercCmd(a, [m], "mark", CAVALRY), true);
   const x0 = g.getMerc(m)!.x;
   run(g, 0.3);
