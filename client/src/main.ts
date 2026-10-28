@@ -2360,51 +2360,54 @@ async function main() {
       const baseY = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y;
       const lift = isReady(w) ? 12 : 0; // 강화 가능 화살표가 있으면 그 위로
       v.label.y = baseY - 14 - lift + (mine ? 0 : 4); // 이름이 막대 바로 위, 그 위에 병종 + 의도
-      // 지금 하려는 일: 내 용병 머리 위에 항상 작게 보여 준다(토너먼트에서도)
+      // 말풍선: 내 용병이 지금 하려는 일(병종 + 행동 → 대상)을 항상 담고, 혼잣말이 나오면 그 위 줄에 함께 보여 준다(토너먼트에서도)
       {
-        const iv = v as unknown as { intent?: Text; intentCode?: number };
-        const code = w[5] === myId ? w[20] ?? 0 : 0; // 토너먼트에서도 내 용병의 의도는 보인다
-        if (code > 0 && !iv.intent) {
-          iv.intent = new Text({ text: "", style: { fill: 0xffffff, fontSize: 10, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
-          iv.intent.anchor.set(0.5, 1);
-          v.node.addChild(iv.intent);
+        type Bub = { box: Container; bg: Graphics; tIntent: Text; tTalk: Text; sig: string };
+        const bv = v as unknown as { bub?: Bub };
+        const code = w[5] === myId ? w[20] ?? 0 : 0;
+        const say = code > 0 && v.node.visible ? talk.get(w[0]) : undefined;
+        if (code > 0 && !bv.bub) {
+          const box = new Container();
+          const bg = new Graphics();
+          const tIntent = new Text({ text: "", style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
+          const tTalk = new Text({ text: "", style: { fill: 0xfff3cf, fontSize: 12, fontWeight: "600", wordWrap: true, wordWrapWidth: 150, align: "center" } });
+          tIntent.anchor.set(0.5, 1);
+          tTalk.anchor.set(0.5, 1);
+          box.addChild(bg, tIntent, tTalk);
+          v.node.addChild(box);
+          bv.bub = { box, bg, tIntent, tTalk, sig: "" };
         }
-        if (iv.intent) {
-          iv.intent.y = baseY - 14 - lift - 12;
-          iv.intent.visible = code > 0;
-          const arg = w[21] ?? -1;
-          const sig = code * 100 + arg + 1;
-          if (code > 0 && iv.intentCode !== sig) {
-            iv.intentCode = sig;
-            // 병종 + 의도(+ 대상 병종): 예) 궁병 공격 → 기병, 창병 마크 → 기병
-            iv.intent.text = `${UNIT_NAMES[w[4]] ?? ""} ${INTENT_NAMES[code] ?? ""}${arg >= 0 ? ` → ${UNIT_NAMES[arg] ?? ""}` : ""}`;
-            iv.intent.style.fill = INTENT_COLOR[code] ?? 0xffffff;
+        if (bv.bub) {
+          const b = bv.bub;
+          b.box.visible = code > 0;
+          if (code > 0) {
+            const arg = w[21] ?? -1;
+            const intentText = `${UNIT_NAMES[w[4]] ?? ""} ${INTENT_NAMES[code] ?? ""}${arg >= 0 ? ` → ${UNIT_NAMES[arg] ?? ""}` : ""}`; // 예) 궁병 공격 → 기병
+            const sig = `${intentText}|${code}|${say?.text ?? ""}`;
+            if (b.sig !== sig) {
+              b.sig = sig;
+              b.tIntent.text = intentText;
+              b.tIntent.style.fill = INTENT_COLOR[code] ?? 0xffffff;
+              b.tTalk.text = say?.text ?? "";
+              const hasTalk = !!say;
+              const bw = Math.max(b.tIntent.width, hasTalk ? b.tTalk.width : 0) + 12;
+              const th = hasTalk ? b.tTalk.height + 3 : 0;
+              const bh = b.tIntent.height + th + 6;
+              b.bg
+                .clear()
+                .roundRect(-bw / 2, -bh - 4, bw, bh, 6)
+                .fill({ color: 0x151822, alpha: 0.88 })
+                .stroke({ width: 1.5, color: INTENT_COLOR[code] ?? 0xffffff, alpha: 0.9 })
+                .poly([-4, -4, 4, -4, 0, 2])
+                .fill({ color: 0x151822, alpha: 0.88 });
+              b.tIntent.position.set(0, -4 - 3);
+              b.tTalk.position.set(0, -4 - 3 - b.tIntent.height - 1);
+              b.tTalk.visible = hasTalk;
+            }
+            b.tTalk.alpha = say?.alpha ?? 1;
+            b.box.y = v.label.y - 13; // 이름표(막대 바로 위) 위에 얹는다
           }
         }
-      }
-      {
-        // 혼잣말 말풍선: 의도 표시 위에 작게 뜬다
-        const bv = v as unknown as { talk?: Container; talkText?: string };
-        const say = talk.get(w[0]);
-        if (say && v.node.visible) {
-          if (!bv.talk || bv.talkText !== say.text) {
-            bv.talk?.destroy({ children: true });
-            const box = new Container();
-            const t = new Text({ text: say.text, style: { fill: 0x1a1d26, fontSize: 12, fontWeight: "600", wordWrap: true, wordWrapWidth: 150, align: "center" } });
-            t.anchor.set(0.5, 1);
-            const bw = t.width + 12;
-            const bh = t.height + 8;
-            const bg = new Graphics().roundRect(-bw / 2, -bh - 3, bw, bh, 7).fill({ color: 0xfff6dc, alpha: 0.95 }).stroke({ width: 1.5, color: 0x3a3320 }).poly([-5, -3, 5, -3, 0, 4]).fill(0xfff6dc);
-            t.position.set(0, -7);
-            box.addChild(bg, t);
-            v.node.addChild(box);
-            bv.talk = box;
-            bv.talkText = say.text;
-          }
-          bv.talk.y = baseY - 14 - lift - 24 - 6;
-          bv.talk.alpha = say.alpha;
-          bv.talk.visible = true;
-        } else if (bv.talk) bv.talk.visible = false;
       }
       const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}/${w[15]}/${isReady(w) ? 1 : 0}`;
       if (v.lastKey !== key) {
