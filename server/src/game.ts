@@ -474,6 +474,7 @@ export interface Merc extends Fighter {
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   flankT: number; // 기병이 우회 접근에 쓴 시간
   intent?: number; // 이번 틱에 하려는 일(INTENT). 머리 위 표시용
+  cmd?: { kind: "mark" | "move" | "attack"; type: number; x: number; y: number; left: number }; // 이름으로 받은 개인 명령(병종 지시·진형을 새로 주면 풀린다)
   stunT?: number; // 기절·속박 남은 시간(움직이지도 공격하지도 못한다)
   slowT?: number; // 둔화 남은 시간
   slowMult?: number; // 둔화 중 이동 속도 배율
@@ -1068,12 +1069,79 @@ export class Game {
       }
     }
     const mask = this.typeMask(types);
+    this.clearMercCmds(playerId, mask);
     for (const t of UNIT_TYPES) if (mask & (1 << t)) s.orders[t] = { kind: pick ? 0 : 1, x: ax, y: ay, left, targetId: 0 };
     // 화면 표시용(마지막 지시 지점)
     s.state.chargeX = ax;
     s.state.chargeY = ay;
     s.state.chargeKind = pick ? 0 : 1;
     s.state.chargeLeft = left;
+  }
+
+  private clearMercCmds(owner: number, mask: number): void {
+    for (const m of this.mercs.values()) if (m.owner === owner && m.cmd && mask & (1 << m.type)) m.cmd = undefined;
+  }
+
+  /** 이름으로 고른 용병 개인에게 명령한다: 마크(그 병종 적을 따라붙어 공격), 이동·공격(지점), 해제. 입력은 모두 검증한다. */
+  mercCmd(playerId: number, ids: unknown, kind: unknown, type?: unknown, x?: unknown, y?: unknown): boolean {
+    if (!this.slots.has(playerId) || !Array.isArray(ids) || ids.length === 0 || ids.length > 40) return false;
+    if (kind !== "mark" && kind !== "move" && kind !== "attack" && kind !== "clear") return false;
+    let cmd: Merc["cmd"];
+    if (kind === "mark") {
+      if (typeof type !== "number" || !Number.isInteger(type) || type < 0 || type >= UNIT_TYPES.length) return false;
+      cmd = { kind, type, x: 0, y: 0, left: 60 };
+    } else if (kind !== "clear") {
+      if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+      cmd = { kind, type: 0, x: clampToWorld(x, 20), y: clampToWorld(y, 20), left: kind === "move" ? TUNE.MOVE_ORDER_SEC : CHARGE_DURATION_SEC };
+    }
+    let n = 0;
+    for (const id of ids) {
+      const m = typeof id === "number" ? this.mercs.get(id) : undefined;
+      if (!m || m.owner !== playerId) continue;
+      m.cmd = cmd ? { ...cmd } : undefined;
+      n++;
+    }
+    return n > 0;
+  }
+
+  /** 개인 명령으로 움직인다. 이번 틱의 AI를 대신했으면 true(마크할 적이 없으면 평소처럼 싸운다). */
+  private runMercCmd(m: Merc, cm: NonNullable<Merc["cmd"]>, c: AiCtx): boolean {
+    const { st, dt } = c;
+    if (cm.kind === "mark") {
+      let best: Target | null = null;
+      let bd = Infinity;
+      for (const t of c.targets) {
+        if (t.type !== cm.type) continue;
+        const d = Math.hypot(t.x - m.x, t.y - m.y);
+        if (d < bd) {
+          bd = d;
+          best = t;
+        }
+      }
+      if (!best) return false;
+      m.intent = INTENT.MARK;
+      this.attackMove(c, best);
+      return true;
+    }
+    if (cm.kind === "move") {
+      m.intent = INTENT.ORDER_MOVE;
+      if (this.autoStrike(c)) return true;
+      if (Math.hypot(cm.x - m.x, cm.y - m.y) > 12) this.moveToward(m, cm.x, cm.y, st.speed, dt, 8);
+      return true;
+    }
+    let near: Target | null = null;
+    let nd = TUNE.ORDER_GROUP_RADIUS * 1.5;
+    for (const t of c.targets) {
+      const d = Math.hypot(t.x - cm.x, t.y - cm.y);
+      if (d < nd) {
+        nd = d;
+        near = t;
+      }
+    }
+    m.intent = INTENT.ORDER_ATTACK;
+    if (near) this.attackMove(c, near);
+    else if (Math.hypot(cm.x - m.x, cm.y - m.y) > 12) this.moveToward(m, cm.x, cm.y, st.speed, dt, 8);
+    return true;
   }
 
   /** 기병에게 돌격 지점을 지시한다(order의 기병 전용 약식). */
@@ -2429,6 +2497,7 @@ export class Game {
     const sl = this.slots.get(playerId);
     if (!sl || (v !== STANCE_DEFEND && v !== STANCE_ASSAULT && v !== STANCE_HOLD && v !== STANCE_PROTECT && v !== STANCE_SPREAD)) return false;
     const mask = this.typeMask(types);
+    this.clearMercCmds(playerId, mask);
     if (v === STANCE_HOLD) {
       // 지점을 정한 적이 없는 병종은 주인공 앞쪽에 지점을 둔다
       const need = UNIT_TYPES.filter((t) => mask & (1 << t) && !sl.holdSets[t]).reduce<number>((m, t) => m | (1 << t), 0);
@@ -3632,6 +3701,11 @@ export class Game {
           m.intent = INTENT.DANGER;
           continue;
         }
+      }
+      if (m.cmd && !duel) {
+        m.cmd.left -= dt;
+        if (m.cmd.left <= 0) m.cmd = undefined;
+        else if (this.runMercCmd(m, m.cmd, c)) continue;
       }
       if (ordNow) {
         c.ordered = true;

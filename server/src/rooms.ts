@@ -175,6 +175,9 @@ export class RoomManager {
       case "order":
         room.game.order(id, msg.x, msg.y, msg.types);
         return;
+      case "mercCmd":
+        room.game.mercCmd(id, msg.ids, msg.kind, msg.type, msg.x, msg.y);
+        return;
       case "debug":
         room.game.dbgOn = msg.on === true;
         return;

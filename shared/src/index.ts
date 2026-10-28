@@ -184,8 +184,8 @@ export type MercWire = [
   intent: number, // 지금 무엇을 하려는지(INTENT_NAMES 번호). 머리 위에 표시한다
 ];
 /** 용병이 지금 하려는 일(머리 위 표시). 0은 표시 없음 */
-export const INTENT_NAMES = ["", "대기", "복귀", "추격", "공격", "돌격", "이동 지시", "공격 지시", "물러남", "위험 회피", "사선 확보", "고지대", "공포", "치고 빠짐", "수비"] as const;
-export const INTENT = { HOLD: 1, RETURN: 2, CHASE: 3, ATTACK: 4, CHARGE: 5, ORDER_MOVE: 6, ORDER_ATTACK: 7, KITE: 8, DANGER: 9, LOS: 10, HIGH: 11, FEAR: 12, EVADE: 13, GUARD: 14 } as const;
+export const INTENT_NAMES = ["", "대기", "복귀", "추격", "공격", "돌격", "이동 지시", "공격 지시", "물러남", "위험 회피", "사선 확보", "고지대", "공포", "치고 빠짐", "수비", "마크"] as const;
+export const INTENT = { HOLD: 1, RETURN: 2, CHASE: 3, ATTACK: 4, CHARGE: 5, ORDER_MOVE: 6, ORDER_ATTACK: 7, KITE: 8, DANGER: 9, LOS: 10, HIGH: 11, FEAR: 12, EVADE: 13, GUARD: 14, MARK: 15 } as const;
 /** 서버가 알려 주는 순간 효과(그 틱에 일어난 일): [종류, x, y, 방향] */
 export const EVT_ARROW_HIT = 0; // 아군 화살 명중
 export const EVT_ENEMY_ARROW_HIT = 1; // 적 화살 명중
@@ -347,6 +347,7 @@ export type ClientMsg =
   | { t: "hold"; x: number; y: number; types?: number } // 이 지점을 지키도록 지시(지점 방어 모드로 바꾼다)
   | { t: "order"; x: number; y: number; types?: number } // 병종 비트마스크(생략하면 전체)에 이동/공격 지시. 적 근처를 찍으면 공격, 빈 땅이면 이동
   | { t: "debug"; on: boolean } // 개발용: AI 표시(목표·길·위험 구역)를 상태에 실어 달라는 요청(F9)
+  | { t: "mercCmd"; ids: number[]; kind: "mark" | "move" | "attack" | "clear"; type?: number; x?: number; y?: number } // 이름으로 고른 용병 개인에게 주는 명령(마크: 그 병종 적을 따라붙어 공격, 이동·공격: 지점, 해제)
   | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)
 
 export type ServerMsg =

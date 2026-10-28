@@ -900,7 +900,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·전원 호위 등)",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·카일 기병 마크해 등)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1758,8 +1758,17 @@ async function main() {
     toastLeft = sec;
   };
   const runVoice = (text: string) => {
-    const cmd = parseVoice(text);
-    if (!cmd) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 창병 공격)`, 4);
+    const roster = (latest?.mercs ?? []).filter((w) => w[5] === myId).map((w) => ({ id: w[0], name: mercName(w[16]) }));
+    const cmd = parseVoice(text, roster);
+    if (!cmd) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 카일 기병 마크해 · 카일 저기 공격)`, 4);
+    if (cmd.kind === "merc") {
+      const wx = mouseX - world.x;
+      const wy = mouseY - world.y;
+      if (cmd.action === "stay") {
+        for (const w of latest?.mercs ?? []) if (cmd.ids.includes(w[0])) send({ t: "mercCmd", ids: [w[0]], kind: "move", x: w[1], y: w[2] });
+      } else send({ t: "mercCmd", ids: cmd.ids, kind: cmd.action, type: cmd.markType, x: wx, y: wy });
+      return say(`🎤 "${text}" → ${cmd.label}`, 3);
+    }
     const tf = cmd.types === null ? typesField() : cmd.types === ALL_MASK ? undefined : cmd.types;
     const me = latest?.players.find((p) => p.id === myId);
     const who = cmd.types === null ? (selMask === ALL_MASK ? "전체" : "선택한 병종") : cmd.types === ALL_MASK ? "전체" : UNIT_TYPES.filter((t) => cmd.types! & (1 << t)).map((t) => UNIT_NAMES[t]).join("·");
@@ -2265,7 +2274,11 @@ async function main() {
       }
       v.node.zIndex = v.y;
       setPoison(v.sprite, w[18] === 1);
-      v.label.visible = showNames || mercPanel.hovered() === w[0];
+      const mine = w[5] === myId && latest?.g?.phase !== "tournament";
+      v.label.visible = mine || showNames || mercPanel.hovered() === w[0]; // 내 용병은 이름을 항상 보여 준다(음성 지시로 이름을 부를 수 있다)
+      const baseY = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y;
+      const lift = isReady(w) ? 12 : 0; // 강화 가능 화살표가 있으면 그 위로
+      v.label.y = baseY - 14 - lift - (mine ? 12 : -4);
       // 지금 하려는 일: 내 용병 머리 위에 항상 작게 보여 준다(토너먼트에서는 숨김)
       {
         const iv = v as unknown as { intent?: Text; intentCode?: number };
@@ -2273,10 +2286,10 @@ async function main() {
         if (code > 0 && !iv.intent) {
           iv.intent = new Text({ text: "", style: { fill: 0xffffff, fontSize: 10, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
           iv.intent.anchor.set(0.5, 1);
-          iv.intent.y = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 14;
           v.node.addChild(iv.intent);
         }
         if (iv.intent) {
+          iv.intent.y = baseY - 14 - lift;
           iv.intent.visible = code > 0;
           if (code > 0 && iv.intentCode !== code) {
             iv.intentCode = code;

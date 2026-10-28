@@ -4,7 +4,14 @@ import { CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE } from "./rules.js";
 export type VoiceCmd =
   | { kind: "stance"; v: number; types: number | null; label: string }
   | { kind: "hold"; at: "hero" | "mouse"; types: number | null; label: string }
-  | { kind: "order"; types: number | null; label: string }; // 마우스 위치로: 적 근처면 공격, 빈 땅이면 이동(우클릭과 같다)
+  | { kind: "order"; types: number | null; label: string } // 마우스 위치로: 적 근처면 공격, 빈 땅이면 이동(우클릭과 같다)
+  | { kind: "merc"; ids: number[]; names: string[]; action: "mark" | "move" | "attack" | "clear" | "stay"; markType?: number; label: string }; // 이름으로 고른 용병 개인에게
+
+/** 이름을 알아듣기 위한 용병 목록(내 용병) */
+export interface VoiceMerc {
+  id: number;
+  name: string; // "붉은 카일"
+}
 
 const TYPE_WORDS: [number, string[]][] = [
   [CAVALRY, ["기병", "기마", "말탄"]],
@@ -36,10 +43,54 @@ export function voiceTypes(text: string): number | null {
 
 const has = (t: string, ...ws: string[]) => ws.some((w) => t.includes(w));
 
-/** 정해진 말(병종 이름 + 명령어)을 명령으로 바꾼다. 못 알아들으면 null. */
-export function parseVoice(text: string): VoiceCmd | null {
-  const t = text.replace(/[\s.,!?]+/g, "");
-  if (!t) return null;
+/** 말한 문장에서 용병 이름을 찾는다: 수식어까지 말하면 그 용병 한 명, 이름만 말하면 그 이름의 용병 모두. 찾은 이름은 문장에서 지운다. */
+function voiceMercs(text: string, roster: readonly VoiceMerc[]): { ids: number[]; names: string[]; rest: string } {
+  let rest = text;
+  const ids = new Set<number>();
+  const names: string[] = [];
+  const parts = roster.map((m) => {
+    const words = m.name.split(/\s+/);
+    return { id: m.id, full: m.name.replace(/\s+/g, ""), given: words[words.length - 1]!, name: m.name };
+  });
+  for (const p of parts) {
+    if (p.full.length >= 2 && rest.includes(p.full)) {
+      ids.add(p.id);
+      if (!names.includes(p.name)) names.push(p.name);
+    }
+  }
+  for (const p of parts) rest = rest.split(p.full).join("_");
+  for (const given of new Set(parts.map((p) => p.given))) {
+    if (given.length < 2 || !rest.includes(given)) continue; // 한 글자 이름은 다른 말과 섞이기 쉬워 수식어와 함께 말해야 한다
+    for (const p of parts) if (p.given === given) ids.add(p.id);
+    names.push(given);
+    rest = rest.split(given).join("_");
+  }
+  return { ids: [...ids], names, rest };
+}
+
+/** 정해진 말(병종 이름 + 명령어, 또는 용병 이름 + 명령어)을 명령으로 바꾼다. 못 알아들으면 null. */
+export function parseVoice(text: string, roster: readonly VoiceMerc[] = []): VoiceCmd | null {
+  const t0 = text.replace(/[\s.,!?]+/g, "");
+  if (!t0) return null;
+  const named = roster.length > 0 ? voiceMercs(t0, roster) : null;
+  if (named && named.ids.length > 0) {
+    const r = named.rest;
+    const who = named.names.join("·");
+    const ids = named.ids;
+    const names = named.names;
+    if (has(r, "해제", "풀어", "그만", "취소", "복귀", "돌아와", "따라와")) return { kind: "merc", ids, names, action: "clear", label: `${who} 개인 명령 해제` };
+    if (has(r, "마크", "견제", "전담", "붙어", "따라붙")) {
+      const mask = voiceTypes(r);
+      if (mask === null) return null;
+      const ty = [0, 1, 2, 3, 4, 5].find((x) => mask & (1 << x))!;
+      return { kind: "merc", ids, names, action: "mark", markType: ty, label: `${who} → 적 ${VOICE_TYPE_NAMES[ty]} 마크` };
+    }
+    if (has(r, "공격", "쳐", "싸워", "죽여")) return { kind: "merc", ids, names, action: "attack", label: `${who} 공격(마우스 위치)` };
+    if (has(r, "수비", "지켜", "멈춰", "대기", "제자리")) return { kind: "merc", ids, names, action: "stay", label: `${who} 제자리 대기` };
+    if (has(r, "이동", "가라", "가자", "움직", "여기", "저기")) return { kind: "merc", ids, names, action: "move", label: `${who} 이동(마우스 위치)` };
+    return null;
+  }
+  const t = t0;
   const types = voiceTypes(t);
   const mouse = has(t, "여기", "저기", "거기", "마우스", "이쪽", "저쪽");
   if (has(t, "돌격", "돌진", "밀어", "쳐들어")) return { kind: "stance", v: 1, types, label: "돌격 진형" };
