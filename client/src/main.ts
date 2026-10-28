@@ -85,6 +85,7 @@ import {
   tierName,
   UNIT_NAMES,
   INTENT_NAMES,
+  personalityOf,
   intentLine,
   parseVoiceBest,
   UNIT_TYPES,
@@ -854,8 +855,8 @@ async function main() {
     key.position.set(26, 14);
     const name = new Text({ text: "", style: { fill: 0xffffff, fontSize: 22, fontWeight: "bold" } });
     name.position.set(68, 8);
-    const sub = new Text({ text: "", style: { fill: 0xb8bdc9, fontSize: 15 } });
-    sub.position.set(68, 38);
+    const sub = new Text({ text: "", style: { fill: 0xb8bdc9, fontSize: 14 } });
+    sub.position.set(68, 39);
     const price = new Text({ text: "", style: { fill: 0xffd45d, fontSize: 24, fontWeight: "bold" } });
     price.anchor.set(1, 0);
     price.position.set(CAMP_W - 28 - 20, 6);
@@ -3367,11 +3368,13 @@ async function main() {
         if (snd.near < 0) audio.play("camp_open"); // 방금 범위에 들어왔다
         nearCampId = best[0];
         nearCampOffers = [best[4], best[5], best[6]];
+        const campNames = [best[7] ?? 0, best[8] ?? 0, best[9] ?? 0];
         const owned = mine.length;
         campHint.text = `보유 금화 ${meState.gold}G · 통솔력 ${used}/${meState.leadership}`;
         [best[4], best[5], best[6]].forEach((code, i) => {
           const { type: t, tier } = decodeOffer(code);
-          const price = Math.round(mercPrice(t, owned) * TIER_BUY_MULT[tier]! * meState.priceMult);
+          const persona = personalityOf(campNames[i]!);
+          const price = Math.round(mercPrice(t, owned) * TIER_BUY_MULT[tier]! * meState.priceMult * (1 + (persona.price ?? 0)));
           const need = unitCost(t, tier);
           const noLeader = used + need > meState.leadership;
           const noGold = meState.gold < price;
@@ -3383,12 +3386,12 @@ async function main() {
           row.key.text = String(t + 2); // 병종마다 고정 번호
           row.name.text = `${tierName(t, tier)}${tier > 0 ? " " + "★".repeat(tier) : ""}`;
           row.name.style.fill = ok ? 0xffffff : 0x8d96a8;
-          row.sub.text = noLeader ? "통솔력이 부족합니다" : noGold ? `금화가 ${price - meState.gold}G 부족합니다` : `${UNIT_NAMES[t]} · ${t + 2}번 키로 고용`;
-          row.sub.style.fill = ok ? 0xb8bdc9 : 0xff9b8f;
+          row.sub.text = `${persona.name} · ${persona.short}`; // 성격은 고용하기 전에 보인다(고용: 병종 번호 키)
+          row.sub.style.fill = ok ? 0xc9b8ff : 0x9a90b8;
           row.price.text = `${price}G`;
           row.price.style.fill = noGold ? 0xff9b8f : 0xffd45d;
-          row.lead.text = `통솔 ${need}`;
-          row.lead.style.fill = noLeader ? 0xff9b8f : 0x9fd0ff;
+          row.lead.text = noLeader ? `통솔력 부족 (${need})` : noGold ? `${price - meState.gold}G 부족` : `통솔 ${need}`;
+          row.lead.style.fill = noLeader || noGold ? 0xff9b8f : 0x9fd0ff;
           row.bg
             .clear()
             .roundRect(0, 0, CAMP_W - 28, CAMP_ROW_H, 10)

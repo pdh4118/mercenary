@@ -10,3 +10,6 @@ Math.random = (): number => {
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
+
+// 용병 성격(능력치 보정·지시 무시)은 시험에서 끈다: 기존 시험은 용병이 지시를 항상 따르고 능력치가 기본값이라고 가정한다. 성격 시험은 game.personality = true로 켠다.
+process.env.MERC_NO_PERSONALITY = "1";

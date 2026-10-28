@@ -1,4 +1,4 @@
-import { nextTierBonus, unitCost, mercName, mercXpNeed, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
+import { personalityOf, nextTierBonus, unitCost, mercName, mercXpNeed, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -75,6 +75,14 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
         sub.className = "stat";
         sub.textContent = respawn > 0 ? `쓰러짐 · 부활까지 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${unitCost(type, tier)}`;
         name.append(nm, sub);
+        const persona = personalityOf(nameId);
+        if (persona.name) {
+          const pr = document.createElement("div");
+          pr.className = "stat";
+          pr.style.color = "#c9b8ff";
+          pr.textContent = `성격 ${persona.name}: ${persona.short}`;
+          name.append(pr);
+        }
         const need = mercXpNeed(tier);
         if (Number.isFinite(need)) {
           const bar = document.createElement("div");

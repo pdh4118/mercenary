@@ -23,6 +23,7 @@ const LINES: Record<string, string[]> = {
   fear: ["으아아아", "저건 계약서에 없었다!", "살려줘!", "나 아직 월급 안 썼어!"],
   evade: ["치고 빠진다", "한 방 먹이고 튄다", "맞기 전에 도망, 병법의 기본"],
   lowhp: ["아직 안 죽었어…", "이러다 월급도 못 받고 가겠네", "붕대 어디 있더라", "살아야 한다. 외상값이 남았다", "아프다. 아프다는 건 살아 있다는 뜻이다"],
+  ignore: ["내 방식대로 한다", "말리지 마라", "안 한다고 했잖아. …한다", "명령은 참고만 하겠다", "그건 내 계획에 없다"],
   allyDown: ["{이름}… 편히 쉬어. 휴가는 아니다", "또 한 명 갔군. 인사팀에 알려야겠어", "죽지 마! …이미 죽었군", "{이름}, 장례비는 외상으로 하겠다", "이 일은 눈물이 나는 일이다. 그래도 일이다"],
   ready: ["슬슬 강해질 때가 됐지", "승급 면담을 신청합니다", "경험치가 월급보다 먼저 찼다", "강해지고 싶다. 얼마인지는 묻지 마라"],
   respawn: ["다시 왔다", "죽었다 살아났더니 허리가 아프다", "저승은 만석이더군", "방금 꿈에서 월급이 나왔다"],
@@ -30,19 +31,16 @@ const LINES: Record<string, string[]> = {
 
 /** 수식어별 말투: 해당 용병은 이 목록의 말을 섞어 쓴다(가끔은 이 말만) */
 const TONE: Record<string, string[]> = {
+  고집쎈: ["내 방식대로 한다", "말리지 마라", "안 한다고 했잖아. …한다", "명령서는 휴지가 아니다. 가끔은"],
   말없는: ["…", "……", "(끄덕)", "(침묵)"],
   수줍은: ["저, 저기…", "죄송합니다…", "아, 아니에요…", "저 때문은 아니죠…?"],
-  거만한: ["나만 믿어라", "이 몸이 나서면 끝이지", "내 칼은 비싸다", "너희는 운이 좋다. 나를 볼 수 있으니"],
   용감한: ["두렵지 않다!", "더 와라!", "죽는 건 나중 일이다"],
-  불꽃: ["다 태워 버리자", "불 붙었다!"],
-  붉은: ["피는 붉은 게 보기 좋지", "빨강은 전투색이다"],
-  굶주린: ["배고프다", "이기면 고기다", "전쟁보다 점심이 급하다"],
+  날쌘: ["잡을 테면 잡아 봐", "느려, 너무 느려", "바람보다 빨라야 월급이 나온다"],
+  철벽: ["뚫리지 않는다", "내 방패는 월급보다 오래 간다", "움직이기 싫은 게 아니라 안 움직이는 거다"],
   늙은: ["이 짓도 이십 년째네", "허리야…", "내가 젊었을 땐 말이야"],
-  행운의: ["오늘은 운이 좋을 것 같아", "동전 던졌는데 앞면이더라"],
-  고집쎈: ["내 방식대로 한다", "말리지 마라", "안 한다고 했잖아. …한다"],
-  철벽: ["뚫리지 않는다", "내 방패는 월급보다 오래 간다"],
-  외눈: ["한쪽 눈이면 충분하지", "원근감은 포기했다"],
-  절름발이: ["다리는 이래도 칼은 곧다", "달리기는 안 시켰으면"],
+  행운의: ["오늘은 운이 좋을 것 같아", "동전 던졌는데 앞면이더라", "운도 실력이라더군"],
+  떠돌이: ["어디든 일자리는 있지", "오늘은 이 깃발 아래다", "옮겨 다니는 게 취미라서"],
+  굶주린: ["배고프다", "이기면 고기다", "전쟁보다 점심이 급하다"],
 };
 
 const pick = <T,>(a: readonly T[]): T => a[Math.floor(Math.random() * a.length)]!;
@@ -149,7 +147,7 @@ export function createMurmur() {
           const map: Record<number, keyof typeof LINES> = {
             [INTENT.CHASE]: "chase", [INTENT.ATTACK]: "attack", [INTENT.CHARGE]: "charge", [INTENT.KITE]: "kite", [INTENT.DANGER]: "danger",
             [INTENT.ORDER_MOVE]: "orderMove", [INTENT.ORDER_ATTACK]: "orderAttack", [INTENT.MARK]: "mark", [INTENT.GUARD]: "guard",
-            [INTENT.RETURN]: "back", [INTENT.LOS]: "los", [INTENT.HIGH]: "high", [INTENT.FEAR]: "fear", [INTENT.EVADE]: "evade",
+            [INTENT.RETURN]: "back", [INTENT.IGNORE]: "ignore", [INTENT.LOS]: "los", [INTENT.HIGH]: "high", [INTENT.FEAR]: "fear", [INTENT.EVADE]: "evade",
           };
           key = map[m.intent] ?? null;
           chance = m.intent === INTENT.ATTACK ? 0.1 : m.intent === INTENT.FEAR || m.intent === INTENT.DANGER ? 0.45 : 0.3;

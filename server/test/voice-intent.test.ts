@@ -35,7 +35,7 @@ test("음성 지시: 진형·수비·공격·이동 명령으로 바뀐다", () 
 });
 
 test("의도 표시: 이름표가 있고, 가만히 있는 용병은 대기·적에게 가면 추격·지시를 받으면 지시로 보인다", () => {
-  assert.equal(INTENT_NAMES.length, 16);
+  assert.equal(INTENT_NAMES.length, 17);
   const g = new Game();
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;

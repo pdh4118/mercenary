@@ -10,6 +10,10 @@ import {
   EVT_DMG_POISON_ALLY,
   type MeteorWire,
   INTENT,
+  personalityOf,
+  PERSONALITY_IGNORE_MAX,
+  sameEpithetName,
+  type Personality,
   CARDS,
   ENEMY_XP,
   ARMY_AGGRO,
@@ -285,6 +289,7 @@ const newMercMods = (): MercMods => ({
   crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, thorns: 0, xp: 1,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
+const NO_PERSONALITY: Personality = { name: "", short: "", mods: {}, ignore: 0 };
 const mstat = (mods: Mods, type: number, stat: MercStat): number =>
   MULT_STATS.includes(stat) ? mods.all[stat] * mods.type[type]![stat] : mods.all[stat] + mods.type[type]![stat];
 
@@ -380,7 +385,7 @@ export interface Slot {
   holdPts: [number, number][]; // 병종별 지점 방어 지점
   holdSets: boolean[]; // 병종별로 지점을 한 번이라도 지정했다
   holdFacings: number[]; // 병종별 지점 방어 진형이 바라보는 방향
-  orders: ({ kind: number; x: number; y: number; left: number; targetId: number } | null)[]; // 병종별 이동(1)/공격(0) 지시
+  orders: ({ kind: number; x: number; y: number; left: number; targetId: number; seq: number } | null)[]; // 병종별 이동(1)/공격(0) 지시
   deaths: number[]; // 최근 용병이 쓰러진 시각(사기 저하 판정)
   shakenGrace: number; // 사기 저하가 다시 걸리지 않는 남은 시간
   leadFlat: number; // 카드로 얻은 통솔력(고정)
@@ -475,6 +480,10 @@ export interface Merc extends Fighter {
   flankT: number; // 기병이 우회 접근에 쓴 시간
   intent?: number; // 이번 틱에 하려는 일(INTENT). 머리 위 표시용
   intentArg?: number; // 의도의 대상 병종
+  orderSeen?: number; // 마지막으로 판정한 지시 번호
+  ignoring?: boolean; // 지금 받은 지시를 무시하는 중(성격)
+  ignoredLast?: boolean; // 바로 앞 지시를 무시했다
+  ignoreT?: number; // 개인 명령을 무시한 뒤 "내 방식대로"를 보여 주는 남은 시간
   num: number; // 주인별 용병 번호(1부터)
   cmd?: { kind: "mark" | "move" | "attack"; type: number; x: number; y: number; left: number }; // 이름으로 받은 개인 명령(병종 지시·진형을 새로 주면 풀린다)
   stunT?: number; // 기절·속박 남은 시간(움직이지도 공격하지도 못한다)
@@ -541,6 +550,7 @@ interface Camp {
   y: number;
   left: number;
   offers: number[];
+  names: number[]; // 선택지마다 미리 정해 둔 이름 번호(성격이 고용 전에 보인다)
 }
 
 /** 공격·피격 대상이 되는 아군(주인공 또는 용병)을 한 형태로 다루기 위한 뷰 */
@@ -592,6 +602,7 @@ interface AiCtx {
   guard: boolean; // 주인공 호위(기본) 명령 중
   fort: boolean; // 보호 진형 도형 안팎의 자리를 지키는 중(검방병은 자리를 지키고, 궁병·마법사는 도형 밖으로 나가지 않는다)
   widthMult: number; // 창병 범위 증가 배율
+  ignoreOrders?: boolean; // 성격 때문에 지금 받은 지시를 무시하는 중
   ordered?: boolean; // 우클릭 지시·돌격으로 움직이는 중(물러나기·지키기보다 지시가 앞선다)
 }
 
@@ -1003,11 +1014,13 @@ export class Game {
     if (this.leadershipUsed(playerId) + need > s.state.leadership) {
       return { ok: false, reason: `통솔력이 부족합니다 (${need} 필요)` };
     }
-    const price = Math.round(mercPrice(type, owned) * TIER_BUY_MULT[tier]! * s.state.priceMult);
+    const offerName = camp.names[offerIndex];
+    const discount = this.personality && offerName !== undefined ? 1 + (personalityOf(offerName).price ?? 0) : 1; // 떠돌이는 싸다
+    const price = Math.round(mercPrice(type, owned) * TIER_BUY_MULT[tier]! * s.state.priceMult * discount);
     if (s.state.gold < price) return { ok: false, reason: `금화가 부족합니다 (${price}G 필요)` };
     s.state.gold -= price;
     s.detail.hired[type] = (s.detail.hired[type] ?? 0) + 1;
-    this.addMerc(playerId, type, s.state.x, s.state.y, price, tier);
+    this.addMerc(playerId, type, s.state.x, s.state.y, price, tier, offerName);
     return { ok: true };
   }
 
@@ -1076,7 +1089,7 @@ export class Game {
     }
     const mask = this.typeMask(types);
     this.clearMercCmds(playerId, mask);
-    for (const t of UNIT_TYPES) if (mask & (1 << t)) s.orders[t] = { kind: pick ? 0 : 1, x: ax, y: ay, left, targetId: 0 };
+    for (const t of UNIT_TYPES) if (mask & (1 << t)) s.orders[t] = { kind: pick ? 0 : 1, x: ax, y: ay, left, targetId: 0, seq: ++this.orderSeq };
     // 화면 표시용(마지막 지시 지점)
     s.state.chargeX = ax;
     s.state.chargeY = ay;
@@ -1105,6 +1118,16 @@ export class Game {
       const m = typeof id === "number" ? this.mercs.get(id) : undefined;
       if (!m || m.owner !== playerId) continue;
       m.cmd = cmd ? { ...cmd } : undefined;
+      if (cmd && this.personality) {
+        // 성격: 개인 명령도 가끔 무시한다(무시하면 바로 취소되고, 다음 명령은 따른다)
+        const p = Math.min(PERSONALITY_IGNORE_MAX, this.persona(m).ignore);
+        const skip = p > 0 && !m.ignoredLast && this.rng() < p;
+        m.ignoredLast = skip;
+        if (skip) {
+          m.cmd = undefined;
+          m.ignoreT = 2.5;
+        }
+      }
       n++;
     }
     return n > 0;
@@ -1374,6 +1397,9 @@ export class Game {
       c.offers[0] ?? 0,
       c.offers[1] ?? 0,
       c.offers[2] ?? 0,
+      c.names[0] ?? 0,
+      c.names[1] ?? 0,
+      c.names[2] ?? 0,
     ]);
   }
 
@@ -2312,13 +2338,17 @@ export class Game {
     return [...this.chests.values()].map((c) => [c.id, round(c.x), round(c.y), c.owner, Math.ceil(c.left)]);
   }
 
-  addMerc(owner: number, type: number, x: number, y: number, paid = 0, tier = 0): number {
+  addMerc(owner: number, type: number, x: number, y: number, paid = 0, tier = 0, nameId?: number): number {
     const id = this.nextEntityId++;
     const used = new Set<number>();
-    for (const o of this.mercs.values()) if (o.owner === owner) used.add(o.num);
+    const usedNames = new Set<number>();
+    for (const o of this.mercs.values()) if (o.owner === owner) {
+      used.add(o.num);
+      usedNames.add(o.nameId);
+    }
     let num = 1;
     while (used.has(num)) num++;
-    const merc: Merc = { num, id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier, nameId: this.pickName(owner), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
+    const merc: Merc = { num, id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier, nameId: nameId === undefined ? this.pickName(owner) : sameEpithetName(nameId, usedNames), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
     this.mercs.set(id, merc);
     merc.hp = this.mercStats(merc).hp; // 이미 받은 강화가 반영된 체력으로 시작한다
     merc.shield = this.mercStats(merc).shield;
@@ -2423,7 +2453,9 @@ export class Game {
 
   spawnCampAt(x: number, y: number, offers: number[]): number {
     const id = this.nextEntityId++;
-    this.camps.set(id, { id, x, y, left: TUNE.CAMP_LIFETIME_SEC, offers });
+    // 이름(성격)은 캠프 번호에서 정한다(난수를 쓰지 않아 다른 규칙의 난수 흐름을 건드리지 않는다)
+    const names = offers.map((_, i) => Math.imul(id * 31 + i * 17 + 7, 2654435761) >>> 0).map((h) => h % MERC_NAME_COUNT);
+    this.camps.set(id, { id, x, y, left: TUNE.CAMP_LIFETIME_SEC, offers, names });
     return id;
   }
 
@@ -2442,7 +2474,7 @@ export class Game {
   private gainMercXp(m: Merc, amount: number): void {
     if (amount <= 0 || m.tier >= MAX_TIER) return;
     const mods = this.slots.get(m.owner)?.mods;
-    const gain = amount * (mods ? mstat(mods, m.type, "xp") : 1); // 경험치 획득 능력
+    const gain = amount * (mods ? this.pstat(m, mods, "xp") : 1); // 경험치 획득 능력
     m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + gain);
   }
 
@@ -3347,7 +3379,7 @@ export class Game {
         hit: (h) => {
           if (m.respawn > 0 || m.hp <= 0) return 0; // 이미 쓰러졌다
           const mods = this.slots.get(m.owner)?.mods;
-          if (!h.dot && !h.pierceGuard && this.dodged(mods ? mstat(mods, m.type, "dodge") : 0, m.x, m.y, m.owner)) return 0;
+          if (!h.dot && !h.pierceGuard && this.dodged(mods ? this.pstat(m, mods, "dodge") : 0, m.x, m.y, m.owner)) return 0;
           const r = h.dot || h.pierceGuard ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
           if (m.type === CAVALRY && h.srcType === SPEAR && !h.dot && !h.pierceGuard) {
@@ -3632,7 +3664,7 @@ export class Game {
       m.cd = Math.max(0, m.cd - dt);
 
       // 공포: 사기가 꺾인 동안 모든 용병이 싸우지 않고 적에게서 멀어지는 쪽으로 도망친다(주문·공격 준비도 끊긴다)
-      if (!duel && ownerSlot && ownerSlot.state.shaken > 0) {
+      if (!duel && ownerSlot && ownerSlot.state.shaken > 0 && !this.persona(m).fearImmune) {
         m.atkT = 0;
         m.evadeT = 0;
         m.intent = INTENT.FEAR;
@@ -3666,13 +3698,16 @@ export class Game {
         allyCache.set(m.owner, allies);
       }
       let home = slotsByOwner.get(m.owner)?.get(m.id) ?? [m.x, m.y];
-      let leash = this.leashOf(st, m.type, ownerSlot);
+      let leash = this.leashOf(st, m.type, ownerSlot) * (1 + (this.persona(m).leash ?? 0)); // 떠돌이는 진형에서 더 멀리 쫓는다
       let assault = this.effStance(ownerSlot, m.type) === STANCE_ASSAULT;
       const trueAssault = ownerSlot?.stances[m.type] === STANCE_ASSAULT; // 보호 진형에서 자유롭게 싸우는 병종은 해당하지 않는다
       if (trueAssault && m.type === CAVALRY) leash = 1e6; // 돌격 진형: 기병은 주인공과의 거리와 상관없이 쫓는다
       let guard = this.effStance(ownerSlot, m.type) === STANCE_DEFEND;
       let fort = ownerSlot?.stances[m.type] === STANCE_PROTECT && m.type !== CAVALRY && m.type !== BLUNT; // 보호 진형 도형 안팎의 자리를 지킨다
-      const ord = m.type === CAVALRY ? null : ownerSlot?.orders[m.type];
+      const rawOrd = m.type === CAVALRY ? null : ownerSlot?.orders[m.type];
+      const rawCav = m.type === CAVALRY ? ownerSlot?.orders[CAVALRY] ?? null : null;
+      const ignoring = !!(rawOrd ?? rawCav) && !duel && this.ignoresOrder(m, (rawOrd ?? rawCav)!.seq); // 성격: 새 지시를 무시하기도 한다(상한 30%)
+      const ord = ignoring ? null : rawOrd;
       if (ord) {
         // 지시를 받은 병종: 지시 지점이 새 "자리"가 된다(이동이면 그 둘레에 흩어져 서고 가까운 적과 싸우며, 공격이면 그 일대의 적을 쫓는다)
         if (ord.kind === 1) {
@@ -3704,7 +3739,8 @@ export class Game {
         fort,
         widthMult: boxWidthMult(m.type, st.arc),
       };
-      const ordNow = m.type === CAVALRY ? null : ownerSlot?.orders[m.type] ?? null;
+      const ordNow = ignoring || m.type === CAVALRY ? null : ownerSlot?.orders[m.type] ?? null;
+      c.ignoreOrders = ignoring;
       const px0 = m.x;
       const py0 = m.y;
       if (!duel && this.danger.length > 0 && !ordNow) {
@@ -3742,6 +3778,8 @@ export class Game {
         }
       }
       if (!m.intent) m.intent = this.inferIntent(m, c, ordNow, trueAssault, Math.hypot(m.x - px0, m.y - py0) > 0.5);
+      if ((m.ignoreT ?? 0) > 0) m.ignoreT = Math.max(0, m.ignoreT! - dt);
+      if ((ignoring || (m.ignoreT ?? 0) > 0) && m.intent !== INTENT.ATTACK && m.intent !== INTENT.DANGER && m.intent !== INTENT.FEAR) m.intent = INTENT.IGNORE; // "내 방식대로 할 거야"
       if (duel) {
         const r = Math.hypot(m.x, m.y);
         if (r > TOURNAMENT_ARENA_RADIUS) {
@@ -3770,7 +3808,7 @@ export class Game {
   /** AI가 따로 정하지 않은 틱의 의도를 상태에서 읽어 낸다(머리 위 표시용) */
   private inferIntent(m: Merc, c: AiCtx, ord: { kind: number } | null, trueAssault: boolean, moved: boolean): number {
     if (m.atkT > 0) return INTENT.ATTACK;
-    const cord = m.type === CAVALRY ? c.owner?.orders[CAVALRY] ?? null : null; // 기병의 지시는 기병 AI가 따로 처리한다
+    const cord = m.type === CAVALRY && !c.ignoreOrders ? c.owner?.orders[CAVALRY] ?? null : null; // 기병의 지시는 기병 AI가 따로 처리한다
     if (ord || cord) return (ord ?? cord)!.kind === 1 ? INTENT.ORDER_MOVE : INTENT.ORDER_ATTACK;
     if (m.type === CAVALRY && m.evadeT > 0) return INTENT.EVADE;
     if (trueAssault && (moved || c.targets.length > 0)) return INTENT.CHARGE;
@@ -4322,7 +4360,7 @@ export class Game {
     const spears = c.targets.filter((t) => t.type === SPEAR);
     if (m.lockT) m.lockT = Math.max(0, m.lockT - dt);
     if (m.skipT) m.skipT = Math.max(0, m.skipT - dt);
-    if (owner?.orders[CAVALRY]?.kind === 1) m.evadeT = 0; // 이동 지시는 치고 빠지기보다 앞선다
+    if (!c.ignoreOrders && owner?.orders[CAVALRY]?.kind === 1) m.evadeT = 0; // 이동 지시는 치고 빠지기보다 앞선다
     if (m.evadeT > 0) {
       // 한 대 치고 빠진다: 대상에서 떨어져 후방으로 돌아 들어가며 속도를 다시 붙인다
       const prey = c.targets.find((t) => t.id === m.runId);
@@ -4355,7 +4393,7 @@ export class Game {
       }
     }
     const healthy = m.hp > st.hp * CAV_RETREAT_HP; // 체력이 낮으면 모험을 멈추고 복귀한다
-    const ord = owner?.orders[CAVALRY] ?? null;
+    const ord = c.ignoreOrders ? null : owner?.orders[CAVALRY] ?? null;
     const charging = !!ord; // 우클릭 지시는 체력이 낮아도 따른다(대상을 찾아 싸우는 것만 체력이 받쳐 줄 때 한다)
     const anchor: [number, number] = charging ? [ord!.x, ord!.y] : c.home;
     const moveOrder = charging && ord!.kind === 1; // 이동 지시: 그곳까지 싸우지 않고 가서 자리를 지킨다
@@ -4698,8 +4736,8 @@ export class Game {
 
   private resolveMercAttack(m: Merc, st: UnitStats): void {
     const mods = this.slots.get(m.owner)?.mods ?? newMods();
-    const crit = this.rollCrit(mstat(mods, m.type, "crit"));
-    const critChance = mstat(mods, m.type, "crit");
+    const crit = this.rollCrit(this.pstat(m, mods, "crit"));
+    const critChance = this.pstat(m, mods, "crit");
     const critMult = critDamageMult(critChance, TUNE.CRIT_BASE_MULT + mstat(mods, m.type, "critMult"));
     const dmg = st.damage * (crit ? critMult : 1);
     if (crit && hasLegend(mods, "stormfire", m.type) && !m.stormBurst) {
@@ -4833,7 +4871,7 @@ export class Game {
     if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
     if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
     // 흡혈: 카드로 쌓은 비율 + 전설 피의 갈증(치명타는 2배). 때린 쪽(주인공 또는 그 병종)만 회복한다.
-    const steal = (owner ? (src ? mstat(owner.mods, src.type, "lifesteal") : owner.mods.heroLifesteal) : 0) + (has("bloodthirst") ? LEGEND_CONST.bloodthirstFrac : 0);
+    const steal = (owner ? (src ? this.pstat(src, owner.mods, "lifesteal") : owner.mods.heroLifesteal) : 0) + (has("bloodthirst") ? LEGEND_CONST.bloodthirstFrac : 0);
     if (steal > 0 && dealt > 0) this.lifesteal(owner!, src, dealt * steal * (hit.crit && has("bloodthirst") ? 2 : 1));
     if (hit.crit) this.pushEvent(EVT_CRIT, e.x, e.y, 0);
     this.pushDamage(hit.crit ? EVT_DMG_ENEMY_CRIT : EVT_DMG_ENEMY, e.id, e.x, e.y, r.body, ownerId);
@@ -5148,7 +5186,7 @@ export class Game {
     const owner = this.slots.get(ownerId);
     if (owner) {
       const scope: LegendScope = src ? src.type : "hero";
-      const steal = (src ? mstat(owner.mods, src.type, "lifesteal") : owner.mods.heroLifesteal) + (hasLegend(owner.mods, "bloodthirst", scope) ? LEGEND_CONST.bloodthirstFrac : 0);
+      const steal = (src ? this.pstat(src, owner.mods, "lifesteal") : owner.mods.heroLifesteal) + (hasLegend(owner.mods, "bloodthirst", scope) ? LEGEND_CONST.bloodthirstFrac : 0);
       const dealt = Math.min(amount, Math.max(0, e.hp));
       if (steal > 0 && dealt > 0) this.lifesteal(owner, src, dealt * steal);
       this.addDealt(owner, src, src ? src.type : SPEAR, dealt);
@@ -5165,7 +5203,7 @@ export class Game {
     if (flat <= 0) return;
     const attacker = h.src as Enemy;
     // 반사 피해도 공격력(%)·단계 배율을 받는다
-    const dmgMult = src ? mstat(owner.mods, src.type, "dmg") * TIER_DMG[src.tier]! : owner.mods.heroDmg;
+    const dmgMult = src ? this.pstat(src, owner.mods, "dmg") * TIER_DMG[src.tier]! : owner.mods.heroDmg;
     if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, flat * dmgMult, owner.state.id, src);
   }
 
@@ -5354,6 +5392,34 @@ export class Game {
     }
   }
 
+  private orderSeq = 0;
+  /**
+   * 지시(우클릭·개인 명령)를 무시하는가. 새 지시를 처음 받은 순간 한 번만 정한다(그 지시가 끝날 때까지 유지). 상한 30%이고,
+   * 바로 앞 지시를 무시했다면 이번 지시는 반드시 따른다(연속으로 무시하지 않는다).
+   */
+  private ignoresOrder(m: Merc, seq: number): boolean {
+    const p = Math.min(PERSONALITY_IGNORE_MAX, this.persona(m).ignore);
+    if (p <= 0) return false;
+    if (m.orderSeen !== seq) {
+      m.orderSeen = seq;
+      m.ignoring = !m.ignoredLast && this.rng() < p;
+      m.ignoredLast = m.ignoring;
+    }
+    return !!m.ignoring;
+  }
+  /** 성격 효과를 켠다(테스트는 MERC_NO_PERSONALITY로 꺼서 지시·능력치가 흔들리지 않게 한다) */
+  personality = !process.env.MERC_NO_PERSONALITY;
+  private persona(m: Merc): Personality {
+    return this.personality ? personalityOf(m.nameId) : NO_PERSONALITY;
+  }
+  /** 카드 능력치에 성격 보정을 더한 값: 배율 능력은 (1 + 값)배, 나머지는 더한다 */
+  private pstat(m: Merc, mods: Mods, stat: MercStat): number {
+    const base = mstat(mods, m.type, stat);
+    const d = this.persona(m).mods[stat];
+    if (!d) return base;
+    return MULT_STATS.includes(stat) ? base * (1 + d) : base + d;
+  }
+
   /** 레벨업 카드와 강화 단계가 반영된 용병 능력치 */
   private mercStats(m: Merc): UnitStats {
     const base = MERC_STATS[m.type]!;
@@ -5362,17 +5428,17 @@ export class Game {
     if (!mods) return base;
     const t = m.type;
     const tier = m.tier;
-    const hpMult = mstat(mods, t, "hp") * TIER_HP[tier]!;
-    const area = mstat(mods, t, "area");
+    const hpMult = this.pstat(m, mods, "hp") * TIER_HP[tier]!;
+    const area = this.pstat(m, mods, "area");
     return {
       ...base,
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
-      damage: base.damage * mstat(mods, t, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)),
+      damage: base.damage * this.pstat(m, mods, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)),
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier),
-      cooldown: base.cooldown / (mstat(mods, t, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
-      speed: base.speed * mstat(mods, t, "speed") * (1 + TIER_SPEED[t]! * tier),
-      reach: meleeReach(t, base.reach * mstat(mods, t, "range") * (1 + TIER_REACH[t]! * tier), area * (1 + TIER_AREA[t]! * tier)),
+      cooldown: base.cooldown / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
+      speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier),
+      reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier), area * (1 + TIER_AREA[t]! * tier)),
       splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier),
       arc: meleeArc(t, base.arc, area),
     };

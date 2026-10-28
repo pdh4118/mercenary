@@ -8,6 +8,7 @@ export * from "./formation.js";
 export * from "./bossskill.js";
 export * from "./tiers.js";
 export * from "./names.js";
+export * from "./personality.js";
 export * from "./audio.js";
 export * from "./terrain.js";
 export * from "./voice.js";
@@ -186,8 +187,8 @@ export type MercWire = [
   num: number, // 내 용병 번호(1부터. 해고하면 비는 번호를 다음 용병이 쓴다). 음성으로 "3번"이라고 부른다
 ];
 /** 용병이 지금 하려는 일(머리 위 표시). 0은 표시 없음 */
-export const INTENT_NAMES = ["", "대기", "복귀", "추격", "공격", "돌격", "이동 지시", "공격 지시", "물러남", "위험 회피", "사선 확보", "고지대", "공포", "치고 빠짐", "수비", "마크"] as const;
-export const INTENT = { HOLD: 1, RETURN: 2, CHASE: 3, ATTACK: 4, CHARGE: 5, ORDER_MOVE: 6, ORDER_ATTACK: 7, KITE: 8, DANGER: 9, LOS: 10, HIGH: 11, FEAR: 12, EVADE: 13, GUARD: 14, MARK: 15 } as const;
+export const INTENT_NAMES = ["", "대기", "복귀", "추격", "공격", "돌격", "이동 지시", "공격 지시", "물러남", "위험 회피", "사선 확보", "고지대", "공포", "치고 빠짐", "수비", "마크", "고집"] as const;
+export const INTENT = { HOLD: 1, RETURN: 2, CHASE: 3, ATTACK: 4, CHARGE: 5, ORDER_MOVE: 6, ORDER_ATTACK: 7, KITE: 8, DANGER: 9, LOS: 10, HIGH: 11, FEAR: 12, EVADE: 13, GUARD: 14, MARK: 15, IGNORE: 16 } as const;
 /** 끝 글자에 받침이 있으면 "을", 없으면 "를" */
 export const eulReul = (word: string): string => {
   const c = word.charCodeAt(word.length - 1);
@@ -216,6 +217,7 @@ export function intentLine(code: number, target?: string, variant = 0): string {
     case INTENT.FEAR: return pick("이길 수 없어…!", "이건 못 이기겠어…!");
     case INTENT.EVADE: return pick("치고 빠져야 해", "치고 빠져야겠어");
     case INTENT.GUARD: return pick("이 자리를 지켜야 해", "이 자리를 지켜야겠어");
+    case INTENT.IGNORE: return pick("내 방식대로 할 거야", "싫어, 내 맘대로 할래");
     case INTENT.MARK: return pick(t ? `${t} 계속 따라붙어야 해` : "마크할 적을 찾아야 해", t ? `${t} 계속 따라붙어야겠어` : "마크할 적을 찾아야겠어");
     default: return INTENT_NAMES[code] ?? "";
   }
@@ -315,7 +317,7 @@ export type MeteorWire = [key: number, x: number, y: number, progress: number, r
 export type TentWire = [id: number, x: number, y: number, left: number, variant: number, resting: number];
 export type RiceWire = [id: number, x: number, y: number, left: number];
 export type ChestWire = [id: number, x: number, y: number, owner: number, left: number];
-export type CampWire = [id: number, x: number, y: number, left: number, offer0: number, offer1: number, offer2: number];
+export type CampWire = [id: number, x: number, y: number, left: number, offer0: number, offer1: number, offer2: number, name0: number, name1: number, name2: number]; // name0~2: 각 선택지 용병의 이름 번호(성격이 정해져 있어 고용 전에 보인다)
 
 export interface PlayerInput {
   dx: number; // -1..1
