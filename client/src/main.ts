@@ -1,4 +1,5 @@
 import { warmAssets } from "./assets.js";
+import { createMurmur } from "./murmur.js";
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
@@ -666,6 +667,8 @@ async function main() {
     ringShape: [number, number, number, number]; // 중심 x, 중심 y, 가로 반지름, 세로 반지름
   }
   const INTENT_COLOR: Record<number, number> = { 1: 0xb8c0d0, 2: 0x9fd2ff, 3: 0xff9a7a, 4: 0xff6a5a, 5: 0xff5a5a, 6: 0x8fe0a0, 7: 0xffc27a, 8: 0xd9b3ff, 9: 0xffa043, 10: 0x7fe0e0, 11: 0xe6d27a, 12: 0xffe14a, 13: 0xff9ac0, 14: 0x9fe0c0 };
+  const murmur = createMurmur();
+  let murmurOn = true;
   const mercs = new Pool<MercView, MercWire>(
     (w) => {
       const node = new Container();
@@ -900,7 +903,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 위치 지정 → E 이동 · Y 공격 · H 수비 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·카일 기병 마크해 등)",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 위치 지정 → E 이동 · Y 공격 · H 수비 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · O 혼잣말 끄고 켜기 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·카일 기병 마크해 등)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1788,7 +1791,11 @@ async function main() {
     const tag = (document.activeElement as HTMLElement | null)?.tagName;
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || myId < 0 || lobby.blocksGameInput() || formations.isOpen()) return;
     const k = e.key.toLowerCase();
-    if (k === "e") issueAtMarker("move");
+    if (k === "o") {
+      murmurOn = !murmurOn;
+      toast.text = murmurOn ? "용병 혼잣말 켬 (O)" : "용병 혼잣말 끔 (O)";
+      toastLeft = 1.8;
+    } else if (k === "e") issueAtMarker("move");
     else if (k === "y") issueAtMarker("attack");
     else if (k === "h") issueAtMarker("hold");
   });
@@ -2294,6 +2301,14 @@ async function main() {
         hitFx.splice(i, 1);
       }
     }
+    // 혼잣말: 내 용병이 상황에 따라 가끔 한마디(O 키로 끄고 켠다)
+    const talk = murmurOn
+      ? murmur.update(
+          latest.g?.phase === "tournament" ? [] : latest.mercs.filter((w) => w[5] === myId).map((w) => ({ id: w[0], type: w[4], nameId: w[16], x: w[1], y: w[2], hp: w[3], maxHp: w[9], down: w[8] > 0, intent: w[20] ?? 0, arg: w[21] ?? -1, ready: isReady(w) })),
+          performance.now(),
+          { x: -world.x + app.screen.width / 2, y: -world.y + app.screen.height / 2, r: Math.max(app.screen.width, app.screen.height) * 0.7 },
+        )
+      : new Map<number, { text: string; alpha: number }>();
     mercs.update(latest.mercs, k, (v, w) => {
       v.node.visible = w[8] <= 0 && ((w[19] ?? 0) & ST_BIT_REST) === 0; // 쓰러진 용병은 부활할 때까지, 텐트에서 쉬는 용병은 나올 때까지 숨긴다
       paintRing(v, ownerColor(w[5]), teamSide(w[5]) !== null);
@@ -2342,6 +2357,30 @@ async function main() {
             iv.intent.style.fill = INTENT_COLOR[code] ?? 0xffffff;
           }
         }
+      }
+      {
+        // 혼잣말 말풍선: 의도 표시 위에 작게 뜬다
+        const bv = v as unknown as { talk?: Container; talkText?: string };
+        const say = talk.get(w[0]);
+        if (say && v.node.visible) {
+          if (!bv.talk || bv.talkText !== say.text) {
+            bv.talk?.destroy({ children: true });
+            const box = new Container();
+            const t = new Text({ text: say.text, style: { fill: 0x1a1d26, fontSize: 12, fontWeight: "600", wordWrap: true, wordWrapWidth: 150, align: "center" } });
+            t.anchor.set(0.5, 1);
+            const bw = t.width + 12;
+            const bh = t.height + 8;
+            const bg = new Graphics().roundRect(-bw / 2, -bh - 3, bw, bh, 7).fill({ color: 0xfff6dc, alpha: 0.95 }).stroke({ width: 1.5, color: 0x3a3320 }).poly([-5, -3, 5, -3, 0, 4]).fill(0xfff6dc);
+            t.position.set(0, -7);
+            box.addChild(bg, t);
+            v.node.addChild(box);
+            bv.talk = box;
+            bv.talkText = say.text;
+          }
+          bv.talk.y = baseY - 14 - lift - 24 - 6;
+          bv.talk.alpha = say.alpha;
+          bv.talk.visible = true;
+        } else if (bv.talk) bv.talk.visible = false;
       }
       const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}/${w[15]}/${isReady(w) ? 1 : 0}`;
       if (v.lastKey !== key) {

@@ -13,3 +13,14 @@ export function mercName(id: number): string {
   const i = ((id % MERC_NAME_COUNT) + MERC_NAME_COUNT) % MERC_NAME_COUNT;
   return `${EPITHETS[Math.floor(i / NAMES.length)]!} ${NAMES[i % NAMES.length]!}`;
 }
+
+/** 이름 번호에서 수식어 번호와 수식어를 얻는다(혼잣말의 말투를 정하는 데 쓴다) */
+export function mercEpithet(id: number): string {
+  const i = ((id % MERC_NAME_COUNT) + MERC_NAME_COUNT) % MERC_NAME_COUNT;
+  return EPITHETS[Math.floor(i / NAMES.length)]!;
+}
+/** 이름 번호에서 이름(수식어 뺀 부분) */
+export function mercGivenName(id: number): string {
+  const i = ((id % MERC_NAME_COUNT) + MERC_NAME_COUNT) % MERC_NAME_COUNT;
+  return NAMES[i % NAMES.length]!;
+}
