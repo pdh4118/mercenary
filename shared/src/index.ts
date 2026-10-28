@@ -197,21 +197,21 @@ export const eulReul = (word: string): string => {
 export function intentLine(code: number, target?: string): string {
   const t = target ? `${target}${eulReul(target)}` : "";
   switch (code) {
-    case INTENT.HOLD: return "여기서 대기한다";
-    case INTENT.RETURN: return "대열로 돌아가자";
-    case INTENT.CHASE: return `${t || "적을"} 쫓아간다`;
-    case INTENT.ATTACK: return `${t ? `${t} ` : ""}공격한다!`;
-    case INTENT.CHARGE: return "적에게 돌격한다!";
-    case INTENT.ORDER_MOVE: return "지정한 곳으로 이동한다";
-    case INTENT.ORDER_ATTACK: return t ? `명령대로 ${t} 공격한다` : "명령대로 공격하러 간다";
-    case INTENT.KITE: return "거리를 벌리자";
-    case INTENT.DANGER: return "위험하다, 피하자!";
-    case INTENT.LOS: return "시야가 막혔다, 옮기자";
-    case INTENT.HIGH: return "높은 곳으로 올라가자";
-    case INTENT.FEAR: return "무서워서 도망간다!";
-    case INTENT.EVADE: return "치고 빠지자";
-    case INTENT.GUARD: return "이 자리를 지킨다";
-    case INTENT.MARK: return t ? `${t} 계속 따라붙는다` : "마크할 적을 찾는다";
+    case INTENT.HOLD: return "여기서 대기해야 해";
+    case INTENT.RETURN: return "대열로 돌아가야 해";
+    case INTENT.CHASE: return `${t || "적을"} 쫓아가야 해`;
+    case INTENT.ATTACK: return `${t ? `${t} ` : ""}공격해야 해!`;
+    case INTENT.CHARGE: return "적에게 돌격해야 해!";
+    case INTENT.ORDER_MOVE: return "지정한 곳으로 가야 해";
+    case INTENT.ORDER_ATTACK: return t ? `명령대로 ${t} 공격해야 해` : "명령대로 공격해야 해";
+    case INTENT.KITE: return "거리를 벌려야 해";
+    case INTENT.DANGER: return "위험해, 피해야 해!";
+    case INTENT.LOS: return "시야가 막혔어, 옮겨야 해";
+    case INTENT.HIGH: return "높은 곳으로 올라가야 해";
+    case INTENT.FEAR: return "이길 수 없어…!";
+    case INTENT.EVADE: return "치고 빠져야 해";
+    case INTENT.GUARD: return "이 자리를 지켜야 해";
+    case INTENT.MARK: return t ? `${t} 계속 따라붙어야 해` : "마크할 적을 찾아야 해";
     default: return INTENT_NAMES[code] ?? "";
   }
 }

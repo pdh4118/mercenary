@@ -233,12 +233,13 @@ test("용병 번호: 1부터 비어 있는 가장 작은 번호를 받고, 해�
 test("의도 문장: 혼잣말처럼 읽히고 조사가 맞는다", () => {
   assert.equal(eulReul("기병"), "을");
   assert.equal(eulReul("마법사"), "를");
-  assert.equal(intentLine(INTENT.ATTACK, "기병"), "기병을 공격한다!");
-  assert.equal(intentLine(INTENT.ATTACK, "마법사"), "마법사를 공격한다!");
-  assert.equal(intentLine(INTENT.ATTACK), "공격한다!");
-  assert.equal(intentLine(INTENT.CHASE, "궁병"), "궁병을 쫓아간다");
-  assert.equal(intentLine(INTENT.CHASE), "적을 쫓아간다");
-  assert.equal(intentLine(INTENT.MARK, "기병"), "기병을 계속 따라붙는다");
-  assert.equal(intentLine(INTENT.KITE), "거리를 벌리자");
+  assert.equal(intentLine(INTENT.ATTACK, "기병"), "기병을 공격해야 해!");
+  assert.equal(intentLine(INTENT.ATTACK, "마법사"), "마법사를 공격해야 해!");
+  assert.equal(intentLine(INTENT.ATTACK), "공격해야 해!");
+  assert.equal(intentLine(INTENT.CHASE, "궁병"), "궁병을 쫓아가야 해");
+  assert.equal(intentLine(INTENT.CHASE), "적을 쫓아가야 해");
+  assert.equal(intentLine(INTENT.MARK, "기병"), "기병을 계속 따라붙어야 해");
+  assert.equal(intentLine(INTENT.KITE), "거리를 벌려야 해");
+  assert.equal(intentLine(INTENT.FEAR), "이길 수 없어…!");
   for (let c = 1; c < INTENT_NAMES.length; c++) assert.ok(intentLine(c, "창병").length > 0, `의도 ${c}`);
 });
