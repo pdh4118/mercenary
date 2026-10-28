@@ -182,6 +182,7 @@ export type MercWire = [
   poison: number, // 1이면 독에 중독된 상태(토너먼트)
   status: number, // 상태 이상 비트(ST_BIT_*): 1 기절·속박(머리 위에 별), 4 둔화
   intent: number, // 지금 무엇을 하려는지(INTENT_NAMES 번호). 머리 위에 표시한다
+  intentArg: number, // 의도의 대상 병종(추격·공격·마크 중인 적의 병종, 없으면 -1)
 ];
 /** 용병이 지금 하려는 일(머리 위 표시). 0은 표시 없음 */
 export const INTENT_NAMES = ["", "대기", "복귀", "추격", "공격", "돌격", "이동 지시", "공격 지시", "물러남", "위험 회피", "사선 확보", "고지대", "공포", "치고 빠짐", "수비", "마크"] as const;
@@ -345,7 +346,7 @@ export type ClientMsg =
   | { t: "charge"; x: number; y: number } // 기병 돌격 지시(월드 좌표)
   | { t: "stance"; v: number; types?: number } // 용병 진형 모드(0 기본, 1 돌격, 2 수비, 3 호위, 4 산개). types는 병종 비트마스크(생략하면 전체)
   | { t: "hold"; x: number; y: number; types?: number } // 이 지점을 지키도록 지시(지점 방어 모드로 바꾼다)
-  | { t: "order"; x: number; y: number; types?: number } // 병종 비트마스크(생략하면 전체)에 이동/공격 지시. 적 근처를 찍으면 공격, 빈 땅이면 이동
+  | { t: "order"; x: number; y: number; types?: number; kind?: "move" | "attack" } // kind를 주면 그대로(이동: 적 근처여도 이동, 공격: 지점 둘레 적에게), 생략하면 적 근처 여부로 자동 // 병종 비트마스크(생략하면 전체)에 이동/공격 지시. 적 근처를 찍으면 공격, 빈 땅이면 이동
   | { t: "debug"; on: boolean } // 개발용: AI 표시(목표·길·위험 구역)를 상태에 실어 달라는 요청(F9)
   | { t: "mercCmd"; ids: number[]; kind: "mark" | "move" | "attack" | "clear"; type?: number; x?: number; y?: number } // 이름으로 고른 용병 개인에게 주는 명령(마크: 그 병종 적을 따라붙어 공격, 이동·공격: 지점, 해제)
   | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)

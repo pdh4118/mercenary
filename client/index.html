@@ -91,6 +91,11 @@
       .tag.quit { background: #2a3040; color: #9fb4d8; }
       .victory { color: #ffe08a; }
       .defeat { color: #ff9b8f; }
+      #pointBar { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); display: none; gap: 6px; z-index: 5; align-items: center; }
+      #pointBar.open { display: flex; }
+      #pointBar b { color: #9aa1b0; font-size: 12px; margin-right: 2px; }
+      #pointBar button { padding: 5px 10px; font-size: 12px; background: rgba(0,0,0,.55); border-color: #3f4659; }
+      #pointBar button b { color: #9aa1b0; font-size: 11px; margin-right: 4px; }
       #stanceBar { position: fixed; left: 10px; bottom: 76px; display: flex; gap: 6px; z-index: 5; align-items: center; }
       #stanceBar b { color: #9aa1b0; font-size: 12px; margin-right: 2px; }
       #stanceBar button { padding: 5px 10px; font-size: 12px; background: rgba(0,0,0,.55); border-color: #3f4659; }
@@ -251,6 +256,7 @@
     <input id="chatInput" type="text" maxlength="60" placeholder="채팅 (Enter 보내기 · Esc 취소)" autocomplete="off" />
     <div id="mercPanel"><header><span id="mercTitle">내 용병</span><span class="stat" style="color:#9aa1b0">U 닫기</span></header><div id="mercList"></div></div>
     <div id="formBar"></div>
+    <div id="pointBar"><b>지정 위치</b><button id="ptMove" title="지정한 위치로 이동 (E)"><b>E</b> 이동</button><button id="ptAttack" title="지정한 위치 둘레의 적을 공격 (Y)"><b>Y</b> 공격</button><button id="ptHold" title="지정한 위치를 지킨다 (H)"><b>H</b> 수비</button><button id="ptClear" title="지정 위치 해제 (Esc)">해제</button></div>
     <div id="stanceBar"><b>용병 [V]</b><button id="stance0" title="기본: 진형이 주인공 주변을 지키며 싸운다 (F1)"><b>F1</b> 기본</button><button id="stance2" title="수비: 지금 주인공이 선 곳을 지킨다 (F2) · 버튼을 누르고 클릭하거나 T: 가리킨 곳을 지킨다"><b>F2</b> 수비</button><button id="stance1" title="돌격: 주인공과의 거리와 상관없이 가까운 적에게 달려가 친다 (F3)"><b>F3</b> 돌격</button><button id="stance3" title="호위: 검방병이 도형으로 주인공을 둘러싸고 창병·궁병·마법사는 그 안에 들어간다. 기병·둔기병은 자유롭게 싸운다 (F4)"><b>F4</b> 호위</button><button id="stance4" title="산개: 주인공 둘레에 넓게 흩어져 서서 범위 공격에 한꺼번에 맞지 않는다. 싸우는 방식은 기본과 같다 (F5)"><b>F5</b> 산개</button></div>
     <div id="formEditor" class="overlay">
       <div class="panel">

@@ -109,3 +109,37 @@ test("개인 명령: 검증 — 남의 용병·잘못된 값은 무시하고, �
   g.order(a, p.x + 200, p.y, 1 << SPEAR);
   assert.equal(g.getMerc(m)!.cmd, undefined, "병종 지시가 우선(나중 명령이 이긴다)");
 });
+
+test("지정 위치 명령: kind가 이동이면 적 근처여도 이동, 공격이면 450px 안의 적까지 공격 지시", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.addMerc(a, SPEAR, p.x, p.y + 50);
+  g.spawnEnemyAt(p.x + 300, p.y, SHIELD);
+  const orders = () => (g as unknown as { slots: Map<number, { orders: ({ kind: number } | null)[] }> }).slots.get(a)!.orders[SPEAR];
+  g.order(a, p.x + 300, p.y, 1 << SPEAR); // 자동: 적 바로 곁이라 공격
+  assert.equal(orders()!.kind, 0);
+  g.order(a, p.x + 300, p.y, 1 << SPEAR, "move");
+  assert.equal(orders()!.kind, 1, "이동은 적 근처여도 이동");
+  g.order(a, p.x + 300, p.y + 350, 1 << SPEAR); // 자동: 350px 떨어져 있어 이동
+  assert.equal(orders()!.kind, 1);
+  g.order(a, p.x + 300, p.y + 350, 1 << SPEAR, "attack");
+  assert.equal(orders()!.kind, 0, "공격은 더 먼 적도 대상으로 삼는다");
+});
+
+test("의도 표시: 대상 병종이 함께 실린다(마크·공격)", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  p.invuln = 1e9;
+  const m = g.addMerc(a, ARCHER, p.x, p.y + 60);
+  const cav = g.spawnEnemyAt(p.x + 200, p.y + 60, CAVALRY);
+  (g.getEnemy(cav) as { cd: number }).cd = 1e9;
+  g.mercCmd(a, [m], "mark", CAVALRY);
+  run(g, 0.3);
+  const w = g.snapshotMercs().find((q) => q[0] === m)!;
+  assert.ok(w[20] === INTENT.MARK || w[20] === INTENT.ATTACK);
+  assert.equal(w[21], CAVALRY, "대상 병종이 기병");
+});

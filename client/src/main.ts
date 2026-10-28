@@ -900,7 +900,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·카일 기병 마크해 등)",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 위치 지정 → E 이동 · Y 공격 · H 수비 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·카일 기병 마크해 등)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1623,7 +1623,8 @@ async function main() {
   let specCount = 0; // 지금 구경할 수 있는 살아 있는 동료 수(관전 중에 매 프레임 갱신)
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (pickingHold) endPickHold();
+      if (marker && !pickingHold && !formations.isOpen()) clearMarker();
+      else if (pickingHold) endPickHold();
       else if (formations.isOpen()) formations.close();
       else lobby.toggleRoomPanel();
       return;
@@ -1748,6 +1749,49 @@ async function main() {
     keys.add(k);
     pushInput();
   });
+  // 지정 위치: 우클릭으로 찍어 두고, 이동·공격·수비 명령을 그 위치에 내린다(음성 지시와 이름으로 부른 개인 명령도 이 위치를 쓴다)
+  let marker: { x: number; y: number } | null = null;
+  const pointBar = document.getElementById("pointBar")!;
+  const markG = new Graphics();
+  const markLabel = new Text({ text: "지정 위치", style: { fill: 0xffe08a, fontSize: 12, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+  markLabel.anchor.set(0.5, 1);
+  markG.visible = markLabel.visible = false;
+  world.addChild(markG, markLabel);
+  const setMarker = (x: number, y: number) => {
+    marker = { x, y };
+    pointBar.classList.add("open");
+    markG.visible = markLabel.visible = true;
+    toast.text = "위치 지정: E 이동 · Y 공격 · H 수비 (Esc 해제)";
+    toastLeft = 2.5;
+  };
+  const clearMarker = () => {
+    marker = null;
+    pointBar.classList.remove("open");
+    markG.visible = markLabel.visible = false;
+  };
+  /** 명령을 낼 위치: 지정해 둔 위치가 있으면 그곳, 없으면 마우스가 가리키는 곳 */
+  const targetPoint = (): { x: number; y: number } => marker ?? { x: mouseX - world.x, y: mouseY - world.y };
+  const issueAtMarker = (kind: "move" | "attack" | "hold") => {
+    const me = latest?.players.find((p) => p.id === myId);
+    if (!me || !marker) return;
+    if (kind === "hold") send({ t: "hold", x: marker.x, y: marker.y, types: typesField() });
+    else {
+      if ((selMask & 1) !== 0) audio.play("cavalry_charge");
+      send({ t: "order", x: marker.x, y: marker.y, types: typesField(), kind });
+    }
+  };
+  document.getElementById("ptMove")!.onclick = () => issueAtMarker("move");
+  document.getElementById("ptAttack")!.onclick = () => issueAtMarker("attack");
+  document.getElementById("ptHold")!.onclick = () => issueAtMarker("hold");
+  document.getElementById("ptClear")!.onclick = clearMarker;
+  window.addEventListener("keydown", (e) => {
+    const tag = (document.activeElement as HTMLElement | null)?.tagName;
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || myId < 0 || lobby.blocksGameInput() || formations.isOpen()) return;
+    const k = e.key.toLowerCase();
+    if (k === "e") issueAtMarker("move");
+    else if (k === "y") issueAtMarker("attack");
+    else if (k === "h") issueAtMarker("hold");
+  });
   // 음성 지시: F를 누르고 있는 동안 듣고, 떼면 알아들은 말을 우클릭·진형 키와 같은 명령으로 보낸다(Chrome·Edge의 음성 인식 사용)
   const SpeechRec = (window as unknown as { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => any }).webkitSpeechRecognition; // eslint-disable-line @typescript-eslint/no-explicit-any
   let voiceRec: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -1762,8 +1806,7 @@ async function main() {
     const cmd = parseVoice(text, roster);
     if (!cmd) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 카일 기병 마크해 · 카일 저기 공격)`, 4);
     if (cmd.kind === "merc") {
-      const wx = mouseX - world.x;
-      const wy = mouseY - world.y;
+      const { x: wx, y: wy } = targetPoint();
       if (cmd.action === "stay") {
         for (const w of latest?.mercs ?? []) if (cmd.ids.includes(w[0])) send({ t: "mercCmd", ids: [w[0]], kind: "move", x: w[1], y: w[2] });
       } else send({ t: "mercCmd", ids: cmd.ids, kind: cmd.action, type: cmd.markType, x: wx, y: wy });
@@ -1772,11 +1815,12 @@ async function main() {
     const tf = cmd.types === null ? typesField() : cmd.types === ALL_MASK ? undefined : cmd.types;
     const me = latest?.players.find((p) => p.id === myId);
     const who = cmd.types === null ? (selMask === ALL_MASK ? "전체" : "선택한 병종") : cmd.types === ALL_MASK ? "전체" : UNIT_TYPES.filter((t) => cmd.types! & (1 << t)).map((t) => UNIT_NAMES[t]).join("·");
+    const tp = targetPoint();
     if (cmd.kind === "stance") send({ t: "stance", v: cmd.v, types: tf });
     else if (cmd.kind === "hold") {
       if (!me) return;
-      send({ t: "hold", x: cmd.at === "mouse" ? mouseX - world.x : me.x, y: cmd.at === "mouse" ? mouseY - world.y : me.y, types: tf });
-    } else if (me) send({ t: "order", x: mouseX - world.x, y: mouseY - world.y, types: tf });
+      send({ t: "hold", x: cmd.at === "mouse" ? tp.x : me.x, y: cmd.at === "mouse" ? tp.y : me.y, types: tf });
+    } else if (me) send({ t: "order", x: tp.x, y: tp.y, types: tf, kind: cmd.label.startsWith("이동") ? "move" : "attack" });
     say(`🎤 "${text}" → ${who} ${cmd.label}`, 3);
   };
   const startVoice = () => {
@@ -1837,10 +1881,8 @@ async function main() {
     mouseX = e.offsetX;
     mouseY = e.offsetY;
     if (e.button === 2) {
-      // 우클릭: 선택한 병종에게 이동(빈 땅) 또는 공격(적 근처, 넉넉하게) 지시
-      const me = latest?.players.find((p) => p.id === myId);
-      if (me && (selMask & 1) !== 0) audio.play("cavalry_charge");
-      if (me) send({ t: "order", x: mouseX - world.x, y: mouseY - world.y, types: typesField() }); // 카메라가 어디를 보든(관전 중에도) 화면에서 가리킨 월드 좌표
+      // 우클릭: 위치를 지정한다(바로 명령하지 않는다). 지정한 위치에 E 이동 · Y 공격 · H 수비(또는 아래 버튼·음성)로 명령한다.
+      if (latest?.players.some((p) => p.id === myId)) setMarker(mouseX - world.x, mouseY - world.y); // 카메라가 어디를 보든(관전 중에도) 화면에서 가리킨 월드 좌표
       return;
     }
     if (pickingHold) {
@@ -2278,7 +2320,7 @@ async function main() {
       v.label.visible = mine || showNames || mercPanel.hovered() === w[0]; // 내 용병은 이름을 항상 보여 준다(음성 지시로 이름을 부를 수 있다)
       const baseY = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y;
       const lift = isReady(w) ? 12 : 0; // 강화 가능 화살표가 있으면 그 위로
-      v.label.y = baseY - 14 - lift - (mine ? 12 : -4);
+      v.label.y = baseY - 14 - lift + (mine ? 0 : 4); // 이름이 막대 바로 위, 그 위에 병종 + 의도
       // 지금 하려는 일: 내 용병 머리 위에 항상 작게 보여 준다(토너먼트에서는 숨김)
       {
         const iv = v as unknown as { intent?: Text; intentCode?: number };
@@ -2289,11 +2331,14 @@ async function main() {
           v.node.addChild(iv.intent);
         }
         if (iv.intent) {
-          iv.intent.y = baseY - 14 - lift;
+          iv.intent.y = baseY - 14 - lift - 12;
           iv.intent.visible = code > 0;
-          if (code > 0 && iv.intentCode !== code) {
-            iv.intentCode = code;
-            iv.intent.text = INTENT_NAMES[code] ?? "";
+          const arg = w[21] ?? -1;
+          const sig = code * 100 + arg + 1;
+          if (code > 0 && iv.intentCode !== sig) {
+            iv.intentCode = sig;
+            // 병종 + 의도(+ 대상 병종): 예) 궁병 공격 → 기병, 창병 마크 → 기병
+            iv.intent.text = `${UNIT_NAMES[w[4]] ?? ""} ${INTENT_NAMES[code] ?? ""}${arg >= 0 ? ` → ${UNIT_NAMES[arg] ?? ""}` : ""}`;
             iv.intent.style.fill = INTENT_COLOR[code] ?? 0xffffff;
           }
         }
@@ -3011,6 +3056,27 @@ async function main() {
       fxLayer.circle(r.x, r.y, LEVELUP_PUSH_RADIUS * (0.25 + 0.75 * k2)).stroke({ width: 5 * (1 - k2) + 1, color: 0xffe08a, alpha: 0.8 * (1 - k2) });
     }
 
+    if (marker) {
+      // 지정 위치 표시: 천천히 뛰는 고리와 십자, 깃발
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+      markG
+        .clear()
+        .circle(marker.x, marker.y, 26 + 4 * pulse)
+        .stroke({ width: 3, color: 0xffe08a, alpha: 0.55 + 0.35 * pulse })
+        .circle(marker.x, marker.y, 4)
+        .fill({ color: 0xffe08a, alpha: 0.95 })
+        .moveTo(marker.x - 14, marker.y)
+        .lineTo(marker.x + 14, marker.y)
+        .moveTo(marker.x, marker.y - 14)
+        .lineTo(marker.x, marker.y + 14)
+        .stroke({ width: 2, color: 0xffe08a, alpha: 0.8 })
+        .moveTo(marker.x, marker.y - 14)
+        .lineTo(marker.x, marker.y - 48)
+        .stroke({ width: 3, color: 0xe8e8e8, alpha: 0.95 })
+        .poly([marker.x, marker.y - 48, marker.x + 24, marker.y - 40, marker.x, marker.y - 32])
+        .fill({ color: 0xffe08a, alpha: 0.95 });
+      markLabel.position.set(marker.x, marker.y - 52);
+    }
     if (dbgOn) {
       dbgG.clear();
       for (const [k, x1, y1, x2, y2] of latest.dbg ?? []) {

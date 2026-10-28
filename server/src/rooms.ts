@@ -173,7 +173,7 @@ export class RoomManager {
         room.game.setHold(id, msg.x, msg.y, msg.types);
         return;
       case "order":
-        room.game.order(id, msg.x, msg.y, msg.types);
+        room.game.order(id, msg.x, msg.y, msg.types, msg.kind);
         return;
       case "mercCmd":
         room.game.mercCmd(id, msg.ids, msg.kind, msg.type, msg.x, msg.y);

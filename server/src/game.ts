@@ -474,6 +474,7 @@ export interface Merc extends Fighter {
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   flankT: number; // 기병이 우회 접근에 쓴 시간
   intent?: number; // 이번 틱에 하려는 일(INTENT). 머리 위 표시용
+  intentArg?: number; // 의도의 대상 병종
   cmd?: { kind: "mark" | "move" | "attack"; type: number; x: number; y: number; left: number }; // 이름으로 받은 개인 명령(병종 지시·진형을 새로 주면 풀린다)
   stunT?: number; // 기절·속박 남은 시간(움직이지도 공격하지도 못한다)
   slowT?: number; // 둔화 남은 시간
@@ -1031,7 +1032,7 @@ export class Game {
    * 병종(types 비트마스크, 생략하면 전체)에 이동·공격을 지시한다. 주인공 가까운 곳으로 제한하고, 일정 시간 뒤 자동으로 해제된다.
    * 적 근처(ORDER_ATTACK_PICK, 넉넉하게)를 찍으면 가장 가까운 그 적을 쫓아 공격하고, 빈 땅을 찍으면 그곳으로 이동해 자리를 지킨다.
    */
-  order(playerId: number, x: unknown, y: unknown, types?: unknown): void {
+  order(playerId: number, x: unknown, y: unknown, types?: unknown, kind?: unknown): void {
     const s = this.slots.get(playerId);
     if (!s || typeof x !== "number" || typeof y !== "number") return; // 쓰러져 있어도 지시할 수 있다(쓰러진 자리 기준)
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -1042,11 +1043,15 @@ export class Game {
       this.phase === "tournament" ? this.duelFoes(playerId).map((f) => ({ id: 0, x: f.x, y: f.y, r: f.radius })) : [...this.enemies.values()].map((e) => ({ id: e.id, x: e.x, y: e.y, r: radiusOf(e) }));
     let pick: { id: number; x: number; y: number } | null = null;
     let best = Infinity;
-    for (const f of foes) {
-      const dd = Math.hypot(f.x - ox, f.y - oy);
-      if (dd <= TUNE.ORDER_ATTACK_PICK + f.r && dd < best) {
-        best = dd;
-        pick = f;
+    // kind가 "이동"이면 적 근처여도 이동이고, "공격"이면 지점에서 조금 먼 적(450px 안)까지 공격 대상으로 본다
+    const pickR = kind === "attack" ? 450 : TUNE.ORDER_ATTACK_PICK;
+    if (kind !== "move") {
+      for (const f of foes) {
+        const dd = Math.hypot(f.x - ox, f.y - oy);
+        if (dd <= pickR + f.r && dd < best) {
+          best = dd;
+          pick = f;
+        }
       }
     }
     const left = pick ? CHARGE_DURATION_SEC : TUNE.MOVE_ORDER_SEC;
@@ -1120,6 +1125,7 @@ export class Game {
       }
       if (!best) return false;
       m.intent = INTENT.MARK;
+      m.intentArg = best.type;
       this.attackMove(c, best);
       return true;
     }
@@ -1139,6 +1145,7 @@ export class Game {
       }
     }
     m.intent = INTENT.ORDER_ATTACK;
+    if (near) m.intentArg = near.type;
     if (near) this.attackMove(c, near);
     else if (Math.hypot(cm.x - m.x, cm.y - m.y) > 12) this.moveToward(m, cm.x, cm.y, st.speed, dt, 8);
     return true;
@@ -1344,6 +1351,7 @@ export class Game {
       (this.duelPoison.get(m.id)?.t ?? 0) > 0 ? 1 : 0,
       ((m.stunT ?? 0) > 0 ? ST_BIT_STUN : 0) | ((m.slowT ?? 0) > 0 ? ST_BIT_SLOW : 0) | ((this.slots.get(m.owner)?.restTent ?? 0) > 0 ? ST_BIT_REST : 0),
       m.respawn > 0 ? 0 : m.intent ?? 0,
+      m.respawn > 0 ? -1 : m.intentArg ?? -1,
     ]);
   }
 
@@ -3627,8 +3635,10 @@ export class Game {
       }
 
       m.intent = 0;
+      m.intentArg = -1;
       if (m.atkT > 0) {
         m.intent = INTENT.ATTACK;
+        m.intentArg = this.typeAlong(m, enemyT);
         if (m.type === MAGE && !duel) this.steerMeteor(m, st, dt); // 주문을 외우는 동안 가장 빽빽한 곳으로 낙하 지점을 옮긴다
         m.atkT -= dt;
         if (m.atkT <= 0) {
@@ -3736,6 +3746,20 @@ export class Game {
     }
   }
 
+  /** 용병이 겨눈 방향(atkAng)에 있는 적의 병종(머리 위 표시용). 없으면 -1 */
+  private typeAlong(m: Merc, targets: readonly Target[]): number {
+    let best = -1;
+    let bd = 400;
+    for (const t of targets) {
+      if (t.type < 0) continue;
+      const d = Math.hypot(t.x - m.x, t.y - m.y);
+      if (d >= bd || Math.abs(angleDiff(Math.atan2(t.y - m.y, t.x - m.x), m.atkAng)) > 0.4) continue;
+      bd = d;
+      best = t.type;
+    }
+    return best;
+  }
+
   private goals = new WeakMap<object, [number, number]>();
   /** AI가 따로 정하지 않은 틱의 의도를 상태에서 읽어 낸다(머리 위 표시용) */
   private inferIntent(m: Merc, c: AiCtx, ord: { kind: number } | null, trueAssault: boolean, moved: boolean): number {
@@ -3746,7 +3770,18 @@ export class Game {
     if (trueAssault && (moved || c.targets.length > 0)) return INTENT.CHARGE;
     if (moved) {
       const g = this.goals.get(m);
-      if (g && Math.hypot(g[0] - c.home[0], g[1] - c.home[1]) > 60) return INTENT.CHASE; // 진형 자리가 아닌 곳(적)으로 가는 중
+      if (g && Math.hypot(g[0] - c.home[0], g[1] - c.home[1]) > 60) {
+        // 진형 자리가 아닌 곳(적)으로 가는 중: 그 지점에 있는 적의 병종을 알린다
+        let bd = 70;
+        for (const t of c.targets) {
+          const d = Math.hypot(t.x - g[0], t.y - g[1]);
+          if (d < bd && t.type >= 0) {
+            bd = d;
+            m.intentArg = t.type;
+          }
+        }
+        return INTENT.CHASE;
+      }
       return INTENT.RETURN;
     }
     return c.guard ? INTENT.GUARD : INTENT.HOLD;
