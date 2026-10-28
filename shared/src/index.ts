@@ -10,6 +10,7 @@ export * from "./tiers.js";
 export * from "./names.js";
 export * from "./audio.js";
 export * from "./terrain.js";
+export * from "./voice.js";
 import { ARCHER, BLUNT, CAVALRY, MAGE, SHIELD, SPEAR } from "./rules.js";
 import type { HazardWire, TeleWire } from "./bossskill.js";
 
@@ -180,7 +181,11 @@ export type MercWire = [
   xp: number, // 용병 경험치(다음 단계 필요량은 mercXpNeed)
   poison: number, // 1이면 독에 중독된 상태(토너먼트)
   status: number, // 상태 이상 비트(ST_BIT_*): 1 기절·속박(머리 위에 별), 4 둔화
+  intent: number, // 지금 무엇을 하려는지(INTENT_NAMES 번호). 머리 위에 표시한다
 ];
+/** 용병이 지금 하려는 일(머리 위 표시). 0은 표시 없음 */
+export const INTENT_NAMES = ["", "대기", "복귀", "추격", "공격", "돌격", "이동 지시", "공격 지시", "물러남", "위험 회피", "사선 확보", "고지대", "공포", "치고 빠짐", "수비"] as const;
+export const INTENT = { HOLD: 1, RETURN: 2, CHASE: 3, ATTACK: 4, CHARGE: 5, ORDER_MOVE: 6, ORDER_ATTACK: 7, KITE: 8, DANGER: 9, LOS: 10, HIGH: 11, FEAR: 12, EVADE: 13, GUARD: 14 } as const;
 /** 서버가 알려 주는 순간 효과(그 틱에 일어난 일): [종류, x, y, 방향] */
 export const EVT_ARROW_HIT = 0; // 아군 화살 명중
 export const EVT_ENEMY_ARROW_HIT = 1; // 적 화살 명중

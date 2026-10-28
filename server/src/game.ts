@@ -9,6 +9,7 @@ import {
   EVT_DMG_POISON,
   EVT_DMG_POISON_ALLY,
   type MeteorWire,
+  INTENT,
   CARDS,
   ENEMY_XP,
   ARMY_AGGRO,
@@ -472,6 +473,7 @@ export interface Merc extends Fighter {
   paid: number; // 고용에 쓴 금화(해고 환급 기준)
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   flankT: number; // 기병이 우회 접근에 쓴 시간
+  intent?: number; // 이번 틱에 하려는 일(INTENT). 머리 위 표시용
   stunT?: number; // 기절·속박 남은 시간(움직이지도 공격하지도 못한다)
   slowT?: number; // 둔화 남은 시간
   slowMult?: number; // 둔화 중 이동 속도 배율
@@ -1273,6 +1275,7 @@ export class Game {
       Math.floor(m.xp),
       (this.duelPoison.get(m.id)?.t ?? 0) > 0 ? 1 : 0,
       ((m.stunT ?? 0) > 0 ? ST_BIT_STUN : 0) | ((m.slowT ?? 0) > 0 ? ST_BIT_SLOW : 0) | ((this.slots.get(m.owner)?.restTent ?? 0) > 0 ? ST_BIT_REST : 0),
+      m.respawn > 0 ? 0 : m.intent ?? 0,
     ]);
   }
 
@@ -3549,11 +3552,14 @@ export class Game {
       if (!duel && ownerSlot && ownerSlot.state.shaken > 0) {
         m.atkT = 0;
         m.evadeT = 0;
+        m.intent = INTENT.FEAR;
         this.mercFlee(m, st, dt);
         continue;
       }
 
+      m.intent = 0;
       if (m.atkT > 0) {
+        m.intent = INTENT.ATTACK;
         if (m.type === MAGE && !duel) this.steerMeteor(m, st, dt); // 주문을 외우는 동안 가장 빽빽한 곳으로 낙하 지점을 옮긴다
         m.atkT -= dt;
         if (m.atkT <= 0) {
@@ -3614,6 +3620,8 @@ export class Game {
         widthMult: boxWidthMult(m.type, st.arc),
       };
       const ordNow = m.type === CAVALRY ? null : ownerSlot?.orders[m.type] ?? null;
+      const px0 = m.x;
+      const py0 = m.y;
       if (!duel && this.danger.length > 0 && !ordNow) {
         // 보스의 위험 구역(예고 모양·불길·고리)에 걸쳐 있으면 하던 일보다 먼저 벗어난다(우클릭 지시는 그대로 따른다)
         const esc = this.dangerEscape(m.x, m.y, st.radius, m.id);
@@ -3621,6 +3629,7 @@ export class Game {
           m.x += esc[0] * st.speed * 1.15 * dt;
           m.y += esc[1] * st.speed * 1.15 * dt;
           if (this.dbgOn) this.dbg.push([4, Math.round(m.x), Math.round(m.y), 0, 0]);
+          m.intent = INTENT.DANGER;
           continue;
         }
       }
@@ -3642,6 +3651,7 @@ export class Game {
           default: this.aiSpear(c);
         }
       }
+      if (!m.intent) m.intent = this.inferIntent(m, c, ordNow, trueAssault, Math.hypot(m.x - px0, m.y - py0) > 0.5);
       if (duel) {
         const r = Math.hypot(m.x, m.y);
         if (r > TOURNAMENT_ARENA_RADIUS) {
@@ -3650,6 +3660,22 @@ export class Game {
         }
       }
     }
+  }
+
+  private goals = new WeakMap<object, [number, number]>();
+  /** AI가 따로 정하지 않은 틱의 의도를 상태에서 읽어 낸다(머리 위 표시용) */
+  private inferIntent(m: Merc, c: AiCtx, ord: { kind: number } | null, trueAssault: boolean, moved: boolean): number {
+    if (m.atkT > 0) return INTENT.ATTACK;
+    const cord = m.type === CAVALRY ? c.owner?.orders[CAVALRY] ?? null : null; // 기병의 지시는 기병 AI가 따로 처리한다
+    if (ord || cord) return (ord ?? cord)!.kind === 1 ? INTENT.ORDER_MOVE : INTENT.ORDER_ATTACK;
+    if (m.type === CAVALRY && m.evadeT > 0) return INTENT.EVADE;
+    if (trueAssault && (moved || c.targets.length > 0)) return INTENT.CHARGE;
+    if (moved) {
+      const g = this.goals.get(m);
+      if (g && Math.hypot(g[0] - c.home[0], g[1] - c.home[1]) > 60) return INTENT.CHASE; // 진형 자리가 아닌 곳(적)으로 가는 중
+      return INTENT.RETURN;
+    }
+    return c.guard ? INTENT.GUARD : INTENT.HOLD;
   }
 
   // --- 병종별 역할 AI ---------------------------------------------------------------
@@ -3761,6 +3787,7 @@ export class Game {
       }
     }
     if (!best) return false;
+    m.intent = INTENT.HIGH;
     this.moveToward(m, best.x, best.y, st.speed, c.dt, 18);
     return true;
   }
@@ -3989,6 +4016,7 @@ export class Game {
     }
     if (threat) {
       m.face = Math.atan2(threat.y - m.y, threat.x - m.x);
+      m.intent = INTENT.KITE;
       if (target && m.cd <= 0 && gapBest > -TUNE.ARCHER_KITE_MARGIN * 0.6 && !frontal) {
         this.startAttack(m, st, Math.atan2(target.y - m.y, target.x - m.x)); // 아주 가깝지 않을 때는 한 발 쏘고 다시 물러난다
         return;
@@ -4047,6 +4075,7 @@ export class Game {
       return;
     }
     if (!this.arrowClear(m, target)) {
+      m.intent = INTENT.LOS;
       this.moveToward(m, target.x, target.y, st.speed, dt, desired * 0.5); // 바위·폐허가 화살을 막으면 사선이 트이는 곳으로 돌아간다
       return;
     }
@@ -4329,6 +4358,7 @@ export class Game {
     }
     [ux, uy] = this.detour(m, ux, uy, step, dt);
     this.dbgGoal(m, gx, gy);
+    this.goals.set(m, [gx, gy]);
     m.x += ux * step;
     m.y += uy * step;
     return true;
@@ -4349,6 +4379,7 @@ export class Game {
     const wd = Math.hypot(wx - f.x, wy - f.y) || 1;
     const [ux, uy] = this.detour(f, (wx - f.x) / wd, (wy - f.y) / wd, step, dt);
     this.dbgGoal(f, tx, ty);
+    this.goals.set(f, [tx, ty]);
     f.x += ux * step;
     f.y += uy * step;
     return true;
@@ -4868,6 +4899,7 @@ export class Game {
     }
     if (threat && !c.ordered) {
       m.face = Math.atan2(threat.y - m.y, threat.x - m.x);
+      m.intent = INTENT.KITE;
       let ax = m.x - threat.x;
       let ay = m.y - threat.y;
       const al = Math.hypot(ax, ay) || 1;

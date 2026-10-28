@@ -83,6 +83,8 @@ import {
   TIER_BUY_MULT,
   tierName,
   UNIT_NAMES,
+  INTENT_NAMES,
+  parseVoice,
   UNIT_TYPES,
   WORLD_SIZE,
   mercPrice,
@@ -663,6 +665,7 @@ async function main() {
     ringTeam: boolean;
     ringShape: [number, number, number, number]; // 중심 x, 중심 y, 가로 반지름, 세로 반지름
   }
+  const INTENT_COLOR: Record<number, number> = { 1: 0xb8c0d0, 2: 0x9fd2ff, 3: 0xff9a7a, 4: 0xff6a5a, 5: 0xff5a5a, 6: 0x8fe0a0, 7: 0xffc27a, 8: 0xd9b3ff, 9: 0xffa043, 10: 0x7fe0e0, 11: 0xe6d27a, 12: 0xffe14a, 13: 0xff9ac0, 14: 0x9fe0c0 };
   const mercs = new Pool<MercView, MercWire>(
     (w) => {
       const node = new Container();
@@ -897,7 +900,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 선택 병종에 이동/공격 지시 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·전원 호위 등)",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1745,6 +1748,79 @@ async function main() {
     keys.add(k);
     pushInput();
   });
+  // 음성 지시: F를 누르고 있는 동안 듣고, 떼면 알아들은 말을 우클릭·진형 키와 같은 명령으로 보낸다(Chrome·Edge의 음성 인식 사용)
+  const SpeechRec = (window as unknown as { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => any }).webkitSpeechRecognition; // eslint-disable-line @typescript-eslint/no-explicit-any
+  let voiceRec: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+  let voiceText = "";
+  let voiceOn = false;
+  const say = (text: string, sec = 2.5) => {
+    toast.text = text;
+    toastLeft = sec;
+  };
+  const runVoice = (text: string) => {
+    const cmd = parseVoice(text);
+    if (!cmd) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 창병 공격)`, 4);
+    const tf = cmd.types === null ? typesField() : cmd.types === ALL_MASK ? undefined : cmd.types;
+    const me = latest?.players.find((p) => p.id === myId);
+    const who = cmd.types === null ? (selMask === ALL_MASK ? "전체" : "선택한 병종") : cmd.types === ALL_MASK ? "전체" : UNIT_TYPES.filter((t) => cmd.types! & (1 << t)).map((t) => UNIT_NAMES[t]).join("·");
+    if (cmd.kind === "stance") send({ t: "stance", v: cmd.v, types: tf });
+    else if (cmd.kind === "hold") {
+      if (!me) return;
+      send({ t: "hold", x: cmd.at === "mouse" ? mouseX - world.x : me.x, y: cmd.at === "mouse" ? mouseY - world.y : me.y, types: tf });
+    } else if (me) send({ t: "order", x: mouseX - world.x, y: mouseY - world.y, types: tf });
+    say(`🎤 "${text}" → ${who} ${cmd.label}`, 3);
+  };
+  const startVoice = () => {
+    if (voiceOn) return;
+    if (!SpeechRec) return say("이 브라우저는 음성 인식을 지원하지 않습니다 (Chrome·Edge 필요)", 4);
+    if (!window.isSecureContext) return say("음성 인식은 https 또는 localhost 주소에서만 쓸 수 있습니다", 4);
+    const rec = new SpeechRec();
+    voiceRec = rec;
+    rec.lang = "ko-KR";
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.onresult = (ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
+      let t = "";
+      for (let i = 0; i < ev.results.length; i++) t += ev.results[i]![0]!.transcript;
+      voiceText = t;
+      say(`🎤 "${t}"`, 8);
+    };
+    rec.onerror = (ev: { error: string }) => {
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") say("마이크 권한이 필요합니다 (주소창 왼쪽 자물쇠에서 허용)", 4);
+      else if (ev.error !== "no-speech" && ev.error !== "aborted") say(`음성 인식 오류: ${ev.error}`, 3);
+    };
+    rec.onend = () => {
+      voiceOn = false;
+      const t = voiceText.trim();
+      voiceText = "";
+      if (t) runVoice(t);
+      else if (toast.text.startsWith("🎤 듣는")) say("");
+    };
+    voiceText = "";
+    voiceOn = true;
+    try {
+      rec.start();
+      say("🎤 듣는 중... F를 누른 채 말하고, 손을 떼면 실행합니다", 15);
+    } catch {
+      voiceOn = false;
+    }
+  };
+  const stopVoice = () => {
+    try {
+      voiceRec?.stop();
+    } catch {
+      /* 이미 멈춤 */
+    }
+  };
+  window.addEventListener("keydown", (e) => {
+    const tag = (document.activeElement as HTMLElement | null)?.tagName;
+    if (e.key.toLowerCase() !== "f" || e.repeat || e.ctrlKey || e.metaKey || e.altKey || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || myId < 0) return;
+    startVoice();
+  });
+  window.addEventListener("keyup", (e) => {
+    if (e.key.toLowerCase() === "f") stopVoice();
+  });
+  window.addEventListener("blur", stopVoice);
   window.addEventListener("keyup", (e) => (keys.delete(e.key.toLowerCase()), pushInput()));
   window.addEventListener("blur", () => ((keys.clear(), (firing = false)), pushInput()));
   app.canvas.addEventListener("pointermove", (e) => ((mouseX = e.offsetX), (mouseY = e.offsetY), pushInput()));
@@ -2190,6 +2266,25 @@ async function main() {
       v.node.zIndex = v.y;
       setPoison(v.sprite, w[18] === 1);
       v.label.visible = showNames || mercPanel.hovered() === w[0];
+      // 지금 하려는 일: 내 용병 머리 위에 항상 작게 보여 준다(토너먼트에서는 숨김)
+      {
+        const iv = v as unknown as { intent?: Text; intentCode?: number };
+        const code = w[5] === myId && latest?.g?.phase !== "tournament" ? w[20] ?? 0 : 0;
+        if (code > 0 && !iv.intent) {
+          iv.intent = new Text({ text: "", style: { fill: 0xffffff, fontSize: 10, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+          iv.intent.anchor.set(0.5, 1);
+          iv.intent.y = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 14;
+          v.node.addChild(iv.intent);
+        }
+        if (iv.intent) {
+          iv.intent.visible = code > 0;
+          if (code > 0 && iv.intentCode !== code) {
+            iv.intentCode = code;
+            iv.intent.text = INTENT_NAMES[code] ?? "";
+            iv.intent.style.fill = INTENT_COLOR[code] ?? 0xffffff;
+          }
+        }
+      }
       const key = `${w[3]}/${w[9]}/${w[10]}/${w[11]}/${w[15]}/${isReady(w) ? 1 : 0}`;
       if (v.lastKey !== key) {
         v.lastKey = key;
