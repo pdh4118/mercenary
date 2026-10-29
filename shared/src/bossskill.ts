@@ -383,7 +383,7 @@ export const BOSS_MAGE = {
   prisonTele: 1,
   prisonPieces: 8,
   prisonHits: 5,
-  meteorSec: 2.5,
+  meteorSec: 2,
   meteorRadius: 140,
   meteorDmg: 1, // 적 마법사의 운석 피해(보스 기본 피해 55)와 같다
   prisonCd: 18,
