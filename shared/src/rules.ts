@@ -30,6 +30,9 @@ export const TUNE = {
   BOSS_HP_BASE: 10, // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
   BOSS_HP_PER_STAGE: 5,
   BOSS_DMG_MULT: 2,
+  BOSS_LATE_FROM: 3, // 이 스테이지 다음부터 장군이 한 단계마다 더 세진다(주인공 체력이 레벨마다 늘어난 만큼 후반 장군도 조금씩 강해진다)
+  BOSS_LATE_HP_GROWTH: 0.05, // 후반 단계마다 장군 체력 +5%
+  BOSS_LATE_DMG_GROWTH: 0.06, // 후반 단계마다 장군 피해 +6%
   BOSS_TIMEOUT_SEC: 90, // 보스군이 등장한 뒤 이 시간(1분 30초) 안에 장군을 못 잡으면 보스군이 격노해 점점 강해진다
   BOSS_HARD_TIMEOUT_SEC: 0, // 0이면 보스를 잡을 때까지 이어진다. 양수면 이 시간(초)이 지나 못 잡았을 때 보스군이 물러나고 다음 스테이지로 넘어간다(마지막 스테이지 제외)
   BOSS_RAGE_INTERVAL_SEC: 20, // 격노 단계가 올라가는 간격

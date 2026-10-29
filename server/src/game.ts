@@ -1439,14 +1439,14 @@ export class Game {
     const st = ENEMY_STATS[type]!;
     const minutes = Math.min(this.stageTime, growSec()) / 60;
     const lv = this.averageLevel() - 1;
-    const hpMult = (1 + TUNE.STAGE_ENEMY_HP_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_HP_GROWTH * minutes + TUNE.ENEMY_LEVEL_HP_GROWTH * lv) * (extra.boss ? (TUNE.BOSS_HP_BASE + TUNE.BOSS_HP_PER_STAGE * (this.stage - 1)) * (BOSS_HP_STAGE_MULT[this.stage] ?? 1) : 1);
+    const hpMult = (1 + TUNE.STAGE_ENEMY_HP_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_HP_GROWTH * minutes + TUNE.ENEMY_LEVEL_HP_GROWTH * lv) * (extra.boss ? (TUNE.BOSS_HP_BASE + TUNE.BOSS_HP_PER_STAGE * (this.stage - 1)) * (BOSS_HP_STAGE_MULT[this.stage] ?? 1) * (1 + TUNE.BOSS_LATE_HP_GROWTH * Math.max(0, this.stage - TUNE.BOSS_LATE_FROM)) : 1);
     const e: Enemy = {
       id, type, x, y,
       hp: st.hp * hpMult,
       maxHp: st.hp * hpMult,
       shield: st.shield * hpMult,
       shieldMax: st.shield * hpMult,
-      dmgMult: (1 + TUNE.STAGE_ENEMY_DMG_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_DMG_GROWTH * minutes + TUNE.ENEMY_LEVEL_DMG_GROWTH * lv) * (extra.boss ? TUNE.BOSS_DMG_MULT : 1),
+      dmgMult: (1 + TUNE.STAGE_ENEMY_DMG_GROWTH * (this.stage - 1) + TUNE.ENEMY_TIME_DMG_GROWTH * minutes + TUNE.ENEMY_LEVEL_DMG_GROWTH * lv) * (extra.boss ? TUNE.BOSS_DMG_MULT * (1 + TUNE.BOSS_LATE_DMG_GROWTH * Math.max(0, this.stage - TUNE.BOSS_LATE_FROM)) : 1),
       flankT: 0, evadeT: 0,
       atkT: 0, atkAng: 0, face: Math.atan2(-y, -x), cd: 0, regenT: 0, momentum: 0, chargeSnap: 0, // 처음에는 중앙(플레이어가 있는 쪽)을 본다
       boss: false, army: false, squad: 0, slotF: 0, slotL: 0,

@@ -254,3 +254,22 @@ test("마법사 대장: 일반 공격 운석 주문 시간만 2초이고 다른 
   assert.equal(bossBasicStats(SPEAR).windup, ENEMY_STATS[SPEAR]!.windup);
   assert.ok(Math.abs(bossBasicStats(MAGE).cooldown - 3.4) < 1e-9, "쿨타임은 그대로 3.4초");
 });
+
+test("후반 장군: 4스테이지부터 단계마다 체력 +5%·피해 +6%씩 더 세진다", () => {
+  const stat = (stage: number) => {
+    const g = new Game();
+    g.autoSpawn = false;
+    g.addPlayer("a");
+    g.jumpToStage(stage);
+    const e = (g as unknown as { makeEnemy(x: number, y: number, t: number, extra: object): { maxHp: number; dmgMult: number } }).makeEnemy(0, 0, SPEAR, { boss: true });
+    return { hp: e.maxHp, dmg: e.dmgMult };
+  };
+  const s3 = stat(3);
+  const s4 = stat(4);
+  const s10 = stat(10);
+  // 3스테이지까지는 기존 공식, 4스테이지부터 후반 보정(체력 1.05배, 피해 1.06배)이 단계마다 붙는다
+  const grow = (s: number) => 1 + TUNE.STAGE_ENEMY_DMG_GROWTH * (s - 1);
+  assert.ok(Math.abs(s4.dmg / s3.dmg - (grow(4) / grow(3)) * (1 + TUNE.BOSS_LATE_DMG_GROWTH)) < 0.02, "4스테이지 피해");
+  assert.ok(Math.abs(s10.dmg / s4.dmg - (grow(10) / grow(4)) * ((1 + 7 * TUNE.BOSS_LATE_DMG_GROWTH) / (1 + TUNE.BOSS_LATE_DMG_GROWTH))) < 0.05, "10스테이지 피해");
+  assert.ok(s10.hp > s4.hp);
+});
