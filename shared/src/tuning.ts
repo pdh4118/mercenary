@@ -339,6 +339,7 @@ function build(): Map<string, Entry> {
     damage: ["기본 공격 피해 배율", 0.2, 5, 0.05, "배"],
     cooldown: ["공격 대기시간 배율(작을수록 빠름)", 0.2, 2, 0.05, "배"],
     arrowSpeed: ["화살 속도 배율", 0.5, 4, 0.05, "배"],
+    mageWindup: ["마법사 대장의 운석 주문 시간", 0.5, 6, 0.1, "초"],
   });
 
   // --- 보스 스킬 수치(자동 이름표: shared/src/bosslabels.ts) ---

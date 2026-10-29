@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TICK_RATE, TUNE, intentLine, eulReul, parseVoice, parseVoiceBest, koNumber, extractNumbers, toJamo, voiceTypes, CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, INTENT, INTENT_NAMES } from "@mercenary/shared";
+import { TICK_RATE, TUNE, bossBasicStats, ENEMY_STATS, intentLine, eulReul, parseVoice, parseVoiceBest, koNumber, extractNumbers, toJamo, voiceTypes, CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE, INTENT, INTENT_NAMES } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -246,4 +246,11 @@ test("의도 문장: 혼잣말처럼 읽히고 조사가 맞는다", () => {
   assert.equal(intentLine(INTENT.GUARD, undefined, 1), "이 자리를 지켜야겠어");
   const mixed = new Set([0, 1].map((v) => intentLine(INTENT.CHASE, "기병", v)));
   assert.equal(mixed.size, 2, "말투가 두 가지로 섞인다");
+});
+
+test("마법사 대장: 일반 공격 운석 주문 시간만 2초이고 다른 대장과 일반 마법사는 그대로", () => {
+  assert.equal(bossBasicStats(MAGE).windup, 2);
+  assert.equal(ENEMY_STATS[MAGE]!.windup, 3.5, "일반 적 마법사는 3.5초");
+  assert.equal(bossBasicStats(SPEAR).windup, ENEMY_STATS[SPEAR]!.windup);
+  assert.ok(Math.abs(bossBasicStats(MAGE).cooldown - 3.4) < 1e-9, "쿨타임은 그대로 3.4초");
 });

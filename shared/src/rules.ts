@@ -476,9 +476,10 @@ export const BOSS_BASIC = {
   damage: 1.25, // 기본 공격 피해 배율(보스 피해 배율에 더해서)
   cooldown: 0.85, // 공격 대기시간 배율
   arrowSpeed: 1.5, // 화살 속도 배율
+  mageWindup: 2, // 마법사 대장만: 운석을 외우는 시간(초). 일반 적 마법사는 3.5초
 };
 export function bossBasicStats(type: number): UnitStats {
   const base = ENEMY_STATS[type]!;
   const B = BOSS_BASIC;
-  return { ...base, reach: base.reach * (base.ranged ? B.rangedReach : B.meleeReach), arc: Math.min(Math.PI, base.arc * B.arc), splash: base.splash * B.splash, damage: base.damage * B.damage, cooldown: base.cooldown * B.cooldown };
+  return { ...base, windup: type === MAGE ? B.mageWindup : base.windup, reach: base.reach * (base.ranged ? B.rangedReach : B.meleeReach), arc: Math.min(Math.PI, base.arc * B.arc), splash: base.splash * B.splash, damage: base.damage * B.damage, cooldown: base.cooldown * B.cooldown };
 }
