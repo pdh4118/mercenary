@@ -67,7 +67,7 @@ test("장군 이름: 스테이지마다 호칭과 이름이 있고 겹치지 않
   assert.equal(BOSS_NAMES.length, STAGE_COUNT);
   assert.equal(BOSS_TITLES.length, STAGE_COUNT);
   assert.equal(new Set(BOSS_NAMES).size, STAGE_COUNT);
-  assert.equal(bossLabel(3), "궁수 장군 그림자 시위 렌");
+  assert.equal(bossLabel(3), "그림자 시위 렌");
   assert.ok(bossLabel(10).includes("그라크"));
   assert.equal(bossLabel(99), "장군");
 });

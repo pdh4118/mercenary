@@ -579,9 +579,9 @@ export const SUPPLY = {
 /** 스테이지별 장군 호칭과 이름(스테이지 표시줄에 보인다). 10스테이지는 마지막 대장군이다. */
 export const BOSS_TITLES = ["기병 장군", "창병 장군", "궁수 장군", "검방병 장군", "둔기병 장군", "마법사 장군", "기마궁수", "전차 장군", "네크로맨서", "대장군"] as const;
 export const BOSS_NAMES = ["질풍의 하르칸", "철창 오르카", "그림자 시위 렌", "불굴의 도르간", "분쇄자 우르곤", "서리 현자 이스벨", "초원의 매 카잔", "철륜 브론타", "무덤지기 말라키", "파멸의 군주 그라크"] as const;
-/** "궁수 장군 그림자 시위 렌" 같은 장군 소개 문구 */
+/** 장군 소개 문구: 이름만 쓴다("그림자 시위 렌"). 이름이 없으면 호칭 */
 export const bossLabel = (stage: number): string => {
   const t = BOSS_TITLES[stage - 1];
   const n = BOSS_NAMES[stage - 1];
-  return t && n ? `${t} ${n}` : t ?? "장군";
+  return n ?? t ?? "장군";
 };
