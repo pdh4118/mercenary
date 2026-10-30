@@ -31,7 +31,7 @@ export const BSK_BLINK = 24; // 마법사 장군: 위협 순간이동
 export const BSK_FIRERING = 25; // 마법사 장군: 확산 불꽃
 export const BSK_HITRUN = 26; // 기마궁수: 치고 빠지기
 export const BSK_ORBITSHOT = 27; // 기마궁수: 선회 사격
-export const BSK_FIRETRAIL = 28; // 기마궁수: 불길 질주
+export const BSK_BLINDARROW = 28; // 기마궁수: 실명 화살(맞으면 시야가 크게 좁아진다)
 export const BSK_LASSO = 29; // 기마궁수: 올가미 화살
 export const BSK_ACCEL = 30; // 전차: 가속 돌진
 export const BSK_SCYTHE = 31; // 전차: 낫 바퀴
@@ -75,7 +75,7 @@ export const BOSS_SKILL_NAMES: Record<number, string> = {
   [BSK_FIRERING]: "확산 불꽃",
   [BSK_HITRUN]: "치고 빠지기",
   [BSK_ORBITSHOT]: "선회 사격",
-  [BSK_FIRETRAIL]: "불길 질주",
+  [BSK_BLINDARROW]: "실명 화살",
   [BSK_LASSO]: "올가미 화살",
   [BSK_ACCEL]: "가속 돌진",
   [BSK_SCYTHE]: "낫 바퀴",
@@ -122,11 +122,13 @@ export const BUL_LASSO = 6; // 올가미 화살
 export const BUL_SHARD = 7; // 철퇴 파편
 export const BUL_BOSSARROW = 8; // 기마궁수의 화살
 export const BUL_ORB = 9; // 네크로맨서의 영혼 구슬
+export const BUL_BLIND = 10; // 기마궁수의 실명 화살
 
 /** 아군 상태이상 종류 */
 export const ST_STUN = 1; // 기절: 움직이지도 공격하지도 못한다
 export const ST_SLOW = 2; // 둔화: 이동 속도가 줄어든다
 export const ST_ROOT = 3; // 속박: 움직이지 못한다(공격은 한다)
+export const ST_BLIND = 4; // 실명: 주인공의 시야가 크게 좁아진다(용병에게는 효과 없음)
 
 /** 예고 모양 */
 export const TELE_LINE = 0; // 직선: 시작점(x,y), 방향(ang), a = 길이, b = 폭
@@ -440,14 +442,12 @@ export const BOSS_MOUNT = {
   orbitRadius: 420,
   orbitShotStep: 1,
   orbitCd: 12,
-  trailTele: 0.9,
-  trailLen: 720,
-  trailSpeed: 700,
-  trailStep: 38,
-  trailR: 42,
-  trailSec: 5,
-  trailDps: 3,
-  trailCd: 14,
+  blindTele: 0.9, // 실명 화살 예고(조준선 고정)
+  blindRange: 950, // 화살이 닿는 거리
+  blindWidth: 44, // 맞는 폭
+  blindDmg: 1.2, // 피해 배율
+  blindSec: 4, // 맞은 주인공이 앞을 거의 못 보는 시간(초)
+  blindCd: 14, // 재사용 대기(초)
   lassoTele: 0.9,
   lassoSpeed: 1000,
   lassoRoot: 1.5,

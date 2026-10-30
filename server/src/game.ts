@@ -201,6 +201,8 @@ import {
   ST_BIT_STUN,
   ST_BIT_ROOT,
   ST_BIT_SLOW,
+  ST_BIT_BLIND,
+  ST_BLIND,
   type TourMatchRecord,
   type TourSideRec,
   type HazardWire,
@@ -382,6 +384,7 @@ export interface Slot {
   stunT?: number; // 기절 남은 시간(움직이지도 공격하지도 못한다)
   rootT?: number; // 속박 남은 시간(움직이지 못한다)
   slowT?: number; // 둔화 남은 시간
+  blindT?: number; // 실명 남은 시간(시야가 좁아진다)
   slowMult?: number; // 둔화 중 이동 속도 배율
   windT: number; // 주문(지팡이)을 외우는 남은 시간. 0이면 외우는 중이 아니다
   skillCd: number; // 스페이스 스킬 쿨타임이 남은 시간(무기를 바꿔도 공유)
@@ -1318,7 +1321,7 @@ export class Game {
       ...s.state,
       hs: this.heroStats(s),
       poisoned: (this.duelPoison.get(-s.state.id)?.t ?? 0) > 0,
-      status: ((s.stunT ?? 0) > 0 ? ST_BIT_STUN : 0) | ((s.rootT ?? 0) > 0 ? ST_BIT_ROOT : 0) | ((s.slowT ?? 0) > 0 ? ST_BIT_SLOW : 0),
+      status: ((s.stunT ?? 0) > 0 ? ST_BIT_STUN : 0) | ((s.rootT ?? 0) > 0 ? ST_BIT_ROOT : 0) | ((s.slowT ?? 0) > 0 ? ST_BIT_SLOW : 0) | ((s.blindT ?? 0) > 0 ? ST_BIT_BLIND : 0),
     }));
   }
 
@@ -2042,6 +2045,7 @@ export class Game {
     p.revive = 0;
     p.invuln = 0;
     s.ghost = undefined;
+    s.blindT = 0;
     p.swing = 0;
     p.wind = 0;
     p.chargeLeft = 0;
@@ -2713,6 +2717,7 @@ export class Game {
       if (s.stunT) s.stunT = Math.max(0, s.stunT - dt);
       if (s.rootT) s.rootT = Math.max(0, s.rootT - dt);
       if (s.slowT) s.slowT = Math.max(0, s.slowT - dt);
+      if (s.blindT) s.blindT = Math.max(0, s.blindT - dt);
       const slowK = (s.slowT ?? 0) > 0 ? (s.slowMult ?? 0.6) : 1;
       if (stunned && s.windT > 0) {
         s.windT = 0; // 기절하면 외우던 주문이 끊긴다
@@ -3504,6 +3509,7 @@ export class Game {
     if (s.state.down || sec <= 0) return;
     if (kind === ST_STUN) s.stunT = Math.max(s.stunT ?? 0, sec);
     else if (kind === ST_ROOT) s.rootT = Math.max(s.rootT ?? 0, sec);
+    else if (kind === ST_BLIND) s.blindT = Math.max(s.blindT ?? 0, sec);
     else if (kind === ST_SLOW) {
       s.slowT = Math.max(s.slowT ?? 0, sec);
       s.slowMult = Math.min(s.slowMult && s.slowT > 0 ? s.slowMult : 1, mult);

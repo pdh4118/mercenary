@@ -53,6 +53,7 @@ import {
   TENT,
   type TentWire,
   ST_BIT_STUN,
+  ST_BIT_BLIND,
   EVT_REFLECT,
   EVT_COUNTER,
   EVT_DMG_POISON,
@@ -620,6 +621,7 @@ async function main() {
           const bs = new Sprite(look.tex);
           bs.anchor.set(look.anchorX, 0.5);
           bs.scale.set(look.scale);
+          if (look.tint !== undefined) bs.tint = look.tint;
           bulletLayer.addChild(bs);
           return { node: bs, x: 0, y: 0, hostile, angle: 0, ready: true, x0: w[1], y0: w[2], bossKind: w[4] };
         }
@@ -793,6 +795,12 @@ async function main() {
   );
 
   // --- HUD (화면 고정) -----------------------------------------------------
+  // 실명: 월드 위, HUD 아래에 어두운 막을 깔고 주인공 둘레만 뚫어 시야를 좁힌다
+  const blindG = new Graphics();
+  blindG.visible = false;
+  app.stage.addChild(blindG);
+  let blindAmt = 0;
+  let wasBlind = false;
   const hud = new Container();
   app.stage.addChild(hud);
   // 왼쪽 위 상태 상자: 레벨·경험치·체력 막대와 금화·통솔력 등을 한 상자에 모아 큼직하게 보여 준다
@@ -3302,6 +3310,23 @@ async function main() {
     if (recovering && meState) {
       recoverLabel.text = `쿨타임 ${meState.fcd.toFixed(1)}초`;
       recoverLabel.position.set(meState.x, meState.y - 78);
+    }
+    {
+      const blindNow = !!meState && ((meState.status ?? 0) & ST_BIT_BLIND) !== 0;
+      if (blindNow && !wasBlind) say("실명! 시야가 크게 좁아졌습니다", 2);
+      wasBlind = blindNow;
+      const dtS = Math.min(0.1, ticker.deltaMS / 1000);
+      blindAmt = blindNow ? Math.min(1, blindAmt + dtS * 6) : Math.max(0, blindAmt - dtS * 1.4); // 맞는 순간 확 좁아지고, 풀리면 서서히 돌아온다
+      if (blindAmt > 0.01 && meState) {
+        const W = app.screen.width;
+        const H = app.screen.height;
+        const cx = meState.x + world.x;
+        const cy = meState.y + world.y;
+        const R = Math.max(W, H) * 0.85 * (1 - blindAmt) + 90 * blindAmt; // 가장 좁을 때 반지름 90px
+        blindG.clear().rect(0, 0, W, H).fill({ color: 0x000000, alpha: 0.97 * blindAmt }).circle(cx, cy, R).cut();
+        for (let i = 0; i < 6; i++) blindG.circle(cx, cy, R - i * 9).stroke({ width: 9, color: 0x000000, alpha: 0.9 * blindAmt * (1 - i / 6) }); // 가장자리를 부드럽게
+        blindG.visible = true;
+      } else blindG.visible = false;
     }
     const charging = !!meState && meState.chargeLeft > 0;
     chargeMark.visible = chargeLabel.visible = charging;

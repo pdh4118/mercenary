@@ -1,6 +1,8 @@
 import {
   BOSS_MOUNT as C,
-  BSK_FIRETRAIL,
+  BSK_BLINDARROW,
+  BUL_BLIND,
+  ST_BLIND,
   BSK_HITRUN,
   BSK_LASSO,
   BSK_ORBITSHOT,
@@ -9,7 +11,6 @@ import {
   BFX_BLINK,
   BFX_IMPACT,
   EF_CORNERED,
-  HZ_FIRE,
   NO_TYPE,
   ST_ROOT,
   TELE_BAND,
@@ -244,40 +245,50 @@ const orbitShot: SkillDef = {
   tele: ({ k }) => [[TELE_BAND, r1(k.x), r1(k.y), 0, C.orbitRadius - 28, C.orbitRadius + 28, ...lt(k), BSK_ORBITSHOT]],
 };
 
-/** 불길 질주(체력 50% 이하): 직선으로 달리며 지나간 길에 불 장판을 남긴다 */
-const fireTrail: SkillDef = {
-  id: BSK_FIRETRAIL,
-  cd: C.trailCd,
+/** 실명 화살(체력 50% 이하): 주인공을 겨눠 쏘면, 맞은 주인공은 한동안 시야가 크게 좁아진다(용병은 피해만 입는다) */
+const blindArrow: SkillDef = {
+  id: BSK_BLINDARROW,
+  cd: C.blindCd,
   weight: 3,
   phase: 2,
-  can: ({ e, foes, sys }) => !!sys.weakFoe(foes, e, 900),
+  can: ({ e, foes, sys }) => foes.some((f) => !f.f.merc && sys.dist(f, e) <= C.blindRange),
   begin: ({ e, k, foes, sys }) => {
-    const t = sys.weakFoe(foes, e, 900)!;
+    let t: Foe | null = null;
+    for (const f of foes) if (!f.f.merc && sys.dist(f, e) <= C.blindRange && (!t || sys.dist(f, e) < sys.dist(t, e))) t = f;
+    t = t ?? sys.nearestFoe(foes, e)!;
     k.ang = Math.atan2(t.y - e.y, t.x - e.x);
     e.face = k.ang;
-    k.t = k.total = C.trailTele;
+    k.t = k.total = C.blindTele;
   },
   run: (c) => {
-    const { e, k, sys } = c;
+    const { e, k, foes, sys } = c;
     if (k.ph === 0) {
       e.face = k.ang;
       if (k.t > 0) return;
-      k.ph = 1;
-      k.d.trav = 0;
-      k.d.drop = 0;
-    }
-    if (k.ph === 1) {
-      const before = k.d.trav!;
-      const res = sys.dashStep(c, C.trailSpeed, C.trailLen, 30, () => undefined, 26);
-      k.d.drop! += k.d.trav! - before;
-      while (k.d.drop! >= C.trailStep) {
-        k.d.drop! -= C.trailStep;
-        sys.addHazard({ kind: HZ_FIRE, x: e.x, y: e.y, a: C.trailR, t: C.trailSec, total: C.trailSec, src: e.id, dmg: C.trailDps });
+      // 선 위에서 가장 가까운 대상 한 명이 맞는다(용병이 가로막으면 용병이 맞는다)
+      let hit: Foe | null = null;
+      let bd = Infinity;
+      for (const f of foes) {
+        if (!sys.inLine(f, e.x, e.y, k.ang, C.blindRange, C.blindWidth)) continue;
+        const d = sys.dist(f, e);
+        if (d < bd) {
+          bd = d;
+          hit = f;
+        }
       }
-      if (res !== "run") sys.end(c);
+      sys.bullet(e, { ang: k.ang, speed: 1500, range: hit ? bd : C.blindRange, kind: BUL_BLIND, vis: true });
+      if (hit) {
+        sys.hitFoe(e, hit, C.blindDmg, 0);
+        if (!hit.f.merc) hit.f.status(ST_BLIND, C.blindSec);
+        sys.fx(hit.x, hit.y, k.ang, BFX_IMPACT);
+      }
+      k.ph = 1;
+      k.t = 0.5;
+      return;
     }
+    if (k.t <= 0) sys.end(c);
   },
-  tele: ({ k }) => [[TELE_LINE, r1(k.x), r1(k.y), r2(k.ang), C.trailLen, 50, ...lt(k), BSK_FIRETRAIL]],
+  tele: ({ e, k }) => [[TELE_LINE, r1(e.x), r1(e.y), r2(k.ang), C.blindRange, C.blindWidth, ...lt(k), BSK_BLINDARROW]],
 };
 
 /** 올가미 화살(체력 50% 이하): 맞은 대상을 속박하고 곧바로 그쪽으로 달려 부딪힌다 */
@@ -344,7 +355,7 @@ export const mountedKit: KitDef = {
   firstDelay: C.firstDelay,
   idleMin: C.idleMin,
   idleMax: C.idleMax,
-  skills: [hitRun, orbitShot, fireTrail, lasso],
+  skills: [hitRun, orbitShot, blindArrow, lasso],
   move,
   tick: ({ k, dt }) => {
     if ((k.v.cornered ?? 0) > 0 && k.cur) k.v.cornered = Math.max(0, k.v.cornered! - dt);

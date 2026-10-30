@@ -163,6 +163,7 @@ export type EnemyWire = [
 export const ST_BIT_STUN = 1;
 export const ST_BIT_ROOT = 2;
 export const ST_BIT_SLOW = 4;
+export const ST_BIT_BLIND = 16; // 실명: 시야가 크게 좁아진다(주인공만)
 export const ST_BIT_REST = 8; // 주인이 텐트에서 쉬는 중(용병을 그리지 않는다)
 
 export type MercWire = [

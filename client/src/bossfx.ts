@@ -49,6 +49,7 @@ import {
   HZ_FOG,
   HZ_LEECH,
   BUL_LASSO,
+  BUL_BLIND,
   BUL_MACE,
   BUL_SHARD,
   BUL_SNIPE,
@@ -939,7 +940,7 @@ export async function createBossFx(d: BossFxDeps) {
   };
 
   /** 장군 투사체 그림(탄환 종류 2 이상) */
-  const bulletLook = (kind: number): { tex: Tex; scale: number; anchorX: number } | null => {
+  const bulletLook = (kind: number): { tex: Tex; scale: number; anchorX: number; tint?: number } | null => {
     switch (kind) {
       case BUL_ICE:
         return { tex: pick(T.ice, 2), scale: 0.55, anchorX: 0.85 };
@@ -953,6 +954,8 @@ export async function createBossFx(d: BossFxDeps) {
         return { tex: T.lasso, scale: 0.55, anchorX: 0.92 };
       case BUL_ORB:
         return { tex: pick(T.orb, 1), scale: 0.7, anchorX: 0.5 };
+      case BUL_BLIND:
+        return { tex: T.snipe, scale: 0.7, anchorX: 0.9, tint: 0x8f5cff }; // 실명 화살: 저격 볼트 그림을 짙은 보라로 물들인다(전용 그림이 생기면 바꾼다)
       case BUL_SHARD:
         return { tex: pick(T.shard, 0), scale: 0.35, anchorX: 0.5 };
       case BUL_BOSSARROW:

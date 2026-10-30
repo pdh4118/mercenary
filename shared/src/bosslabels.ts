@@ -1464,53 +1464,41 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "재사용 대기(초)",
   "hint": ""
  },
- "BOSS_MOUNT.trailTele": {
+ "BOSS_MOUNT.blindTele": {
   "boss": "기마궁수",
-  "skill": "불길 질주",
+  "skill": "실명 화살",
   "label": "예고 시간(초)",
-  "hint": ""
+  "hint": "실명 화살 예고(조준선 고정)"
  },
- "BOSS_MOUNT.trailLen": {
+ "BOSS_MOUNT.blindRange": {
   "boss": "기마궁수",
-  "skill": "불길 질주",
-  "label": "길이",
-  "hint": ""
+  "skill": "실명 화살",
+  "label": "사용 거리",
+  "hint": "화살이 닿는 거리"
  },
- "BOSS_MOUNT.trailSpeed": {
+ "BOSS_MOUNT.blindWidth": {
   "boss": "기마궁수",
-  "skill": "불길 질주",
-  "label": "속도",
-  "hint": ""
+  "skill": "실명 화살",
+  "label": "폭",
+  "hint": "맞는 폭"
  },
- "BOSS_MOUNT.trailStep": {
+ "BOSS_MOUNT.blindDmg": {
   "boss": "기마궁수",
-  "skill": "불길 질주",
-  "label": "간격(초)",
-  "hint": ""
+  "skill": "실명 화살",
+  "label": "피해 배율",
+  "hint": "피해 배율"
  },
- "BOSS_MOUNT.trailR": {
+ "BOSS_MOUNT.blindSec": {
   "boss": "기마궁수",
-  "skill": "불길 질주",
-  "label": "trailR",
-  "hint": ""
- },
- "BOSS_MOUNT.trailSec": {
-  "boss": "기마궁수",
-  "skill": "불길 질주",
+  "skill": "실명 화살",
   "label": "지속 시간(초)",
-  "hint": ""
+  "hint": "맞은 주인공이 앞을 거의 못 보는 시간(초)"
  },
- "BOSS_MOUNT.trailDps": {
+ "BOSS_MOUNT.blindCd": {
   "boss": "기마궁수",
-  "skill": "불길 질주",
-  "label": "초당 피해",
-  "hint": ""
- },
- "BOSS_MOUNT.trailCd": {
-  "boss": "기마궁수",
-  "skill": "불길 질주",
+  "skill": "실명 화살",
   "label": "재사용 대기(초)",
-  "hint": ""
+  "hint": "재사용 대기(초)"
  },
  "BOSS_MOUNT.lassoTele": {
   "boss": "기마궁수",
@@ -1876,7 +1864,7 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "boss": "네크로맨서",
   "skill": "암흑 안개",
   "label": "반경",
-  "hint": "원거리 용병(사거리 280)이 안개 밖에서 보스를 칠 수 있게 사거리보다 조금 작게"
+  "hint": "안개 반지름(이전 260). 원거리 용병 사거리(280)보다 커져서 안개 안으로 들어가야 보스를 칠 수 있다"
  },
  "BOSS_NECRO.fogSec": {
   "boss": "네크로맨서",
@@ -1984,7 +1972,7 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "boss": "네크로맨서",
   "skill": "생명 흡수",
   "label": "회복량",
-  "hint": "흡수한 피해의 이 배만큼 보스가 회복(보스 체력이 커서 체감을 맞춘다)"
+  "hint": "흡수한 피해의 이 배만큼 보스가 회복(보스 체력이 커서 체감을 맞춘다. 1.5에서 3배로 올림)"
  },
  "BOSS_NECRO.drainCd": {
   "boss": "네크로맨서",

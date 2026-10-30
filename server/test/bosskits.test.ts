@@ -292,3 +292,32 @@ test("궁수 장군 은신 저격: 1초에 걸쳐 5%까지 투명해져 저격 �
   void ARC;
 });
 const ARC_MIN = 0.05;
+
+import { BSK_BLINDARROW, BOSS_MOUNT, ST_BIT_BLIND } from "@mercenary/shared";
+
+test("기마궁수 실명 화살: 맞은 주인공은 시야가 좁아지는 실명 상태가 되고 시간이 지나면 풀린다(용병은 실명되지 않는다)", () => {
+  const { g, b, ids } = setup(7, BSK_BLINDARROW);
+  b.hp = b.maxHp * 0.4; // 체력 50% 이하에서 쓰는 스킬
+  const p = hero(g, ids[0]!);
+  place(b, 0, 0);
+  place(p, 0, 500);
+  const m = g.addMerc(ids[0]!, ARCHER, 600, 600);
+  void m;
+  let blindSeen = false;
+  for (let i = 0; i < TICK_RATE * (BOSS_MOUNT.blindTele + 1.5); i++) {
+    g.step();
+    p.hp = p.maxHp;
+    place(p, 0, 500);
+    place(b, 0, 0);
+    if (g.snapshotPlayers().find((q) => q.id === ids[0])!.status! & ST_BIT_BLIND) blindSeen = true;
+  }
+  assert.ok(blindSeen, "맞으면 실명 비트가 켜진다");
+  for (let i = 0; i < TICK_RATE * (BOSS_MOUNT.blindSec + 0.5); i++) {
+    g.step();
+    p.hp = p.maxHp;
+    b.bk.cds[BSK_BLINDARROW] = 999; // 더 쏘지 않게
+  }
+  assert.equal((g.snapshotPlayers().find((q) => q.id === ids[0])!.status ?? 0) & ST_BIT_BLIND, 0, "시간이 지나면 풀린다");
+  const merc = (g as any).mercs.values().next().value;
+  assert.equal(merc.stunT ?? 0, 0, "용병은 실명 효과가 없다");
+});
