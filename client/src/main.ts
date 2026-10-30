@@ -2485,7 +2485,7 @@ async function main() {
       {
         type Bub = { box: Container; bg: Graphics; tIntent: Text; tTalk: Text; sig: string; h: number };
         const bv = v as unknown as { bub?: Bub };
-        // 의도 문구는 잠깐씩 바뀌는 값에 흔들리지 않게 거른다: 새 의도가 1.5초 이상 이어지고 지금 문구를 2.5초 이상 보여 준 뒤에만 바꾼다(위급·명령은 더 빨리)
+        // 의도 문구는 잠깐씩 바뀌는 값에 흔들리지 않게 거른다: 새 의도가 2.5초 이상 이어지고 지금 문구를 4초 이상 보여 준 뒤에만 바꾼다(위급·명령은 조금 더 빨리)
         const rawCode = w[5] === myId ? w[20] ?? 0 : 0;
         const nowMs = performance.now();
         const sh = ((bv as unknown as { sh?: { code: number; cand: number; candAt: number; shownAt: number } }).sh ??= { code: rawCode, cand: rawCode, candAt: nowMs, shownAt: nowMs });
@@ -2495,7 +2495,7 @@ async function main() {
         }
         if (sh.cand !== sh.code) {
           const urgent = sh.cand === INTENT.DANGER || sh.cand === INTENT.FEAR || sh.cand === INTENT.ORDER_MOVE || sh.cand === INTENT.ORDER_ATTACK || sh.cand === INTENT.MARK || sh.cand === 0;
-          if (nowMs - sh.candAt >= (urgent ? 400 : 1500) && nowMs - sh.shownAt >= (urgent ? 1200 : 2500)) {
+          if (nowMs - sh.candAt >= (urgent ? 800 : 2500) && nowMs - sh.shownAt >= (urgent ? 2000 : 4000)) {
             sh.code = sh.cand;
             sh.shownAt = nowMs;
           }
