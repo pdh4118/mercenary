@@ -85,6 +85,7 @@ import {
   TIER_BUY_MULT,
   tierName,
   UNIT_NAMES,
+  INTENT,
   INTENT_NAMES,
   bossLabel,
   TOUR_MODE_NAMES,
@@ -2482,9 +2483,24 @@ async function main() {
       v.label.y = baseY - 22 - lift; // 이름이 막대 바로 위, 그 위에 병종 + 의도
       // 말풍선: 내 용병이 지금 하려는 일(병종 + 행동 → 대상)을 항상 담고, 혼잣말이 나오면 그 위 줄에 함께 보여 준다(토너먼트에서도)
       {
-        type Bub = { box: Container; bg: Graphics; tIntent: Text; tTalk: Text; sig: string };
+        type Bub = { box: Container; bg: Graphics; tIntent: Text; tTalk: Text; sig: string; h: number };
         const bv = v as unknown as { bub?: Bub };
-        const code = w[5] === myId ? w[20] ?? 0 : 0;
+        // 의도 문구는 잠깐씩 바뀌는 값에 흔들리지 않게 거른다: 새 의도가 1.5초 이상 이어지고 지금 문구를 2.5초 이상 보여 준 뒤에만 바꾼다(위급·명령은 더 빨리)
+        const rawCode = w[5] === myId ? w[20] ?? 0 : 0;
+        const nowMs = performance.now();
+        const sh = ((bv as unknown as { sh?: { code: number; cand: number; candAt: number; shownAt: number } }).sh ??= { code: rawCode, cand: rawCode, candAt: nowMs, shownAt: nowMs });
+        if (rawCode !== sh.cand) {
+          sh.cand = rawCode;
+          sh.candAt = nowMs;
+        }
+        if (sh.cand !== sh.code) {
+          const urgent = sh.cand === INTENT.DANGER || sh.cand === INTENT.FEAR || sh.cand === INTENT.ORDER_MOVE || sh.cand === INTENT.ORDER_ATTACK || sh.cand === INTENT.MARK || sh.cand === 0;
+          if (nowMs - sh.candAt >= (urgent ? 400 : 1500) && nowMs - sh.shownAt >= (urgent ? 1200 : 2500)) {
+            sh.code = sh.cand;
+            sh.shownAt = nowMs;
+          }
+        }
+        const code = sh.code;
         const say = code > 0 && v.node.visible ? talk.get(w[0]) : undefined;
         if (code > 0 && !bv.bub) {
           const box = new Container();
@@ -2495,7 +2511,7 @@ async function main() {
           tTalk.anchor.set(0.5, 1);
           box.addChild(bg, tIntent, tTalk);
           v.node.addChild(box);
-          bv.bub = { box, bg, tIntent, tTalk, sig: "" };
+          bv.bub = { box, bg, tIntent, tTalk, sig: "", h: 0 };
         }
         if (bv.bub) {
           const b = bv.bub;
@@ -2513,6 +2529,7 @@ async function main() {
               const bw = Math.max(b.tIntent.width, hasTalk ? b.tTalk.width : 0) + 12;
               const th = hasTalk ? b.tTalk.height + 3 : 0;
               const bh = b.tIntent.height + th + 6;
+              b.h = bh;
               b.bg
                 .clear()
                 .roundRect(-bw / 2, -bh - 4, bw, bh, 6)
@@ -2525,7 +2542,8 @@ async function main() {
               b.tTalk.visible = hasTalk;
             }
             b.tTalk.alpha = say?.alpha ?? 1;
-            b.box.y = v.label.y - v.label.height - 2; // 이름표(막대 바로 위) 위에 얹는다
+            b.box.y = baseY - 22 - lift; // 막대 바로 위에 말풍선, 이름은 그 위(아래 label.y)
+            v.label.y = b.box.y - b.h - 8;
           }
         }
       }

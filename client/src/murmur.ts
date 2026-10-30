@@ -150,17 +150,17 @@ export function createMurmur() {
             [INTENT.RETURN]: "back", [INTENT.IGNORE]: "ignore", [INTENT.LOS]: "los", [INTENT.HIGH]: "high", [INTENT.FEAR]: "fear", [INTENT.EVADE]: "evade",
           };
           key = map[m.intent] ?? null;
-          chance = m.intent === INTENT.ATTACK ? 0.1 : m.intent === INTENT.FEAR || m.intent === INTENT.DANGER ? 0.45 : 0.3;
+          chance = m.intent === INTENT.ATTACK ? 0.06 : m.intent === INTENT.FEAR || m.intent === INTENT.DANGER ? 0.35 : 0.18;
           extra = { enemy };
         } else if (!key && m.intent === INTENT.HOLD && now - s.idleSince > 14000) {
           s.idleSince = now;
           key = "idle";
           chance = 0.7;
         }
-        if (key && onScreen && now >= s.cd && active < 3 && Math.random() < chance) {
+        if (key && onScreen && now >= s.cd && active < 2 && Math.random() < chance) {
           s.text = compose(key, m, extra);
           s.until = now + SHOW_MS;
-          s.cd = now + 14000 + Math.random() * 16000; // 용병마다 14~30초에 한 번
+          s.cd = now + 35000 + Math.random() * 35000; // 용병마다 35~70초에 한 번(너무 자주 바뀌면 정신이 없다)
           active++;
         }
         if (s.until > now && s.text) out.set(m.id, { text: s.text, alpha: Math.min(1, (s.until - now) / 400) });
