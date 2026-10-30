@@ -2437,7 +2437,12 @@ async function main() {
           { x: -world.x + app.screen.width / 2, y: -world.y + app.screen.height / 2, r: Math.max(app.screen.width, app.screen.height) * 0.7 },
         )
       : new Map<number, { text: string; alpha: number }>();
+    // 토너먼트에서 이번 판에 싸우지 않는 쪽(일기토의 용병, 용병전의 주인공)은 반투명하게 구경한다
+    const tourView = latest.g?.phase === "tournament" ? latest.g.tour : null;
+    const SPECTATOR_ALPHA = 0.35;
+    const sitsOut = (owner: number, hero: boolean): boolean => !!tourView && (owner === tourView.a || owner === tourView.b) && (hero ? tourView.mode === TOUR_MERCS : tourView.mode === TOUR_DUEL);
     mercs.update(latest.mercs, k, (v, w) => {
+      v.node.alpha = sitsOut(w[5], false) ? SPECTATOR_ALPHA : 1;
       v.node.visible = w[8] <= 0 && ((w[19] ?? 0) & ST_BIT_REST) === 0; // 쓰러진 용병은 부활할 때까지, 텐트에서 쉬는 용병은 나올 때까지 숨긴다
       paintRing(v, ownerColor(w[5]), teamSide(w[5]) !== null);
       if (v.wasDown && w[8] <= 0 && w[5] === myId) audio.play("merc_respawn", { x: v.x, y: v.y });
@@ -2572,7 +2577,7 @@ async function main() {
       if (dead && !v.wasDown && p.id !== myId) audio.play("hero_down", { x: v.x, y: v.y });
       v.wasDown = dead;
       // 쓰러지면 흐리게, 부활 직후 무적일 때는 깜빡인다
-      v.node.alpha = dead ? 0.4 : p.invuln > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 90)) : 1;
+      v.node.alpha = dead ? 0.4 : sitsOut(p.id, true) ? SPECTATOR_ALPHA : p.invuln > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 90)) : 1;
       // 들고 있는 무기에 맞는 모습으로 바꾸고, 조준한 쪽을 바라보게 좌우 반전한다
       const tex = (p.lk === 1 ? heroTexF[p.weapon] : null) ?? heroTex[p.weapon] ?? heroTex[0]!;
       if (v.sprite.texture !== tex) v.sprite.texture = tex;
