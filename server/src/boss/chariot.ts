@@ -7,6 +7,7 @@ import {
   BFX_CRASH,
   BFX_IMPACT,
   BFX_SCYTHE,
+  BFX_DRIFT,
   EF_MAD,
   EF_SCYTHE,
   HZ_MACE,
@@ -142,6 +143,7 @@ const drift: SkillDef = {
         sys.fx(f.x, f.y, k.ang, BFX_IMPACT);
       }
       sys.fx(e.x + Math.cos(k.ang) * 80, e.y + Math.sin(k.ang) * 80, k.ang, BFX_IMPACT);
+      sys.fx(e.x, e.y, k.ang, BFX_DRIFT, C.driftRange);
       k.ph = 2;
       k.t = C.driftRest; // 멈춘다: 약점이 드러난다
     } else if (k.ph === 2 && k.t <= 0) sys.end(c);
@@ -149,69 +151,71 @@ const drift: SkillDef = {
   tele: ({ e, k }) => [[TELE_CONE, r1(e.x), r1(e.y), r2(k.ang), r2(C.driftHalf), C.driftRange, ...lt(k), BSK_DRIFT]],
 };
 
-/** 폭주(체력 40% 이하): 말이 광분해 바퀴가 붉게 달아오른다. 방벽·철퇴·창 장애물을 모두 부수며 직진하다가 지형·맵 끝에 부딪히거나 속도가 떨어지면 멈춘다. 직격은 한 방. */
+/** 폭주(체력 40% 이하): 말이 광분해 바퀴가 붉게 달아오른다. 7초 동안 사방팔방으로 방향을 바꿔 가며 마구 날뛰고, 몸에 닿으면 피해를 준다. 장애물은 부수고 벽·바위·맵 끝에 부딪히면 튕겨 나간다. 다 날뛰면 지쳐 멈춘다(약점 노출). */
 const rampage: SkillDef = {
   id: BSK_RAMPAGE,
   cd: C.rampageCd,
   weight: 6,
   phase: 3,
   can: ({ e, foes, sys }) => !!sys.weakFoe(foes, e, 1100),
-  begin: ({ e, k, foes, sys }) => {
-    const t = sys.weakFoe(foes, e, 1100)!;
-    k.ang = Math.atan2(t.y - e.y, t.x - e.x);
-    e.face = k.ang;
+  begin: ({ k }) => {
     k.t = k.total = C.rampageTele;
   },
   run: (c) => {
     const { e, k, sys, dt } = c;
-    const g = sys.g as any;
     if (k.ph === 0) {
-      e.face = k.ang;
       if (k.t > 0) return;
       k.ph = 1;
-      k.d.trav = 0;
-      k.d.el = 0;
-      k.d.mult = 1;
+      k.t = C.rampageSec; // 날뛰는 남은 시간
+      k.d.el = 0; // 날뛴 시간
+      k.d.seg = 0; // 지금 방향으로 달릴 남은 시간
+      k.d.gap = 0; // 맞은 대상 목록을 비우기까지 남은 시간
     }
     if (k.ph === 1) {
       k.d.el! += dt;
-      const peak = Math.min(C.rampageMax, C.rampageStart + C.rampageAccel * k.d.el!);
-      const v = peak * k.d.mult!;
-      // 박힌 철퇴·창 장애물을 부수며 지나간다(부술 때마다 속도가 줄어든다)
+      k.d.seg! -= dt;
+      k.d.gap! -= dt;
+      if (k.d.seg! <= 0) {
+        k.ang = Math.random() * Math.PI * 2; // 사방팔방 아무 쪽으로나
+        k.d.seg = C.rampageSegMin + Math.random() * (C.rampageSegMax - C.rampageSegMin);
+      }
+      if (k.d.gap! <= 0) {
+        k.hit.clear(); // 같은 대상도 간격을 두고 다시 친다
+        k.d.gap = C.rampageHitGap;
+      }
+      // 박힌 철퇴·창 장애물은 부수고 지나간다
       for (const h of sys.hazards) {
         if ((h.kind !== HZ_MACE && h.kind !== HZ_SPEAR) || h.delay > 0 || Math.hypot(h.x - e.x, h.y - e.y) > BODY + h.solid) continue;
         h.t = 0;
-        k.d.mult! *= 1 - (h.kind === HZ_MACE ? C.breakMace : C.breakSpear);
         sys.fx(h.x, h.y, 0, BFX_IMPACT);
       }
+      k.d.trav = 0;
       const res = sys.dashStep(
         c,
-        v,
-        6000,
+        C.rampageSpeed,
+        1e9,
         C.rampageHitW,
         (f) => {
-          sys.hitFoe(e, f, LETHAL, 160);
+          sys.hitFoe(e, f, C.rampageDmg, C.rampageKnock);
           sys.fx(f.x, f.y, k.ang, BFX_IMPACT);
         },
         BODY,
-        () => {
-          k.d.mult! *= 1 - C.breakWall; // 방벽을 부수고 지나간다
-          sys.fx(e.x, e.y, k.ang, BFX_IMPACT);
-        },
+        () => sys.fx(e.x, e.y, k.ang, BFX_IMPACT), // 방벽은 부수고 지나간다
       );
-      if (res === "crash") {
-        e.stunT = C.rampageStun;
-        sys.fx(e.x, e.y, k.ang, BFX_CRASH);
-        sys.end(c);
-      } else if (k.d.el! > 1 && v < C.rampageMax * C.rampageStopFrac) {
-        e.stunT = C.rampageStun; // 속도가 떨어져 멈춘다(그로기)
+        if (res === "crash") {
+        // 벽·바위·맵 끝에 부딪히면 반대쪽으로 튕겨 나간다
+        k.ang += Math.PI + (Math.random() - 0.5) * 1.6;
+        k.d.seg = C.rampageSegMin;
+        sys.fx(e.x, e.y, k.ang, BFX_IMPACT);
+      }
+      if (k.t <= 0) {
+        e.stunT = C.rampageStun; // 지쳐 멈춘다(그로기)
         sys.fx(e.x, e.y, k.ang, BFX_CRASH);
         sys.end(c);
       }
-      void g;
     }
   },
-  tele: ({ e, k }) => [[TELE_LINE, r1(e.x), r1(e.y), r2(k.ang), 1500, C.rampageHitW, ...lt(k), BSK_RAMPAGE]],
+  tele: ({ e, k }) => [[TELE_CIRCLE, r1(e.x), r1(e.y), 0, BODY + 90, 0, ...lt(k), BSK_RAMPAGE]],
 };
 
 export const chariotKit: KitDef = {

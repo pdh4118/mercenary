@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   ARCHER,
   BOSS_SPEAR,
+  BOSS_CHARIOT,
   BSK_CLONE,
+  BSK_RAMPAGE,
   BSK_GUARD,
   BSK_THROW,
   BSK_TRIPLE,
@@ -320,4 +322,32 @@ test("기마궁수 실명 화살: 맞은 주인공은 시야가 좁아지는 실
   assert.equal((g.snapshotPlayers().find((q) => q.id === ids[0])!.status ?? 0) & ST_BIT_BLIND, 0, "시간이 지나면 풀린다");
   const merc = (g as any).mercs.values().next().value;
   assert.equal(merc.stunT ?? 0, 0, "용병은 실명 효과가 없다");
+});
+
+test("전차 장군 폭주: 사방팔방으로 방향을 바꿔 날뛰며 닿으면 피해를 주고, 다 날뛰면 지쳐 멈춘다", () => {
+  const { g, b, ids } = setup(8, BSK_RAMPAGE);
+  b.hp = b.maxHp * 0.3; // 체력 40% 이하에서 쓰는 스킬
+  const p = hero(g, ids[0]!);
+  place(b, 0, 0);
+  place(p, 300, 0);
+  p.maxHp = 1e9; // 한 방에 쓰러지지 않게(쓰러지면 판이 끝난다)
+  p.hp = p.maxHp;
+  const heads = new Set<number>();
+  let hit = false;
+  let px = b.x;
+  let py = b.y;
+  const total = Math.round(TICK_RATE * (BOSS_CHARIOT.rampageTele + BOSS_CHARIOT.rampageSec + 1));
+  for (let i = 0; i < total; i++) {
+    g.step();
+    if (p.hp < p.maxHp) hit = true;
+    p.hp = p.maxHp;
+    if (Math.hypot(b.x - px, b.y - py) > 3) heads.add(Math.round(Math.atan2(b.y - py, b.x - px) / (Math.PI / 4)));
+    px = b.x;
+    py = b.y;
+    if (i % 20 === 0) place(p, b.x + 30, b.y); // 몸 바로 옆에 둬서 닿게 한다
+    if (b.stunT > 0 && heads.size >= 3) break;
+  }
+  assert.ok(heads.size >= 3, `여러 방향으로 달린다(${heads.size}방향)`);
+  assert.ok(hit, "닿으면 피해를 준다");
+  assert.ok(b.stunT > 0, "다 날뛰면 지쳐 멈춘다");
 });

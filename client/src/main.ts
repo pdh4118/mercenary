@@ -44,6 +44,8 @@ import {
   EVT_KNOCK,
   EVT_BOSSFX,
   EF_STEALTH,
+  EF_MAD,
+  BSK_RAMPAGE,
   EF_SKEL,
   EF_SUPPLY,
   EVT_RICE,
@@ -2285,6 +2287,7 @@ async function main() {
     const k = 1 - Math.exp(-ticker.deltaMS / SMOOTH_MS);
 
     enemies.update(latest.enemies, k, (v, w) => {
+      let heatTint = 0;
       const size = w[11] === 1 ? BOSS_SIZE : 1;
       if (!v.art && w[11] === 1 && (latest?.g?.stage ?? 99) <= BOSS_ART_STAGES) {
         // 장군 그림이 뒤늦게 도착했으면 이제 장군 그림으로 바꾼다(장군 그림은 시작을 늦추지 않으려고 뒤에서 받는다)
@@ -2301,6 +2304,7 @@ async function main() {
         v.sprite.texture = v.art.pose(w[13] ?? 0, w[14] ?? 0, w[5] > 0) ?? v.art.idle!;
         const as = v.art.scale * (BOSS_SIZE / BOSS_SIZE_BASE); // 장군 크기 배율이 바뀐 만큼 그림도 키운다
         v.sprite.scale.set(as * v.face, as);
+        if (latest?.g?.stage === 8 && ((((w[14] ?? 0) & EF_MAD) !== 0) || (w[13] ?? 0) === BSK_RAMPAGE)) heatTint = bossFx.wheelHeat(w[0]!, v.x, v.y, as * v.face, performance.now()); // 전차 장군 폭주: 달아오른 바퀴
       } else if (((w[14] ?? 0) & EF_SUPPLY) !== 0 && bossFx.supply.idle) {
         // 군량병: 도망칠 때는 달리는 그림, 멈추면 서 있는 그림, 맞은 직후에는 놀란 그림
         const sv = v as unknown as { px?: number; py?: number; hp?: number; hurtT?: number; runT?: number };
@@ -2340,7 +2344,7 @@ async function main() {
         // 장군 상태 표시: 은신(거의 투명)·무적(황금빛)·기절·쉴드·궁지 등
         const mk = bossFx.enemyMarks(w[0], v.x, v.y, w[14] ?? 0, w[11] === 1, latest?.g?.stage ?? 1, size, performance.now(), w[8] ?? 0, w[15] ?? 100);
         v.sprite.alpha *= mk.alpha;
-        v.sprite.tint = mk.tint;
+        v.sprite.tint = heatTint || mk.tint;
       }
       setPoison(v.sprite, w[12] === 1);
     });

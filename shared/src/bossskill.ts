@@ -155,6 +155,7 @@ export const BFX_CHAINBREAK = 14; // 영혼 사슬이 끊어짐(ang = 사슬 방
 export const BFX_BACKSTEP = 11; // 뒤로 훌쩍 물러나는 먼지(ang = 물러나는 방향)
 export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)
 export const BFX_MTHRUST = 17; // 일반 근접 유닛(적·용병·주인공·장군 기본 공격)의 찌르기 줄기(ang = 방향, owner = 사거리 x 4 + 편)
+export const BFX_DRIFT = 20; // 전차 장군 급선회 파쇄: 후방 부채꼴로 먼지와 바퀴 자국이 퍼진다(ang = 후방, owner = 사거리)
 export const BFX_SCYTHE = 19; // 전차 장군 낫 바퀴: 몸 옆으로 낫이 휩쓰는 호(ang = 휘두르는 쪽, owner = 사거리)
 export const BFX_MSWING = 18; // 일반 근접 유닛의 휘두르기 호(ang = 방향, owner = 사거리 x 4 + 편)
 export const MELEE_TEAM_ALLY = 0; // 내 편(주인공·용병)
@@ -496,17 +497,17 @@ export const BOSS_CHARIOT = {
   driftKnock: 150,
   driftRest: 1.2,
   driftCd: 11,
-  rampageTele: 1.5,
-  rampageMax: 1500,
-  rampageAccel: 1100,
-  rampageStart: 300,
-  rampageStopFrac: 0.3,
-  rampageHitW: 90,
-  rampageStun: 4,
+  rampageTele: 1.2, // 폭주 시작 전 포효
+  rampageSec: 7, // 날뛰는 시간
+  rampageSpeed: 650, // 날뛰는 속도
+  rampageSegMin: 0.7, // 한 방향으로 달리는 최소 시간
+  rampageSegMax: 1.4, // 한 방향으로 달리는 최대 시간
+  rampageHitW: 90, // 닿는 폭
+  rampageDmg: 6, // 닿았을 때 피해(배율)
+  rampageKnock: 140,
+  rampageHitGap: 0.6, // 같은 대상을 다시 칠 수 있는 간격
+  rampageStun: 3, // 다 날뛴 뒤 지쳐 멈추는 시간(약점 노출)
   rampageCd: 40,
-  breakWall: 0.25,
-  breakMace: 0.25,
-  breakSpear: 0.15,
 } as const;
 
 /** 보스 메테오 폭발 가장자리의 피해 감소 비율(적 마법사와 같다) */

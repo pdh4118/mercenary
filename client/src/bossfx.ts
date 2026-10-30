@@ -10,6 +10,7 @@ import {
   BFX_MTHRUST,
   BFX_MSWING,
   BFX_SCYTHE,
+  BFX_DRIFT,
   MELEE_TEAM_ALLY,
   MELEE_TEAM_BOSS,
   MELEE_TEAM_ENEMY,
@@ -122,7 +123,7 @@ const BOSS_UNIT_TEX = [
   "boss5_whirlpose_0", "boss5_whirlpose_1", "boss5_whirlpose_2", "boss5_whirlpose_3",
   "boss6_idle", "boss6_cast", "boss6_blink",
   "boss7_gallop", "boss7_shoot",
-  "boss8_normal", "boss8_mad",
+  "boss8_normal", "boss8_mad", "boss8_wheel",
   "boss9_idle", "boss9_cast", "boss9_drain",
 ] as const;
 
@@ -161,6 +162,7 @@ export async function createBossFx(d: BossFxDeps) {
     fire: ["boss7_fire", [0, 1, 2]],
     cornered: ["boss7_cornered", [0, 1, 2]],
     dazed: ["boss8_dazed", [0, 1, 2, 3]],
+    heat: ["boss8_heat", [0, 1, 2, 3]],
     scythe: ["boss8_scythe", [0, 1, 2, 3]],
     crash: ["boss8_crash", [1, 2, 3, 4]],
     shell: ["boss4_shell", [0, 1, 2, 3, 4]],
@@ -227,7 +229,7 @@ export async function createBossFx(d: BossFxDeps) {
     { get idle() { return u("boss5_idle"); }, scale: 0.42, pose: (sk, fl, atk) => (fl & EF_WHIRL ? u(`boss5_whirlpose_${Math.floor(performance.now() / WHIRL_FRAME_MS) % 4}`) : sk === BSK_JUMP ? u("boss5_jump") : sk === BSK_FLURRY ? (performance.now() - lastSwingAt < 170 ? u("boss5_swing_b") : u("boss5_swing_a")) : sk === BSK_MACETHROW || sk === BSK_WHIRL || atk ? u("boss5_smash") : u("boss5_idle")) },
     { get idle() { return u("boss6_idle"); }, scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_BLINK ? u("boss6_blink") : sk > 0 || atk ? u("boss6_cast") : u("boss6_idle")) },
     { get idle() { return u("boss7_gallop"); }, scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")) },
-    { get idle() { return u("boss8_normal"); }, scale: 0.75, pose: (sk, fl) => (sk === BSK_ACCEL ? u("boss8_normal") : fl & EF_MAD || sk === BSK_RAMPAGE ? u("boss8_mad") : u("boss8_normal")) },
+    { get idle() { return u("boss8_wheel"); }, scale: 0.75, pose: () => u("boss8_wheel") }, // 바퀴가 온전한 그림 하나로 쓰고, 폭주의 달아오른 바퀴는 wheelHeat 효과로 얹는다
     { get idle() { return u("boss9_idle"); }, scale: 0.42, pose: (sk) => (sk === BSK_DRAIN ? u("boss9_drain") : sk === BSK_FOG || sk === BSK_CHAIN || sk === BSK_ORB ? u("boss9_cast") : u("boss9_idle")) },
   ];
   void BSK_STEALTH;
@@ -329,6 +331,18 @@ export async function createBossFx(d: BossFxDeps) {
       // 전차 장군 낫 바퀴: 판정 범위(len)에 맞춘 철청색 호가 양 옆을 휩쓴다
       meleeFlip = !meleeFlip;
       playSeq(T.flurryArc, x, y - 14, 0.28, Math.max(0.3, (len * 1.7) / 300), ang, 0.53, meleeFlip, 0.85, 0xa8c8e0);
+    } else if (val === BFX_DRIFT) {
+      // 전차 장군 급선회 파쇄: 꼬리(바퀴)가 후방 부채꼴을 쓸며 흙먼지가 퍼지고, 바퀴 자국 호와 충격이 남는다
+      const half = (Math.PI * 100) / 180;
+      meleeFlip = !meleeFlip;
+      playSeq(T.flurryArc, x, y - 8, 0.35, Math.max(0.4, (len * 1.05) / 300), ang, 0.53, meleeFlip, 0.65, 0xc9c4b8);
+      for (let i = 0; i < 6; i++) {
+        const a = ang + (Math.random() - 0.5) * half * 1.8;
+        const r = len * (0.3 + 0.65 * Math.random());
+        playSeq(T.dust, x + Math.cos(a) * r, y + Math.sin(a) * r + 6, 0.35 + 0.25 * Math.random(), 0.3 + 0.3 * Math.random(), 0, 0.5, false, 0.7, 0xdcc9a8);
+      }
+      playSeq(T.crash, x + Math.cos(ang) * len * 0.55, y + Math.sin(ang) * len * 0.55 - 6, 0.45, 0.8, 0, 0.5, false, 0.85);
+      d.sound("skill_wall_break", x + Math.cos(ang) * 120, y + Math.sin(ang) * 120, 0.8);
     } else if (val === BFX_SLASH) {
       // 기병 장군의 선회 베기: 둔기병 장군의 휘두르기와 같은 호를 주황빛으로(좌우로 번갈아 뒤집는다)
       meleeFlip = !meleeFlip;
@@ -931,6 +945,23 @@ export async function createBossFx(d: BossFxDeps) {
     return { alpha, tint };
   };
 
+  /**
+   * 전차 장군 폭주: 바퀴가 달아오른 모습을 효과로 얹는다(바퀴 위에 붉게 달군 바퀴 그림을 깜빡이며 겹치고 몸을 붉게 물들인다).
+   * scale = 장군 그림 배율 x 좌우 방향(그림은 말이 오른쪽을 향한 모습이 기본이다)
+   */
+  const wheelHeat = (id: number, x: number, y: number, scale: number, now: number): number => {
+    const s = Math.abs(scale);
+    const dir = scale < 0 ? -1 : 1;
+    const pulse = 0.75 + 0.25 * Math.sin(now / 70);
+    mark(id, "heatA", pick(T.heat, 2), x + dir * -74 * s, y - 24 * s, s * 0.95, 0.5 + 0.3 * pulse);
+    mark(id, "heatB", pick(T.heat, 1 + (Math.floor(now / 110) % 2)), x + dir * -6 * s, y - 18 * s, s * 0.85, 0.3 + 0.25 * pulse);
+    for (const k of ["heatA", "heatB"]) {
+      const sp = marks.get(`${id}:${k}`);
+      if (sp) sp.zIndex = y + 3; // 장군 그림 위에 얹는다
+    }
+    return 0xffb8a0; // 몸을 붉게 물들이는 색
+  };
+
   /** 주인공·용병의 기절 표시: 머리 위에 별이 도는 그림(장군 기절 표시와 같은 그림을 쓴다). key는 대상마다 다른 문자열 */
   const stunMark = (key: string, x: number, y: number, scale: number, now: number): void => {
     mark(key, "stun", pick(T.dazed, Math.floor(now / 110) % 4), x, y, scale, 0.95);
@@ -992,6 +1023,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, playFx, enemyMarks, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
+  return { art, frame, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
 }
 

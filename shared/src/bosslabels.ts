@@ -1732,66 +1732,66 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "boss": "전차",
   "skill": "폭주",
   "label": "예고 시간(초)",
-  "hint": ""
+  "hint": "폭주 시작 전 포효"
  },
- "BOSS_CHARIOT.rampageMax": {
+ "BOSS_CHARIOT.rampageSec": {
+  "boss": "전차",
+  "skill": "폭주",
+  "label": "지속 시간(초)",
+  "hint": "날뛰는 시간"
+ },
+ "BOSS_CHARIOT.rampageSpeed": {
+  "boss": "전차",
+  "skill": "폭주",
+  "label": "속도",
+  "hint": "날뛰는 속도"
+ },
+ "BOSS_CHARIOT.rampageSegMin": {
+  "boss": "전차",
+  "skill": "폭주",
+  "label": "최소",
+  "hint": "한 방향으로 달리는 최소 시간"
+ },
+ "BOSS_CHARIOT.rampageSegMax": {
   "boss": "전차",
   "skill": "폭주",
   "label": "최대",
-  "hint": ""
- },
- "BOSS_CHARIOT.rampageAccel": {
-  "boss": "전차",
-  "skill": "폭주",
-  "label": "rampageAccel",
-  "hint": ""
- },
- "BOSS_CHARIOT.rampageStart": {
-  "boss": "전차",
-  "skill": "폭주",
-  "label": "rampageStart",
-  "hint": ""
- },
- "BOSS_CHARIOT.rampageStopFrac": {
-  "boss": "전차",
-  "skill": "폭주",
-  "label": "비율",
-  "hint": ""
+  "hint": "한 방향으로 달리는 최대 시간"
  },
  "BOSS_CHARIOT.rampageHitW": {
   "boss": "전차",
   "skill": "폭주",
-  "label": "rampageHitW",
+  "label": "닿는 폭",
+  "hint": "닿는 폭"
+ },
+ "BOSS_CHARIOT.rampageDmg": {
+  "boss": "전차",
+  "skill": "폭주",
+  "label": "피해 배율",
+  "hint": "닿았을 때 피해(배율)"
+ },
+ "BOSS_CHARIOT.rampageKnock": {
+  "boss": "전차",
+  "skill": "폭주",
+  "label": "넉백 거리",
   "hint": ""
+ },
+ "BOSS_CHARIOT.rampageHitGap": {
+  "boss": "전차",
+  "skill": "폭주",
+  "label": "간격",
+  "hint": "같은 대상을 다시 칠 수 있는 간격"
  },
  "BOSS_CHARIOT.rampageStun": {
   "boss": "전차",
   "skill": "폭주",
   "label": "기절 시간(초)",
-  "hint": ""
+  "hint": "다 날뛴 뒤 지쳐 멈추는 시간(약점 노출)"
  },
  "BOSS_CHARIOT.rampageCd": {
   "boss": "전차",
   "skill": "폭주",
   "label": "재사용 대기(초)",
-  "hint": ""
- },
- "BOSS_CHARIOT.breakWall": {
-  "boss": "전차",
-  "skill": "장애물 파괴",
-  "label": "breakWall",
-  "hint": ""
- },
- "BOSS_CHARIOT.breakMace": {
-  "boss": "전차",
-  "skill": "장애물 파괴",
-  "label": "breakMace",
-  "hint": ""
- },
- "BOSS_CHARIOT.breakSpear": {
-  "boss": "전차",
-  "skill": "장애물 파괴",
-  "label": "breakSpear",
   "hint": ""
  },
  "BOSS_NECRO.firstDelay": {
