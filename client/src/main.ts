@@ -690,9 +690,9 @@ async function main() {
       if (w[4] === 0) sprite.anchor.set(...CAV_ANCHOR);
       else sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
       const bar = new Graphics();
-      const label = new Text({ text: mercName(w[16]), style: { fill: 0xffffff, fontSize: 11, stroke: { color: 0x000000, width: 3 } } });
+      const label = new Text({ text: mercName(w[16]), style: { fill: 0xffffff, fontSize: 15, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
       label.anchor.set(0.5, 1);
-      label.y = -t.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 18;
+      label.y = -t.height * SPRITE_SCALE * SPRITE_ANCHOR_Y - 28;
       label.visible = false;
       node.addChild(ring, sprite, bar, label);
       mercLayer.addChild(node);
@@ -2478,8 +2478,8 @@ async function main() {
       }
       v.label.visible = mine || showNames || mercPanel.hovered() === w[0]; // 내 용병은 이름을 항상 보여 준다(음성 지시로 이름을 부를 수 있다)
       const baseY = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y;
-      const lift = isReady(w) ? 12 : 0; // 강화 가능 화살표가 있으면 그 위로
-      v.label.y = baseY - 14 - lift + (mine ? 0 : 4); // 이름이 막대 바로 위, 그 위에 병종 + 의도
+      const lift = isReady(w) ? 10 : 0; // 강화 가능 화살표가 있으면 그 위로(강화 점·방패 막대·화살표와 겹치지 않게 막대에서 충분히 띄운다)
+      v.label.y = baseY - 22 - lift; // 이름이 막대 바로 위, 그 위에 병종 + 의도
       // 말풍선: 내 용병이 지금 하려는 일(병종 + 행동 → 대상)을 항상 담고, 혼잣말이 나오면 그 위 줄에 함께 보여 준다(토너먼트에서도)
       {
         type Bub = { box: Container; bg: Graphics; tIntent: Text; tTalk: Text; sig: string };
@@ -2489,8 +2489,8 @@ async function main() {
         if (code > 0 && !bv.bub) {
           const box = new Container();
           const bg = new Graphics();
-          const tIntent = new Text({ text: "", style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
-          const tTalk = new Text({ text: "", style: { fill: 0xfff3cf, fontSize: 12, fontWeight: "600", wordWrap: true, wordWrapWidth: 150, align: "center" } });
+          const tIntent = new Text({ text: "", style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+          const tTalk = new Text({ text: "", style: { fill: 0xfff3cf, fontSize: 15, fontWeight: "700", wordWrap: true, wordWrapWidth: 200, align: "center", stroke: { color: 0x000000, width: 3 } } });
           tIntent.anchor.set(0.5, 1);
           tTalk.anchor.set(0.5, 1);
           box.addChild(bg, tIntent, tTalk);
@@ -2525,7 +2525,7 @@ async function main() {
               b.tTalk.visible = hasTalk;
             }
             b.tTalk.alpha = say?.alpha ?? 1;
-            b.box.y = v.label.y - 13; // 이름표(막대 바로 위) 위에 얹는다
+            b.box.y = v.label.y - v.label.height - 2; // 이름표(막대 바로 위) 위에 얹는다
           }
         }
       }
@@ -3304,7 +3304,7 @@ async function main() {
     const meState = latest.players.find((p) => p.id === myId);
     if (meState) audio.setListener(meState.x, meState.y);
     // 쿨타임: 주문·공격이 끝난 뒤 다시 쏠 수 있을 때까지. 왜 발사가 안 되는지 머리 위에 알려 준다.
-    const recovering = !!meState && !meState.down && meState.wind <= 0 && meState.fcd >= 0.4;
+    const recovering = !!meState && !meState.down && WEAPONS[meState.weapon]?.type === MAGE_TYPE && meState.wind <= 0 && meState.fcd >= 0.4; // 마법사 주인공만
     recoverLabel.visible = recovering;
     if (recovering && meState) {
       recoverLabel.text = `쿨타임 ${meState.fcd.toFixed(1)}초`;

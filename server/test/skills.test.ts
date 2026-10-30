@@ -61,12 +61,12 @@ test("활 스킬(은신): 1초간 점점 투명해져 5%가 되고, 투명 50% �
   run(g, 0.4); // 1.1초: 가장 투명(5%)
   assert.equal(alpha(), 5);
   assert.ok(hidden());
-  run(g, 0.8); // 1.9초: 아직 유지 중(5%)
-  assert.ok(hidden() && alpha() === 5, `1.9초 ${alpha()}`);
-  run(g, 0.4); // 2.3초: 돌아오는 중이지만 아직 50% 아래라 어그로는 풀려 있다
-  assert.ok(hidden() && alpha() > 5 && alpha() < 50, `2.3초 ${alpha()}`);
-  run(g, 0.3); // 2.6초: 50% 위로 돌아와 어그로가 다시 끌린다
-  assert.ok(!hidden() && alpha() > 50, `2.6초 ${alpha()}`);
+  run(g, 2.8); // 3.9초: 아직 유지 중(5%, 3초 유지)
+  assert.ok(hidden() && alpha() === 5, `3.9초 ${alpha()}`);
+  run(g, 0.4); // 4.3초: 돌아오는 중이지만 아직 50% 아래라 어그로는 풀려 있다
+  assert.ok(hidden() && alpha() > 5 && alpha() < 50, `4.3초 ${alpha()}`);
+  run(g, 0.3); // 4.6초: 50% 위로 돌아와 어그로가 다시 끌린다
+  assert.ok(!hidden() && alpha() > 50, `4.6초 ${alpha()}`);
   run(g, 1);
   assert.equal(alpha(), 100);
   assert.equal((g as any).slots.get(a).ghost, undefined, "끝나면 상태가 사라진다");
