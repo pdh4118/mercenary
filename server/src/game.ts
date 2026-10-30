@@ -181,6 +181,11 @@ import {
   BSK_SLASH,
   BSK_SPRINT,
   BFX_CRASH,
+  BFX_MTHRUST,
+  BFX_MSWING,
+  MELEE_TEAM_ENEMY,
+  MELEE_TEAM_BOSS,
+  MELEE_TEAM_ALLY,
   BSK_STEALTH,
   EF_STEALTH,
   BFX_IMPACT,
@@ -1275,6 +1280,7 @@ export class Game {
     }
     const duel = this.phase === "tournament";
     this.stepGhosts(dt);
+    this.meleeFxLeft = 24;
     this.navBudget = 24;
     this.dbg.length = 0;
     this.trackEnemyVel(dt);
@@ -2964,6 +2970,7 @@ export class Game {
       return;
     }
     p.swing = SWING_VISUAL_SEC;
+    this.meleeFx(p.x, p.y, p.aim, reach, w.type, MELEE_TEAM_ALLY);
     this.boss.strikeBarriers(p.x, p.y, reach, damage);
     const arc = meleeArc(w.type, w.arc, s.mods.heroArea);
     // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
@@ -4630,6 +4637,18 @@ export class Game {
 
   // --- AI 보조: 위험 구역 회피 · 적 속도 추적 · 디버그 ------------------------------------
 
+  private meleeFxLeft = 24;
+  /**
+   * 일반 근접 공격이 나갈 때의 효과(창·기병은 찌르기 줄기, 나머지는 휘두르기 호). 한 틱에 보내는 수를 제한해 큰 전투에서도 가볍게 한다.
+   * 이벤트의 owner 칸에 사거리 x 4 + 편(MELEE_TEAM_*)을 실어 보낸다.
+   */
+  private meleeFx(x: number, y: number, ang: number, reach: number, type: number, team: number): void {
+    if (this.meleeFxLeft <= 0) return;
+    this.meleeFxLeft--;
+    const thrust = type === SPEAR || type === CAVALRY;
+    this.pushEvent(EVT_BOSSFX, x, y, ang, thrust ? BFX_MTHRUST : BFX_MSWING, Math.round(Math.min(600, reach)) * 4 + team);
+  }
+
   /** 은신(투명화) 시간을 흘리고, 주인공 투명도를 상태에 싣는다. 장군의 은신은 스킬이 끝났는데 안 풀렸으면 풀어 준다. */
   private stepGhosts(dt: number): void {
     for (const s of this.slots.values()) {
@@ -4885,6 +4904,7 @@ export class Game {
       m.momentum *= CAV_MOMENTUM_AFTER_HIT; // 부딪히면 속도를 잃는다
     }
     m.chargeSnap = 0;
+    this.meleeFx(m.x, m.y, m.atkAng, st.reach, m.type, MELEE_TEAM_ALLY);
     this.boss.strikeBarriers(m.x, m.y, st.reach, dmg); // 거대 방패·얼음벽을 때린다
     if (this.phase === "tournament") {
       const foes = this.duelFoes(m.owner);
@@ -5974,6 +5994,7 @@ export class Game {
       return;
     }
     const charge = e.type === CAVALRY ? e.chargeSnap : 0;
+    this.meleeFx(e.x, e.y, e.atkAng, st.reach, e.type, e.boss ? MELEE_TEAM_BOSS : MELEE_TEAM_ENEMY);
     if (e.type === CAVALRY) {
       e.momentum *= CAV_MOMENTUM_AFTER_HIT;
       e.evadeT = CAV_EVADE_SEC; // 치고 빠지기

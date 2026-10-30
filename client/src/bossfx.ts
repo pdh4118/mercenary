@@ -7,6 +7,11 @@ import {
   BFX_SWING,
   BFX_FLURRYHIT,
   BFX_THRUST,
+  BFX_MTHRUST,
+  BFX_MSWING,
+  MELEE_TEAM_ALLY,
+  MELEE_TEAM_BOSS,
+  MELEE_TEAM_ENEMY,
   BFX_BACKSTEP,
   BOSS_SPEAR,
   BOSS_BLUNT,
@@ -229,13 +234,14 @@ export async function createBossFx(d: BossFxDeps) {
 
   // --- 효과 컷(순서대로) ---------------------------------------------------------
   const seqFx: { sp: Sprite; frames: Tex[]; age: number; dur: number; maxA: number }[] = [];
-  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5, flipY = false, maxA = 1) => {
+  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5, flipY = false, maxA = 1, tint = 0xffffff) => {
     const f = first(frames);
     if (!f || seqFx.length > 60) return;
     const sp = new Sprite(f);
     sp.anchor.set(anchorX, 0.5);
     sp.scale.set(scale, flipY ? -scale : scale);
     sp.rotation = rot;
+    sp.tint = tint;
     sp.position.set(x, y);
     d.fxLayer.addChild(sp);
     seqFx.push({ sp, frames, age: 0, dur, maxA });
@@ -243,10 +249,11 @@ export async function createBossFx(d: BossFxDeps) {
 
   const now0 = (): number => performance.now();
   let lastThrustSound = 0;
+  let meleeFlip = false;
   /** 창 찌르기 줄기의 밝은 심: 앞으로 뻗으며 가늘어지는 흰 초록 선이 0.2초 동안 사라진다(그림 컷 위에 겹쳐 더 또렷하게 보인다) */
   const thrustG = new Graphics();
   d.fxLayer.addChild(thrustG);
-  const thrustCores: { x: number; y: number; ang: number; len: number; age: number }[] = [];
+  const thrustCores: { x: number; y: number; ang: number; len: number; age: number; color: number; w: number }[] = [];
   const drawThrustCores = (dtMs: number) => {
     thrustG.clear();
     for (let i = thrustCores.length - 1; i >= 0; i--) {
@@ -258,12 +265,12 @@ export async function createBossFx(d: BossFxDeps) {
       }
       const k = c.age / 0.2;
       const reach = c.len * Math.min(1, 0.35 + k * 3); // 앞으로 쭉 뻗는다
-      const w = 9 * (1 - k);
+      const w = c.w * (1 - k);
       const px = -Math.sin(c.ang);
       const py = Math.cos(c.ang);
       const ex = c.x + Math.cos(c.ang) * reach;
       const ey = c.y + Math.sin(c.ang) * reach;
-      thrustG.poly([c.x + px * w, c.y + py * w, ex, ey, c.x - px * w, c.y - py * w]).fill({ color: 0xe8ffe0, alpha: 0.75 * (1 - k) });
+      thrustG.poly([c.x + px * w, c.y + py * w, ex, ey, c.x - px * w, c.y - py * w]).fill({ color: c.color, alpha: 0.75 * (1 - k) });
       thrustG.moveTo(c.x, c.y).lineTo(ex, ey).stroke({ width: 2, color: 0xffffff, alpha: 0.9 * (1 - k) });
     }
   };
@@ -297,15 +304,32 @@ export async function createBossFx(d: BossFxDeps) {
       // 창을 앞으로 찌르는 줄기: 몸 앞에서 시작해 길이만큼 뻗는다(그림 길이 약 190px을 늘려 맞춘다)
       const L = Math.max(60, len || 300);
       playSeq(T.thrust, x + Math.cos(ang) * 26, y - 26 + Math.sin(ang) * 26, 0.22, L / 190, ang, 0.02);
-      thrustCores.push({ x: x + Math.cos(ang) * 26, y: y - 26 + Math.sin(ang) * 26, ang, len: L, age: 0 });
+      thrustCores.push({ x: x + Math.cos(ang) * 26, y: y - 26 + Math.sin(ang) * 26, ang, len: L, age: 0, color: 0xe8ffe0, w: 9 });
       if (now0() - lastThrustSound > 140) {
         lastThrustSound = now0();
         d.sound("spear_thrust", x, y, 0.8); // 방어 태세의 연속 찌르기는 소리를 겹쳐 내지 않는다
       }
+    } else if (val === BFX_MTHRUST || val === BFX_MSWING) {
+      // 일반 근접 유닛의 공격 효과: 창·기병은 찌르기 줄기, 나머지는 휘두르기 호. 편마다 색이 다르다(내 편 하늘색 · 적 붉은색 · 장군 금색).
+      const reach = Math.floor(len / 4);
+      const team = len % 4;
+      const tint = team === MELEE_TEAM_BOSS ? 0xffd27a : team === MELEE_TEAM_ENEMY ? 0xff9a8a : 0xbfe4ff;
+      if (val === BFX_MTHRUST) {
+        const L = Math.max(40, reach * 1.15);
+        playSeq(T.thrust, x + Math.cos(ang) * 14, y - 22 + Math.sin(ang) * 14, 0.16, L / 190, ang, 0.02, false, 0.8);
+        thrustCores.push({ x: x + Math.cos(ang) * 14, y: y - 22 + Math.sin(ang) * 14, ang, len: L, age: 0, color: tint, w: 7 });
+      } else {
+        meleeFlip = !meleeFlip;
+        playSeq(T.flurryArc, x, y - 14, 0.2, Math.max(0.2, Math.min(1.1, (reach * 1.7) / 300)), ang, 0.53, meleeFlip, 0.75, tint);
+      }
     } else if (val === BFX_MACEBOOM) {
       if (!d.maceBoom(x, y, ang * 100)) playSeq(T.impact, x, y, 0.55, 1, 0);
       d.sound("skill_mace_hit", x, y);
-    } else if (val === BFX_SLASH) playSeq(T.slash, x + Math.cos(ang) * 40, y + Math.sin(ang) * 40, 0.3, 1.2, ang);
+    } else if (val === BFX_SLASH) {
+      // 기병 장군의 선회 베기: 둔기병 장군의 휘두르기와 같은 호를 주황빛으로(좌우로 번갈아 뒤집는다)
+      meleeFlip = !meleeFlip;
+      playSeq(T.flurryArc, x, y - 12, 0.3, 1.15, ang, 0.53, meleeFlip, 0.8, 0xff7a2a);
+    }
     else if (val === BFX_ROAR) {
       playSeq(T.cry, x, y, 0.9, 1.5, 0);
       d.sound("boss_warning", x, y, 0.6);

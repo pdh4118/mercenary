@@ -154,6 +154,11 @@ export const BFX_FLURRYHIT = 16; // 철퇴 난타가 땅을 때리는 충격
 export const BFX_CHAINBREAK = 14; // 영혼 사슬이 끊어짐(ang = 사슬 방향)
 export const BFX_BACKSTEP = 11; // 뒤로 훌쩍 물러나는 먼지(ang = 물러나는 방향)
 export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)
+export const BFX_MTHRUST = 17; // 일반 근접 유닛(적·용병·주인공·장군 기본 공격)의 찌르기 줄기(ang = 방향, owner = 사거리 x 4 + 편)
+export const BFX_MSWING = 18; // 일반 근접 유닛의 휘두르기 호(ang = 방향, owner = 사거리 x 4 + 편)
+export const MELEE_TEAM_ALLY = 0; // 내 편(주인공·용병)
+export const MELEE_TEAM_ENEMY = 1; // 일반 적
+export const MELEE_TEAM_BOSS = 2; // 장군
 export const BFX_MACEBOOM = 9; // 점프 쿵: 던진 철퇴가 땅에 닿는 폭발 그림(ang x 100 = 반경)
 
 /** 기병 장군(스테이지 1) 수치 */
@@ -570,3 +575,13 @@ export const SUPPLY = {
   healFrac: 0.2, // 회복량 = 최대 체력의 20% + healFlat
   healFlat: 15,
 } as const;
+
+/** 스테이지별 장군 호칭과 이름(스테이지 표시줄에 보인다). 10스테이지는 마지막 대장군이다. */
+export const BOSS_TITLES = ["기병 장군", "창병 장군", "궁수 장군", "검방병 장군", "둔기병 장군", "마법사 장군", "기마궁수", "전차 장군", "네크로맨서", "대장군"] as const;
+export const BOSS_NAMES = ["질풍의 하르칸", "철창 오르카", "그림자 시위 렌", "불굴의 도르간", "분쇄자 우르곤", "서리 현자 이스벨", "초원의 매 카잔", "철륜 브론타", "무덤지기 말라키", "파멸의 군주 그라크"] as const;
+/** "궁수 장군 그림자 시위 렌" 같은 장군 소개 문구 */
+export const bossLabel = (stage: number): string => {
+  const t = BOSS_TITLES[stage - 1];
+  const n = BOSS_NAMES[stage - 1];
+  return t && n ? `${t} ${n}` : t ?? "장군";
+};
