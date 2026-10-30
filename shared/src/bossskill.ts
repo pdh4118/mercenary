@@ -155,6 +155,7 @@ export const BFX_CHAINBREAK = 14; // 영혼 사슬이 끊어짐(ang = 사슬 방
 export const BFX_BACKSTEP = 11; // 뒤로 훌쩍 물러나는 먼지(ang = 물러나는 방향)
 export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)
 export const BFX_MTHRUST = 17; // 일반 근접 유닛(적·용병·주인공·장군 기본 공격)의 찌르기 줄기(ang = 방향, owner = 사거리 x 4 + 편)
+export const BFX_SCYTHE = 19; // 전차 장군 낫 바퀴: 몸 옆으로 낫이 휩쓰는 호(ang = 휘두르는 쪽, owner = 사거리)
 export const BFX_MSWING = 18; // 일반 근접 유닛의 휘두르기 호(ang = 방향, owner = 사거리 x 4 + 편)
 export const MELEE_TEAM_ALLY = 0; // 내 편(주인공·용병)
 export const MELEE_TEAM_ENEMY = 1; // 일반 적

@@ -9,6 +9,7 @@ import {
   BFX_THRUST,
   BFX_MTHRUST,
   BFX_MSWING,
+  BFX_SCYTHE,
   MELEE_TEAM_ALLY,
   MELEE_TEAM_BOSS,
   MELEE_TEAM_ENEMY,
@@ -64,7 +65,6 @@ import {
   EF_GUARD,
   EF_INVULN,
   EF_MAD,
-  EF_SCYTHE,
   EF_STEALTH,
   EF_STUN,
   EF_WHIRL,
@@ -325,6 +325,10 @@ export async function createBossFx(d: BossFxDeps) {
     } else if (val === BFX_MACEBOOM) {
       if (!d.maceBoom(x, y, ang * 100)) playSeq(T.impact, x, y, 0.55, 1, 0);
       d.sound("skill_mace_hit", x, y);
+    } else if (val === BFX_SCYTHE) {
+      // 전차 장군 낫 바퀴: 판정 범위(len)에 맞춘 철청색 호가 양 옆을 휩쓴다
+      meleeFlip = !meleeFlip;
+      playSeq(T.flurryArc, x, y - 14, 0.28, Math.max(0.3, (len * 1.7) / 300), ang, 0.53, meleeFlip, 0.85, 0xa8c8e0);
     } else if (val === BFX_SLASH) {
       // 기병 장군의 선회 베기: 둔기병 장군의 휘두르기와 같은 호를 주황빛으로(좌우로 번갈아 뒤집는다)
       meleeFlip = !meleeFlip;
@@ -924,7 +928,6 @@ export async function createBossFx(d: BossFxDeps) {
       if (sh) mark(id, "shell", sh, x, y + 30, 1.25, 0.7, true, 0.9);
       else guardWalls.push({ x, y, ang: faceAng });
     }
-    if (flags & EF_SCYTHE) mark(id, "scythe", pick(T.scythe, 3), x, y - 20, 1.7, 0.9);
     return { alpha, tint };
   };
 

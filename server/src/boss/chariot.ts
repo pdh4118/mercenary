@@ -6,6 +6,7 @@ import {
   BSK_SCYTHE,
   BFX_CRASH,
   BFX_IMPACT,
+  BFX_SCYTHE,
   EF_MAD,
   EF_SCYTHE,
   HZ_MACE,
@@ -100,6 +101,9 @@ const scythe: SkillDef = {
       k.d.next! -= dt;
       if (k.d.next! <= 0) {
         k.d.next = C.scytheStep;
+        // 낫이 양 옆을 휩쓰는 호(판정이 들어가는 순간마다 좌우로 하나씩)
+        sys.fx(e.x, e.y, e.face + Math.PI / 2, BFX_SCYTHE, BODY + C.scytheRange);
+        sys.fx(e.x, e.y, e.face - Math.PI / 2, BFX_SCYTHE, BODY + C.scytheRange);
         for (const f of foes) {
           const d = sys.dist(f, e);
           if (d > BODY + C.scytheRange + f.r) continue;
@@ -112,7 +116,11 @@ const scythe: SkillDef = {
       if (k.t <= 0) sys.end(c);
     }
   },
-  tele: ({ e, k }) => [[TELE_CIRCLE, r1(e.x), r1(e.y), 0, BODY + C.scytheRange, 0, ...lt(k), BSK_SCYTHE]],
+  // 예고: 판정과 같은 양옆 부채꼴 두 개(정면·후면은 안전)
+  tele: ({ e, k }) => [
+    [TELE_CONE, r1(e.x), r1(e.y), r2(e.face + 1.575), 0.775, BODY + C.scytheRange, ...lt(k), BSK_SCYTHE],
+    [TELE_CONE, r1(e.x), r1(e.y), r2(e.face - 1.575), 0.775, BODY + C.scytheRange, ...lt(k), BSK_SCYTHE],
+  ],
 };
 
 /** 급선회 파쇄: 급선회하며 꼬리가 후방 부채꼴을 휩쓴다. 끝나면 멈춰 후방 약점이 드러난다. */
