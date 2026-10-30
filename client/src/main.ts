@@ -1451,7 +1451,7 @@ async function main() {
             groundFx.addChild(sp);
             maceHits.push({ sp, age: 0, r: val });
           }
-          else if (kind === EVT_SKILL && val === 0 && (WEAPONS[Math.round(ang)]?.type === SPEAR_TYPE || WEAPONS[Math.round(ang)]?.type === ARCHER_TYPE) && latest.players.some((q) => q.id === owner)) {
+          else if (kind === EVT_SKILL && val === 0 && (WEAPONS[Math.round(ang)]?.type === SPEAR_TYPE) && latest.players.some((q) => q.id === owner)) {
             // 창 돌진·활 후퇴: 움직이는 동안 주인공 그림을 어둡게 복사한 잔상이 지나온 길에 남는다(창은 무적이라 링은 그리지 않는다)
             if (WEAPONS[Math.round(ang)]!.type === ARCHER_TYPE && backDustTex.every((t) => t !== null)) {
               // 후퇴 시작 자리의 흙먼지: 그림은 왼쪽 위로 튀는 모양이라 후퇴 방향에 맞춰 돌린다
@@ -2330,7 +2330,7 @@ async function main() {
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
       if ((w[14] ?? 0) !== 0 || v.sprite.tint !== 0xffffff) {
         // 장군 상태 표시: 은신(거의 투명)·무적(황금빛)·기절·쉴드·궁지 등
-        const mk = bossFx.enemyMarks(w[0], v.x, v.y, w[14] ?? 0, w[11] === 1, latest?.g?.stage ?? 1, size, performance.now(), w[8] ?? 0);
+        const mk = bossFx.enemyMarks(w[0], v.x, v.y, w[14] ?? 0, w[11] === 1, latest?.g?.stage ?? 1, size, performance.now(), w[8] ?? 0, w[15] ?? 100);
         v.sprite.alpha *= mk.alpha;
         v.sprite.tint = mk.tint;
       }
@@ -2577,7 +2577,9 @@ async function main() {
       if (dead && !v.wasDown && p.id !== myId) audio.play("hero_down", { x: v.x, y: v.y });
       v.wasDown = dead;
       // 쓰러지면 흐리게, 부활 직후 무적일 때는 깜빡인다
-      v.node.alpha = dead ? 0.4 : sitsOut(p.id, true) ? SPECTATOR_ALPHA : p.invuln > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 90)) : 1;
+      // 은신: 서버가 알려 준 투명도(5%까지). 내 주인공은 내가 찾을 수 있게 최소 30%로만 흐려진다.
+      const ghostA = Math.max(p.id === myId ? 0.3 : 0.05, (p.alpha ?? 100) / 100);
+      v.node.alpha = dead ? 0.4 : sitsOut(p.id, true) ? SPECTATOR_ALPHA : ghostA < 1 ? ghostA : p.invuln > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 90)) : 1;
       // 들고 있는 무기에 맞는 모습으로 바꾸고, 조준한 쪽을 바라보게 좌우 반전한다
       const tex = (p.lk === 1 ? heroTexF[p.weapon] : null) ?? heroTex[p.weapon] ?? heroTex[0]!;
       if (v.sprite.texture !== tex) v.sprite.texture = tex;

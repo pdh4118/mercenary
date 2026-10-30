@@ -13,6 +13,7 @@ export * from "./audio.js";
 export * from "./terrain.js";
 export * from "./voice.js";
 export * from "./cardsummary.js";
+export * from "./ghost.js";
 import { ARCHER, BLUNT, CAVALRY, MAGE, SHIELD, SPEAR } from "./rules.js";
 import type { HazardWire, TeleWire } from "./bossskill.js";
 
@@ -70,7 +71,7 @@ export interface SkillDef {
   note: string;
 }
 export const SKILLS: readonly SkillDef[] = [
-  { name: "후퇴", note: "뒤로 살짝 물러난다" }, // 활
+  { name: "은신", note: "1초간 점점 투명해져(5%) 적의 시선에서 벗어나고, 1초 머문 뒤 1초에 걸쳐 돌아온다(투명 50% 이하에서 어그로 해제)" }, // 활
   { name: "돌진", note: "조준한 방향으로 돌진해 찌른다" }, // 창
   { name: "무적", note: "1.5초간 피해를 받지 않는다" }, // 검
   { name: "투척", note: "커서 방향으로 철퇴를 던져, 적에게 닿으면 그 자리에 광역 피해" }, // 철퇴
@@ -127,6 +128,7 @@ export interface PlayerState {
   revive: number; // 부활 진행도 0..1
   invuln: number; // 부활 직후·스킬 무적 남은 시간(초)
   fcd: number; // 다음 공격까지 남은 후딜레이(초, 주문·휘두르기가 끝난 뒤). 0이면 바로 쏠 수 있다
+  alpha: number; // 투명도 0..100(100이면 보통). 활 은신 스킬 중에 줄었다 돌아온다
   sk: number; // 스페이스 스킬 쿨타임이 남은 시간(초, 무기를 바꿔도 공유)
   skMax: number; // 마지막으로 쓴 스킬의 전체 쿨타임(초)
   lk?: number; // 주인공 외형(0 = 기본, 1 = 여성). 처음 들어갈 때 고른다
@@ -155,6 +157,7 @@ export type EnemyWire = [
   poison: number, // 1이면 독에 중독된 상태(몸이 보랏빛으로 보인다)
   skill: number, // 장군이 쓰고 있는 스킬 번호(BSK_*). 없으면 0
   flags: number, // 장군 상태 비트(EF_*: 질주·은신·무적·궁지 등)
+  alpha: number, // 투명도 0..100(100이면 보통). 은신 스킬 중에 줄었다 돌아온다
 ];
 /** 상태 이상 비트(주인공·용병 전송용) */
 export const ST_BIT_STUN = 1;

@@ -10,6 +10,13 @@ import {
   EVT_DMG_POISON_ALLY,
   type MeteorWire,
   INTENT,
+  type Ghost,
+  newGhost,
+  GHOST,
+  stepGhost,
+  releaseGhost,
+  ghostAlpha,
+  ghostHidesAggro,
   personalityOf,
   PERSONALITY_IGNORE_MAX,
   sameEpithetName,
@@ -174,6 +181,8 @@ import {
   BSK_SLASH,
   BSK_SPRINT,
   BFX_CRASH,
+  BSK_STEALTH,
+  EF_STEALTH,
   BFX_IMPACT,
   BFX_ROAR,
   BFX_SLASH,
@@ -383,6 +392,7 @@ export interface Slot {
   dashVy: number;
   dashStrike: boolean; // 돌진이 끝나면 찌른다(창)
   offerBoxed: boolean; // 지금 떠 있는 선택지가 상자 보너스로 뽑힌 것인가
+  ghost?: Ghost; // 활 은신 스킬 상태
   picks: number[]; // 지금까지 고른 카드(CARDS 번호, 고른 순서). Tab 표에 보여 준다
   restTent: number; // 쉬고 있는 텐트 번호(0이면 쉬지 않음)
   dashHit: Set<number>; // 이번 돌진에서 이미 지나가며 벤 적(번호)
@@ -455,6 +465,7 @@ export interface Foe {
 }
 
 export interface Enemy extends Fighter {
+  ghost?: Ghost; // 은신(투명화) 상태: 투명도가 절반 이하면 어그로가 풀린다
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   rage?: number; // 보스군 격노 단계(이동 속도가 단계마다 조금씩 빨라진다)
@@ -936,6 +947,7 @@ export class Game {
         down: false,
         revive: 0,
         invuln: 0,
+        alpha: 100,
         fcd: 0,
         sk: 0,
         skMax: 0,
@@ -1259,6 +1271,7 @@ export class Game {
       }
     }
     const duel = this.phase === "tournament";
+    this.stepGhosts(dt);
     this.navBudget = 24;
     this.dbg.length = 0;
     this.trackEnemyVel(dt);
@@ -1349,7 +1362,8 @@ export class Game {
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
       e.bk?.show ?? 0,
-      e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0),
+      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
+      Math.round(ghostAlpha(e.ghost) * 100),
     ]);
   }
 
@@ -2027,6 +2041,7 @@ export class Game {
     s.shieldIdle = 99;
     p.revive = 0;
     p.invuln = 0;
+    s.ghost = undefined;
     p.swing = 0;
     p.wind = 0;
     p.chargeLeft = 0;
@@ -3040,15 +3055,17 @@ export class Game {
     const pow = 1 + Math.max(0, s.mods.heroSkillPow); // 스킬 효과 카드
     switch (w.type) {
       case ARCHER:
+        // 은신: 1초간 점점 투명해져(5%) 투명 50% 이하에서 적의 어그로가 풀리고, 1초 머문 뒤 1초에 걸쳐 돌아온다(50% 이상에서 어그로 복귀)
+        s.ghost = newGhost(GHOST.holdSec * pow);
+        break;
       case SPEAR: {
-        const back = w.type === ARCHER;
-        const dist = (back ? TUNE.SKILL_BACKSTEP_DIST : TUNE.SKILL_DASH_DIST) * pow;
-        const sec = back ? TUNE.SKILL_BACKSTEP_SEC : TUNE.SKILL_DASH_SEC;
-        const ang = back ? s.input.aim + Math.PI : s.input.aim;
+        const dist = TUNE.SKILL_DASH_DIST * pow;
+        const sec = TUNE.SKILL_DASH_SEC;
+        const ang = s.input.aim;
         s.dashT = sec;
         s.dashVx = (Math.cos(ang) * dist) / sec;
         s.dashVy = (Math.sin(ang) * dist) / sec;
-        s.dashStrike = !back;
+        s.dashStrike = true;
         s.dashHit.clear();
         break;
       }
@@ -3577,7 +3594,7 @@ export class Game {
   private enemyTargets(): Target[] {
     const out: Target[] = [];
     for (const e of this.enemies.values()) {
-      if (e.boss && (e.bk?.v.stealth ?? 0) > 0) continue; // 은신한 장군은 용병이 조준하지 못한다
+      if (ghostHidesAggro(e.ghost)) continue; // 은신(투명 50% 이하)한 적은 용병이 조준하지 못한다
       out.push({ x: e.x, y: e.y, r: radiusOf(e), type: e.type, face: e.face, shield: e.shield, ranged: ENEMY_STATS[e.type]!.ranged, id: e.id, hero: false, hpFrac: Math.max(0, e.hp) / e.maxHp });
     }
     return out;
@@ -3590,6 +3607,7 @@ export class Game {
         out.push({ x: f.x, y: f.y, r: f.radius, type: f.merc.type, face: f.merc.face, shield: f.merc.shield, ranged: MERC_STATS[f.merc.type]!.ranged, id: f.merc.id, hero: false, hpFrac: Math.max(0, f.merc.hp) / this.mercStats(f.merc).hp });
       } else {
         const sl = this.slots.get(f.ownerId)!;
+        if (ghostHidesAggro(sl.ghost)) continue; // 은신한 상대 주인공은 용병이 노리지 못한다
         out.push({ x: f.x, y: f.y, r: f.radius, type: NO_TYPE, face: sl.state.aim, shield: 0, ranged: WEAPONS[sl.state.weapon]!.ranged, id: -f.ownerId, hero: true, hpFrac: Math.max(0, sl.state.hp) / sl.state.maxHp });
       }
     }
@@ -4606,6 +4624,20 @@ export class Game {
 
   // --- AI 보조: 위험 구역 회피 · 적 속도 추적 · 디버그 ------------------------------------
 
+  /** 은신(투명화) 시간을 흘리고, 주인공 투명도를 상태에 싣는다. 장군의 은신은 스킬이 끝났는데 안 풀렸으면 풀어 준다. */
+  private stepGhosts(dt: number): void {
+    for (const s of this.slots.values()) {
+      if (s.ghost && !stepGhost(s.ghost, dt)) s.ghost = undefined;
+      if (s.state.down && s.ghost) s.ghost = undefined;
+      s.state.alpha = Math.round(ghostAlpha(s.ghost) * 100);
+    }
+    for (const e of this.enemies.values()) {
+      if (!e.ghost) continue;
+      if (e.ghost.hold === Infinity && e.ghost.phase !== 2 && e.bk?.cur?.id !== BSK_STEALTH) releaseGhost(e.ghost); // 은신 스킬 밖에서는 계속 투명할 수 없다
+      if (!stepGhost(e.ghost, dt)) e.ghost = undefined;
+    }
+  }
+
   /** 개발용 AI 표시(F9). 켜져 있으면 개체의 목표 지점·길·위험 구역을 상태에 실어 보낸다. */
   dbgOn = false;
   private dbg: number[][] = [];
@@ -5586,7 +5618,8 @@ export class Game {
   }
 
   private stepEnemies(dt: number, friendlies: Friendly[]): void {
-    const foes = this.buildFoes(friendlies, dt);
+    // 은신(투명 50% 이하)한 주인공은 적의 어그로 대상에서 빠진다
+    const foes = this.buildFoes(friendlies.filter((f) => f.merc || !ghostHidesAggro(this.slots.get(f.ownerId)?.ghost)), dt);
     const archers: Enemy[] = [];
     for (const o of this.enemies.values()) if (o.type === ARCHER) archers.push(o);
     const load = new Map<Foe, number>(); // 근접 적이 한 대상에게만 몰리지 않도록, 이미 붙은 적의 수만큼 그 대상을 덜 노린다

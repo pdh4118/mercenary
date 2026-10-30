@@ -255,3 +255,40 @@ test("검방병 장군 반사 태세: 궁병·마법사(활·지팡이)의 공�
   hit(5); // 마법사
   assert.equal(takeEvents().filter((ev) => ev[0] === EVT_REFLECT).length, 0, "궁병·마법사는 반사 없음");
 });
+
+import { BSK_STEALTH, BOSS_ARCHER as ARC, ghostAlpha, ghostHidesAggro, EF_STEALTH } from "@mercenary/shared";
+
+test("궁수 장군 은신 저격: 1초에 걸쳐 5%까지 투명해져 저격 전까지 유지하고, 저격하면 1초에 걸쳐 돌아온다(50% 이상에서 어그로 복귀)", () => {
+  const { g, b, ids } = setup(3, BSK_STEALTH);
+  const p = hero(g, ids[0]!);
+  place(b, 0, 0);
+  place(p, 0, 1300);
+  b.bk.v.threat = 5; // 위협을 받은 상태
+  let began = -1;
+  let alphaAtOne = -1;
+  let aimSeenInvisible = false;
+  let fired = -1;
+  let hiddenWhileAiming = false;
+  for (let i = 0; i < TICK_RATE * 12; i++) {
+    g.step();
+    p.hp = p.maxHp;
+    const k = b.bk;
+    if (began < 0 && k.cur?.id === BSK_STEALTH) began = i;
+    if (began >= 0 && alphaAtOne < 0 && i - began >= TICK_RATE) alphaAtOne = ghostAlpha(b.ghost);
+    if (k.cur?.id === BSK_STEALTH && k.ph === 2 && b.ghost) {
+      aimSeenInvisible = true;
+      if (ghostHidesAggro(b.ghost)) hiddenWhileAiming = true;
+    }
+    if (fired < 0 && b.ghost?.phase === 2 && aimSeenInvisible) fired = i;
+    if (fired >= 0 && i - fired >= TICK_RATE * 1.2) break;
+  }
+  assert.ok(began >= 0, "은신 스킬을 썼다");
+  assert.ok(alphaAtOne <= ARC_MIN + 0.011 && alphaAtOne >= ARC_MIN - 0.001, `1초 뒤 5% ${alphaAtOne}`);
+  assert.ok(aimSeenInvisible && hiddenWhileAiming, "저격을 겨누는 동안에도 투명하다");
+  assert.ok(fired >= 0, "저격한 뒤에 돌아오기 시작한다");
+  const snap = g.snapshotEnemies().find((w) => w[0] === b.id)!;
+  assert.ok(typeof snap[15] === "number");
+  void EF_STEALTH;
+  void ARC;
+});
+const ARC_MIN = 0.05;

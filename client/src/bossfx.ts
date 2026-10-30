@@ -880,10 +880,9 @@ export async function createBossFx(d: BossFxDeps) {
    * 적(장군이든 아니든) 한 마리의 상태 표시. 돌려주는 값으로 투명도·색을 바꾼다.
    * @returns alpha 배율(은신이면 아주 투명), tint
    */
-  const enemyMarks = (id: number, x: number, y: number, flags: number, boss: boolean, stage: number, size: number, now: number, faceAng = 0): { alpha: number; tint: number } => {
-    let alpha = 1;
+  const enemyMarks = (id: number, x: number, y: number, flags: number, boss: boolean, stage: number, size: number, now: number, faceAng = 0, alphaPct = 100): { alpha: number; tint: number } => {
+    let alpha = Math.max(0.05, Math.min(1, alphaPct / 100)); // 은신(투명화): 서버가 1초에 걸쳐 줄였다 돌려주는 투명도
     let tint = 0xffffff;
-    if (flags & EF_STEALTH) alpha = 0.05;
     if (flags & EF_INVULN) {
       tint = 0xffe9a0;
       if (boss) mark(id, "inv", pick(T.inv, 1 + (Math.floor(now / 140) % 2)), x, y + 6, 1.7, 0.6, true, 0.7);

@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EVT_HEAL, EVT_INVULN, EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
+import { ghostHidesAggro, EVT_HEAL, EVT_INVULN, EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -45,13 +46,48 @@ test("쓰러져 있으면 스킬을 쓸 수 없다", () => {
   assert.equal(g.useSkill(a), false);
 });
 
-test("활 스킬: 조준 반대쪽으로 살짝 물러난다", () => {
+test("활 스킬(은신): 1초간 점점 투명해져 5%가 되고, 투명 50% 이하에서 적의 어그로가 풀리며, 1초 머문 뒤 1초에 걸쳐 돌아와 50% 이상에서 어그로가 돌아온다", () => {
   const { g, a, p } = start(0);
   const x0 = p.x;
-  g.setInput(a, { ...idle, aim: 0 });
-  g.useSkill(a);
+  assert.equal(g.getPlayer(a)!.alpha, 100);
+  assert.equal(g.useSkill(a), true);
+  const hidden = () => ghostHidesAggro((g as any).slots.get(a).ghost);
+  const alpha = () => g.getPlayer(a)!.alpha;
+  // 투명해지는 1초: 중간(0.5초)에는 아직 50%를 넘고 어그로가 있다
   run(g, 0.4);
-  assert.ok(Math.abs(x0 - g.getPlayer(a)!.x - TUNE.SKILL_BACKSTEP_DIST) < 3, `${x0 - g.getPlayer(a)!.x}`);
+  assert.ok(alpha() < 100 && alpha() > 55 && !hidden(), `0.4초 ${alpha()}`);
+  run(g, 0.3); // 0.7초: 50% 아래
+  assert.ok(alpha() < 50 && hidden(), `0.7초 ${alpha()}`);
+  run(g, 0.4); // 1.1초: 가장 투명(5%)
+  assert.equal(alpha(), 5);
+  assert.ok(hidden());
+  run(g, 0.8); // 1.9초: 아직 유지 중(5%)
+  assert.ok(hidden() && alpha() === 5, `1.9초 ${alpha()}`);
+  run(g, 0.4); // 2.3초: 돌아오는 중이지만 아직 50% 아래라 어그로는 풀려 있다
+  assert.ok(hidden() && alpha() > 5 && alpha() < 50, `2.3초 ${alpha()}`);
+  run(g, 0.3); // 2.6초: 50% 위로 돌아와 어그로가 다시 끌린다
+  assert.ok(!hidden() && alpha() > 50, `2.6초 ${alpha()}`);
+  run(g, 1);
+  assert.equal(alpha(), 100);
+  assert.equal((g as any).slots.get(a).ghost, undefined, "끝나면 상태가 사라진다");
+  assert.ok(Math.abs(g.getPlayer(a)!.x - x0) < 1, "뒤로 물러나지 않는다");
+});
+
+test("활 은신: 어그로가 풀린 동안 적은 주인공이 아닌 용병을 노리고, 풀리기 전·후에는 주인공을 노린다", () => {
+  const { g, a, p } = start(0);
+  p.invuln = 1e9;
+  const e = (g as any).enemies.get(dummy(g, p.x + 300, p.y)) as { x: number; y: number }; // 가까운 적 하나
+  const mercId = g.addMerc(a, 1, p.x + 900, p.y); // 적 너머 먼 곳의 용병(은신 중에는 이쪽이 대상이 된다)
+  const eFace = () => Math.atan2(g.getPlayer(a)!.y - e.y, g.getPlayer(a)!.x - e.x);
+  void eFace;
+  g.useSkill(a);
+  run(g, 1.2); // 가장 투명한 상태
+  const before = Math.hypot(e.x - p.x, e.y - p.y);
+  run(g, 0.5);
+  const after = Math.hypot(e.x - p.x, e.y - p.y);
+  // 어그로가 풀린 동안 적은 주인공 쪽으로 다가오지 않고 용병 쪽(반대편)으로 움직인다
+  assert.ok(after > before + 15, `주인공에게서 멀어진다(용병 쪽으로 간다): ${before.toFixed(0)} → ${after.toFixed(0)}`);
+  void mercId;
 });
 
 test("창 스킬: 조준 방향으로 일정 거리 돌진하고 끝에 찌른다", () => {

@@ -7,6 +7,7 @@ import { CARD_TUNE, HERO_STATS, LEGEND_CONST, MERC_STAT_BASE, MERC_STAT_LABEL, R
 import { SUPPLY, BOSS_CAV, BOSS_SPEAR, BOSS_ARCHER, BOSS_SHIELD, BOSS_BLUNT, BOSS_MAGE, BOSS_MOUNT, BOSS_CHARIOT, BOSS_NECRO } from "./bossskill.js";
 import { BOSS_LABELS } from "./bosslabels.js";
 import { TENT, BOSS_BASIC } from "./rules.js";
+import { GHOST } from "./ghost.js";
 
 export interface TuneDef {
   key: string;
@@ -170,8 +171,6 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   SKILL_BOOST_MULT: ["기마 가속 중 속도 추가 배율", G.hero, 1, 3, 0.05],
   SKILL_DASH_DIST: ["창 돌진 거리", G.hero, 0, 800, 10],
   SKILL_DASH_SEC: ["창 돌진 시간(초)", G.hero, 0.05, 1, 0.01],
-  SKILL_BACKSTEP_DIST: ["활 후퇴 거리", G.hero, 0, 600, 10],
-  SKILL_BACKSTEP_SEC: ["활 후퇴 시간(초)", G.hero, 0.05, 1, 0.01],
   SKILL_INVULN_SEC: ["검 무적 지속(초)", G.hero, 0, 10, 0.1],
   SKILL_MACE_RANGE: ["철퇴 투척 최대 거리", G.hero, 100, 1500, 10],
   SKILL_MACE_SPEED: ["철퇴 투척 속도", G.hero, 100, 2000, 20],
@@ -323,6 +322,12 @@ function build(): Map<string, Entry> {
     riceRadius: ["쌀을 먹는 거리", 10, 200, 1, "px"],
     healFrac: ["쌀 회복: 최대 체력의 비율", 0, 1, 0.01, "%", 100],
     healFlat: ["쌀 회복: 고정 회복량", 0, 500, 1],
+  });
+  objEntries("GHOST", GHOST, "전투·난이도", "활 은신(주인공·궁수 장군)", {
+    fadeSec: ["투명해지는 시간 / 돌아오는 시간", 0.2, 5, 0.1, "초"],
+    holdSec: ["가장 투명한 채로 머무는 시간(주인공)", 0, 5, 0.1, "초"],
+    minAlpha: ["가장 투명할 때의 투명도", 0, 0.5, 0.01, "%", 100],
+    aggroAlpha: ["이 투명도 이하에서 어그로가 풀림", 0.05, 1, 0.05, "%", 100],
   });
   objEntries("TENT", TENT, "전투·난이도", "휴식 텐트", {
     useRadius: ["텐트에 들어갈 수 있는 거리", 20, 400, 5, "px"],

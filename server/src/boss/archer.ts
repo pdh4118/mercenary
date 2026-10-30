@@ -9,13 +9,14 @@ import {
   BUL_SNIPE,
   BFX_IMPACT,
   CAVALRY,
-  EF_STEALTH,
   HZ_RAIN,
   NO_TYPE,
   ST_SLOW,
   TELE_CONE,
   TELE_LINE,
   clampToWorld,
+  newGhost,
+  releaseGhost,
 } from "@mercenary/shared";
 import type { Ctx, KitDef, SkillDef } from "./types.js";
 
@@ -42,6 +43,7 @@ const stealth: SkillDef = {
     k.d.tx = clampToWorld(t.x + Math.cos(a) * C.stealthDist, 40);
     k.d.ty = clampToWorld(t.y + Math.sin(a) * C.stealthDist, 40);
     k.t = k.total = C.stealthTele;
+    e.ghost = newGhost(Infinity); // 점점 투명해져(1초에 5%) 저격할 때까지 투명하게 머문다
   },
   run: (c) => {
     const { e, k, foes, sys, dt } = c;
@@ -52,15 +54,14 @@ const stealth: SkillDef = {
       k.t = C.stealthSec;
     }
     if (k.ph === 1) {
-      k.v.stealth = 1;
       const sp = g.enemySpeed(e) * C.stealthMult;
       g.moveToward(e, k.d.tx!, k.d.ty!, sp, dt, 12);
       e.face = Math.atan2(k.d.ty! - e.y, k.d.tx! - e.x);
       if (k.t <= 0 || Math.hypot(k.d.tx! - e.x, k.d.ty! - e.y) <= 14) {
-        // 은신을 풀며 저격 조준선을 켠다(예고 시작 때 방향 고정)
-        k.v.stealth = 0;
+        // 저격 조준선을 켠다(예고 시작 때 방향 고정). 투명은 저격할 때까지 그대로 둔다.
         const t = sys.weakFoe(foes, e, 3000);
         if (!t) {
+          if (e.ghost) releaseGhost(e.ghost);
           sys.end(c);
           return;
         }
@@ -81,6 +82,7 @@ const stealth: SkillDef = {
         sys.fx(f.x, f.y, k.ang, BFX_IMPACT);
       }
       sys.bullet(e, { ang: k.ang, speed: 3200, range: C.snipeLen, kind: BUL_SNIPE, vis: true });
+      if (e.ghost) releaseGhost(e.ghost); // 저격하면 모습이 드러난다: 1초에 걸쳐 돌아오고, 투명 50% 이상에서 어그로가 다시 끌린다
       k.ph = 3;
       k.t = C.snipeRest;
       return;
@@ -182,11 +184,10 @@ export const archerKit: KitDef = {
   skills: [stealth, iceArrow, rain],
   tick: ({ k, dt }) => {
     if ((k.v.threat ?? 0) > 0) k.v.threat = Math.max(0, k.v.threat! - dt);
-    if (k.cur?.id !== BSK_STEALTH) k.v.stealth = 0; // 은신 질주 밖에서는 항상 드러난다
   },
   onHit: ({ k }, hit, _owner, src) => {
     // 주인공이 근접 공격으로 때렸다 → 잠시 위협
     if (!src && !hit.dot && hit.srcType !== 2 && hit.srcType !== 5) k.v.threat = C.threatSec;
   },
-  flags: ({ k }) => ((k.v.stealth ?? 0) > 0 ? EF_STEALTH : 0),
+  flags: () => 0, // 은신(EF_STEALTH)은 투명도에 따라 game.ts가 붙인다
 };
