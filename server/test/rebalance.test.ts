@@ -306,7 +306,7 @@ test("창 반사: 돌격하는 기병 용병은 창을 든 상대 선수에게 �
   const g = quiet();
   const a = g.addPlayer("a")!;
   const b = g.addPlayer("b")!;
-  g.jumpToStage(3);
+  g.jumpToStage(9);
   (g as unknown as { onBossDown(at: { x: number; y: number }): void }).onBossDown({ x: 0, y: 0 });
   run(g, TUNE.TOURNAMENT_NOTICE_SEC + 0.2); // 예고가 끝나면 토너먼트가 열린다
   const t = g.info().tour!;

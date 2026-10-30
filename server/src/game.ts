@@ -203,6 +203,12 @@ import {
   type TerrainWire,
   TOURNAMENT_END_SEC,
   TOURNAMENT_OUTRO_SEC,
+  tourGames,
+  TOUR_DUEL,
+  TOUR_MERCS,
+  TOUR_ALL,
+  TOUR_POINTS,
+  TOUR_MODE_NAMES,
   TOURNAMENT_START_DIST,
   isTournamentStage,
   tournamentRoundName,
@@ -627,6 +633,8 @@ interface Tournament {
   r: number; // 지금 라운드
   m: number; // 지금 경기
   step: "intro" | "fight" | "outro" | "end";
+  g: number; // 한 경기 안에서 지금 몇 번째 판인가(10스테이지는 세 판)
+  pts: [number, number]; // 세 판 경기의 점수(a, b)
   t: number; // 이 단계에서 남은 초
   winner: string;
   champion: string;
@@ -1889,6 +1897,14 @@ export class Game {
     return id !== 0 && (id === a || id === b);
   }
 
+  /** 지금 판의 방식(TOUR_DUEL·TOUR_MERCS·TOUR_ALL). 토너먼트가 아니면 null */
+  private tourMode(): number | null {
+    const t = this.tour;
+    if (!t || this.phase !== "tournament") return null;
+    const games = tourGames(this.stage);
+    return games[Math.min(t.g, games.length - 1)] ?? TOUR_ALL;
+  }
+
   /** 상대 선수의 주인공과 용병들(공격 대상) */
   private duelFoes(owner: number, all: Friendly[] = this.collectFriendlies()): Friendly[] {
     const opp = this.opponentOf(owner);
@@ -1937,7 +1953,7 @@ export class Game {
       mt.bn = this.tourName(mt.b);
     });
     this.phase = "tournament";
-    this.tour = { rounds, r: 0, m: 0, step: "intro", t: TUNE.TOURNAMENT_INTRO_SEC, winner: "", champion: "", sa: 0, sb: 0, se: 0, side: null };
+    this.tour = { rounds, r: 0, m: 0, g: 0, pts: [0, 0], step: "intro", t: TUNE.TOURNAMENT_INTRO_SEC, winner: "", champion: "", sa: 0, sb: 0, se: 0, side: null };
     this.tourAdvance();
   }
 
@@ -2038,18 +2054,31 @@ export class Game {
     }
   }
 
-  /** 선수의 남은 전력(주인공 + 용병 체력 합 / 최대치 합) 0..1 */
-  private tourPower(id: number): number {
+  /** 선수의 남은 전력 0..1: 일기토는 주인공 체력, 용병전은 용병 체력 합, 단체전은 둘의 합(체력 합 / 최대치 합) */
+  private tourPower(id: number, mode: number | null = this.tourMode()): number {
     const s = this.slots.get(id);
     if (!s) return 0;
-    let hp = s.state.down ? 0 : s.state.hp;
-    let max = s.state.maxHp;
-    for (const m of this.mercs.values()) {
-      if (m.owner !== id) continue;
-      hp += m.respawn > 0 ? 0 : Math.max(0, m.hp);
-      max += this.mercStats(m).hp;
+    let hp = 0;
+    let max = 0;
+    if (mode !== TOUR_MERCS) {
+      hp += s.state.down ? 0 : s.state.hp;
+      max += s.state.maxHp;
+    }
+    if (mode !== TOUR_DUEL) {
+      for (const m of this.mercs.values()) {
+        if (m.owner !== id) continue;
+        hp += m.respawn > 0 ? 0 : Math.max(0, m.hp);
+        max += this.mercStats(m).hp;
+      }
     }
     return max > 0 ? hp / max : 0;
+  }
+
+  /** 살아서 싸울 수 있는 용병 수(용병전의 승패 판정) */
+  private tourMercsAlive(id: number): number {
+    let n = 0;
+    for (const m of this.mercs.values()) if (m.owner === id && m.respawn <= 0 && m.hp > 0) n++;
+    return n;
   }
 
   private stepTournament(dt: number): void {
@@ -2076,15 +2105,18 @@ export class Game {
     }
     if (t.step === "fight") {
       const mt = t.rounds[t.r]!.matches[t.m]!;
-      const aOut = !this.slots.get(mt.a) || this.slots.get(mt.a)!.away || this.slots.get(mt.a)!.state.down;
-      const bOut = !this.slots.get(mt.b) || this.slots.get(mt.b)!.away || this.slots.get(mt.b)!.state.down;
+      const mode = this.tourMode();
+      const gone = (id: number) => !this.slots.get(id) || this.slots.get(id)!.away;
+      // 일기토·단체전은 주인공이 쓰러지면 지고, 용병전은 용병이 모두 쓰러지면 진다(나가 버린 선수는 어느 방식이든 진다)
+      const aOut = gone(mt.a) || (mode === TOUR_MERCS ? this.tourMercsAlive(mt.a) === 0 : this.slots.get(mt.a)!.state.down);
+      const bOut = gone(mt.b) || (mode === TOUR_MERCS ? this.tourMercsAlive(mt.b) === 0 : this.slots.get(mt.b)!.state.down);
       if (aOut || bOut) {
         // 주인공이 쓰러진 쪽이 진다(동시에 쓰러지면 남은 용병이 많은 쪽)
-        const aw = aOut && bOut ? this.tourPower(mt.a) >= this.tourPower(mt.b) : !aOut;
+        const aw = aOut && bOut ? this.tourPower(mt.a, mode) >= this.tourPower(mt.b, mode) : !aOut;
         return this.tourMatchDone(aw ? 1 : 2, aOut && bOut ? "both" : "down");
       }
-      t.sa += this.tourPower(mt.a) * dt;
-      t.sb += this.tourPower(mt.b) * dt;
+      t.sa += this.tourPower(mt.a, mode) * dt;
+      t.sb += this.tourPower(mt.b, mode) * dt;
       t.se += dt;
       if (t.t <= 0) {
         // 시간 초과: 경기 내내 평균 남은 전력이 높은 쪽(막판 부활·타이밍으로 뒤집히지 않는다)
@@ -2096,8 +2128,16 @@ export class Game {
     }
     if (t.step === "outro") {
       if (t.t <= 0) {
-        t.m++;
-        this.tourAdvance();
+        const mt = t.rounds[t.r]!.matches[t.m]!;
+        if (mt.w === 0) {
+          t.g++; // 세 판 경기: 아직 승부가 안 났으니 다음 판으로(같은 두 선수가 방식만 바꿔 다시 선다)
+          this.tourSetup(mt);
+        } else {
+          t.m++;
+          t.g = 0;
+          t.pts = [0, 0];
+          this.tourAdvance();
+        }
       }
       return;
     }
@@ -2126,27 +2166,38 @@ export class Game {
         down: !s || s.state.down,
       };
     });
-    this.tourLog.push({ stage: this.stage, round: t.rounds[t.r]!.title, dur: Math.round(TUNE.TOURNAMENT_MATCH_SEC - Math.max(0, t.t)), reason, winner: winner === 1 ? 0 : 1, sides: rec as [TourSideRec, TourSideRec] });
+    this.tourLog.push({ stage: this.stage, round: tourGames(this.stage).length > 1 ? `${t.rounds[t.r]!.title}·${TOUR_MODE_NAMES[this.tourMode() ?? TOUR_ALL]}` : t.rounds[t.r]!.title, dur: Math.round(TUNE.TOURNAMENT_MATCH_SEC - Math.max(0, t.t)), reason, winner: winner === 1 ? 0 : 1, sides: rec as [TourSideRec, TourSideRec] });
     void mt;
   }
 
+  /** 한 판이 끝났다. 한 판짜리 경기는 곧 경기가 끝나고, 세 판 경기는 점수(3:3:4)를 더해 마지막 판에서 점수가 높은 쪽이 이긴다. */
   private tourMatchDone(winner: 1 | 2, reason: "down" | "time" | "both" = "time"): void {
     this.tourLogMatch(winner, reason);
     const t = this.tour!;
     const mt = t.rounds[t.r]!.matches[t.m]!;
+    const games = tourGames(this.stage);
+    const mode = this.tourMode() ?? TOUR_ALL;
+    const gameWinner = winner === 1 ? mt.a : mt.b;
+    t.winner = this.tourName(gameWinner);
+    t.step = "outro";
+    t.t = TOURNAMENT_OUTRO_SEC;
+    this.bullets = [];
+    if (games.length > 1) {
+      t.pts[winner === 1 ? 0 : 1] += TOUR_POINTS[mode] ?? 0;
+      if (t.g < games.length - 1) return; // 다음 판이 남았다(mt.w는 아직 0)
+      // 마지막 판: 점수가 높은 쪽이 경기를 이긴다(3+3+4=10이라 동점이 없다)
+      winner = t.pts[0] > t.pts[1] ? 1 : 2;
+      t.winner = this.tourName(winner === 1 ? mt.a : mt.b);
+    }
     mt.w = winner;
     const id = winner === 1 ? mt.a : mt.b;
     const s = this.slots.get(id);
-    t.winner = this.tourName(id);
-    t.step = "outro";
-    t.t = TOURNAMENT_OUTRO_SEC;
     if (s) {
       s.stats.wins++;
       const gold = TUNE.TOURNAMENT_WIN_GOLD * this.stage;
       s.state.gold += gold;
       s.stats.gold += gold;
     }
-    this.bullets = [];
   }
 
   /** 결승이 끝났다: 우승·준우승 보상을 주고 우승자를 발표한다 */
@@ -2231,6 +2282,10 @@ export class Game {
       champion: t.champion,
       rounds: t.rounds.map((r) => ({ title: r.title, matches: r.matches.map((m): TourMatchInfo => ({ a: m.an, b: m.bn, w: m.w })) })),
       now: [t.r, t.m],
+      mode: this.tourMode() ?? TOUR_ALL,
+      game: t.g,
+      games: tourGames(this.stage).length,
+      pts: tourGames(this.stage).length > 1 ? [t.pts[0], t.pts[1]] : [0, 0],
     };
   }
 
@@ -2665,7 +2720,8 @@ export class Game {
       const duel = this.phase === "tournament";
       const fighter = duel && this.isFighter(p.id);
       // 토너먼트: 선수는 경기 시작 전·후에는 움직일 수 없고, 경기장 밖으로 나갈 수 없다. 선수가 아니면 싸울 수 없다.
-      const frozen = fighter && this.tour?.step !== "fight";
+      const tmode = duel ? this.tourMode() : null;
+      const frozen = fighter && (this.tour?.step !== "fight" || tmode === TOUR_MERCS); // 용병전에서는 주인공이 제자리에서 지켜본다
       const casting = s.windT > 0 && WEAPONS[p.weapon]!.type === MAGE; // 주문을 외우는 동안은 움직일 수 없다
       const moving = !frozen && !casting && !stunned && !rooted && (s.input.dx !== 0 || s.input.dy !== 0);
       if (s.boostT > 0) s.boostT = Math.max(0, s.boostT - dt);
@@ -2723,8 +2779,8 @@ export class Game {
           this.strikeHero(s);
         }
       } else if (WEAPONS[p.weapon]!.type === BLUNT) {
-        this.stepMaceCharge(s, dt, !stunned && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight")));
-      } else if (!stunned && s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight"))) this.useWeapon(s);
+        this.stepMaceCharge(s, dt, !stunned && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight" && tmode !== TOUR_MERCS)));
+      } else if (!stunned && s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight" && tmode !== TOUR_MERCS))) this.useWeapon(s);
     }
     if (this.phase !== "tournament") this.stepRevive(dt);
   }
@@ -2977,7 +3033,7 @@ export class Game {
     }
     if (!s || s.away || s.state.down || s.skillCd > 0) return false;
     const duel = this.phase === "tournament";
-    if (duel && !(this.isFighter(playerId) && this.tour?.step === "fight")) return false;
+    if (duel && !(this.isFighter(playerId) && this.tour?.step === "fight" && this.tourMode() !== TOUR_MERCS)) return false;
     const p = s.state;
     const widx = p.weapon;
     const w = WEAPONS[widx]!;
@@ -3289,8 +3345,10 @@ export class Game {
 
   private collectFriendlies(): Friendly[] {
     const list: Friendly[] = [];
+    const mode = this.tourMode();
     for (const s of this.slots.values()) {
       if (s.state.down || s.away || s.restTent > 0) continue; // 텐트 안의 사람은 공격받지 않는다
+      if (mode === TOUR_MERCS) continue; // 용병전: 주인공은 싸우지도 맞지도 않는다
       const p = s.state;
       const fr: Friendly = {
         x: p.x,
@@ -3371,6 +3429,7 @@ export class Game {
     }
     for (const m of this.mercs.values()) {
       if (m.respawn > 0 || (this.slots.get(m.owner)?.restTent ?? 0) > 0) continue; // 쉬는 주인의 용병도 텐트 안에 있다
+      if (mode === TOUR_DUEL) continue; // 일기토: 용병은 싸우지도 맞지도 않는다
       const fm: Friendly = {
         x: m.x,
         y: m.y,
@@ -3649,7 +3708,8 @@ export class Game {
         }
         continue;
       }
-      if (duel && !(fighting && this.isFighter(m.owner))) continue;
+      const tmode = duel ? this.tourMode() : null;
+      if (duel && (!(fighting && this.isFighter(m.owner)) || tmode === TOUR_DUEL)) continue; // 일기토에서는 용병이 움직이지 않는다
       if (m.slowT) m.slowT = Math.max(0, m.slowT - dt);
       if (m.stunT && m.stunT > 0) {
         m.stunT -= dt; // 기절·속박: 움직이지도 공격하지도 못한다
@@ -3704,6 +3764,10 @@ export class Game {
       let assault = this.effStance(ownerSlot, m.type) === STANCE_ASSAULT;
       const trueAssault = ownerSlot?.stances[m.type] === STANCE_ASSAULT; // 보호 진형에서 자유롭게 싸우는 병종은 해당하지 않는다
       if (trueAssault && m.type === CAVALRY) leash = 1e6; // 돌격 진형: 기병은 주인공과의 거리와 상관없이 쫓는다
+      if (duel && tmode === TOUR_MERCS) {
+        leash = 1e6; // 용병전: 주인공이 제자리에 있으므로 용병이 스스로 적진으로 나가 싸운다
+        assault = true;
+      }
       let guard = this.effStance(ownerSlot, m.type) === STANCE_DEFEND;
       let fort = ownerSlot?.stances[m.type] === STANCE_PROTECT && m.type !== CAVALRY && m.type !== BLUNT; // 보호 진형 도형 안팎의 자리를 지킨다
       const rawOrd = m.type === CAVALRY ? null : ownerSlot?.orders[m.type];

@@ -292,6 +292,10 @@ export interface TourInfo {
   champion: string; // 우승자(end 단계)
   rounds: { title: string; matches: TourMatchInfo[] }[];
   now: [round: number, match: number]; // 지금 진행 중인 경기 위치
+  mode: number; // 지금 판의 방식(TOUR_MODE_NAMES 번호: 0 일기토, 1 용병전, 2 단체전)
+  game: number; // 한 경기 안에서 지금 몇 번째 판인가(0부터)
+  games: number; // 한 경기의 판 수(1 또는 3)
+  pts: [a: number, b: number]; // 세 판 경기의 현재 점수(한 판 경기는 0)
 }
 
 export interface ResultPlayer {

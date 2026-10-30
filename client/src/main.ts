@@ -85,6 +85,10 @@ import {
   tierName,
   UNIT_NAMES,
   INTENT_NAMES,
+  TOUR_MODE_NAMES,
+  TOUR_POINTS,
+  TOUR_DUEL,
+  TOUR_MERCS,
   summarizePicks,
   SUMMARY_COLUMNS,
   personalityOf,
@@ -2073,11 +2077,17 @@ async function main() {
     const tag = (side: "red" | "blue", id: number) => (id === me ? `${side === "blue" ? "파랑" : "빨강"} · 나` : side === "red" ? "빨강" : "파랑");
     const nm = (name: string, side: "red" | "blue", id: number) => `<span style="color:${TEAM_CSS[side]}">${esc(name)}</span> <small style="color:${TEAM_CSS[side]}">(${tag(side, id)})</small>`;
     tourBannerEl.style.display = tourBracketEl.style.display = "block";
+    const modeName = TOUR_MODE_NAMES[tour.mode] ?? "";
+    const multi = tour.games > 1;
+    const pointsNow = TOUR_POINTS[tour.mode] ?? 0;
+    // 한 판의 이름: 3스테이지 일기토 · 6스테이지 용병전 · 9스테이지 단체전 · 10스테이지는 세 판(점수 3:3:4)
+    const gameLabel = `${esc(modeName)}${multi ? ` (${tour.game + 1}/${tour.games}판 · ${pointsNow}점)` : ""}`;
+    const rule = tour.mode === TOUR_DUEL ? "주인공이 쓰러지면 패배(용병은 구경)" : tour.mode === TOUR_MERCS ? "용병이 모두 쓰러지면 패배(주인공은 구경)" : "주인공이 쓰러지면 패배";
     tourBannerEl.innerHTML =
-      `<div class="tt">토너먼트 · ${esc(tour.title)}</div>` +
+      `<div class="tt">토너먼트 · ${esc(tour.title)} · ${gameLabel}${multi ? ` · 점수 ${tour.pts[0]} : ${tour.pts[1]}` : ""}</div>` +
       `<div class="vs"><div class="side"><div class="nm">${nm(tour.an, sa, tour.a)}</div><div class="pct">${tour.ha}%</div><div class="bar"><div style="width:${tour.ha}%;background:${TEAM_CSS[sa]}"></div></div></div>` +
       `<span>VS</span><div class="side"><div class="nm">${nm(tour.bn, sb, tour.b)}</div><div class="pct">${tour.hb}%</div><div class="bar b"><div style="width:${tour.hb}%;background:${TEAM_CSS[sb]}"></div></div></div></div>` +
-      `<div class="tm">${tour.step === "fight" ? `남은 시간 ${tour.t}초 · 주인공이 쓰러지면 패배 · 시간 초과 판정(평균 전력) ${tour.sa} : ${tour.sb}` : tour.step === "outro" ? "경기 종료" : tour.step === "end" ? "토너먼트 종료" : fighter ? "선수 입장" : "관전 중"}</div>`;
+      `<div class="tm">${tour.step === "fight" ? `남은 시간 ${tour.t}초 · ${rule} · 시간 초과 판정(평균 전력) ${tour.sa} : ${tour.sb}` : tour.step === "outro" ? "경기 종료" : tour.step === "end" ? "토너먼트 종료" : fighter ? "선수 입장" : "관전 중"}</div>`;
     let html = "<h3>대진표</h3>";
     tour.rounds.forEach((r, ri) => {
       html += `<div class="rt">${esc(r.title)}</div>`;
@@ -2090,11 +2100,11 @@ async function main() {
     tourBracketEl.innerHTML = html;
     let big = "";
     if (tour.step === "intro") {
-      big = `<div class="a">${esc(tour.title)}</div><div class="b"><span style="color:${TEAM_CSS[sa]}">${esc(tour.an)}</span> vs <span style="color:${TEAM_CSS[sb]}">${esc(tour.bn)}</span></div><div class="c">${fighter ? "준비하세요! 당신은 파랑, 상대는 빨강입니다" : "관전 중입니다 · 빨강 대 파랑"} ${tour.t}</div>`;
+      big = `<div class="a">${esc(tour.title)} · ${gameLabel}</div><div class="b"><span style="color:${TEAM_CSS[sa]}">${esc(tour.an)}</span> vs <span style="color:${TEAM_CSS[sb]}">${esc(tour.bn)}</span></div><div class="c">${fighter ? "준비하세요! 당신은 파랑, 상대는 빨강입니다" : "관전 중입니다 · 빨강 대 파랑"} ${tour.t}</div>`;
     } else if (tour.step === "fight" && tour.t >= TUNE.TOURNAMENT_MATCH_SEC - 1.5) {
       big = `<div class="b">시작!</div>`;
     } else if (tour.step === "outro") {
-      big = `<div class="a">${esc(tour.title)}</div><div class="b">승자: ${esc(tour.winner)}</div>`;
+      big = `<div class="a">${esc(tour.title)} · ${esc(modeName)}</div><div class="b">승자: ${esc(tour.winner)}</div>${multi ? `<div class="c">점수 ${tour.pts[0]} : ${tour.pts[1]}${tour.game + 1 < tour.games ? " · 다음 판 준비" : ""}</div>` : ""}`;
     } else if (tour.step === "end") {
       big = `<div class="a">토너먼트 우승</div><div class="b">${esc(tour.champion)}</div><div class="c">상금과 경험치를 받았습니다</div>`;
     }

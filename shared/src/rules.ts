@@ -415,6 +415,18 @@ export const TOURNAMENT_END_SEC = 7; // 우승자 발표
 export const IDLE_KICK_SEC = 300;
 export const TOURNAMENT_ARENA_RADIUS = 1950; // 경기장 반지름(px). 월드 중앙. 지름이 예전(1600)의 약 2.4배로, 월드(4000)가 허락하는 최대에 가깝다
 export const TOURNAMENT_START_DIST = 1270; // 두 선수가 중앙에서 떨어져 서는 거리
+/** 토너먼트 경기 방식: 일기토(주인공끼리), 용병전(용병만), 단체전(주인공과 용병 다 같이) */
+export const TOUR_MODE_NAMES = ["일기토", "용병전", "단체전"] as const;
+export const TOUR_DUEL = 0;
+export const TOUR_MERCS = 1;
+export const TOUR_ALL = 2;
+/** 세 판으로 겨루는 마지막 토너먼트에서 판마다 걸린 점수(일기토 3 · 용병전 3 · 단체전 4, 합 10) */
+export const TOUR_POINTS = [3, 3, 4] as const;
+/**
+ * 스테이지별 경기 구성(한 경기에서 치르는 판의 방식 순서): 3스테이지 일기토, 6스테이지 용병전, 9스테이지 단체전,
+ * 10스테이지는 일기토 → 용병전 → 단체전 세 판을 3:3:4 점수로 겨뤄 점수가 높은 쪽이 이긴다.
+ */
+export const tourGames = (stage: number): readonly number[] => (stage === 3 ? [TOUR_DUEL] : stage === 6 ? [TOUR_MERCS] : stage === 10 ? [TOUR_DUEL, TOUR_MERCS, TOUR_ALL] : [TOUR_ALL]);
 export const isTournamentStage = (stage: number): boolean => (TOURNAMENT_STAGES as readonly number[]).includes(stage);
 /** n명이 겨루는 토너먼트의 라운드 이름: 결승, 준결승, 8강... (roundsLeft는 이 라운드를 포함해 남은 라운드 수) */
 export const tournamentRoundName = (roundsLeft: number): string => (roundsLeft <= 1 ? "결승" : roundsLeft === 2 ? "준결승" : `${2 ** roundsLeft}강`);

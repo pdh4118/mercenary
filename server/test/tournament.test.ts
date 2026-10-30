@@ -197,14 +197,14 @@ test("10스테이지 토너먼트가 끝나야 승리가 된다", () => {
   run(g, 0.2);
   assert.equal(g.info().status, "playing", "토너먼트가 끝나기 전에는 승리가 아니다");
   assert.equal(g.info().phase, "tournament");
-  run(g, TUNE.TOURNAMENT_INTRO_SEC + TUNE.TOURNAMENT_MATCH_SEC + TOURNAMENT_OUTRO_SEC + TOURNAMENT_END_SEC + 1); // 아무도 안 싸우면 시간 초과 판정
+  run(g, 3 * (TUNE.TOURNAMENT_INTRO_SEC + TUNE.TOURNAMENT_MATCH_SEC + TOURNAMENT_OUTRO_SEC) + TOURNAMENT_END_SEC + 3); // 아무도 안 싸우면 세 판 모두 시간 초과 판정(일기토·용병전·단체전)
   assert.equal(g.info().status, "victory");
 });
 
 test("선수가 아닌 사람은 공격할 수 없고, 3명이면 준결승 뒤 결승이 열린다(부전승 포함)", () => {
   const g = quiet();
   const ids = [g.addPlayer("a")!, g.addPlayer("b")!, g.addPlayer("c")!];
-  g.jumpToStage(6);
+  g.jumpToStage(9);
   bossDownAndWait(g);
   g.step();
   let tour = g.info().tour!;
@@ -294,7 +294,7 @@ test("시간 초과 판정은 마지막 순간이 아니라 경기 내내의 평
   const g = quiet();
   g.addPlayer("a");
   g.addPlayer("b");
-  g.jumpToStage(3);
+  g.jumpToStage(9);
   bossDownAndWait(g);
   g.step();
   const tour = g.info().tour!;
