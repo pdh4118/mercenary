@@ -2584,7 +2584,7 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "boss": "군주",
   "skill": "성문",
   "label": "배율",
-  "hint": "성문이 근접·주문에 받는 피해 배율"
+  "hint": "성문이 근접에 받는 피해 배율(위험한 만큼 가장 빠르다)"
  },
  "BOSS_LORD.gateBulletMult": {
   "boss": "군주",

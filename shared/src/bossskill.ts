@@ -700,9 +700,9 @@ export const BOSS_LORD = {
   garrisonMax: 13,
   garrisonHp: 1.6, // 수비대 체력 배율
   fieldCap: 150, // 필드에 동시에 있을 수 있는 졸개 수 상한
-  gateMeleeMult: 1, // 성문이 근접·주문에 받는 피해 배율
-  gateBulletMult: 0.3, // 성문이 화살 등에 받는 피해 배율
-  gateMeteorMult: 2.2, // 성문이 운석에 받는 피해 배율
+  gateMeleeMult: 1.6, // 성문이 근접에 받는 피해 배율(위험한 만큼 가장 빠르다)
+  gateBulletMult: 0.05, // 성문이 화살 등에 받는 피해 배율
+  gateMeteorMult: 0.6, // 성문이 운석에 받는 피해 배율
   gateRegenWait: 6, // 이만큼 안 맞으면 성문이 회복을 시작한다
   gateRegenPct: 1.5, // 회복 속도(초당 체력 %)
 } as const;
