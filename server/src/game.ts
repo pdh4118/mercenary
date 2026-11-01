@@ -493,6 +493,8 @@ export interface Enemy extends Fighter {
   buffT?: number; // 돌격 함성(보스군 강화)이 남은 시간
   buffMult?: number; // 그 강화로 올려 둔 피해 배율(끝나면 이만큼 나눈다. 없으면 돌격 함성 값)
   elite?: boolean; // 군주의 정예(근위대·성문 개방 돌격 기병): 전용 그림으로 그린다
+  hold?: boolean; // 제자리를 지킨다(움직이지 않고 사거리 안의 대상만 공격). 성 안 수비대는 성문이 뚫리면 풀린다
+  post?: boolean; // 성벽 위 수비병(성벽 통로 안에 갇혀 있다)
   guard?: boolean; // 군주의 근위대(살아 있는 동안 군주가 받는 피해가 줄어든다)
   maxHp: number;
   shieldMax: number;
@@ -803,7 +805,7 @@ export class Game {
   /** 이번 판의 지형(없으면 평지). 방이 게임을 시작할 때 generateTerrain()으로 만든다. */
   terrain: TerrainMap | null = null;
   /** 공성전(스테이지 10): 성이 드러나는 중이거나 드러난 상태. 아니면 null */
-  siege: { t: number; solid: boolean; open: boolean; waveT: number; clock: number; sortieT: number } | null = null;
+  siege: { t: number; solid: boolean; open: boolean; waveT: number; clock: number; sortieT: number; postT?: number } | null = null;
   private terrainTrack: { o: { x: number; y: number }; px: number; py: number; r: number; en?: boolean }[] = [];
 
   /** 이번 판의 지형을 새로 만든다(시작 지점 둘레는 비워 둔다) */
@@ -851,7 +853,10 @@ export class Game {
       }
       // 공성전: 성문이 부서진 뒤에는 안뜰의 계단으로 성벽 위에 오를 수 있다(주인공·용병만). 위에서는 통로 안에 갇힌다.
       let pass = -1;
-      if (this.siege?.open && !u.en) {
+      if (u.en && (o as { post?: boolean }).post) {
+        [x, y] = clampToWallTop(x, y); // 성벽 위 수비병은 통로 안에만 있다
+        pass = this.terrain!.items.length + 7;
+      } else if (this.siege?.open && !u.en) {
         const wo = o as { wall?: boolean };
         const rs = rampSideAt(x, y);
         if (rs !== 0) {
@@ -1746,7 +1751,7 @@ export class Game {
     const s = this.siege;
     if (!s || s.solid || !this.terrain) return;
     s.solid = true;
-    this.terrain.addSolids(castleSolids(), this.terrain.items.length + 7);
+    this.terrain.addSolids(castleSolids(), this.terrain.items.length + 7, false); // 성벽은 화살을 막지 않는다(성벽 위 적을 아래에서 쏠 수 있다)
     this.siegePlaceGate();
   }
 
@@ -1762,6 +1767,7 @@ export class Game {
   siegeGateBroken(): void {
     if (!this.siege || this.siege.open) return;
     this.siege.open = true;
+    for (const e of this.enemies.values()) if (e.hold && !e.post) e.hold = false; // 성 안 수비대가 움직이기 시작한다
     // 성벽 윗면 통로는 높은 곳이다(아래에서 올려다보며 쏘면 약하고, 위에서 쏘면 강하다)
     for (const r of WALL_STRIPS) this.terrain?.addHighRect(r[0], r[1], r[2], r[3]);
   }
@@ -1808,7 +1814,10 @@ export class Game {
     if (!s.solid && s.t >= SIEGE.revealSec * SIEGE.solidAt) this.siegeSolidify();
     if (s.open || this.phase === "boss") this.leashGuards();
     this.stepWallArchers();
-    if (this.phase === "boss" && this.autoSpawn) this.stepSiegeWaves(dt);
+    if (this.phase === "boss" && this.autoSpawn) {
+      if (s.open) this.stepSiegeWaves(dt);
+      else this.stepWallPosts(dt);
+    }
   }
 
   /** 근위대는 군주에게서 일정 범위 안에서만 쫓아온다(범위 밖으로 나가려 하면 경계에서 멈춘다) */
@@ -1824,6 +1833,52 @@ export class Game {
         e.y = SIEGE.lordY + (dy / d) * R;
       }
     }
+  }
+
+  /** 성문이 뚫리기 전: 성벽 위에 궁병·마법사 수비병이 끊임없이 채워진다(죽으면 몇 초 뒤 다시 나온다) */
+  private stepWallPosts(dt: number): void {
+    const s = this.siege!;
+    s.postT = (s.postT ?? 0) - dt;
+    if (s.postT > 0) return;
+    s.postT = BOSS_LORD.postRespawn;
+    let n = 0;
+    for (const e of this.enemies.values()) if (e.post) n++;
+    const want = BOSS_LORD.postBase + BOSS_LORD.postPerPlayer * Math.max(0, this.slots.size - 1);
+    if (n >= Math.min(BOSS_LORD.postMax, want)) return;
+    this.spawnWallPost();
+  }
+
+  /** 성벽 위 통로 아무 데나에 궁병(주로)·마법사 수비병 한 명 */
+  spawnWallPost(): number {
+    const pick = this.rng();
+    const r = WALL_STRIPS[pick < 0.5 ? 0 : pick < 0.75 ? 1 : 2]!;
+    const x = r[0] + 20 + this.rng() * (r[2] - r[0] - 40);
+    const y = r[1] + 20 + this.rng() * (r[3] - r[1] - 40);
+    const e = this.makeEnemy(x, y, this.rng() < BOSS_LORD.postMage ? MAGE : ARCHER, { hold: true, post: true, face: Math.PI / 2 });
+    const m = 1 + Math.min(1.5, (this.siege?.clock ?? 0) / 300);
+    e.maxHp *= BOSS_LORD.postHp * m;
+    e.hp *= BOSS_LORD.postHp * m;
+    e.dmgMult *= BOSS_LORD.postDmg;
+    return e.id;
+  }
+
+  /** 성 안 수비대: 안뜰에 검방병·창병·둔기병이 열을 맞춰 서 있다가 성문이 뚫리면 움직인다 */
+  private spawnGarrison(): number {
+    const per = Math.min(BOSS_LORD.garrisonMax, BOSS_LORD.garrisonRow + BOSS_LORD.garrisonPerPlayer * Math.max(0, this.slots.size - 1));
+    const rows: [number, number][] = [[SHIELD, -1385], [SPEAR, -1435], [BLUNT, -1485]];
+    let made = 0;
+    for (const [type, y] of rows) {
+      for (let i = 0; i < per; i++) {
+        const x = (i - (per - 1) / 2) * 46;
+        const e = this.makeEnemy(x, y, type, { hold: true, face: Math.PI / 2 });
+        e.maxHp *= BOSS_LORD.garrisonHp;
+        e.hp *= BOSS_LORD.garrisonHp;
+        e.shield *= BOSS_LORD.garrisonHp;
+        e.shieldMax *= BOSS_LORD.garrisonHp;
+        made++;
+      }
+    }
+    return made;
   }
 
   /** 군주가 성을 지키는 동안 필드에는 졸개가 끊임없이 몰려온다. 시간이 갈수록 무리가 커지고 간격이 짧아지며 졸개도 강해진다. */
@@ -1931,6 +1986,7 @@ export class Game {
     s.clock = 0;
     s.waveT = BOSS_LORD.waveFirst;
     this.makeEnemy(SIEGE.lordX, SIEGE.lordY, bossTypeOf(this.stage), { boss: true, face: Math.PI / 2 });
+    this.spawnGarrison();
     this.armyTotal = 1;
     this.armyBase = 1;
   }
@@ -5891,7 +5947,9 @@ export class Game {
     const load = new Map<Foe, number>(); // 근접 적이 한 대상에게만 몰리지 않도록, 이미 붙은 적의 수만큼 그 대상을 덜 노린다
     const hardOf = new Map<number, number>(); // 플레이어별 난이도(받는 피해 감소가 적을수록 어렵다): 어려울수록 약한 원거리 아군을 노린다
     for (const sl of this.slots.values()) hardOf.set(sl.state.id, 1 - (DIFFICULTY_REDUCTION[sl.difficulty] ?? 0));
+    const held: [Enemy, number, number][] = [];
     for (const e of [...this.enemies.values()]) {
+      if (e.hold) held.push([e, e.x, e.y]);
       if (this.tickPoison(e, dt)) continue;
       if (e.buffT && e.buffT > 0) {
         // 돌격 함성: 끝나면 올려 둔 피해가 돌아온다
@@ -5997,6 +6055,10 @@ export class Game {
         }
       }
       this.enemyMove(e, st, dt, foes, archers, target, targetDist, speed);
+    }
+    for (const [e, hx, hy] of held) {
+      e.x = hx; // 제자리 수비병은 이번 틱에 움직인 만큼을 되돌린다(공격은 그대로 한다)
+      e.y = hy;
     }
   }
 

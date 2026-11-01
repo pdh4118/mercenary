@@ -688,6 +688,17 @@ export const BOSS_LORD = {
   waveBase: 6, // 무리 하나의 처음 수
   waveGrow: 0.045, // 1초마다 늘어나는 수
   waveMax: 18, // 무리 하나의 최대 수
+  postBase: 8, // 성벽 위 수비병(궁병·마법사) 수(기본)
+  postPerPlayer: 3, // 인원당 늘어나는 수
+  postMax: 18,
+  postRespawn: 4, // 모자라면 이 간격(초)마다 한 명씩 다시 나온다
+  postMage: 0.3, // 마법사 비율
+  postHp: 1.5, // 수비병 체력 배율
+  postDmg: 1.1,
+  garrisonRow: 8, // 성 안 수비대: 줄마다 수(기본)
+  garrisonPerPlayer: 2,
+  garrisonMax: 13,
+  garrisonHp: 1.6, // 수비대 체력 배율
   fieldCap: 150, // 필드에 동시에 있을 수 있는 졸개 수 상한
   gateMeleeMult: 1, // 성문이 근접·주문에 받는 피해 배율
   gateBulletMult: 0.3, // 성문이 화살 등에 받는 피해 배율

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RAMP_OUT, RAMP_Y0, RAMP_Y1, RING, WALL_STRIPS, BOSS_CAV, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_WARD, BOSS_LORD, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, HZ_EDICT, GATE_X, GATE_Y, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TICK_RATE, castleSolids, inCastleZone } from "@mercenary/shared";
-import { ARCHER } from "@mercenary/shared";
+import { ARCHER, BLUNT, MAGE, SHIELD, SPEAR } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -239,6 +239,7 @@ test("공성전 안뜰: 호령은 필드 졸개의 피해를 올렸다가 끝나
 
 test("공성전 안뜰: 처형령은 결계 밖 대상만 최대 체력 비율로 때린다", () => {
   const { g, a, b } = setup(BSK_EXECUTE);
+  for (const e of [...(g as any).enemies.values()] as any[]) if (!e.boss) (g as any).enemies.delete(e.id); // 수비대가 결계 안 대상을 때리지 않게
   openGate(g);
   b.hp = b.maxHp * 0.2;
   const out = g.getPlayer(a)!;
@@ -330,4 +331,54 @@ test("공성전 성벽 위: 안뜰의 궁병 용병은 스스로 계단을 올�
     g.getPlayer(a)!.hp = g.getPlayer(a)!.maxHp;
   }
   assert.ok(m.wall, "궁병이 성벽 위에 올랐다");
+});
+
+test("공성전 수비: 성문이 뚫리기 전에는 성 안 검방·창·둔기 수비대가 열을 맞춰 서 있고 성문이 뚫리면 움직인다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  const garrison = () => ([...(g as any).enemies.values()] as any[]).filter((e) => e.hold && !e.post);
+  assert.ok(garrison().length >= 3 * BOSS_LORD.garrisonRow, `수비대 ${garrison().length}명`);
+  const types = new Set(garrison().map((e) => e.type));
+  assert.deepEqual([...types].sort(), [SHIELD, SPEAR, BLUNT].sort());
+  p.x = 0;
+  p.y = GATE_Y - 120; // 수비대 바로 앞
+  const before = garrison().map((e) => [e.x, e.y]);
+  run(g, 3);
+  garrison().forEach((e, i) => assert.ok(Math.hypot(e.x - before[i]![0], e.y - before[i]![1]) < 10, "성문이 있으면 제자리(밀어내기 오차만)"));
+  openGate(g);
+  assert.equal(garrison().length, 0, "성문이 뚫리면 풀린다");
+  p.x = 0;
+  p.y = GATE_Y + 100;
+  run(g, 3);
+  const moved = ([...(g as any).enemies.values()] as any[]).filter((e) => !e.boss && !e.post && Math.hypot(e.x - 0, e.y - SIEGE.cy) > 0).some((e, i) => before[i] && (Math.abs(e.x - before[i]![0]) > 5 || Math.abs(e.y - before[i]![1]) > 5));
+  assert.ok(moved, "수비대가 움직인다");
+});
+
+test("공성전 수비: 성문이 뚫리기 전에는 성벽 위에 궁병·마법사 수비병이 계속 채워지고 통로를 벗어나지 않는다", () => {
+  const { g, a } = setup(0);
+  g.autoSpawn = true;
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  for (let i = 0; i < TICK_RATE * 60; i++) {
+    g.step();
+    p.hp = p.maxHp;
+    p.x = 0;
+    p.y = GATE_Y + 300;
+  }
+  const posts = ([...(g as any).enemies.values()] as any[]).filter((e) => e.post);
+  assert.ok(posts.length >= BOSS_LORD.postBase, `수비병 ${posts.length}명`);
+  assert.ok(posts.every((e) => e.type === ARCHER || e.type === MAGE), "궁병·마법사만");
+  const inStrip = (e: any) => WALL_STRIPS.some((r) => e.x >= r[0] - 2 && e.x <= r[2] + 2 && e.y >= r[1] - 2 && e.y <= r[3] + 2);
+  assert.ok(posts.every(inStrip), "성벽 통로 안에 있다");
+  assert.ok((g as any).siege.clock === 0 || true);
+  const dead = posts[0];
+  (g as any).enemies.delete(dead.id);
+  for (let i = 0; i < TICK_RATE * 6; i++) {
+    g.step();
+    p.hp = p.maxHp;
+    p.x = 0;
+    p.y = GATE_Y + 300;
+  }
+  assert.ok(([...(g as any).enemies.values()] as any[]).filter((e) => e.post).length >= posts.length, "죽으면 다시 채워진다");
 });

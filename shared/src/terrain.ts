@@ -132,9 +132,9 @@ export class TerrainMap {
   }
 
   /** 판 도중에 단단한 원을 더한다(공성전 성벽). obj는 items 번호와 겹치지 않는 값 */
-  addSolids(list: readonly { x: number; y: number; r: number }[], obj: number): void {
+  addSolids(list: readonly { x: number; y: number; r: number }[], obj: number, arrow = true): void {
     for (const s of list) {
-      this.solids.push({ x: s.x, y: s.y, r: s.r, arrow: true, obj });
+      this.solids.push({ x: s.x, y: s.y, r: s.r, arrow, obj });
       this.indexSolid(this.solids.length - 1);
     }
     this.nav = null;

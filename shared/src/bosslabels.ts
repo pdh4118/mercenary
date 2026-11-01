@@ -2508,6 +2508,72 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "최대",
   "hint": "무리 하나의 최대 수"
  },
+ "BOSS_LORD.postBase": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "성벽 위 수비병",
+  "hint": "성벽 위 수비병(궁병·마법사) 수(기본)"
+ },
+ "BOSS_LORD.postPerPlayer": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "인원당 개수",
+  "hint": "인원당 늘어나는 수"
+ },
+ "BOSS_LORD.postMax": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "최대",
+  "hint": ""
+ },
+ "BOSS_LORD.postRespawn": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "모자라면 이 간격",
+  "hint": "모자라면 이 간격(초)마다 한 명씩 다시 나온다"
+ },
+ "BOSS_LORD.postMage": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "마법사 비율",
+  "hint": "마법사 비율"
+ },
+ "BOSS_LORD.postHp": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "체력 비율",
+  "hint": "수비병 체력 배율"
+ },
+ "BOSS_LORD.postDmg": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "피해 배율",
+  "hint": ""
+ },
+ "BOSS_LORD.garrisonRow": {
+  "boss": "군주",
+  "skill": "성 안 수비대",
+  "label": "성 안 수비대: 줄마다 수",
+  "hint": "성 안 수비대: 줄마다 수(기본)"
+ },
+ "BOSS_LORD.garrisonPerPlayer": {
+  "boss": "군주",
+  "skill": "성 안 수비대",
+  "label": "인원당 개수",
+  "hint": ""
+ },
+ "BOSS_LORD.garrisonMax": {
+  "boss": "군주",
+  "skill": "성 안 수비대",
+  "label": "최대",
+  "hint": ""
+ },
+ "BOSS_LORD.garrisonHp": {
+  "boss": "군주",
+  "skill": "성 안 수비대",
+  "label": "체력 비율",
+  "hint": "수비대 체력 배율"
+ },
  "BOSS_LORD.fieldCap": {
   "boss": "군주",
   "skill": "필드 졸개 물량",
