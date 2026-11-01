@@ -989,6 +989,9 @@ async function main() {
   }
   const stageText = new Text({ text: "", style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
   stageText.anchor.set(0.5, 0);
+  const edictText = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 26, fontWeight: "900", stroke: { color: 0x000000, width: 6 }, align: "center" } });
+  edictText.anchor.set(0.5, 0);
+  edictText.visible = false;
   const bossBar = new Graphics();
   const levelToast = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 20, stroke: { color: 0x000000, width: 3 } } });
   levelToast.anchor.set(0.5, 0);
@@ -1203,7 +1206,7 @@ async function main() {
     weaponHint.text = WEAPONS[active]!.note;
   };
   weaponBar.visible = false;
-  hud.addChild(hudPanel, mini, statsPanel, stageText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
+  hud.addChild(hudPanel, mini, statsPanel, stageText, edictText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
@@ -2355,11 +2358,23 @@ async function main() {
     // 장군 스킬 예고·장판·효과 컷
     bossFx.frame(latest.bt ?? [], latest.hz ?? [], latest.g?.stage ?? 1, ticker.deltaMS, performance.now());
     {
+      // 칙령(공성전): 걸려 있는 동안 화면 위에 규칙 문구를 크게 보여 준다
+      const ed = bossFx.edict();
+      edictText.visible = !!ed;
+      if (ed) {
+        const rule = ed.rule === 1 ? "진군령 — 멈추면 번개!" : "분산령 — 뭉치면 번개!";
+        edictText.text = `칙령  ${rule}\n${ed.grace ? "곧 시행됩니다" : `${Math.ceil(ed.left)}초`}`;
+        edictText.style.fill = ed.grace ? 0xffe08a : 0xff6a5a;
+        edictText.scale.set(1 + (ed.grace ? 0.04 * Math.sin(performance.now() / 90) : 0));
+        edictText.position.set(app.screen.width / 2, 120);
+      }
+    }
+    {
       // 공성전: 성이 서서히 드러나고(성벽이 솟고 그 자리의 바위·나무가 사라진다), 성문 체력이 보인다
       const sg = latest.g?.siege ?? null;
       if (sg && !castle) castle = createCastle(enemyLayer);
       if (sg && castle) {
-        castle.update(sg.reveal / 100, sg.gate, sg.open, performance.now());
+        castle.update(sg.reveal / 100, sg.gate, sg.open, performance.now(), sg.sortie);
         for (const tv of tviews) {
           if (!inCastleZone(tv.x, tv.footY)) continue;
           tv.sp.alpha = Math.max(0, 1 - sg.reveal / 35);

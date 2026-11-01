@@ -7,7 +7,7 @@ import { GATE_X, GATE_Y, SIEGE, castleSolids } from "@mercenary/shared";
  */
 export interface Castle {
   /** reveal 0..1, gate 0..100(성문 체력 %), open = 성문이 부서짐 */
-  update(reveal: number, gate: number, open: boolean, now: number): void;
+  update(reveal: number, gate: number, open: boolean, now: number, sortie?: boolean): void;
   destroy(): void;
 }
 
@@ -78,7 +78,7 @@ export function createCastle(layer: Container): Castle {
     if (rise > 0.85 && seed % 2 === 0) g.rect(b.x - w * 0.22, b.y - H - 12, w * 0.44, 14).fill(0x9296a8).stroke({ width: 1.5, color: 0x2a2d38 });
   };
 
-  const drawGate = (gate: number, open: boolean, rise: number, now: number): void => {
+  const drawGate = (gate: number, open: boolean, rise: number, now: number, sortie = false): void => {
     const g = gateG.clear();
     gateLabel.visible = false;
     if (rise <= 0.05) return;
@@ -98,6 +98,14 @@ export function createCastle(layer: Container): Castle {
         const py = y + 8 + hash(i + 11) * 26;
         g.rect(px, py, 10 + hash(i) * 26, 5).fill(0x6b4a2a).stroke({ width: 1, color: 0x2a1a0c });
       }
+      return;
+    }
+    if (sortie) {
+      // 성문 개방 돌격: 문짝이 양옆으로 활짝 열리고 안이 어둡다
+      g.rect(x - hw, y - H, hw * 2, H + 6).fill({ color: 0x0e0f14, alpha: 0.9 });
+      g.rect(x - hw - 6, y - H, 22, H).fill(0x7a5330).stroke({ width: 2, color: 0x2a1a0c });
+      g.rect(x + hw - 16, y - H, 22, H).fill(0x7a5330).stroke({ width: 2, color: 0x2a1a0c });
+      g.circle(x, y - H * 0.35, 5 + 3 * Math.sin(now / 80)).fill({ color: 0xff5a3a, alpha: 0.6 });
       return;
     }
     // 나무 문짝 두 장 + 쇠띠
@@ -128,7 +136,7 @@ export function createCastle(layer: Container): Castle {
   };
 
   return {
-    update(reveal, gate, open, now) {
+    update(reveal, gate, open, now, sortie) {
       for (let i = 0; i < blocks.length; i++) {
         const b = blocks[i]!;
         const rise = ease(clamp01((reveal - b.delay) / (1 - b.delay - 0.02 + 0.02)));
@@ -137,7 +145,7 @@ export function createCastle(layer: Container): Castle {
         b.last = q;
         drawBlock(b, rise, i);
       }
-      drawGate(gate, open, ease(clamp01((reveal - 0.45) / 0.5)), now);
+      drawGate(gate, open, ease(clamp01((reveal - 0.45) / 0.5)), now, !!sortie);
     },
     destroy() {
       for (const b of blocks) b.g.destroy();

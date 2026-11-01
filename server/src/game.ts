@@ -799,7 +799,7 @@ export class Game {
   /** 이번 판의 지형(없으면 평지). 방이 게임을 시작할 때 generateTerrain()으로 만든다. */
   terrain: TerrainMap | null = null;
   /** 공성전(스테이지 10): 성이 드러나는 중이거나 드러난 상태. 아니면 null */
-  siege: { t: number; solid: boolean; open: boolean; waveT: number; clock: number } | null = null;
+  siege: { t: number; solid: boolean; open: boolean; waveT: number; clock: number; sortieT: number } | null = null;
   private terrainTrack: { o: { x: number; y: number }; px: number; py: number; r: number }[] = [];
 
   /** 이번 판의 지형을 새로 만든다(시작 지점 둘레는 비워 둔다) */
@@ -1718,7 +1718,7 @@ export class Game {
   /** 스테이지 10에 들어가면 성이 드러나기 시작한다. instant면 곧바로 다 드러난 상태로(보스 연습·테스트) */
   private siegeEnsure(instant: boolean): void {
     if (!this.siege) {
-      this.siege = { t: instant ? SIEGE.revealSec : 0, solid: false, open: false, waveT: BOSS_LORD.waveFirst, clock: 0 };
+      this.siege = { t: instant ? SIEGE.revealSec : 0, solid: false, open: false, waveT: BOSS_LORD.waveFirst, clock: 0, sortieT: 0 };
       this.terrain ??= new TerrainMap([], TOURNAMENT_ARENA_RADIUS + 60);
       this.terrain.clearWhere((it) => inCastleZone(it[1], it[2])); // 성 자리와 성문 앞 마당의 바위·나무를 치운다
     } else if (instant) this.siege.t = Math.max(this.siege.t, SIEGE.revealSec);
@@ -1751,7 +1751,7 @@ export class Game {
     const s = this.siege;
     if (!s) return null;
     const gate = this.boss.hazards.find((h) => h.kind === HZ_GATE && h.t > 0);
-    return { reveal: Math.round(Math.min(1, s.t / SIEGE.revealSec) * 100), gate: s.open ? 0 : gate ? Math.max(1, Math.ceil((100 * gate.hp) / gate.hpMax)) : 100, open: s.open };
+    return { reveal: Math.round(Math.min(1, s.t / SIEGE.revealSec) * 100), gate: s.open ? 0 : gate ? Math.max(1, Math.ceil((100 * gate.hp) / gate.hpMax)) : 100, open: s.open, sortie: s.sortieT > 0 };
   }
 
   private stepSiege(dt: number): void {
@@ -1759,6 +1759,7 @@ export class Game {
     const s = this.siege;
     if (!s) return;
     s.t += dt;
+    s.sortieT = Math.max(0, s.sortieT - dt);
     if (!s.solid && s.t >= SIEGE.revealSec * SIEGE.solidAt) this.siegeSolidify();
     if (this.phase === "boss" && this.autoSpawn) this.stepSiegeWaves(dt);
   }
@@ -1814,6 +1815,27 @@ export class Game {
       made++;
     }
     return made;
+  }
+
+  /** 성문 개방 돌격: 성문이 열리고(그림) 정예 기병이 성문 앞으로 쏟아져 나온다. 닫힐 때 성문이 조금 회복한다. 만든 수를 돌려준다. */
+  spawnSortie(n: number): number {
+    const s = this.siege;
+    if (!s) return 0;
+    s.sortieT = BOSS_LORD.sortieOpenSec;
+    const gate = this.boss.hazards.find((h) => h.kind === HZ_GATE && h.t > 0);
+    if (gate) gate.hp = Math.min(gate.hpMax, gate.hp + (gate.hpMax * BOSS_LORD.sortieGateHeal) / 100);
+    if (gate) gate.b = Math.ceil((100 * gate.hp) / gate.hpMax);
+    let field = 0;
+    for (const e of this.enemies.values()) if (!e.boss) field++;
+    const k = Math.max(0, Math.min(n, BOSS_LORD.fieldCap - field));
+    for (let i = 0; i < k; i++) {
+      const x = GATE_X + (i - (k - 1) / 2) * 46;
+      const e = this.makeEnemy(x, GATE_Y + 70 + (i % 2) * 34, 0, { face: Math.PI / 2 });
+      e.maxHp *= BOSS_LORD.sortieHp;
+      e.hp *= BOSS_LORD.sortieHp;
+      e.dmgMult *= BOSS_LORD.sortieDmg;
+    }
+    return k;
   }
 
   /** 보스 단계의 공성전: 군주는 성 안마당에 서 있고(성문이 부서질 때까지 무적), 졸개가 몰려오기 시작한다 */

@@ -71,6 +71,7 @@ import {
   HZ_FIRE,
   HZ_CALTROP,
   HZ_OIL,
+  HZ_EDICT,
   HZ_GHOST,
   HZ_ICE,
   HZ_MACE,
@@ -829,12 +830,16 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
+  /** 지금 걸려 있는 칙령(공성전): rule 1 진군령, 2 분산령. grace면 아직 예고 */
+  let edictNow: { rule: number; left: number; grace: boolean } | null = null;
+
   const frame = (bt: TeleWire[], hz: HazardWire[], stage: number, dtMs: number, now: number) => {
     drawWhirls(now);
     drawThrustCores(dtMs);
     necroG.clear();
     wallG.clear();
     caltropG.clear();
+    edictNow = null;
     for (const gw of guardWalls) drawCurvedWall(gw.x + Math.cos(gw.ang) * 48, gw.y + 8 + Math.sin(gw.ang) * 48 * 0.6, gw.ang + Math.PI / 2, gw.ang, 96, 44, 104, 0.95, 100, now);
     guardWalls.length = 0;
     teleG.clear();
@@ -851,6 +856,10 @@ export async function createBossFx(d: BossFxDeps) {
       }
       if (kind === HZ_OIL) {
         drawOil(id, x, y, a, left, state, now);
+        continue;
+      }
+      if (kind === HZ_EDICT) {
+        edictNow = { rule: a, left: left / 10, grace: state === 0 };
         continue;
       }
       let v = hzViews.get(id);
@@ -1078,6 +1087,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
+  return { art, frame, edict: () => edictNow, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
 }
 

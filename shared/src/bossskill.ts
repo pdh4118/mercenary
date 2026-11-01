@@ -37,6 +37,9 @@ export const BSK_ACCEL = 30; // 전차: 가속 돌진
 export const BSK_CALTROP = 31; // 전차: 마름쇠 질주
 export const BSK_CATAPULT = 40; // 군주: 성루 투석
 export const BSK_OIL = 41; // 군주: 끓는 기름
+export const BSK_ARROWSTORM = 42; // 군주: 화살 소나기
+export const BSK_SORTIE = 43; // 군주: 성문 개방 돌격
+export const BSK_EDICT = 44; // 군주: 칙령
 export const BSK_DRIFT = 32; // 전차: 급선회 파쇄
 export const BSK_RAMPAGE = 33; // 전차: 폭주
 export const BSK_FOG = 34; // 네크로맨서: 암흑 안개
@@ -83,6 +86,9 @@ export const BOSS_SKILL_NAMES: Record<number, string> = {
   [BSK_CALTROP]: "마름쇠 질주",
   [BSK_CATAPULT]: "성루 투석",
   [BSK_OIL]: "끓는 기름",
+  [BSK_ARROWSTORM]: "화살 소나기",
+  [BSK_SORTIE]: "성문 개방 돌격",
+  [BSK_EDICT]: "칙령",
   [BSK_DRIFT]: "급선회 파쇄",
   [BSK_RAMPAGE]: "폭주",
 };
@@ -115,6 +121,7 @@ export const HZ_CHAIN = 12; // 영혼 사슬: 위치 = 보스, 방향 = 대상 �
 export const HZ_DRAINRING = 13; // 생명 흡수 범위 고리: a = 반지름(예고 중에는 state 0)
 export const HZ_CALTROP = 14; // 마름쇠: a = 반지름(예고 중에는 state 0), 밟으면 피해와 둔화
 export const HZ_GATE = 15; // 성문(공성전): 위치 = 성문 중심, a = 반길이, b = 남은 체력 %
+export const HZ_EDICT = 17; // 칙령(공성전): a = 규칙(1 진군령, 2 분산령), 예고(state 0) 뒤 규칙이 적용된다. 위치는 군주
 export const HZ_OIL = 16; // 끓는 기름 장판(공성전): a = 반지름(예고 중에는 state 0)
 export const HZ_RING = 8; // 퍼지는 불꽃 고리: a = 현재 반지름, b = 틈 반각(라디안), 방향 = 틈 중심
 export type HazardWire = [id: number, kind: number, x: number, y: number, ang: number, a: number, b: number, left: number, total: number, state: number];
@@ -612,6 +619,30 @@ export const BOSS_LORD = {
   oilSlowMult: 0.7, // 장판 위 이동 속도 배율
   oilGateRange: 520, // 성문 둘레 이 거리 안의 대상을 노린다
   oilCd: 9,
+  arrowCount: 8, // 화살 소나기: 화살비 개수(기본)
+  arrowPerPlayer: 2, // 인원당 늘어나는 개수
+  arrowRadius: 85,
+  arrowFall: 1.3, // 떨어지기까지(예고 시간, 초)
+  arrowGap: 0.1, // 화살비 사이 간격(초)
+  arrowArea: 620, // 성문 앞 이 범위 안에 흩뿌린다
+  arrowDmg: 3,
+  arrowCd: 11,
+  sortieTele: 0.9, // 성문 개방 돌격: 성문이 열리기까지(예고)
+  sortieBase: 3, // 쏟아져 나오는 정예 기병 수(기본)
+  sortiePerPlayer: 2, // 인원당 늘어나는 수
+  sortieHp: 2.5, // 정예 체력 배율
+  sortieDmg: 1.3, // 정예 피해 배율
+  sortieOpenSec: 3.5, // 성문이 열려 있는 시간(그림)
+  sortieGateHeal: 6, // 닫힐 때 성문이 회복하는 체력(%)
+  sortieCd: 24,
+  edictGrace: 1.5, // 칙령: 규칙이 적용되기까지(문구를 읽을 시간)
+  edictSec: 8, // 규칙이 적용되는 시간
+  edictCheck: 0.75, // 위반을 검사하는 간격(초)
+  edictStill: 28, // 진군령: 이 거리(px)도 못 움직이면 멈춘 것
+  edictSpread: 130, // 분산령: 이 거리 안에 다른 아군이 있으면 뭉친 것
+  edictDmg: 3, // 위반했을 때 번개 피해(배율)
+  edictSpreadGate: 60, // 분산령은 성문 체력이 이 % 이하일 때부터
+  edictCd: 26,
   // 물량: 보스 단계 동안 아래쪽에서 끊임없이 몰려온다
   waveFirst: 6, // 첫 무리까지(초)
   waveGapStart: 7, // 무리 사이 간격(처음)

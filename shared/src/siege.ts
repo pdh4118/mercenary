@@ -73,4 +73,5 @@ export interface SiegeInfo {
   reveal: number; // 성이 드러난 정도 0..100
   gate: number; // 성문 체력 비율 0..100(0이면 부서졌다)
   open: boolean; // 성문이 부서져 군주를 칠 수 있다
+  sortie?: boolean; // 성문이 열려 정예가 쏟아져 나오는 중(그림)
 }

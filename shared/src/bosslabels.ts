@@ -2190,6 +2190,150 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "재사용 대기(초)",
   "hint": ""
  },
+ "BOSS_LORD.arrowCount": {
+  "boss": "군주",
+  "skill": "화살 소나기",
+  "label": "개수",
+  "hint": "화살 소나기: 화살비 개수(기본)"
+ },
+ "BOSS_LORD.arrowPerPlayer": {
+  "boss": "군주",
+  "skill": "화살 소나기",
+  "label": "인원당 개수",
+  "hint": "인원당 늘어나는 개수"
+ },
+ "BOSS_LORD.arrowRadius": {
+  "boss": "군주",
+  "skill": "화살 소나기",
+  "label": "반경",
+  "hint": ""
+ },
+ "BOSS_LORD.arrowFall": {
+  "boss": "군주",
+  "skill": "화살 소나기",
+  "label": "낙하 시간(초)",
+  "hint": "떨어지기까지(예고 시간, 초)"
+ },
+ "BOSS_LORD.arrowGap": {
+  "boss": "군주",
+  "skill": "화살 소나기",
+  "label": "간격",
+  "hint": "화살비 사이 간격(초)"
+ },
+ "BOSS_LORD.arrowArea": {
+  "boss": "군주",
+  "skill": "화살 소나기",
+  "label": "범위",
+  "hint": "성문 앞 이 범위 안에 흩뿌린다"
+ },
+ "BOSS_LORD.arrowDmg": {
+  "boss": "군주",
+  "skill": "화살 소나기",
+  "label": "피해 배율",
+  "hint": ""
+ },
+ "BOSS_LORD.arrowCd": {
+  "boss": "군주",
+  "skill": "화살 소나기",
+  "label": "재사용 대기(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.sortieTele": {
+  "boss": "군주",
+  "skill": "성문 개방 돌격",
+  "label": "예고 시간(초)",
+  "hint": "성문 개방 돌격: 성문이 열리기까지(예고)"
+ },
+ "BOSS_LORD.sortieBase": {
+  "boss": "군주",
+  "skill": "성문 개방 돌격",
+  "label": "쏟아져 나오는 정예 기병 수",
+  "hint": "쏟아져 나오는 정예 기병 수(기본)"
+ },
+ "BOSS_LORD.sortiePerPlayer": {
+  "boss": "군주",
+  "skill": "성문 개방 돌격",
+  "label": "인원당 개수",
+  "hint": "인원당 늘어나는 수"
+ },
+ "BOSS_LORD.sortieHp": {
+  "boss": "군주",
+  "skill": "성문 개방 돌격",
+  "label": "체력 비율",
+  "hint": "정예 체력 배율"
+ },
+ "BOSS_LORD.sortieDmg": {
+  "boss": "군주",
+  "skill": "성문 개방 돌격",
+  "label": "피해 배율",
+  "hint": "정예 피해 배율"
+ },
+ "BOSS_LORD.sortieOpenSec": {
+  "boss": "군주",
+  "skill": "성문 개방 돌격",
+  "label": "지속 시간(초)",
+  "hint": "성문이 열려 있는 시간(그림)"
+ },
+ "BOSS_LORD.sortieGateHeal": {
+  "boss": "군주",
+  "skill": "성문 개방 돌격",
+  "label": "회복량",
+  "hint": "닫힐 때 성문이 회복하는 체력(%)"
+ },
+ "BOSS_LORD.sortieCd": {
+  "boss": "군주",
+  "skill": "성문 개방 돌격",
+  "label": "재사용 대기(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.edictGrace": {
+  "boss": "군주",
+  "skill": "칙령",
+  "label": "칙령: 규칙이 적용되기까지",
+  "hint": "칙령: 규칙이 적용되기까지(문구를 읽을 시간)"
+ },
+ "BOSS_LORD.edictSec": {
+  "boss": "군주",
+  "skill": "칙령",
+  "label": "지속 시간(초)",
+  "hint": "규칙이 적용되는 시간"
+ },
+ "BOSS_LORD.edictCheck": {
+  "boss": "군주",
+  "skill": "칙령",
+  "label": "위반을 검사하는 간격",
+  "hint": "위반을 검사하는 간격(초)"
+ },
+ "BOSS_LORD.edictStill": {
+  "boss": "군주",
+  "skill": "칙령",
+  "label": "진군령: 이 거리",
+  "hint": "진군령: 이 거리(px)도 못 움직이면 멈춘 것"
+ },
+ "BOSS_LORD.edictSpread": {
+  "boss": "군주",
+  "skill": "칙령",
+  "label": "분산령: 이 거리 안에 다른 아군이 있으면 ",
+  "hint": "분산령: 이 거리 안에 다른 아군이 있으면 뭉친 것"
+ },
+ "BOSS_LORD.edictDmg": {
+  "boss": "군주",
+  "skill": "칙령",
+  "label": "피해 배율",
+  "hint": "위반했을 때 번개 피해(배율)"
+ },
+ "BOSS_LORD.edictSpreadGate": {
+  "boss": "군주",
+  "skill": "칙령",
+  "label": "분산령은 성문 체력이 이 % 이하일 때부터",
+  "hint": "분산령은 성문 체력이 이 % 이하일 때부터"
+ },
+ "BOSS_LORD.edictCd": {
+  "boss": "군주",
+  "skill": "칙령",
+  "label": "재사용 대기(초)",
+  "hint": ""
+ },
  "BOSS_LORD.waveFirst": {
   "boss": "군주",
   "skill": "필드 졸개 물량",
