@@ -992,6 +992,10 @@ async function main() {
   const edictText = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 26, fontWeight: "900", stroke: { color: 0x000000, width: 6 }, align: "center" } });
   edictText.anchor.set(0.5, 0);
   edictText.visible = false;
+  const execG = new Graphics(); // 처형령: 어두워지는 화면과 번쩍임
+  const execText = new Text({ text: "", style: { fill: 0xff5a4a, fontSize: 64, fontWeight: "900", stroke: { color: 0x000000, width: 8 }, align: "center" } });
+  execText.anchor.set(0.5, 0.5);
+  execText.visible = false;
   const bossBar = new Graphics();
   const levelToast = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 20, stroke: { color: 0x000000, width: 3 } } });
   levelToast.anchor.set(0.5, 0);
@@ -1206,7 +1210,7 @@ async function main() {
     weaponHint.text = WEAPONS[active]!.note;
   };
   weaponBar.visible = false;
-  hud.addChild(hudPanel, mini, statsPanel, stageText, edictText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
+  hud.addChild(execG, hudPanel, mini, statsPanel, stageText, edictText, execText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
@@ -2357,6 +2361,23 @@ async function main() {
     });
     // 장군 스킬 예고·장판·효과 컷
     bossFx.frame(latest.bt ?? [], latest.hz ?? [], latest.g?.stage ?? 1, ticker.deltaMS, performance.now());
+    {
+      // 처형령(공성전): 화면이 점점 어두워지고 카운트다운, 벼락이 치는 순간 번쩍인다
+      const ex = bossFx.execute();
+      execG.clear();
+      execText.visible = !!ex && ex.grace;
+      if (ex) {
+        const W = app.screen.width;
+        const H = app.screen.height;
+        if (ex.grace) {
+          const pr = 1 - ex.left / Math.max(0.1, ex.total);
+          execG.rect(0, 0, W, H).fill({ color: 0x14081f, alpha: 0.12 + 0.4 * pr });
+          execText.text = `처형령\n${Math.ceil(ex.left)}\n결계 안으로!`;
+          execText.position.set(W / 2, H * 0.36);
+          execText.scale.set(0.8 + 0.12 * Math.abs(Math.sin(performance.now() / 120)));
+        } else execG.rect(0, 0, W, H).fill({ color: 0xffffff, alpha: Math.min(0.85, ex.left / 0.4) });
+      }
+    }
     {
       // 칙령(공성전): 걸려 있는 동안 화면 위에 규칙 문구를 크게 보여 준다
       const ed = bossFx.edict();
@@ -3652,7 +3673,7 @@ async function main() {
       }
       lastTourIn = tin;
       if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${gi.siege ? "군주의 성 공성전까지" : "보스군 도착까지"} ${mmss(gi.timer)}${squadText}`;
-      else if (gi.phase === "boss" && gi.siege) stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${bossLabel(gi.stage)}의 성 · ${gi.siege.open ? "성문 붕괴! 군주를 쓰러뜨리세요" : `성문 ${gi.siege.gate}%`}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}` : ""}`;
+      else if (gi.phase === "boss" && gi.siege) stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${bossLabel(gi.stage)}의 성 · ${gi.siege.open ? (gi.siege.guards ?? 0) > 0 ? `성문 붕괴! 근위대 ${gi.siege.guards}명 남음(군주 피해 -${Math.min(100, (gi.siege.guards ?? 0) * 20)}%)` : "성문 붕괴! 군주를 쓰러뜨리세요" : `성문 ${gi.siege.gate}%`}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}` : ""}`;
       else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${bossLabel(gi.stage)}의 군대 ${gi.armyLeft}/${gi.armyTotal}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}${gi.timer > 0 ? ` (다음 ${gi.timer}초)` : " (최대)"}` : gi.timer > 0 ? ` · 격노까지 ${gi.timer}초` : ""}`;
       else if (gi.phase === "tournament") stageText.text = ""; // 위쪽 대진 배너가 대신한다
       else if ((gi.tourIn ?? 0) > 0) stageText.text = `스테이지 ${gi.stage} 클리어! 토너먼트가 ${gi.tourIn}초 뒤에 시작됩니다`;

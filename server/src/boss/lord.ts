@@ -1,4 +1,4 @@
-import { BFX_IMPACT, BOSS_LORD as C, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, EF_INVULN, GATE_X, GATE_Y, HZ_EDICT, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TELE_CIRCLE } from "@mercenary/shared";
+import { BFX_IMPACT, BFX_MACEBOOM, BFX_ROAR, BOSS_CAV, BOSS_LORD as C, BSK_ARROWSTORM, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_EXECUTE, HZ_WARD, TELE_BAND, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, EF_INVULN, GATE_X, GATE_Y, HZ_EDICT, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TELE_CIRCLE } from "@mercenary/shared";
 import type { Foe } from "../game.js";
 import type { Ctx, KitDef, SkillDef } from "./types.js";
 
@@ -10,6 +10,7 @@ const gatePct = (c: Ctx): number => {
   const h = c.sys.hazards.find((x) => x.kind === HZ_GATE && x.t > 0);
   return h ? (100 * h.hp) / h.hpMax : 0;
 };
+const isOpen = (sys: Ctx["sys"]): boolean => !!(sys.g as any).siege?.open;
 const jitter = (v: number, a: number) => v + (Math.random() - 0.5) * 2 * a;
 
 /** 성루 투석: 성벽 위 투석기가 바위를 연달아 던진다. 큰 원이 예고된 뒤 떨어진다(가까운 대상과 밀집한 곳을 번갈아 노린다). */
@@ -65,7 +66,7 @@ const oil: SkillDef = {
   id: BSK_OIL,
   cd: C.oilCd,
   weight: 4,
-  can: ({ foes }) => foes.some((f) => Math.hypot(f.x - GATE_X, f.y - GATE_Y) <= C.oilGateRange),
+  can: ({ foes, sys }) => !isOpen(sys) && foes.some((f) => Math.hypot(f.x - GATE_X, f.y - GATE_Y) <= C.oilGateRange),
   begin: ({ k }) => {
     k.t = k.total = 0.5;
   },
@@ -90,7 +91,7 @@ const arrowStorm: SkillDef = {
   id: BSK_ARROWSTORM,
   cd: C.arrowCd,
   weight: 4,
-  can: ({ foes }) => foes.some((f) => Math.hypot(f.x - GATE_X, f.y - (GATE_Y + 250)) <= C.arrowArea + 200),
+  can: ({ foes, sys }) => !isOpen(sys) && foes.some((f) => Math.hypot(f.x - GATE_X, f.y - (GATE_Y + 250)) <= C.arrowArea + 200),
   begin: ({ k }) => {
     k.t = k.total = 0.6;
   },
@@ -127,7 +128,7 @@ const sortie: SkillDef = {
   id: BSK_SORTIE,
   cd: C.sortieCd,
   weight: 3,
-  can: ({ foes }) => foes.some((f) => Math.hypot(f.x - GATE_X, f.y - GATE_Y) <= 700),
+  can: ({ foes, sys }) => !isOpen(sys) && foes.some((f) => Math.hypot(f.x - GATE_X, f.y - GATE_Y) <= 700),
   begin: ({ k }) => {
     k.t = k.total = C.sortieTele;
   },
@@ -189,17 +190,135 @@ const edict: SkillDef = {
   tele: () => [],
 };
 
+/** 근위대 소집(성문이 부서진 뒤): 병종별 정예 4명이 군주를 감싼다. 살아 있는 동안 군주가 받는 피해가 크게 줄어든다(한 명 쓰러뜨릴 때마다 20%p). */
+const guards: SkillDef = {
+  id: BSK_GUARDS,
+  cd: C.guardsCd,
+  weight: 3,
+  can: ({ sys }) => isOpen(sys) && (sys.g as any).guardCount() === 0,
+  begin: ({ k }) => {
+    k.t = k.total = 0.9;
+  },
+  run: (c) => {
+    const { e, k, sys } = c;
+    if (k.ph === 0 && k.t <= 0) {
+      (sys.g as any).spawnGuards();
+      sys.fx(e.x, e.y + 90, 0, BFX_ROAR);
+      k.ph = 1;
+      k.t = 0.8;
+    } else if (k.ph === 1 && k.t <= 0) sys.end(c);
+  },
+  tele: ({ e, k }) => [[TELE_CIRCLE, r1(e.x), r1(e.y + 80), 0, 200, 0, ...lt(k), BSK_GUARDS]],
+};
+
+/** 홀 내려찍기: 군주 둘레 큰 원이 예고된 뒤 내려찍고, 곧이어 충격파가 바깥 띠로 퍼진다. */
+const scepter: SkillDef = {
+  id: BSK_SCEPTER,
+  cd: C.scepterCd,
+  weight: 5,
+  can: ({ e, foes, sys }) => isOpen(sys) && foes.some((f) => sys.dist(f, e) <= C.scepterWave + 120),
+  begin: ({ k }) => {
+    k.t = k.total = C.scepterTele;
+  },
+  run: (c) => {
+    const { e, k, foes, sys } = c;
+    if (k.ph === 0 && k.t <= 0) {
+      for (const f of foes) if (sys.dist(f, e) <= C.scepterRadius + f.r) sys.hitFoe(e, f, C.scepterDmg, C.scepterKnock);
+      sys.fx(e.x, e.y, C.scepterRadius / 100, BFX_MACEBOOM);
+      k.ph = 1;
+      k.t = C.scepterWaveDelay;
+      k.total = C.scepterWaveDelay;
+    } else if (k.ph === 1 && k.t <= 0) {
+      for (const f of foes) {
+        const d = sys.dist(f, e);
+        if (d > C.scepterRadius - f.r && d <= C.scepterWave + f.r) sys.hitFoe(e, f, C.scepterWaveDmg, 120);
+      }
+      sys.fx(e.x, e.y, C.scepterWave / 100, BFX_MACEBOOM);
+      k.ph = 2;
+      k.t = 0.7;
+    } else if (k.ph === 2 && k.t <= 0) sys.end(c);
+  },
+  telePhases: [0, 1],
+  tele: ({ e, k }) => (k.ph === 0 ? [[TELE_CIRCLE, r1(e.x), r1(e.y), 0, C.scepterRadius, 0, ...lt(k), BSK_SCEPTER]] : [[TELE_BAND, r1(e.x), r1(e.y), 0, C.scepterRadius, C.scepterWave, ...lt(k), BSK_SCEPTER]]),
+};
+
+/** 호령: 필드의 졸개 전체가 잠깐 강해진다(성을 빨리 무너뜨리라는 압박). */
+const rally: SkillDef = {
+  id: BSK_RALLY,
+  cd: C.rallyCd,
+  weight: 3,
+  can: ({ sys }) => isOpen(sys),
+  begin: ({ k }) => {
+    k.t = k.total = 0.8;
+  },
+  run: (c) => {
+    const { e, k, sys } = c;
+    if (k.ph === 0 && k.t <= 0) {
+      for (const m of (sys.g as any).enemies.values()) {
+        if (m.boss || (m.buffT ?? 0) > 0) continue;
+        m.buffT = C.rallySec;
+        m.buffMult = C.rallyMult;
+        m.dmgMult *= C.rallyMult;
+      }
+      sys.fx(e.x, e.y, 0, BFX_ROAR);
+      k.ph = 1;
+      k.t = 0.8;
+    } else if (k.ph === 1 && k.t <= 0) sys.end(c);
+  },
+  tele: () => [],
+};
+
+/** 처형령(군주 체력 30% 이하): 화면이 어두워지고 카운트다운 뒤 전장 전체에 벼락이 친다. 결계 원 안은 안전하다. */
+const execute: SkillDef = {
+  id: BSK_EXECUTE,
+  cd: C.executeCd,
+  weight: 6,
+  can: ({ e, sys }) => isOpen(sys) && e.hp / e.maxHp <= C.executeHp,
+  begin: ({ k, e, sys }) => {
+    k.t = k.total = C.executeTele;
+    // 결계: 안마당 안 아무 곳(서로 겹치지 않게)
+    const spots: [number, number][] = [];
+    for (let tries = 0; tries < 60 && spots.length < C.executeWards; tries++) {
+      const x = SIEGE.cx + (Math.random() - 0.5) * 2 * (SIEGE.hw - 140);
+      const y = SIEGE.cy + (Math.random() - 0.5) * 2 * (SIEGE.hh - 110);
+      if (spots.every(([sx, sy]) => Math.hypot(sx - x, sy - y) > C.executeWardRadius * 1.7)) spots.push([x, y]);
+    }
+    for (const [x, y] of spots) sys.addHazard({ kind: HZ_WARD, x, y, a: C.executeWardRadius, t: C.executeTele + 1.1, total: C.executeTele + 1.1, src: e.id });
+    sys.addHazard({ kind: HZ_EXECUTE, x: e.x, y: e.y, a: 0, delay: C.executeTele, t: 0.8, total: 0.8, src: e.id });
+  },
+  run: (c) => {
+    const { e, k, foes, sys } = c;
+    if (k.ph === 0 && k.t <= 0) {
+      const wards = sys.hazards.filter((h) => h.kind === HZ_WARD);
+      for (const f of foes) {
+        if (wards.some((w) => Math.hypot(f.x - w.x, f.y - w.y) <= w.a)) continue; // 결계 안은 안전
+        sys.pctHit(e, f, C.executePct);
+        sys.fx(f.x, f.y, 0, BFX_IMPACT);
+      }
+      k.ph = 1;
+      k.t = 1;
+    } else if (k.ph === 1 && k.t <= 0) sys.end(c);
+  },
+  tele: () => [],
+};
+
 /** 군주: 성 안마당에서 움직이지 않는다. 성문이 있는 동안은 무적이다. */
 export const lordKit: KitDef = {
   firstDelay: C.firstDelay,
   idleMin: C.idleMin,
   idleMax: C.idleMax,
-  skills: [catapult, oil, arrowStorm, sortie, edict],
+  skills: [catapult, oil, arrowStorm, sortie, edict, guards, scepter, rally, execute],
   move: () => true,
   tick: (c) => {
     c.e.x = SIEGE.lordX;
     c.e.y = SIEGE.lordY;
     if (gateAlive(c)) c.e.invulnT = Math.max(c.e.invulnT ?? 0, 0.5);
+  },
+  /** 근위대가 살아 있는 동안 군주가 받는 피해가 줄어든다 */
+  preHit: (c, hit) => {
+    const n = (c.sys.g as any).guardCount() as number;
+    if (n <= 0) return hit;
+    return { ...hit, damage: hit.damage * Math.max(0, 1 - C.guardsReduce * n) };
   },
   flags: (c) => (gateAlive(c) ? EF_INVULN : 0),
 };

@@ -24,7 +24,7 @@ PREFIX = {
     "BOSS_MAGE": {"blink": "순간이동", "meteor": "운석", "prison": "얼음 감옥", "ring": "확산 불꽃", "shield": "매직 쉴드"},
     "BOSS_MOUNT": {"break": "막혔을 때", "cornered": "궁지에 몰렸을 때", "flee": "도주", "hit": "치고 빠지기", "keep": "거리 유지", "lasso": "올가미 화살", "orbit": "선회 사격", "shot": "사격", "speed": "이동 속도", "blind": "실명 화살"},
     "BOSS_CHARIOT": {"accel": "가속 돌진", "drift": "급선회 파쇄", "front": "정면 충돌", "rampage": "폭주", "caltrop": "마름쇠 질주", "weak": "약점"},
-    "BOSS_LORD": {"catapult": "성루 투석", "oil": "끓는 기름", "arrow": "화살 소나기", "sortie": "성문 개방 돌격", "edict": "칙령", "wave": "필드 졸개 물량", "field": "필드 졸개 물량", "gate": "성문"},
+    "BOSS_LORD": {"catapult": "성루 투석", "oil": "끓는 기름", "arrow": "화살 소나기", "sortie": "성문 개방 돌격", "edict": "칙령", "guards": "근위대 소집", "scepter": "홀 내려찍기", "rally": "호령", "execute": "처형령", "wave": "필드 졸개 물량", "field": "필드 졸개 물량", "gate": "성문"},
     "BOSS_NECRO": {"chain": "영혼 사슬", "corpse": "시체", "drain": "생명 흡수", "fog": "암흑 안개", "keep": "거리 유지", "orb": "영혼 구슬(평타)", "revive": "뼈 소생", "skel": "스켈레톤"},
 }
 out = {}

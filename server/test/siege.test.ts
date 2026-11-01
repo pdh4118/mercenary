@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BOSS_LORD, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, HZ_EDICT, GATE_X, GATE_Y, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TICK_RATE, castleSolids, inCastleZone } from "@mercenary/shared";
+import { BOSS_CAV, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_WARD, BOSS_LORD, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, HZ_EDICT, GATE_X, GATE_Y, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TICK_RATE, castleSolids, inCastleZone } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -172,4 +172,92 @@ test("공성전: 진군령은 멈춘 대상에게만 번개를 내린다", () =>
   };
   assert.ok(run1(false) > 0, "멈추면 맞는다");
   assert.equal(run1(true), 0, "움직이면 맞지 않는다");
+});
+
+const openGate = (g: Game) => {
+  (g as any).boss.strikeBarriers(GATE_X, GATE_Y + 40, 80, 1e9);
+  for (let i = 0; i < TICK_RATE; i++) g.step(); // 군주의 무적이 풀릴 때까지
+};
+
+test("공성전 안뜰: 근위대가 살아 있는 동안 군주가 받는 피해가 줄고, 쓰러뜨릴수록 늘어난다", () => {
+  const { g, a, b } = setup(BSK_GUARDS);
+  g.getPlayer(a)!.maxHp = g.getPlayer(a)!.hp = 1e9;
+  openGate(g);
+  const hit = { damage: 100, charge: 0, srcType: -1, fromAngle: 0 };
+  for (let i = 0; i < TICK_RATE * 3 && g.guardCount() < 4; i++) g.step();
+  assert.equal(g.guardCount(), 4, "근위대 4명");
+  assert.ok(Math.abs((g as any).boss.preHit(b, hit, a).damage - 20) < 1e-6, "4명이면 피해 80% 감소");
+  const all = [...(g as any).enemies.values()].filter((e: any) => e.guard);
+  (g as any).enemies.delete(all[0].id);
+  assert.ok(Math.abs((g as any).boss.preHit(b, hit, a).damage - 40) < 1e-6, "3명이면 60% 감소");
+  assert.equal(g.info().siege!.guards, 3);
+  for (const e of all.slice(1)) (g as any).enemies.delete(e.id);
+  assert.equal((g as any).boss.preHit(b, hit, a).damage, 100, "근위대가 없으면 그대로");
+});
+
+test("공성전 안뜰: 홀 내려찍기는 안쪽 원과 바깥 충격파로 나눠 맞힌다", () => {
+  const { g, a } = setup(BSK_SCEPTER);
+  openGate(g);
+  const near = g.getPlayer(a)!;
+  near.maxHp = near.hp = 1e9;
+  const far = g.addPlayer("b")!;
+  const fp = g.getPlayer(far)!;
+  for (const p of [near, fp]) p.maxHp = p.hp = 1e9;
+  let nearHit = false;
+  let farHit = false;
+  for (let i = 0; i < TICK_RATE * 4; i++) {
+    near.x = SIEGE.lordX + 100;
+    near.y = SIEGE.lordY + 40;
+    fp.x = SIEGE.lordX + 340; // 안쪽 원 밖, 충격파 안
+    fp.y = SIEGE.lordY;
+    g.step();
+    if (near.hp < 1e9) nearHit = true;
+    if (fp.hp < 1e9) farHit = true;
+    near.hp = fp.hp = 1e9;
+  }
+  assert.ok(nearHit, "안쪽 원에 맞는다");
+  assert.ok(farHit, "충격파에 맞는다");
+});
+
+test("공성전 안뜰: 호령은 필드 졸개의 피해를 올렸다가 끝나면 되돌린다", () => {
+  const { g, a } = setup(BSK_RALLY);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  const id = g.spawnEnemyAt(0, 0, 1);
+  const e = (g as any).enemies.get(id);
+  const base = e.dmgMult;
+  openGate(g);
+  for (let i = 0; i < TICK_RATE * 2 && e.dmgMult <= base * 1.5; i++) g.step();
+  assert.ok(e.dmgMult > base * 1.5, `호령으로 강해진다(${e.dmgMult / base})`);
+  const bs = [...(g as any).enemies.values()].find((x: any) => x.boss);
+  bs.bk.cds[BSK_RALLY] = 999; // 더 쓰지 않게
+  for (let i = 0; i < TICK_RATE * (BOSS_LORD.rallySec + 1); i++) g.step();
+  assert.ok(Math.abs(e.dmgMult - base) < 1e-9, "끝나면 원래대로");
+  void BOSS_CAV;
+});
+
+test("공성전 안뜰: 처형령은 결계 밖 대상만 최대 체력 비율로 때린다", () => {
+  const { g, a, b } = setup(BSK_EXECUTE);
+  openGate(g);
+  b.hp = b.maxHp * 0.2;
+  const out = g.getPlayer(a)!;
+  const inn = g.addPlayer("b")!;
+  const ip = g.getPlayer(inn)!;
+  for (const p of [out, ip]) p.maxHp = p.hp = 1000;
+  let placed = false;
+  for (let i = 0; i < TICK_RATE * (BOSS_LORD.executeTele + 1.2); i++) {
+    const wards = ((g as any).boss.hazards as any[]).filter((h) => h.kind === HZ_WARD);
+    if (wards.length > 0) {
+      ip.x = wards[0].x;
+      ip.y = wards[0].y;
+      // 결계에서 가장 먼 곳(성 밖)에 둔다
+      out.x = 0;
+      out.y = GATE_Y + 900;
+      placed = true;
+    }
+    g.step();
+  }
+  assert.ok(placed, "결계가 깔린다");
+  assert.ok(out.hp <= 1000 * (1 - BOSS_LORD.executePct) + 1, `결계 밖은 크게 다친다(${out.hp})`);
+  assert.equal(ip.hp, 1000, "결계 안은 무사");
 });

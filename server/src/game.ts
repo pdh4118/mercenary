@@ -490,6 +490,8 @@ export interface Enemy extends Fighter {
   bk?: BossKitState; // 장군의 스킬 상태
   invulnT?: number; // 무적 남은 시간(운석 맞춤 무적 등)
   buffT?: number; // 돌격 함성(보스군 강화)이 남은 시간
+  buffMult?: number; // 그 강화로 올려 둔 피해 배율(끝나면 이만큼 나눈다. 없으면 돌격 함성 값)
+  guard?: boolean; // 군주의 근위대(살아 있는 동안 군주가 받는 피해가 줄어든다)
   maxHp: number;
   shieldMax: number;
   dmgMult: number;
@@ -1751,7 +1753,7 @@ export class Game {
     const s = this.siege;
     if (!s) return null;
     const gate = this.boss.hazards.find((h) => h.kind === HZ_GATE && h.t > 0);
-    return { reveal: Math.round(Math.min(1, s.t / SIEGE.revealSec) * 100), gate: s.open ? 0 : gate ? Math.max(1, Math.ceil((100 * gate.hp) / gate.hpMax)) : 100, open: s.open, sortie: s.sortieT > 0 };
+    return { reveal: Math.round(Math.min(1, s.t / SIEGE.revealSec) * 100), gate: s.open ? 0 : gate ? Math.max(1, Math.ceil((100 * gate.hp) / gate.hpMax)) : 100, open: s.open, sortie: s.sortieT > 0, guards: this.guardCount() };
   }
 
   private stepSiege(dt: number): void {
@@ -1836,6 +1838,28 @@ export class Game {
       e.dmgMult *= BOSS_LORD.sortieDmg;
     }
     return k;
+  }
+
+  /** 살아 있는 근위대 수 */
+  guardCount(): number {
+    let n = 0;
+    for (const e of this.enemies.values()) if (e.guard) n++;
+    return n;
+  }
+
+  /** 근위대 소집: 군주 둘레에 병종별 정예(검방·창·궁·마법) 4명 */
+  spawnGuards(): number {
+    const types = [SHIELD, SPEAR, ARCHER, MAGE];
+    const spots: [number, number][] = [[-150, 60], [-60, 100], [60, 100], [150, 60]];
+    types.forEach((type, i) => {
+      const e = this.makeEnemy(SIEGE.lordX + spots[i]![0], SIEGE.lordY + spots[i]![1], type, { guard: true, face: Math.PI / 2 });
+      e.maxHp *= BOSS_LORD.guardsHp;
+      e.hp *= BOSS_LORD.guardsHp;
+      e.shield *= BOSS_LORD.guardsHp;
+      e.shieldMax *= BOSS_LORD.guardsHp;
+      e.dmgMult *= BOSS_LORD.guardsDmg;
+    });
+    return types.length;
   }
 
   /** 보스 단계의 공성전: 군주는 성 안마당에 서 있고(성문이 부서질 때까지 무적), 졸개가 몰려오기 시작한다 */
@@ -5701,7 +5725,7 @@ export class Game {
   }
 
   /** 레벨업 카드와 강화 단계가 반영된 용병 능력치 */
-  private mercStats(m: Merc): UnitStats {
+  mercStats(m: Merc): UnitStats {
     const base = MERC_STATS[m.type]!;
     const slot = this.slots.get(m.owner);
     const mods = slot?.mods;
@@ -5808,7 +5832,8 @@ export class Game {
         e.buffT -= dt;
         if (e.buffT <= 0) {
           e.buffT = 0;
-          e.dmgMult /= BOSS_CAV.roarDmg;
+          e.dmgMult /= e.buffMult ?? BOSS_CAV.roarDmg;
+          e.buffMult = undefined;
         }
       }
       if (e.stunT && e.stunT > 0) {

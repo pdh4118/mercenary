@@ -2334,6 +2334,132 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "재사용 대기(초)",
   "hint": ""
  },
+ "BOSS_LORD.guardsCd": {
+  "boss": "군주",
+  "skill": "근위대 소집",
+  "label": "재사용 대기(초)",
+  "hint": "근위대 소집(성문이 부서진 뒤 안마당 단계)"
+ },
+ "BOSS_LORD.guardsReduce": {
+  "boss": "군주",
+  "skill": "근위대 소집",
+  "label": "근위대 한 명이 살아 있을 때마다 군주가 받",
+  "hint": "근위대 한 명이 살아 있을 때마다 군주가 받는 피해 감소 비율"
+ },
+ "BOSS_LORD.guardsHp": {
+  "boss": "군주",
+  "skill": "근위대 소집",
+  "label": "체력 비율",
+  "hint": "근위대 체력 배율"
+ },
+ "BOSS_LORD.guardsDmg": {
+  "boss": "군주",
+  "skill": "근위대 소집",
+  "label": "피해 배율",
+  "hint": ""
+ },
+ "BOSS_LORD.scepterTele": {
+  "boss": "군주",
+  "skill": "홀 내려찍기",
+  "label": "예고 시간(초)",
+  "hint": "홀 내려찍기: 안쪽 원이 예고되는 시간"
+ },
+ "BOSS_LORD.scepterRadius": {
+  "boss": "군주",
+  "skill": "홀 내려찍기",
+  "label": "반경",
+  "hint": "안쪽 원 반지름"
+ },
+ "BOSS_LORD.scepterWave": {
+  "boss": "군주",
+  "skill": "홀 내려찍기",
+  "label": "충격파가 퍼지는 바깥 반지름",
+  "hint": "충격파가 퍼지는 바깥 반지름"
+ },
+ "BOSS_LORD.scepterDmg": {
+  "boss": "군주",
+  "skill": "홀 내려찍기",
+  "label": "피해 배율",
+  "hint": ""
+ },
+ "BOSS_LORD.scepterWaveDmg": {
+  "boss": "군주",
+  "skill": "홀 내려찍기",
+  "label": "피해 배율",
+  "hint": ""
+ },
+ "BOSS_LORD.scepterKnock": {
+  "boss": "군주",
+  "skill": "홀 내려찍기",
+  "label": "넉백 거리",
+  "hint": ""
+ },
+ "BOSS_LORD.scepterWaveDelay": {
+  "boss": "군주",
+  "skill": "홀 내려찍기",
+  "label": "대기(초)",
+  "hint": "안쪽 원 뒤 충격파까지"
+ },
+ "BOSS_LORD.scepterCd": {
+  "boss": "군주",
+  "skill": "홀 내려찍기",
+  "label": "재사용 대기(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.rallySec": {
+  "boss": "군주",
+  "skill": "호령",
+  "label": "지속 시간(초)",
+  "hint": "호령: 필드 졸개가 강해지는 시간"
+ },
+ "BOSS_LORD.rallyMult": {
+  "boss": "군주",
+  "skill": "호령",
+  "label": "배율",
+  "hint": "졸개 피해 배율"
+ },
+ "BOSS_LORD.rallyCd": {
+  "boss": "군주",
+  "skill": "호령",
+  "label": "재사용 대기(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.executeTele": {
+  "boss": "군주",
+  "skill": "처형령",
+  "label": "예고 시간(초)",
+  "hint": "처형령: 벼락까지 카운트다운(초)"
+ },
+ "BOSS_LORD.executeWards": {
+  "boss": "군주",
+  "skill": "처형령",
+  "label": "결계 수",
+  "hint": "결계 수"
+ },
+ "BOSS_LORD.executeWardRadius": {
+  "boss": "군주",
+  "skill": "처형령",
+  "label": "반경",
+  "hint": ""
+ },
+ "BOSS_LORD.executePct": {
+  "boss": "군주",
+  "skill": "처형령",
+  "label": "결계 밖 대상이 입는 피해",
+  "hint": "결계 밖 대상이 입는 피해(최대 체력 비율)"
+ },
+ "BOSS_LORD.executeHp": {
+  "boss": "군주",
+  "skill": "처형령",
+  "label": "체력 비율",
+  "hint": "군주 체력이 이 비율 이하일 때부터"
+ },
+ "BOSS_LORD.executeCd": {
+  "boss": "군주",
+  "skill": "처형령",
+  "label": "재사용 대기(초)",
+  "hint": ""
+ },
  "BOSS_LORD.waveFirst": {
   "boss": "군주",
   "skill": "필드 졸개 물량",

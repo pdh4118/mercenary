@@ -237,6 +237,13 @@ export class BossSystem {
     if (knock > 0) this.knock(f, ang, knock);
   }
 
+  /** 대상의 최대 체력 비율만큼 피해를 준다(처형령 벼락) */
+  pctHit(e: Enemy, foe: Foe, pct: number): void {
+    const f = foe.f;
+    const maxHp = f.merc ? (this.g as any).mercStats(f.merc).hp as number : this.g.slots.get(f.ownerId)?.state.maxHp ?? 100;
+    this.hitFriendly(e, f, (maxHp * pct) / Math.max(1, this.base(e)), 0);
+  }
+
   hitFoe(e: Enemy, foe: Foe, mult: number, knock = 0, charge = 0): void {
     this.hitFriendly(e, foe.f, mult, knock, charge);
   }

@@ -40,6 +40,10 @@ export const BSK_OIL = 41; // 군주: 끓는 기름
 export const BSK_ARROWSTORM = 42; // 군주: 화살 소나기
 export const BSK_SORTIE = 43; // 군주: 성문 개방 돌격
 export const BSK_EDICT = 44; // 군주: 칙령
+export const BSK_GUARDS = 45; // 군주: 근위대 소집
+export const BSK_SCEPTER = 46; // 군주: 홀 내려찍기
+export const BSK_RALLY = 47; // 군주: 호령
+export const BSK_EXECUTE = 48; // 군주: 처형령
 export const BSK_DRIFT = 32; // 전차: 급선회 파쇄
 export const BSK_RAMPAGE = 33; // 전차: 폭주
 export const BSK_FOG = 34; // 네크로맨서: 암흑 안개
@@ -89,6 +93,10 @@ export const BOSS_SKILL_NAMES: Record<number, string> = {
   [BSK_ARROWSTORM]: "화살 소나기",
   [BSK_SORTIE]: "성문 개방 돌격",
   [BSK_EDICT]: "칙령",
+  [BSK_GUARDS]: "근위대 소집",
+  [BSK_SCEPTER]: "홀 내려찍기",
+  [BSK_RALLY]: "호령",
+  [BSK_EXECUTE]: "처형령",
   [BSK_DRIFT]: "급선회 파쇄",
   [BSK_RAMPAGE]: "폭주",
 };
@@ -121,6 +129,8 @@ export const HZ_CHAIN = 12; // 영혼 사슬: 위치 = 보스, 방향 = 대상 �
 export const HZ_DRAINRING = 13; // 생명 흡수 범위 고리: a = 반지름(예고 중에는 state 0)
 export const HZ_CALTROP = 14; // 마름쇠: a = 반지름(예고 중에는 state 0), 밟으면 피해와 둔화
 export const HZ_GATE = 15; // 성문(공성전): 위치 = 성문 중심, a = 반길이, b = 남은 체력 %
+export const HZ_WARD = 18; // 결계(처형령에서 안전한 곳): a = 반지름
+export const HZ_EXECUTE = 19; // 처형령: 예고(state 0) 동안 화면이 어두워지고 끝나면 벼락. a = 0
 export const HZ_EDICT = 17; // 칙령(공성전): a = 규칙(1 진군령, 2 분산령), 예고(state 0) 뒤 규칙이 적용된다. 위치는 군주
 export const HZ_OIL = 16; // 끓는 기름 장판(공성전): a = 반지름(예고 중에는 state 0)
 export const HZ_RING = 8; // 퍼지는 불꽃 고리: a = 현재 반지름, b = 틈 반각(라디안), 방향 = 틈 중심
@@ -643,6 +653,27 @@ export const BOSS_LORD = {
   edictDmg: 3, // 위반했을 때 번개 피해(배율)
   edictSpreadGate: 60, // 분산령은 성문 체력이 이 % 이하일 때부터
   edictCd: 26,
+  guardsCd: 30, // 근위대 소집(성문이 부서진 뒤 안마당 단계)
+  guardsReduce: 0.2, // 근위대 한 명이 살아 있을 때마다 군주가 받는 피해 감소 비율
+  guardsHp: 2, // 근위대 체력 배율
+  guardsDmg: 1.2,
+  scepterTele: 1.0, // 홀 내려찍기: 안쪽 원이 예고되는 시간
+  scepterRadius: 240, // 안쪽 원 반지름
+  scepterWave: 440, // 충격파가 퍼지는 바깥 반지름
+  scepterDmg: 5,
+  scepterWaveDmg: 4,
+  scepterKnock: 240,
+  scepterWaveDelay: 0.6, // 안쪽 원 뒤 충격파까지
+  scepterCd: 9,
+  rallySec: 6, // 호령: 필드 졸개가 강해지는 시간
+  rallyMult: 1.6, // 졸개 피해 배율
+  rallyCd: 22,
+  executeTele: 3, // 처형령: 벼락까지 카운트다운(초)
+  executeWards: 5, // 결계 수
+  executeWardRadius: 120,
+  executePct: 0.7, // 결계 밖 대상이 입는 피해(최대 체력 비율)
+  executeHp: 0.3, // 군주 체력이 이 비율 이하일 때부터
+  executeCd: 28,
   // 물량: 보스 단계 동안 아래쪽에서 끊임없이 몰려온다
   waveFirst: 6, // 첫 무리까지(초)
   waveGapStart: 7, // 무리 사이 간격(처음)

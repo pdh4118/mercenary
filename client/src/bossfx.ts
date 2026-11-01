@@ -72,6 +72,8 @@ import {
   HZ_CALTROP,
   HZ_OIL,
   HZ_EDICT,
+  HZ_WARD,
+  HZ_EXECUTE,
   HZ_GHOST,
   HZ_ICE,
   HZ_MACE,
@@ -833,6 +835,20 @@ export async function createBossFx(d: BossFxDeps) {
   /** 지금 걸려 있는 칙령(공성전): rule 1 진군령, 2 분산령. grace면 아직 예고 */
   let edictNow: { rule: number; left: number; grace: boolean } | null = null;
 
+  /** 결계(처형령에서 안전한 곳): 푸른 빛의 원과 돌아가는 룬 */
+  const drawWard = (id: number, x: number, y: number, r: number, now: number): void => {
+    const pulse = 0.5 + 0.5 * Math.sin(now / 160 + id);
+    caltropG.ellipse(x, y, r, r * 0.72).fill({ color: 0x9ae0ff, alpha: 0.3 + 0.15 * pulse }).stroke({ width: 6, color: 0xe6f8ff, alpha: 1 });
+    caltropG.ellipse(x, y, r * 0.7, r * 0.5).stroke({ width: 2, color: 0x9ad8ff, alpha: 0.55 });
+    for (let i = 0; i < 6; i++) {
+      const a = now / 900 + (i * Math.PI) / 3;
+      caltropG.circle(x + Math.cos(a) * r * 0.85, y + Math.sin(a) * r * 0.61, 3).fill({ color: 0xe6f6ff, alpha: 0.9 });
+    }
+  };
+
+  /** 지금 진행 중인 처형령(공성전): left 남은 초, grace = 아직 카운트다운 중(끝나면 벼락과 함께 false가 되어 번쩍임이 남는다) */
+  let executeNow: { left: number; total: number; grace: boolean } | null = null;
+
   const frame = (bt: TeleWire[], hz: HazardWire[], stage: number, dtMs: number, now: number) => {
     drawWhirls(now);
     drawThrustCores(dtMs);
@@ -840,6 +856,7 @@ export async function createBossFx(d: BossFxDeps) {
     wallG.clear();
     caltropG.clear();
     edictNow = null;
+    executeNow = null;
     for (const gw of guardWalls) drawCurvedWall(gw.x + Math.cos(gw.ang) * 48, gw.y + 8 + Math.sin(gw.ang) * 48 * 0.6, gw.ang + Math.PI / 2, gw.ang, 96, 44, 104, 0.95, 100, now);
     guardWalls.length = 0;
     teleG.clear();
@@ -856,6 +873,14 @@ export async function createBossFx(d: BossFxDeps) {
       }
       if (kind === HZ_OIL) {
         drawOil(id, x, y, a, left, state, now);
+        continue;
+      }
+      if (kind === HZ_WARD) {
+        drawWard(id, x, y, a, now);
+        continue;
+      }
+      if (kind === HZ_EXECUTE) {
+        executeNow = { left: left / 10, total: total / 10, grace: state === 0 };
         continue;
       }
       if (kind === HZ_EDICT) {
@@ -1087,6 +1112,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, edict: () => edictNow, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
+  return { art, frame, edict: () => edictNow, execute: () => executeNow, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
 }
 
