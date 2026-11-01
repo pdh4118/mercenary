@@ -1059,3 +1059,17 @@ Four elite wall defenders in a row, black plate armor with purple cape and gold 
 (4) "post_mage_idle": the same mage standing at ease, staff planted on the ground.
 Each figure is drawn from the feet up with the feet clearly visible and flat (no ground, no shadow), so it can stand on a wall walkway.
 ```
+
+### 12-10. 성 안 수비대 3종(검방병·창병·둔기병) - 수비병 그림과 같은 크기·화풍
+
+```
+Hand-painted cartoon strategy-game character sheet, thick dark outlines, slightly desaturated colors, transparent background, generous empty margin (at least 20px) around every figure, no grid lines, no captions.
+Exactly the same camera, scale and style as the attached wall defender sheet (archer and mage): a straight-on front view slightly from above, each figure facing right, standing on flat feet with no ground and no shadow, about 330 px tall.
+Six royal castle garrison soldiers in a row, black plate armor with purple cape and gold trim, each with a caption below: 
+(1) "post_sword_idle": a sword-and-shield knight at ease, a tall black tower shield on the left arm, sword lowered.
+(2) "post_sword_atk": the same knight thrusting the sword forward, shield raised.
+(3) "post_spear_idle": a spearman at ease holding a long spear upright beside him, purple plume on the helmet.
+(4) "post_spear_atk": the same spearman thrusting the long spear forward at shoulder height.
+(5) "post_blunt_idle": a heavy mace soldier at ease, a huge spiked iron mace resting on the shoulder, bulkier armor with spiked pauldrons.
+(6) "post_blunt_atk": the same soldier swinging the huge mace overhead in a smashing blow.
+```

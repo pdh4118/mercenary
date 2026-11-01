@@ -1871,7 +1871,7 @@ export class Game {
     for (const [type, y] of rows) {
       for (let i = 0; i < per; i++) {
         const x = (i - (per - 1) / 2) * 46;
-        const e = this.makeEnemy(x, y, type, { hold: true, face: Math.PI / 2 });
+        const e = this.makeEnemy(x, y, type, { hold: true, elite: true, face: Math.PI / 2 });
         e.maxHp *= BOSS_LORD.garrisonHp;
         e.hp *= BOSS_LORD.garrisonHp;
         e.shield *= BOSS_LORD.garrisonHp;
