@@ -664,7 +664,7 @@ test("레벨업 선택: 효과가 적용되고 쌓인 선택이 이어서 뜬다
   const leadershipCard = CARDS.findIndex((c) => c.effect.k === "leadership" && c.effect.v === 1);
   p.offer = [leadershipCard, p.offer[1]!, p.offer[2]!];
   assert.equal(g.pick(a, 0), true);
-  assert.equal(p.leadership, TUNE.START_LEADERSHIP + 1);
+  assert.equal(p.leadership, TUNE.START_LEADERSHIP + 2 * TUNE.LEADERSHIP_PER_LEVEL + 1, "레벨업 2회 보너스 + 카드 +1");
   assert.equal(p.pending, 1);
   assert.equal(p.offer.length, OFFER_SIZE, "남은 선택이 이어서 뜬다");
   assert.equal(g.pick(a, 1), true);

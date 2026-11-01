@@ -145,7 +145,7 @@ export const CARD_TUNE = { globalFactor: 0.35, globalLifesteal: 5, globalWeight:
 /** 규모 카드(통솔력·고용 비용·경험치·행운·보상금·전리품): base는 일반 등급 효과량, weight는 일반 등급 뽑힐 가중치 */
 export const SCALE_CARD = {
   leadWeight: 40,
-  leadPctBase: 0.1,
+  leadPctBase: 0.07, // 일반 7%: 통솔력 약 14에서 +1 카드와 같아지고, 그보다 낮을 때는 +N 카드가 낫고 높을수록 % 카드가 낫다
   leadPctWeight: 14,
   priceBase: 0.15,
   priceWeight: 5,

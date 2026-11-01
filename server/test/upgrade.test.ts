@@ -638,7 +638,22 @@ test("통솔력 % 카드: 쌓인 통솔력 전체에 비율로 곱해지고 고�
   g.applyCardForTest(a, { k: "leadershipPct", v: 0.16 });
   assert.equal(p.leadership, 25, "20 x 1.26 = 25.2");
   g.applyCardForTest(a, { k: "leadership", v: 3 }); // 고정 증가도 비율이 곱해진다
-  assert.equal(p.leadership, 29, "23 x 1.26 = 28.98");
+  assert.equal(p.leadership, 28, "23 x 1.26 = 28.98(소수점은 버린다)");
+});
+
+test("통솔력: 레벨업마다 +1, % 카드는 통솔력이 낮을 때 +N 카드보다 약하고 높을수록 강하다", () => {
+  const g = new Game(() => 0.999);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  g.giveXp(a, p.xpNeed); // 1레벨 업
+  assert.equal(p.leadership, TUNE.START_LEADERSHIP + TUNE.LEADERSHIP_PER_LEVEL);
+  const common = CARDS.find((c) => c.effect.k === "leadershipPct" && c.rarity === 0)!.effect as { v: number };
+  const before = p.leadership;
+  g.applyCardForTest(a, { k: "leadershipPct", v: common.v });
+  assert.ok(p.leadership - before < 1, "통솔력이 낮을 때 일반 % 카드는 +1 카드보다 약하다(소수점 버림)");
+  g.addLeadership(a, 24); // 30
+  assert.ok(p.leadership - Math.floor(30) >= 2, `통솔력이 높으면 % 카드가 +1 카드보다 강하다(${p.leadership})`);
 });
 
 test("근접 반사는 공격력(%)과 흡혈도 받는다", () => {

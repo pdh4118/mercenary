@@ -1224,9 +1224,9 @@ export class Game {
     this.recalcLeadership(s);
   }
 
-  /** 통솔력 = (시작값 + 카드로 얻은 고정 증가) x (1 + 비율 카드 합), 반올림 */
+  /** 통솔력 = (시작값 + 레벨업·카드로 얻은 고정 증가) x (1 + 비율 카드 합), 소수점은 버린다(통솔력이 낮을 때는 % 카드가 +N 카드보다 약하다) */
   private recalcLeadership(s: Slot): void {
-    s.state.leadership = Math.round((TUNE.START_LEADERSHIP + s.leadFlat) * (1 + s.leadPct));
+    s.state.leadership = Math.floor((TUNE.START_LEADERSHIP + s.leadFlat) * (1 + s.leadPct) + 1e-6);
   }
 
   step(): void {
@@ -5373,10 +5373,12 @@ export class Game {
       p.level++;
       p.maxHp += TUNE.HERO_HP_PER_LEVEL;
       p.hp += TUNE.HERO_HP_PER_LEVEL;
+      s.leadFlat += TUNE.LEADERSHIP_PER_LEVEL; // 레벨업마다 통솔력
       p.xpNeed = xpNeeded(p.level);
       p.pending++;
       leveled = true;
     }
+    if (leveled) this.recalcLeadership(s);
     if (leveled && !p.down) this.levelUpPush(p);
     if (p.pending > 0 && p.offer.length === 0) p.offer = this.rollOffer(s);
   }

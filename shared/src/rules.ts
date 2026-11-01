@@ -112,6 +112,7 @@ export const TUNE = {
   SPEAR_HALF_WIDTH_NEAR: 15, // 몸 바로 앞의 반폭(px)
   SPEAR_HALF_WIDTH_FAR: 15, // 사거리 끝의 반폭(px)
   CAV_HALF_WIDTH: 20, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
+  LEADERSHIP_PER_LEVEL: 1, // 주인공 레벨업 1회당 통솔력 증가
   HERO_HP_PER_LEVEL: 10, // 주인공 레벨업 1회당 최대 체력 증가
   PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s
