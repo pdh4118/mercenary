@@ -1082,7 +1082,7 @@ export async function createBossFx(d: BossFxDeps) {
             v.high = behind;
             (behind ? d.highLayer : d.standLayer).addChild(sp);
           }
-          v.see = (v.see ?? 1) + ((behind ? 0.5 : 1) - (v.see ?? 1)) * 0.25;
+          v.see = (v.see ?? 1) + ((behind ? 0.5 : 1) - (v.see ?? 1)) * (behind ? 0.7 : 0.12); // 투명해질 때는 거의 바로, 돌아올 때만 서서히
           sp.alpha *= v.see;
         }
       }

@@ -121,7 +121,7 @@ export function createCastle(layer: Container, high: Container): Castle {
         isHigh = wantHigh;
         for (const c of [front, towers]) (wantHigh ? high : layer).addChild(c);
       }
-      seeThru += ((wantHigh ? 0.5 : 1) - seeThru) * 0.2; // 가려질 때 반투명으로 서서히 바뀐다
+      seeThru += ((wantHigh ? 0.5 : 1) - seeThru) * (wantHigh ? 0.7 : 0.12); // 가려질 때는 거의 바로, 돌아올 때만 서서히
       const rise = ease(clamp01(reveal));
       back.visible = front.visible = towers.visible = rise > 0.02;
       for (const c of [back, front, towers]) {

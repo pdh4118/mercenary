@@ -333,6 +333,11 @@ async function main() {
     .cut();
   world.addChild(ground, outside, border, terrainFlat, terrainLow);
 
+  /** 유닛에 가려질 때의 투명 전환: 투명해질 때는 거의 바로(0.05초), 돌아올 때만 서서히(0.2초) */
+  const seeThru = (cur: number, behind: boolean): number => {
+    const target = behind ? 0.5 : 1;
+    return cur + (target - cur) * (behind ? 0.7 : 0.12);
+  };
   const campLayer = new Container();
   const enemyLayer = new Container();
   const fxLayer = new Graphics(); // 공격 예고 부채꼴
@@ -3126,7 +3131,7 @@ async function main() {
             pc.high = behind;
             (behind ? terrainHigh : terrainLow).addChild(pc.sp);
           }
-          pc.sp.alpha += ((behind ? 0.5 : 1) - pc.sp.alpha) * 0.25; // 유닛을 가리면 반투명
+          pc.sp.alpha = seeThru(pc.sp.alpha, behind); // 유닛을 가리면 반투명
         }
         for (let k = n; k < pcs.length; k++) pcs[k]!.sp.destroy();
         pcs.length = n;
@@ -3435,7 +3440,7 @@ async function main() {
           tv.high = behind;
           (behind ? terrainHigh : terrainLow).addChild(tv.sp);
         }
-        if (!(latest?.g?.siege && inCastleZone(tv.x, tv.footY))) tv.sp.alpha += ((behind ? 0.5 : 1) - tv.sp.alpha) * 0.25; // 유닛을 가리면 반투명해져 위치가 보인다
+        if (!(latest?.g?.siege && inCastleZone(tv.x, tv.footY))) tv.sp.alpha = seeThru(tv.sp.alpha, behind); // 유닛을 가리면 반투명해져 위치가 보인다
       }
     }
     // 카메라와 HUD
