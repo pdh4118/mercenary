@@ -283,7 +283,7 @@ import {
 import { resolveHit, type Hit, type HitResult } from "./combat.js";
 import { BossSystem } from "./boss/system.js";
 import type { BossKitState } from "./boss/types.js";
-import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, SIEGE, castleSolids, inCastleZone, type SiegeInfo } from "@mercenary/shared";
+import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, RAMP_Y, SIEGE, WALL_STRIP_HALF, WALL_STRIP_Y0, WALL_STRIP_Y1, castleSolids, clampToWallTop, inCastleZone, rampSideAt, wallX, type SiegeInfo } from "@mercenary/shared";
 import { SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
@@ -804,7 +804,7 @@ export class Game {
   terrain: TerrainMap | null = null;
   /** 공성전(스테이지 10): 성이 드러나는 중이거나 드러난 상태. 아니면 null */
   siege: { t: number; solid: boolean; open: boolean; waveT: number; clock: number; sortieT: number } | null = null;
-  private terrainTrack: { o: { x: number; y: number }; px: number; py: number; r: number }[] = [];
+  private terrainTrack: { o: { x: number; y: number }; px: number; py: number; r: number; en?: boolean }[] = [];
 
   /** 이번 판의 지형을 새로 만든다(시작 지점 둘레는 비워 둔다) */
   generateTerrain(): TerrainWire[] {
@@ -827,7 +827,7 @@ export class Game {
     const tr = this.terrainTrack;
     for (const s of this.slots.values()) if (!s.state.down) tr.push({ o: s.state, px: s.state.x, py: s.state.y, r: PLAYER_RADIUS });
     for (const m of this.mercs.values()) if (m.respawn <= 0) tr.push({ o: m, px: m.x, py: m.y, r: MERC_STATS[m.type]!.radius });
-    for (const e of this.enemies.values()) tr.push({ o: e, px: e.x, py: e.y, r: radiusOf(e) });
+    for (const e of this.enemies.values()) tr.push({ o: e, px: e.x, py: e.y, r: radiusOf(e), en: true });
   }
 
   /** 고지대·비탈에서는 이번 틱에 움직인 만큼을 줄이고, 통과할 수 없는 지형 밖으로 밀어낸다 */
@@ -849,7 +849,23 @@ export class Game {
           y = u.py + dy * f;
         }
       }
-      [x, y] = t.pushOut(x, y, u.r);
+      // 공성전: 성문이 부서진 뒤에는 안뜰의 계단으로 성벽 위에 오를 수 있다(주인공·용병만). 위에서는 통로 안에 갇힌다.
+      let pass = -1;
+      if (this.siege?.open && !u.en) {
+        const wo = o as { wall?: boolean };
+        const rs = rampSideAt(x, y);
+        if (rs !== 0) {
+          const along = Math.abs(x - wallX(rs));
+          if (!wo.wall && along <= 40) wo.wall = true; // 계단 위쪽 끝에 닿으면 성벽 위에 올라선다
+          else if (wo.wall && along >= 110) wo.wall = false; // 계단 아래쪽 끝에 닿으면 내려온다
+        }
+        if (wo.wall) {
+          const side = x < SIEGE.cx ? -1 : 1;
+          [x, y] = clampToWallTop(side, x, y);
+        }
+        if (wo.wall || rs !== 0) pass = this.terrain!.items.length + 7;
+      }
+      [x, y] = t.pushOut(x, y, u.r, pass);
       o.x = x;
       o.y = y;
     }
@@ -1748,7 +1764,36 @@ export class Game {
 
   /** 성문이 부서졌다(장군 시스템이 부른다) */
   siegeGateBroken(): void {
-    if (this.siege) this.siege.open = true;
+    if (!this.siege || this.siege.open) return;
+    this.siege.open = true;
+    // 성벽 윗면 통로는 높은 곳이다(아래에서 올려다보며 쏘면 약하고, 위에서 쏘면 강하다)
+    for (const side of [-1, 1]) this.terrain?.addHighRect(wallX(side) - WALL_STRIP_HALF, WALL_STRIP_Y0, wallX(side) + WALL_STRIP_HALF, WALL_STRIP_Y1);
+  }
+
+  /** 성문이 부서진 뒤 안뜰의 아군 궁병 용병은 가까운 계단으로 성벽에 올라 통로에 흩어져 선다 */
+  private stepWallArchers(): void {
+    const s = this.siege;
+    if (!s?.open || this.phase === "tournament") return;
+    for (const m of this.mercs.values()) {
+      const wo = m as unknown as { wall?: boolean; climb?: boolean };
+      if (m.type !== ARCHER || m.respawn > 0) continue;
+      if (m.cmd) continue;
+      wo.climb = false;
+      const slotY = WALL_STRIP_Y0 + 40 + (((m.id * 53) % 100) / 100) * (WALL_STRIP_Y1 - WALL_STRIP_Y0 - 80);
+      if (wo.wall) {
+        const side = m.x < SIEGE.cx ? -1 : 1;
+        if (Math.abs(m.y - slotY) > 30) {
+          m.cmd = { kind: "move", type: 0, x: wallX(side), y: slotY, left: 8 };
+          wo.climb = true;
+        }
+        continue;
+      }
+      // 안뜰(성 안)에 있는 궁병만 오른다
+      if (Math.abs(m.x - SIEGE.cx) > SIEGE.hw - 60 || Math.abs(m.y - SIEGE.cy) > SIEGE.hh - 40) continue;
+      const side = m.x < SIEGE.cx ? -1 : 1;
+      m.cmd = { kind: "move", type: 0, x: wallX(side), y: RAMP_Y, left: 12 };
+      wo.climb = true;
+    }
   }
 
   private siegeInfo(): SiegeInfo | null {
@@ -1766,6 +1811,7 @@ export class Game {
     s.sortieT = Math.max(0, s.sortieT - dt);
     if (!s.solid && s.t >= SIEGE.revealSec * SIEGE.solidAt) this.siegeSolidify();
     if (s.open || this.phase === "boss") this.leashGuards();
+    this.stepWallArchers();
     if (this.phase === "boss" && this.autoSpawn) this.stepSiegeWaves(dt);
   }
 
@@ -4815,6 +4861,12 @@ export class Game {
     const d = Math.hypot(tx - f.x, ty - f.y);
     if (d <= stop) return false;
     const step = Math.min(speed * dt, d - stop);
+    if ((f as { climb?: boolean }).climb) {
+      // 성벽에 오르는 중: 성벽 충돌을 피해 돌아가지 않고 계단 쪽으로 곧장 간다(성벽 위 이동은 terrainEnd가 통로 안으로 가둔다)
+      f.x += ((tx - f.x) / d) * step;
+      f.y += ((ty - f.y) / d) * step;
+      return true;
+    }
     const [wx, wy] = this.navGoal(f, tx, ty);
     const wd = Math.hypot(wx - f.x, wy - f.y) || 1;
     const [ux, uy] = this.detour(f, (wx - f.x) / wd, (wy - f.y) / wd, step, dt);

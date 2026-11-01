@@ -68,6 +68,54 @@ export function inCastleZone(x: number, y: number, extra = 0): boolean {
 /** 성 안마당(군주가 서 있는 곳 둘레)인가 */
 export const inCourtyard = (x: number, y: number): boolean => Math.abs(x - SIEGE.cx) < SIEGE.hw - 70 && Math.abs(y - SIEGE.cy) < SIEGE.hh - 70;
 
+/**
+ * 성벽 위(동·서 성벽의 윗면 통로)와 오르는 계단. 성문이 부서진 뒤 안뜰의 계단으로만 오를 수 있다.
+ * 계단 상자(ramp)는 성벽 안쪽에 붙은 가로로 긴 상자이고, 성벽 윗면(strip)은 성벽 중심선을 따라 세로로 긴 상자이다.
+ */
+export const WALL_X = SIEGE.hw - 30; // 동·서 성벽 중심선의 중심에서의 거리
+export const WALL_STRIP_HALF = 30; // 성벽 윗면 통로의 절반 폭
+export const WALL_STRIP_Y0 = SIEGE.cy - (SIEGE.hh - 30) + 90; // 통로가 시작하는 y(모서리 탑 아래)
+export const WALL_STRIP_Y1 = SIEGE.cy + (SIEGE.hh - 30) - 90;
+export const RAMP_Y = SIEGE.cy; // 계단의 가운데 y
+export const RAMP_HALF = 38; // 계단 절반 폭(세로)
+export const RAMP_LEN = 170; // 계단 길이(성벽에서 안뜰 쪽으로)
+
+/** side: -1 서쪽, 1 동쪽. 성벽 중심선 x */
+export const wallX = (side: number): number => SIEGE.cx + side * WALL_X;
+
+/** 계단 상자 안에 있는가. 어느 쪽 계단인지(-1·1), 아니면 0 */
+export function rampSideAt(x: number, y: number): number {
+  if (Math.abs(y - RAMP_Y) > RAMP_HALF) return 0;
+  for (const side of [-1, 1]) {
+    const wx = wallX(side);
+    const inward = (x - wx) * -side; // 성벽에서 안뜰 쪽으로 잰 거리(안뜰 쪽이 +)
+    if (inward >= -WALL_STRIP_HALF && inward <= RAMP_LEN) return side;
+  }
+  return 0;
+}
+
+/** 성벽 윗면 통로 안에 있는가(어느 쪽인지, 아니면 0) */
+export function stripSideAt(x: number, y: number): number {
+  if (y < WALL_STRIP_Y0 || y > WALL_STRIP_Y1) return 0;
+  for (const side of [-1, 1]) if (Math.abs(x - wallX(side)) <= WALL_STRIP_HALF) return side;
+  return 0;
+}
+
+/** 성벽 위에 서 있는 대상을 통로와 계단 안으로 가둔다(둘 중 가까운 쪽으로 끌어 넣는다) */
+export function clampToWallTop(side: number, x: number, y: number): [number, number] {
+  const wx = wallX(side);
+  const clampStrip = (): [number, number] => [Math.max(wx - WALL_STRIP_HALF, Math.min(wx + WALL_STRIP_HALF, x)), Math.max(WALL_STRIP_Y0, Math.min(WALL_STRIP_Y1, y))];
+  const inwardMin = -WALL_STRIP_HALF;
+  const inward = (x - wx) * -side;
+  const clampRamp = (): [number, number] => {
+    const iw = Math.max(inwardMin, Math.min(RAMP_LEN, inward));
+    return [wx + iw * -side, Math.max(RAMP_Y - RAMP_HALF, Math.min(RAMP_Y + RAMP_HALF, y))];
+  };
+  const a = clampStrip();
+  const b = clampRamp();
+  return Math.hypot(a[0] - x, a[1] - y) <= Math.hypot(b[0] - x, b[1] - y) ? a : b;
+}
+
 /** 공성전 진행 정보(스테이지 10에서만 있다) */
 export interface SiegeInfo {
   reveal: number; // 성이 드러난 정도 0..100

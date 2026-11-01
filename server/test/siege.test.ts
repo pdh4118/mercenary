@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BOSS_CAV, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_WARD, BOSS_LORD, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, HZ_EDICT, GATE_X, GATE_Y, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TICK_RATE, castleSolids, inCastleZone } from "@mercenary/shared";
+import { RAMP_Y, WALL_STRIP_HALF, wallX, BOSS_CAV, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_WARD, BOSS_LORD, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, HZ_EDICT, GATE_X, GATE_Y, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TICK_RATE, castleSolids, inCastleZone } from "@mercenary/shared";
+import { ARCHER } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -278,4 +279,53 @@ test("공성전 안뜰: 근위대는 군주에게서 일정 범위 안에서만 
     for (const e of (g as any).enemies.values()) if (e.guard) far = Math.max(far, Math.hypot(e.x - SIEGE.lordX, e.y - SIEGE.lordY));
   }
   assert.ok(far <= BOSS_LORD.guardsLeash + 60, `근위대가 범위를 넘지 않는다(${Math.round(far)})`);
+});
+
+test("공성전 성벽 위: 성문이 부서지기 전에는 오를 수 없고, 부서진 뒤 안뜰 계단으로 올라 통로 안에 갇힌다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  const wx = wallX(-1);
+  p.x = wx + 120;
+  p.y = RAMP_Y;
+  /** 목표 쪽으로 한 틱에 6px씩 걸어간다(지금 위치에서 이어서 움직인다) */
+  const walkTo = (tx: number, ty: number, ticks = 80) => {
+    for (let i = 0; i < ticks; i++) {
+      const dx = tx - p.x;
+      const dy = ty - p.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 4) break;
+      p.x += (dx / d) * Math.min(6, d);
+      p.y += (dy / d) * Math.min(6, d);
+      g.step();
+      p.hp = p.maxHp;
+    }
+  };
+  walkTo(wx - 20, RAMP_Y);
+  assert.ok(p.x > wx + 20, `성문이 있으면 성벽에 막힌다(${Math.round(p.x)})`);
+  assert.ok(!(p as any).wall);
+  openGate(g);
+  walkTo(wx + 10, RAMP_Y);
+  assert.ok((p as any).wall, "계단 끝에서 성벽 위에 올라선다");
+  walkTo(wx, RAMP_Y - 200); // 통로를 따라 위로
+  assert.ok(Math.abs(p.x - wx) <= WALL_STRIP_HALF + 1, `통로 안에 갇힌다(${Math.round(p.x)})`);
+  assert.ok((g as any).terrain.elevated(p.x, p.y), "성벽 위는 높은 곳");
+  walkTo(wx + 80, p.y, 12); // 통로 밖(안뜰 쪽)으로 나가려 해도 못 나간다
+  assert.ok(Math.abs(p.x - wx) <= WALL_STRIP_HALF + 1, `통로 밖으로 못 나간다(${Math.round(p.x)})`);
+  walkTo(wx, RAMP_Y); // 계단으로 돌아와
+  walkTo(wx + 140, RAMP_Y); // 안뜰로 내려온다
+  assert.ok(!(p as any).wall, "계단 아래에서 내려온다");
+});
+
+test("공성전 성벽 위: 안뜰의 궁병 용병은 스스로 계단을 올라 성벽 위에 선다", () => {
+  const { g, a } = setup(0);
+  g.getPlayer(a)!.maxHp = g.getPlayer(a)!.hp = 1e9;
+  openGate(g);
+  const id = g.addMerc(a, ARCHER, wallX(-1) + 90, RAMP_Y + 30);
+  const m = (g as any).mercs.get(id);
+  for (let i = 0; i < TICK_RATE * 14 && !m.wall; i++) {
+    g.step();
+    g.getPlayer(a)!.hp = g.getPlayer(a)!.maxHp;
+  }
+  assert.ok(m.wall, "궁병이 성벽 위에 올랐다");
 });

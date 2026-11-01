@@ -1,5 +1,5 @@
 import { Assets, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
-import { GATE_X, GATE_Y, SIEGE, castleSolids } from "@mercenary/shared";
+import { GATE_X, GATE_Y, RAMP_HALF, RAMP_LEN, RAMP_Y, SIEGE, castleSolids, wallX } from "@mercenary/shared";
 
 const CASTLE_TEX = ["boss10_wall_a", "boss10_wall_b", "boss10_wall_c", "boss10_tower", "boss10_gate_0", "boss10_gate_1", "boss10_gate_2", "boss10_gate_open", "boss10_gate_ruin", "boss10_wall_side_a", "boss10_wall_side_b", "boss10_wall_side_c", "boss10_wall_side_end", "boss10_wall_front_a", "boss10_wall_front_b", "boss10_wall_front_c", "boss10_wall_side2_a", "boss10_wall_side2_b", "boss10_wall_side2_c", "boss10_tower_round"] as const;
 
@@ -115,6 +115,32 @@ export function createCastle(layer: Container): Castle {
   Promise.all(CASTLE_TEX.map((n) => Assets.load<Texture>(`assets/fx/${n}.png`).then((t) => (tex[n] = t)).catch(() => (tex[n] = null)))).then(() => {
     if (tex.boss10_wall_a && tex.boss10_tower && tex.boss10_gate_0) buildSprites();
   });
+
+  // 성문이 부서진 뒤 안뜰에 드러나는 계단(성벽 위로 오르는 길): 그림 없이 코드로 그린다(바닥에 깔린 돌계단)
+  const stairsG = new Graphics();
+  stairsG.zIndex = RAMP_Y - 380;
+  layer.addChild(stairsG);
+  let stairsDrawn = false;
+  const drawStairs = (): void => {
+    stairsDrawn = true;
+    const g = stairsG.clear();
+    for (const side of [-1, 1]) {
+      const wx = wallX(side);
+      const n = 8;
+      const sl = RAMP_LEN / n;
+      for (let i = 0; i < n; i++) {
+        // 안뜰 쪽(i가 큼)이 낮고 성벽 쪽(i가 작음)이 높다: 성벽에 가까울수록 밝고 윗면 폭이 넓다
+        const x0 = wx + -side * i * sl;
+        const x1 = wx + -side * (i + 1) * sl;
+        const lx = Math.min(x0, x1);
+        const w = Math.abs(x1 - x0);
+        const lift = (n - i) * 2.2;
+        g.rect(lx, RAMP_Y - RAMP_HALF - lift, w, RAMP_HALF * 2).fill({ color: 0x8e93a3 + 0x040404 * (n - i), alpha: 1 }).stroke({ width: 1.5, color: 0x2a2d38, alpha: 0.9 });
+      }
+      g.rect(Math.min(wx, wx + -side * RAMP_LEN), RAMP_Y - RAMP_HALF - 18, RAMP_LEN, 8).fill({ color: 0x6f7486 }).stroke({ width: 1.5, color: 0x2a2d38 }); // 위쪽 난간
+      g.rect(Math.min(wx, wx + -side * RAMP_LEN), RAMP_Y + RAMP_HALF - 6, RAMP_LEN, 8).fill({ color: 0x6f7486 }).stroke({ width: 1.5, color: 0x2a2d38 }); // 아래쪽 난간
+    }
+  };
 
   const gateG = new Graphics();
   gateG.zIndex = GATE_Y + 30;
@@ -237,6 +263,8 @@ export function createCastle(layer: Container): Castle {
 
   return {
     update(reveal, gate, open, now, sortie) {
+      if (open && !stairsDrawn) drawStairs();
+      stairsG.visible = open;
       if (spritesOn) {
         for (let i = 0; i < pieces.length; i++) {
           const pc = pieces[i]!;
@@ -264,6 +292,7 @@ export function createCastle(layer: Container): Castle {
     destroy() {
       for (const pc of pieces) pc.sp.destroy();
       gateSp?.destroy();
+      stairsG.destroy();
       for (const b of blocks) b.g.destroy();
       gateG.destroy();
       gateLabel.destroy();

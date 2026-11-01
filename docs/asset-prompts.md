@@ -1039,3 +1039,10 @@ Also add one extra image captioned "boss10_wall_side_end": the same wall ending 
 받음·적용(베타 1.194): `assets/fx/boss10_wall_side_a~c`(옆 성벽 3종)와 `boss10_wall_side_end`(끝 마개, 아직 쓰지 않고 보관). 받은 그림은 비스듬한 등각 시점이라 정면 성벽과 시점이 조금 다르다.
 
 받음·적용(베타 1.195): `assets/fx/boss10_wall_front_a~c`(정면 성벽), `boss10_wall_side2_a~c`(윗면이 보이는 옆 성벽), `boss10_tower_round`(둥근 탑). 보관(아직 쓰지 않음): `boss10_wall_corner_left·right`, `boss10_wall_side2_end`, `boss10_stairs_left·right`(계단), `boss10_wall_archer_slot`(궁병 자리). 계단·궁병 자리는 성벽 위로 오르는 기능을 만들 때 쓴다.
+
+
+### 12-8. 성벽 시점 3차 요청(높이감 + 궁병이 설 통로)
+
+문제: 성벽이 납작해 높이감이 없고, 동서 성벽 윗면 통로가 좁아 궁병이 설 자리가 없어 보인다. 모든 조각을 **같은 카메라 규칙**으로 한 대화에서 이어서 요청한다(이미 받은 정면 성벽·탑 그림을 참고 이미지로 붙인다).
+
+공통 규칙: oblique (cabinet) projection, camera looks straight at the scene from the front and slightly down. Vertical faces face the viewer as flat undistorted rectangles. Ground depth is foreshortened to 0.5, so a walkway 100 units deep appears as a band 50 px tall on a front wall. Never isometric, never diagonal.

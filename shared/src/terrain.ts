@@ -170,7 +170,7 @@ export class TerrainMap {
   }
 
   /** 반지름 r인 몸이 통과할 수 없는 지형 밖으로 밀려난 위치. 안 겹치면 그대로. */
-  pushOut(x: number, y: number, r: number): [number, number] {
+  pushOut(x: number, y: number, r: number, passObj = -1): [number, number] {
     if (this.solids.length === 0) return [x, y];
     for (let pass = 0; pass < 3; pass++) {
       let moved = false;
@@ -182,7 +182,7 @@ export class TerrainMap {
           if (!cell) continue;
           for (const idx of cell) {
             const c = this.solids[idx]!;
-            if (!this.live(c.obj)) continue;
+            if (!this.live(c.obj) || c.obj === passObj) continue; // passObj: 이 물체는 통과한다(성벽 위로 오르는 아군)
             const dx = x - c.x;
             const dy = y - c.y;
             const min = c.r + r;
@@ -220,8 +220,15 @@ export class TerrainMap {
     return false;
   }
 
+  /** 판 도중에 생긴 높은 곳(성벽 윗면 통로): 상자 목록 */
+  private readonly highRects: { x0: number; y0: number; x1: number; y1: number }[] = [];
+  addHighRect(x0: number, y0: number, x1: number, y1: number): void {
+    this.highRects.push({ x0, y0, x1, y1 });
+  }
+
   /** 고지대 윗면에 서 있는가 */
   elevated(x: number, y: number): boolean {
+    for (const h of this.highRects) if (x >= h.x0 && x <= h.x1 && y >= h.y0 && y <= h.y1) return true;
     for (const p of this.plateaus) if (this.live(p.obj) && p.tops.some((t) => inEll(t, x, y))) return true;
     return false;
   }
