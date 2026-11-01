@@ -31,7 +31,7 @@ export const TOWERS: readonly (readonly [number, number])[] = [[-530, -1781], [5
 /** 안뜰 바닥 범위(성벽 안쪽) */
 export const COURT = { cx: 0, cy: -1540, hw: 330, hh: 100 } as const; // 그림에서 보이는 안뜰 바닥(남쪽 성벽 윗면 뒤는 가려진다)
 /** 남쪽 성벽 윗면 통로의 중심 y(그림에서 성벽 윗면이 보이는 높이 = 성벽 바닥보다 약 150 위) */
-export const SOUTH_TOP = RING.south - 150;
+export const SOUTH_TOP = RING.south - 190;
 
 export interface CastleSolid {
   x: number;

@@ -73,7 +73,6 @@ import {
   TerrainMap,
   inCastleZone,
   SIEGE,
-  SOUTH_TOP,
   RING,
   GATE_X,
   SPRITE_BY_ID,
@@ -2379,7 +2378,7 @@ async function main() {
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
         v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
       }
-      v.sprite.zIndex = ((w[14] ?? 0) & EF_POST) !== 0 && v.y > SOUTH_TOP - 28 ? v.y + 2000 : v.y; // 남쪽 성벽 윗면 위 수비병은 앞 층 성벽 위에 그린다
+      v.sprite.zIndex = v.y;
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
       if ((w[14] ?? 0) !== 0 || v.sprite.tint !== 0xffffff) {
         // 장군 상태 표시: 은신(거의 투명)·무적(황금빛)·기절·쉴드·궁지 등

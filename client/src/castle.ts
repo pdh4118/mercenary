@@ -20,7 +20,7 @@ const IMG_CX = 604.5; // 원본에서 성 중심 x
 const IMG_BASE = 810; // 원본에서 남쪽 성벽 앞면 바닥 y(성문 아치 바닥)
 const SX = 1.1; // 월드 px / 그림 px (가로)
 const SY = 0.95; // (세로: 내려다보는 시점이라 조금 낮춰 맞춘다)
-const FRONT_MID_Y = 538; // 원본에서 남쪽 성벽 윗면이 시작하는 y(이 아래가 앞 층)
+const FRONT_MID_Y = 604; // 남쪽 성벽 바깥쪽 성가퀴(요철)부터 앞 층: 윗면 통로 위에 선 수비병은 이 성가퀴 뒤로 하반신이 가려진다 // 원본에서 남쪽 성벽 윗면이 시작하는 y(이 아래가 앞 층)
 const FRONT_TOWER_Y = 470; // 남쪽 탑은 더 위에서부터 앞 층
 const MID_X0 = 250; // 원본에서 남쪽 성벽 가운데 구간
 const MID_X1 = 960;
@@ -38,8 +38,11 @@ export function createCastle(layer: Container): Castle {
   const front = new Container();
   front.zIndex = GATE_Y + 1;
   front.visible = false;
-  layer.addChild(back, front);
-  for (const c of [back, front]) {
+  const towers = new Container(); // 남쪽 탑: 성벽 위 수비병보다도 앞(수비병이 탑 기둥에 가려진다)
+  towers.zIndex = 1e5;
+  towers.visible = false;
+  layer.addChild(back, front, towers);
+  for (const c of [back, front, towers]) {
     c.pivot.set(0, baseY);
     c.position.set(0, baseY);
   }
@@ -67,16 +70,16 @@ export function createCastle(layer: Container): Castle {
     place(whole, CROP_X, CROP_Y);
     back.addChild(whole);
     // 앞 층: 남쪽 성벽 가운데 + 양쪽 탑(그림을 잘라 낸 조각)
-    const piece = (x0: number, y0: number, x1: number, y1: number): void => {
+    const piece = (x0: number, y0: number, x1: number, y1: number, into: Container = front): void => {
       const fx = x0 - CROP_X;
       const fy = y0 - CROP_Y;
       const sp = new Sprite(new Texture({ source: t.source, frame: new Rectangle(fx, fy, x1 - x0, y1 - y0) }));
       place(sp, x0, y0);
-      front.addChild(sp);
+      into.addChild(sp);
     };
     piece(MID_X0, FRONT_MID_Y, MID_X1, 858);
-    piece(CROP_X, FRONT_TOWER_Y, MID_X0, 858);
-    piece(MID_X1, FRONT_TOWER_Y, 1171, 858);
+    piece(CROP_X, FRONT_TOWER_Y, MID_X0, 858, towers);
+    piece(MID_X1, FRONT_TOWER_Y, 1171, 858, towers);
     if (tex.boss10_gate_0) {
       gateSp = new Sprite(tex.boss10_gate_0);
       gateSp.anchor.set(0.5, 1);
@@ -110,15 +113,17 @@ export function createCastle(layer: Container): Castle {
     update(reveal, gate, open, now, sortie) {
       if (!ready) return;
       const rise = ease(clamp01(reveal));
-      back.visible = front.visible = rise > 0.02;
-      back.scale.set(1, Math.max(0.01, rise));
-      front.scale.set(1, Math.max(0.01, rise));
-      back.alpha = front.alpha = Math.min(1, rise * 2.5);
+      back.visible = front.visible = towers.visible = rise > 0.02;
+      for (const c of [back, front, towers]) {
+        c.scale.set(1, Math.max(0.01, rise));
+        c.alpha = Math.min(1, rise * 2.5);
+      }
       drawGate(gate, open, rise >= 0.98, now, !!sortie);
     },
     destroy() {
       back.destroy({ children: true });
       front.destroy({ children: true });
+      towers.destroy({ children: true });
       gateG.destroy();
       gateLabel.destroy();
     },

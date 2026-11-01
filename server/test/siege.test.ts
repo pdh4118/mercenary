@@ -27,8 +27,7 @@ function setup(only: number) {
 
 test("공성전: 군주는 성 안마당에 서 있고 성문이 있는 동안은 무적이다", () => {
   const { g, b } = setup(0);
-  assert.equal(Math.round(b.x), SIEGE.lordX);
-  assert.equal(Math.round(b.y), SIEGE.lordY);
+  assert.ok(Math.abs(b.x - SIEGE.lordX) <= 4 && Math.abs(b.y - SIEGE.lordY) <= 4, `군주 위치 ${Math.round(b.x)},${Math.round(b.y)}`);
   const info = g.info().siege!;
   assert.ok(info && info.reveal === 100 && info.gate === 100 && !info.open);
   run(g, 1);

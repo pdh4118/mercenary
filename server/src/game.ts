@@ -1895,7 +1895,7 @@ export class Game {
   /** 성 안 수비대: 안뜰에 검방병·창병·둔기병이 열을 맞춰 서 있다가 성문이 뚫리면 움직인다 */
   private spawnGarrison(): number {
     const per = Math.min(BOSS_LORD.garrisonMax, BOSS_LORD.garrisonRow + BOSS_LORD.garrisonPerPlayer * Math.max(0, this.slots.size - 1));
-    const rows: [number, number][] = [[SHIELD, -1480], [SPEAR, -1520], [BLUNT, -1560]];
+    const rows: [number, number][] = [[SHIELD, -1555], [SPEAR, -1580], [BLUNT, -1605]];
     let made = 0;
     for (const [type, y] of rows) {
       for (let i = 0; i < per; i++) {
