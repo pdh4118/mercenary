@@ -1035,3 +1035,5 @@ Also add one extra image captioned "boss10_wall_side_end": the same wall ending 
 ```
 
 동쪽 성벽은 같은 그림을 좌우로 뒤집어 씁니다(그래서 **왼쪽 면만** 그리라고 했습니다).
+
+받음·적용(베타 1.194): `assets/fx/boss10_wall_side_a~c`(옆 성벽 3종)와 `boss10_wall_side_end`(끝 마개, 아직 쓰지 않고 보관). 받은 그림은 비스듬한 등각 시점이라 정면 성벽과 시점이 조금 다르다.
