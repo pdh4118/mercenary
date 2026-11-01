@@ -398,6 +398,7 @@ async function main() {
     maxX: number;
     maxY: number;
     high: boolean;
+    plat?: boolean; // 고지대(윗면이 있는 산): 평소엔 유닛 아래에 깔리고, 저지대 유닛이 뒤에 서 있을 때만 위로 올라온다
   }
   /** 로딩 화면: 처음 그림을 불러오는 동안과 판이 시작될 때 지형이 준비될 때까지 */
   const loadingEl = document.getElementById("loading")!;
@@ -431,7 +432,7 @@ async function main() {
       const solid = s.kind !== TK_PLATEAU && s.kind !== TK_DECOR;
       sp.zIndex = it[2];
       (solid ? terrainLow : terrainFlat).addChild(sp);
-      tviews.push({ sp, obj: n, solid, x: it[1], footY: it[2], halfW: (s.w / 2) * it[3], top: it[2] - ay * it[3], minX: Math.min(it[1] - ax * it[3] * (it[4] ? -1 : 1), it[1] + (s.w - ax) * it[3] * (it[4] ? -1 : 1)), maxX: Math.max(it[1] - ax * it[3] * (it[4] ? -1 : 1), it[1] + (s.w - ax) * it[3] * (it[4] ? -1 : 1)), maxY: it[2] + (s.h - ay) * it[3], high: false });
+      tviews.push({ sp, obj: n, solid, plat: s.kind === TK_PLATEAU, x: it[1], footY: it[2], halfW: (s.w / 2) * it[3], top: it[2] - ay * it[3], minX: Math.min(it[1] - ax * it[3] * (it[4] ? -1 : 1), it[1] + (s.w - ax) * it[3] * (it[4] ? -1 : 1)), maxX: Math.max(it[1] - ax * it[3] * (it[4] ? -1 : 1), it[1] + (s.w - ax) * it[3] * (it[4] ? -1 : 1)), maxY: it[2] + (s.h - ay) * it[3], high: false });
     });
   };
 
@@ -3428,6 +3429,33 @@ async function main() {
         const hh = app.screen.height / 2 + 80;
         const vis = tv.maxX > cx - hw && tv.minX < cx + hw && tv.maxY > cy - hh && tv.top < cy + hh && terrain.liveObj(tv.obj);
         tv.sp.visible = vis;
+        if (vis && tv.plat) {
+          // 고지대: 저지대 유닛이 산 뒤(북쪽)에 서 있을 때만 유닛 위로 올라와 반투명해진다.
+          // 고지대 윗면·비탈길·비탈에 유닛이 하나라도 있으면 가림을 끄고 지금처럼 아래에 깐다(올라선 유닛이 가려지지 않게).
+          const pl = terrain.plateaus.find((p) => p.obj === tv.obj);
+          let behind = false;
+          if (pl) {
+            const sl = pl.slope;
+            const inSlope = (x: number, y: number) => ((x - sl.x) / sl.rx) ** 2 + ((y - sl.y) / sl.ry) ** 2 <= 1.15;
+            let occupied = false;
+            let back = false;
+            const scan = (v: { x: number; y: number }) => {
+              if (v.x < tv.minX || v.x > tv.maxX || v.y > tv.maxY || v.y < tv.top) return;
+              if (terrain!.elevated(v.x, v.y) || terrain!.onRamp(v.x, v.y) || inSlope(v.x, v.y)) occupied = true;
+              else if (Math.abs(v.x - sl.x) < sl.rx && v.y < sl.y - sl.ry * 0.6) back = true; // 산 뒤쪽(북쪽) 저지대
+            };
+            for (const v of players.views.values()) scan(v);
+            for (const v of mercs.views.values()) scan(v);
+            for (const v of enemies.views.values()) scan(v);
+            behind = back && !occupied;
+          }
+          if (behind !== tv.high) {
+            tv.high = behind;
+            (behind ? terrainHigh : terrainFlat).addChild(tv.sp);
+          }
+          tv.sp.alpha = seeThru(tv.sp.alpha, behind);
+          continue;
+        }
         if (!vis || !tv.solid) continue;
         let behind = false;
         const check = (v: { x: number; y: number }) => {
