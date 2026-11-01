@@ -2357,13 +2357,13 @@ async function main() {
         v.sprite.anchor.set(0.5, 0.8);
         v.sprite.scale.set(SPRITE_SCALE * 1.25 * v.face, SPRITE_SCALE * 1.25);
         v.lastX = v.x;
-      } else if (((w[14] ?? 0) & EF_ELITE) !== 0 && bossFx.eliteTex[w[4]]) {
+      } else if (((w[14] ?? 0) & EF_ELITE) !== 0 && (bossFx.eliteTex[w[4]] || (w[4] === 4 && bossFx.postTex.blunt![0]))) {
         // 군주의 정예(근위대·성문 개방 돌격 기병): 전용 그림(방향은 좌우만)
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
-        const pt = ((w[14] ?? 0) & EF_POST) !== 0 ? (bossFx.postTex[w[4] === 5 ? "mage" : w[4] === 3 ? "sword" : w[4] === 1 ? "spear" : w[4] === 2 ? "archer" : "none"] ?? [])[w[5] > 0 ? 1 : 0] ?? null : null;
-        v.sprite.texture = pt ?? bossFx.eliteTex[w[4]]!;
+        const pt = ((w[14] ?? 0) & EF_POST) !== 0 ? (bossFx.postTex[w[4] === 5 ? "mage" : w[4] === 3 ? "sword" : w[4] === 1 ? "spear" : w[4] === 2 ? "archer" : w[4] === 4 ? "blunt" : "none"] ?? [])[w[5] > 0 ? 1 : 0] ?? null : null;
+        v.sprite.texture = (pt ?? bossFx.eliteTex[w[4]])!;
         v.sprite.anchor.set(0.5, pt ? 0.95 : 0.88);
-        const es = (pt ? 0.36 : w[4] === 0 ? 0.4 : 0.46) * size;
+        const es = (pt ? (w[4] === 4 ? 0.29 : 0.36) : w[4] === 0 ? 0.4 : 0.46) * size;
         v.sprite.scale.set(es * v.face, es);
         v.lastX = v.x;
         v.lastY = v.y;
