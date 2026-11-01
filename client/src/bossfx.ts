@@ -238,8 +238,8 @@ export async function createBossFx(d: BossFxDeps) {
     if (n) pendingLoads.push(loadTex(`assets/units/boss10_guard_${n}.png`).then((t) => (eliteTex[i] = t)));
   });
   /** 성벽 위 수비병 그림: [서 있는 모습, 쏘는 모습] */
-  const postTex: { archer: Tex[]; mage: Tex[] } = { archer: [null, null], mage: [null, null] };
-  (["archer_idle", "archer_aim", "mage_idle", "mage_cast"] as const).forEach((n, i) => pendingLoads.push(loadTex(`assets/units/boss10_post_${n}.png`).then((t) => (postTex[i < 2 ? "archer" : "mage"][i % 2] = t))));
+  const postTex: Record<string, Tex[]> = { archer: [null, null], mage: [null, null], sword: [null, null], spear: [null, null] };
+  (["archer_idle", "archer_aim", "mage_idle", "mage_cast", "sword_idle", "sword_atk", "spear_idle", "spear_atk"] as const).forEach((n, i) => pendingLoads.push(loadTex(`assets/units/boss10_post_${n}.png`).then((t) => (postTex[n.split("_")[0]!]![i % 2] = t))));
   const skelTex: Tex[] = ["cavalry", "spear", "archer", "sword", "blunt", "mage"].map(() => null);
   ["cavalry", "spear", "archer", "sword", "blunt", "mage"].forEach((n, i) => pendingLoads.push(loadTex(`assets/units/skel_${n}.png`).then((t) => (skelTex[i] = t))));
 

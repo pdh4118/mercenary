@@ -2360,7 +2360,7 @@ async function main() {
       } else if (((w[14] ?? 0) & EF_ELITE) !== 0 && bossFx.eliteTex[w[4]]) {
         // 군주의 정예(근위대·성문 개방 돌격 기병): 전용 그림(방향은 좌우만)
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
-        const pt = ((w[14] ?? 0) & EF_POST) !== 0 ? bossFx.postTex[w[4] === 5 ? "mage" : "archer"][w[5] > 0 ? 1 : 0] : null;
+        const pt = ((w[14] ?? 0) & EF_POST) !== 0 ? (bossFx.postTex[w[4] === 5 ? "mage" : w[4] === 3 ? "sword" : w[4] === 1 ? "spear" : w[4] === 2 ? "archer" : "none"] ?? [])[w[5] > 0 ? 1 : 0] ?? null : null;
         v.sprite.texture = pt ?? bossFx.eliteTex[w[4]]!;
         v.sprite.anchor.set(0.5, pt ? 0.95 : 0.88);
         const es = (pt ? 0.36 : w[4] === 0 ? 0.4 : 0.46) * size;

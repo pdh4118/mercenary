@@ -495,6 +495,7 @@ export interface Enemy extends Fighter {
   buffMult?: number; // 그 강화로 올려 둔 피해 배율(끝나면 이만큼 나눈다. 없으면 돌격 함성 값)
   elite?: boolean; // 군주의 정예(근위대·성문 개방 돌격 기병): 전용 그림으로 그린다
   hold?: boolean; // 제자리를 지킨다(움직이지 않고 사거리 안의 대상만 공격). 성 안 수비대는 성문이 뚫리면 풀린다
+  art?: boolean; // 성 안 수비대 전용 그림(성문이 뚫려 움직여도 유지)
   post?: boolean; // 성벽 위 수비병(성벽 통로 안에 갇혀 있다)
   guard?: boolean; // 군주의 근위대(살아 있는 동안 군주가 받는 피해가 줄어든다)
   maxHp: number;
@@ -1398,7 +1399,7 @@ export class Game {
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
       e.bk?.show ?? 0,
-      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0) | (e.elite ? EF_ELITE : 0) | (e.post ? EF_ELITE | EF_POST : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
+      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0) | (e.elite ? EF_ELITE : 0) | ((e.post || e.art) ? EF_ELITE | EF_POST : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
       Math.round(ghostAlpha(e.ghost) * 100),
     ]);
   }
@@ -1871,7 +1872,7 @@ export class Game {
     for (const [type, y] of rows) {
       for (let i = 0; i < per; i++) {
         const x = (i - (per - 1) / 2) * 46;
-        const e = this.makeEnemy(x, y, type, { hold: true, elite: true, face: Math.PI / 2 });
+        const e = this.makeEnemy(x, y, type, { hold: true, art: true, face: Math.PI / 2 });
         e.maxHp *= BOSS_LORD.garrisonHp;
         e.hp *= BOSS_LORD.garrisonHp;
         e.shield *= BOSS_LORD.garrisonHp;
