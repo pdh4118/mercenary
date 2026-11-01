@@ -203,6 +203,7 @@ import {
   type MatchRecord,
   BOSS_NECRO,
   EF_SKEL,
+  EF_ELITE,
   ST_BIT_STUN,
   ST_BIT_ROOT,
   ST_BIT_SLOW,
@@ -491,6 +492,7 @@ export interface Enemy extends Fighter {
   invulnT?: number; // 무적 남은 시간(운석 맞춤 무적 등)
   buffT?: number; // 돌격 함성(보스군 강화)이 남은 시간
   buffMult?: number; // 그 강화로 올려 둔 피해 배율(끝나면 이만큼 나눈다. 없으면 돌격 함성 값)
+  elite?: boolean; // 군주의 정예(근위대·성문 개방 돌격 기병): 전용 그림으로 그린다
   guard?: boolean; // 군주의 근위대(살아 있는 동안 군주가 받는 피해가 줄어든다)
   maxHp: number;
   shieldMax: number;
@@ -1378,7 +1380,7 @@ export class Game {
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
       e.bk?.show ?? 0,
-      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
+      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0) | (e.elite ? EF_ELITE : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
       Math.round(ghostAlpha(e.ghost) * 100),
     ]);
   }
@@ -1832,7 +1834,7 @@ export class Game {
     const k = Math.max(0, Math.min(n, BOSS_LORD.fieldCap - field));
     for (let i = 0; i < k; i++) {
       const x = GATE_X + (i - (k - 1) / 2) * 46;
-      const e = this.makeEnemy(x, GATE_Y + 70 + (i % 2) * 34, 0, { face: Math.PI / 2 });
+      const e = this.makeEnemy(x, GATE_Y + 70 + (i % 2) * 34, 0, { elite: true, face: Math.PI / 2 });
       e.maxHp *= BOSS_LORD.sortieHp;
       e.hp *= BOSS_LORD.sortieHp;
       e.dmgMult *= BOSS_LORD.sortieDmg;
@@ -1852,7 +1854,7 @@ export class Game {
     const types = [SHIELD, SPEAR, ARCHER, MAGE];
     const spots: [number, number][] = [[-150, 60], [-60, 100], [60, 100], [150, 60]];
     types.forEach((type, i) => {
-      const e = this.makeEnemy(SIEGE.lordX + spots[i]![0], SIEGE.lordY + spots[i]![1], type, { guard: true, face: Math.PI / 2 });
+      const e = this.makeEnemy(SIEGE.lordX + spots[i]![0], SIEGE.lordY + spots[i]![1], type, { guard: true, elite: true, face: Math.PI / 2 });
       e.maxHp *= BOSS_LORD.guardsHp;
       e.hp *= BOSS_LORD.guardsHp;
       e.shield *= BOSS_LORD.guardsHp;

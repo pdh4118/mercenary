@@ -48,6 +48,7 @@ import {
   EF_MAD,
   BSK_RAMPAGE,
   EF_SKEL,
+  EF_ELITE,
   EF_SUPPLY,
   EVT_RICE,
   EVT_TENT,
@@ -2338,6 +2339,15 @@ async function main() {
         v.sprite.anchor.set(0.5, 0.8);
         v.sprite.scale.set(SPRITE_SCALE * 1.25 * v.face, SPRITE_SCALE * 1.25);
         v.lastX = v.x;
+      } else if (((w[14] ?? 0) & EF_ELITE) !== 0 && bossFx.eliteTex[w[4]]) {
+        // 군주의 정예(근위대·성문 개방 돌격 기병): 전용 그림(방향은 좌우만)
+        faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
+        v.sprite.texture = bossFx.eliteTex[w[4]]!;
+        v.sprite.anchor.set(0.5, 0.88);
+        const es = (w[4] === 0 ? 0.4 : 0.46) * size;
+        v.sprite.scale.set(es * v.face, es);
+        v.lastX = v.x;
+        v.lastY = v.y;
       } else if (w[4] === 0) {
         cavDir(v, v.x, v.y, w[5] > 0 ? w[6] : null);
         const fr = cavGait(v, ticker.deltaMS, w[5] > 0, CAV_SCALE * size);

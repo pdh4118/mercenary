@@ -22,6 +22,11 @@ import {
   BFX_SLASH,
   BOSS_SKILL_NAMES,
   BSK_ACCEL,
+  BSK_SCEPTER,
+  BSK_EDICT,
+  BSK_RALLY,
+  BSK_EXECUTE,
+  BSK_GUARDS,
   BSK_BLINK,
   BSK_CLONE,
   BSK_FLURRY,
@@ -129,6 +134,7 @@ const BOSS_UNIT_TEX = [
   "boss7_gallop", "boss7_shoot",
   "boss8_normal", "boss8_mad", "boss8_wheel",
   "boss9_idle", "boss9_cast", "boss9_drain",
+  "boss10_idle", "boss10_scepter", "boss10_cast",
 ] as const;
 
 /**
@@ -180,6 +186,7 @@ export async function createBossFx(d: BossFxDeps) {
     chainBreak: ["boss9_chain_break", [0, 1, 2]],
     orb: ["boss9_orb", [0, 1, 2]],
     flurryArc: ["boss5_flurry_arc", [0, 1, 2]],
+    oil: ["boss10_oil", [0, 1, 2, 3]],
     flurryHit: ["boss5_flurry_hit", [0, 1, 2]],
     riceGlint: ["rice_glint", [0, 1]],
     riceEat: ["rice_eat", [0, 1, 2]],
@@ -215,6 +222,11 @@ export async function createBossFx(d: BossFxDeps) {
   const pick = (a: Tex[], i: number): Tex => a[Math.max(0, Math.min(a.length - 1, i))] ?? first(a);
   const u = (n: string): Tex => unit[n] ?? null;
   /** 스켈레톤 그림(병종 번호 순서: 기병·창병·궁병·검방병·둔기병·마법사) */
+  /** 군주의 정예(근위대·성문 개방 돌격 기병) 전용 그림: 병종 번호 순(기병·창·궁·검방·둔기·마법). 둔기병은 없다 */
+  const eliteTex: Tex[] = ["cavalry", "spear", "archer", "sword", null, "mage"].map(() => null);
+  ["cavalry", "spear", "archer", "sword", null, "mage"].forEach((n, i) => {
+    if (n) pendingLoads.push(loadTex(`assets/units/boss10_guard_${n}.png`).then((t) => (eliteTex[i] = t)));
+  });
   const skelTex: Tex[] = ["cavalry", "spear", "archer", "sword", "blunt", "mage"].map(() => null);
   ["cavalry", "spear", "archer", "sword", "blunt", "mage"].forEach((n, i) => pendingLoads.push(loadTex(`assets/units/skel_${n}.png`).then((t) => (skelTex[i] = t))));
 
@@ -235,6 +247,8 @@ export async function createBossFx(d: BossFxDeps) {
     { get idle() { return u("boss7_gallop"); }, scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")) },
     { get idle() { return u("boss8_wheel"); }, scale: 0.75, pose: () => u("boss8_wheel") }, // 바퀴가 온전한 그림 하나로 쓰고, 폭주의 달아오른 바퀴는 wheelHeat 효과로 얹는다
     { get idle() { return u("boss9_idle"); }, scale: 0.42, pose: (sk) => (sk === BSK_DRAIN ? u("boss9_drain") : sk === BSK_FOG || sk === BSK_CHAIN || sk === BSK_ORB ? u("boss9_cast") : u("boss9_idle")) },
+    // 군주(스테이지 10): 홀 내려찍기는 치켜든 자세, 칙령·호령·처형령·근위대 소집은 손을 든 자세
+    { get idle() { return u("boss10_idle"); }, scale: 0.46, pose: (sk) => (sk === BSK_SCEPTER ? u("boss10_scepter") : sk === BSK_EDICT || sk === BSK_RALLY || sk === BSK_EXECUTE || sk === BSK_GUARDS ? u("boss10_cast") : u("boss10_idle")) },
   ];
   void BSK_STEALTH;
 
@@ -815,6 +829,8 @@ export async function createBossFx(d: BossFxDeps) {
   };
 
   /** 끓는 기름 장판(그림 없이 코드로 그린다): 예고 중에는 붉은 원, 깔리면 검갈색 웅덩이에서 거품이 올라오고 가장자리가 타오른다 */
+  const oilSprites = new Map<number, Sprite>();
+  const oilSeen = new Set<number>();
   const drawOil = (id: number, x: number, y: number, r: number, left: number, state: number, now: number): void => {
     if (state === 0) {
       const pulse = 0.5 + 0.5 * Math.sin(now / 70 + id);
@@ -822,6 +838,24 @@ export async function createBossFx(d: BossFxDeps) {
       return;
     }
     const fade = Math.min(1, left / 10 / 0.8);
+    const tex = pick(T.oil, Math.floor(now / 140 + id) % 4);
+    if (tex) {
+      // 그림이 있으면 그림으로(웅덩이 그림을 장판 반지름에 맞춘다)
+      let sp = oilSprites.get(id);
+      if (!sp) {
+        sp = new Sprite(tex);
+        sp.anchor.set(0.5, 0.5);
+        d.groundFx.addChild(sp);
+        oilSprites.set(id, sp);
+      }
+      oilSeen.add(id);
+      sp.texture = tex;
+      const sc = (r * 2.15) / Math.max(1, tex.width);
+      sp.scale.set(sc);
+      sp.position.set(x, y);
+      sp.alpha = fade;
+      return;
+    }
     caltropG.ellipse(x, y, r, r * 0.7).fill({ color: 0x2a1a0c, alpha: 0.72 * fade }).stroke({ width: 3, color: 0xff8a3a, alpha: 0.7 * fade });
     caltropG.ellipse(x - r * 0.15, y - r * 0.1, r * 0.6, r * 0.4).fill({ color: 0x4a2c12, alpha: 0.5 * fade });
     for (let i = 0; i < 6; i++) {
@@ -855,6 +889,12 @@ export async function createBossFx(d: BossFxDeps) {
     necroG.clear();
     wallG.clear();
     caltropG.clear();
+    for (const [oid, osp] of oilSprites) {
+      if (oilSeen.has(oid)) continue;
+      osp.destroy();
+      oilSprites.delete(oid);
+    }
+    oilSeen.clear();
     edictNow = null;
     executeNow = null;
     for (const gw of guardWalls) drawCurvedWall(gw.x + Math.cos(gw.ang) * 48, gw.y + 8 + Math.sin(gw.ang) * 48 * 0.6, gw.ang + Math.PI / 2, gw.ang, 96, 44, 104, 0.95, 100, now);
@@ -1112,6 +1152,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, edict: () => edictNow, execute: () => executeNow, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
+  return { art, frame, edict: () => edictNow, execute: () => executeNow, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, eliteTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
 }
 

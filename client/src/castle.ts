@@ -1,5 +1,7 @@
-import { Container, Graphics, Text } from "pixi.js";
+import { Assets, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
 import { GATE_X, GATE_Y, SIEGE, castleSolids } from "@mercenary/shared";
+
+const CASTLE_TEX = ["boss10_wall_a", "boss10_wall_b", "boss10_wall_c", "boss10_tower", "boss10_gate_0", "boss10_gate_1", "boss10_gate_2", "boss10_gate_open", "boss10_gate_ruin"] as const;
 
 /**
  * 공성전의 성(그림 없이 코드로 그린다). 스테이지 10에 들어가면 성이 드러난 정도(reveal 0..1)에 따라 성벽 돌덩이가 하나씩 솟는다.
@@ -37,6 +39,60 @@ export function createCastle(layer: Container): Castle {
     layer.addChild(g);
     return { g, x: s.x, y: s.y, r: s.r, tower: s.tower, delay: 0.05 + hash(i) * 0.45, last: -1 };
   });
+  // 그림이 도착하면 코드로 그린 돌덩이 대신 성벽·탑·성문 그림을 쓴다
+  const tex: Record<string, Texture | null> = {};
+  interface Piece {
+    sp: Sprite;
+    base: number;
+    delay: number;
+    last: number;
+  }
+  const pieces: Piece[] = [];
+  let spritesOn = false;
+  let gateSp: Sprite | null = null;
+  const buildSprites = (): void => {
+    const ex = SIEGE.hw - 30;
+    const ey = SIEGE.hh - 30;
+    const x0 = SIEGE.cx - ex;
+    const x1 = SIEGE.cx + ex;
+    const y0 = SIEGE.cy - ey;
+    const y1 = SIEGE.cy + ey;
+    const add = (name: string, x: number, y: number, scale: number, zAdd: number, i: number): void => {
+      const t = tex[name]!;
+      const sp = new Sprite(t);
+      sp.anchor.set(0.5, 0.94);
+      sp.position.set(x, y);
+      sp.zIndex = y + zAdd;
+      sp.visible = false;
+      layer.addChild(sp);
+      pieces.push({ sp, base: scale, delay: 0.05 + hash(i) * 0.45, last: -1 });
+    };
+    let n = 0;
+    const wallName = (i: number) => (["boss10_wall_a", "boss10_wall_b", "boss10_wall_c"] as const)[Math.floor(hash(i + 9) * 3)]!;
+    const ws = 96 / Math.max(1, (tex.boss10_wall_a?.width ?? 225) - 12); // 성벽 한 칸을 가로 약 96px로
+    for (let x = x0 + 40; x < x1 - 30; x += 84) {
+      add(wallName(n), x, y0 + 14, ws, 8, n++); // 북쪽
+      if (Math.abs(x - GATE_X) > SIEGE.gateHalf + 70) add(wallName(n), x, y1 + 14, ws, 8, n++); // 남쪽(성문 둘레는 탑과 성문이 채운다)
+    }
+    for (let y = y0 + 60; y < y1 - 40; y += 56) {
+      add(wallName(n), x0, y + 14, ws * 0.9, 8, n++); // 서쪽
+      add(wallName(n), x1, y + 14, ws * 0.9, 8, n++); // 동쪽
+    }
+    const ts = 120 / Math.max(1, (tex.boss10_tower?.width ?? 190) - 12);
+    for (const [tx, ty] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [GATE_X - SIEGE.gateHalf - 50, y1], [GATE_X + SIEGE.gateHalf + 50, y1]] as const) add("boss10_tower", tx, ty + 24, ts, 30, n++);
+    gateSp = new Sprite(tex.boss10_gate_0!);
+    gateSp.anchor.set(0.5, 0.93);
+    gateSp.position.set(GATE_X, GATE_Y + 26);
+    gateSp.zIndex = GATE_Y + 18;
+    gateSp.visible = false;
+    layer.addChild(gateSp);
+    for (const b of blocks) b.g.visible = false;
+    spritesOn = true;
+  };
+  Promise.all(CASTLE_TEX.map((n) => Assets.load<Texture>(`assets/fx/${n}.png`).then((t) => (tex[n] = t)).catch(() => (tex[n] = null)))).then(() => {
+    if (tex.boss10_wall_a && tex.boss10_tower && tex.boss10_gate_0) buildSprites();
+  });
+
   const gateG = new Graphics();
   gateG.zIndex = GATE_Y + 30;
   layer.addChild(gateG);
@@ -83,6 +139,27 @@ export function createCastle(layer: Container): Castle {
     gateLabel.visible = false;
     if (rise <= 0.05) return;
     const hw = SIEGE.gateHalf;
+    if (spritesOn && gateSp) {
+      // 성문 그림: 상태(온전·금·크게 부서짐·열림·무너짐)에 맞는 그림을 쓰고, 체력 막대만 코드로 그린다
+      const name = open ? "boss10_gate_ruin" : sortie ? "boss10_gate_open" : gate > 66 ? "boss10_gate_0" : gate > 33 ? "boss10_gate_1" : "boss10_gate_2";
+      const t = tex[name] ?? tex.boss10_gate_0!;
+      gateSp.texture = t;
+      const gs = (hw * 2 + 30) / Math.max(1, t.width - 12);
+      gateSp.scale.set(gs, gs * rise);
+      gateSp.alpha = Math.min(1, rise * 2);
+      gateSp.visible = true;
+      if (!open) {
+        const bw = hw * 2;
+        const by = GATE_Y + 26 - t.height * gs * 0.93 * rise - 14;
+        g.roundRect(GATE_X - bw / 2, by, bw, 10, 4).fill({ color: 0x15161b, alpha: 0.85 }).stroke({ width: 1.5, color: 0xffffff, alpha: 0.5 });
+        const pulse2 = gate < 30 ? 0.7 + 0.3 * Math.sin(now / 90) : 1;
+        g.roundRect(GATE_X - bw / 2 + 2, by + 2, Math.max(2, ((bw - 4) * gate) / 100), 6, 3).fill({ color: gate > 50 ? 0xe0b24a : gate > 25 ? 0xff8a3a : 0xff4a3a, alpha: pulse2 });
+        gateLabel.visible = true;
+        gateLabel.text = `성문 ${gate}%`;
+        gateLabel.position.set(GATE_X, by - 2);
+      }
+      return;
+    }
     const H = 112 * rise;
     const x = GATE_X;
     const y = GATE_Y + 18;
@@ -137,6 +214,20 @@ export function createCastle(layer: Container): Castle {
 
   return {
     update(reveal, gate, open, now, sortie) {
+      if (spritesOn) {
+        for (let i = 0; i < pieces.length; i++) {
+          const pc = pieces[i]!;
+          const rise = ease(clamp01((reveal - pc.delay) / (1 - pc.delay)));
+          const q = Math.round(rise * 40);
+          if (q === pc.last) continue; // 올라가는 정도가 같으면 다시 만지지 않는다
+          pc.last = q;
+          pc.sp.visible = rise > 0.02;
+          pc.sp.scale.set(pc.base, pc.base * rise);
+          pc.sp.alpha = Math.min(1, rise * 3);
+        }
+        drawGate(gate, open, ease(clamp01((reveal - 0.45) / 0.5)), now, !!sortie);
+        return;
+      }
       for (let i = 0; i < blocks.length; i++) {
         const b = blocks[i]!;
         const rise = ease(clamp01((reveal - b.delay) / (1 - b.delay - 0.02 + 0.02)));
@@ -148,6 +239,8 @@ export function createCastle(layer: Container): Castle {
       drawGate(gate, open, ease(clamp01((reveal - 0.45) / 0.5)), now, !!sortie);
     },
     destroy() {
+      for (const pc of pieces) pc.sp.destroy();
+      gateSp?.destroy();
       for (const b of blocks) b.g.destroy();
       gateG.destroy();
       gateLabel.destroy();
