@@ -16,7 +16,7 @@ export const SIEGE = {
   solidAt: 0.55, // 이 비율을 넘으면 성벽이 단단해진다(그 전에는 솟는 중)
   lordX: 0,
   lordY: -1570,
-  gateHp: 3600, // 성문 체력(주인공 근접 한 번 피해 기준)
+  gateHp: 6000, // 성문 체력(주인공 근접 한 번 피해 기준)
   clearMargin: 160, // 성 둘레에서 지형을 치우는 여유
   clearApron: 330, // 성문 앞 마당
 } as const;
