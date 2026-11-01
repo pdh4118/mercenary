@@ -898,7 +898,16 @@ export class Game {
 
   /** 적에게 받는 피해에 곱한다(그 플레이어의 난이도). 토너먼트(플레이어끼리)에는 적용하지 않는다. */
   private damageTakenMult(ownerId: number): number {
-    if (this.phase === "tournament") return 1;
+    if (this.phase === "tournament") {
+      // 토너먼트: 두 선수의 난이도(받는 피해 감소)를 맞춘다. 낮은 쪽을 0%로 잡고, 높은 쪽은 차이만큼만 감소한다(60%와 90%면 0%와 75%).
+      const [a, b] = this.tourPair();
+      if (a === 0 || b === 0 || (ownerId !== a && ownerId !== b)) return 1;
+      const ra = DIFFICULTY_REDUCTION[this.slots.get(a)?.difficulty ?? DEFAULT_DIFFICULTY] ?? 0;
+      const rb = DIFFICULTY_REDUCTION[this.slots.get(b)?.difficulty ?? DEFAULT_DIFFICULTY] ?? 0;
+      const mine = ownerId === a ? ra : rb;
+      const low = Math.min(ra, rb);
+      return (1 - mine) / (1 - low);
+    }
     return 1 - (DIFFICULTY_REDUCTION[this.slots.get(ownerId)?.difficulty ?? DEFAULT_DIFFICULTY] ?? 0);
   }
 
@@ -3177,6 +3186,7 @@ export class Game {
 
   /** 주인공 공격. 활은 투사체를 쏘고, 나머지는 조준 방향 부채꼴을 즉시 휘두른다. 무기마다 방패·범위 규칙이 다르다. */
   private useWeapon(s: Slot): void {
+    if (s.ghost) releaseGhost(s.ghost); // 은신 중 공격하면 서서히 투명이 풀리기 시작한다
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
     const rate = s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0));
@@ -3246,6 +3256,7 @@ export class Game {
   }
 
   private strikeHero(s: Slot, power = 1): void {
+    if (s.ghost) releaseGhost(s.ghost); // 은신 중 공격하면 서서히 투명이 풀리기 시작한다
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
     const crit = this.rollCrit(s.mods.heroCrit);
@@ -3525,6 +3536,7 @@ export class Game {
     if (!s || typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= WEAPONS.length) return false;
     if (s.state.weapon === index) return false;
     s.state.weapon = index;
+    if (s.ghost) releaseGhost(s.ghost); // 은신 중 무기를 바꾸면 서서히 투명이 풀리기 시작한다
     s.switchCd = WEAPON_SWITCH_DELAY_SEC;
     s.windT = 0;
     s.chargeT = 0;

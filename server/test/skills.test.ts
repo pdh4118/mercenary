@@ -346,3 +346,19 @@ test("체력 재생으로 회복하면 회복 숫자 이벤트가 0.6초 모아�
   run(g, 1.5);
   assert.equal(g.takeEvents().filter((e) => e[0] === EVT_HEAL).length, 0, "체력이 가득 차 있으면 숫자가 없다");
 });
+
+test("활 스킬(은신): 투명한 동안 공격하거나 무기를 바꾸면 서서히 투명이 풀리기 시작한다", () => {
+  for (const how of ["fire", "weapon"] as const) {
+    const { g, a } = start(0);
+    const p = g.getPlayer(a)!;
+    assert.equal(g.useSkill(a), true);
+    run(g, 1.6); // 가장 투명한 유지 구간
+    assert.equal(p.alpha, 5);
+    if (how === "weapon") g.setWeapon(a, 1);
+    else (g as any).useWeapon((g as any).slots.get(a));
+    run(g, 0.3);
+    assert.ok(p.alpha > 5 && p.alpha < 100, `${how}: 풀리는 중(${p.alpha})`);
+    run(g, 1.2);
+    assert.equal(p.alpha, 100, `${how}: 다 풀렸다`);
+  }
+});

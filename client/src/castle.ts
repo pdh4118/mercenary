@@ -9,7 +9,7 @@ import { GATE_X, GATE_Y, SIEGE } from "@mercenary/shared";
  */
 export interface Castle {
   /** reveal 0..1, gate 0..100(성문 체력 %), open = 성문이 부서짐 */
-  update(reveal: number, gate: number, open: boolean, now: number, sortie?: boolean): void;
+  update(reveal: number, gate: number, open: boolean, now: number, sortie?: boolean, behind?: boolean): void;
   destroy(): void;
 }
 
@@ -29,7 +29,8 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const ease = (v: number) => 1 - (1 - v) * (1 - v);
 const GATE_TEX = ["boss10_gate_0", "boss10_gate_1", "boss10_gate_2", "boss10_gate_open", "boss10_gate_ruin"] as const;
 
-export function createCastle(layer: Container): Castle {
+/** high: 유닛 위에 그리는 층. 성벽 뒤(안쪽)에 선 유닛이 있으면 앞 층 성벽이 이 층으로 올라가 유닛을 가리고, 위치가 보이도록 반투명해진다 */
+export function createCastle(layer: Container, high: Container): Castle {
   const baseY = GATE_Y + (858 - IMG_BASE) * SY; // 그림 아래 끝(탑 바닥)의 월드 y
   const tex: Record<string, Texture | null> = {};
   const back = new Container();
@@ -55,6 +56,9 @@ export function createCastle(layer: Container): Castle {
   layer.addChild(gateLabel);
   let gateSp: Sprite | null = null;
   let ready = false;
+  let isHigh = false;
+  let seeThru = 1;
+  const rise0 = (r: number) => ease(clamp01(r));
 
   const place = (sp: Sprite, ox: number, oy: number): void => {
     // ox, oy: 원본 그림에서의 왼쪽 위 좌표
@@ -110,13 +114,19 @@ export function createCastle(layer: Container): Castle {
   };
 
   return {
-    update(reveal, gate, open, now, sortie) {
+    update(reveal, gate, open, now, sortie, behind) {
       if (!ready) return;
+      const wantHigh = !!behind && rise0(reveal) >= 0.98;
+      if (wantHigh !== isHigh) {
+        isHigh = wantHigh;
+        for (const c of [front, towers]) (wantHigh ? high : layer).addChild(c);
+      }
+      seeThru += ((wantHigh ? 0.5 : 1) - seeThru) * 0.2; // 가려질 때 반투명으로 서서히 바뀐다
       const rise = ease(clamp01(reveal));
       back.visible = front.visible = towers.visible = rise > 0.02;
       for (const c of [back, front, towers]) {
         c.scale.set(1, Math.max(0.01, rise));
-        c.alpha = Math.min(1, rise * 2.5);
+        c.alpha = Math.min(1, rise * 2.5) * (c === back ? 1 : seeThru);
       }
       drawGate(gate, open, rise >= 0.98, now, !!sortie);
     },

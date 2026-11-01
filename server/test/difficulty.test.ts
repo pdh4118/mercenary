@@ -208,3 +208,23 @@ test("시전 속도 카드: 마법사 용병과 주인공 지팡이의 주문이
   const t1 = castTime(true);
   assert.ok(t0 > 1.5 && Math.abs(t1 / t0 - 1 / 1.3) < 0.03, `${t0} -> ${t1}`);
 });
+
+test("토너먼트: 두 선수의 난이도를 맞춘다(낮은 쪽 0%, 높은 쪽은 차이만큼: 90%와 60%면 75%와 0%)", () => {
+  const g = new Game(() => 0.99);
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const b = g.addPlayer("b")!;
+  const c = g.addPlayer("c")!;
+  g.setDifficulty(a, 0); // 90%
+  g.setDifficulty(b, 1); // 60%
+  g.setDifficulty(c, 0);
+  (g as any).phase = "tournament";
+  (g as any).tourPair = () => [a, b];
+  const mult = (id: number): number => (g as any).damageTakenMult(id);
+  assert.ok(Math.abs(mult(a) - 0.25) < 1e-9, `90% 쪽은 75% 감소(${mult(a)})`);
+  assert.equal(mult(b), 1, "60% 쪽은 감소 없음");
+  assert.equal(mult(c), 1, "선수가 아니면 영향 없다");
+  g.setDifficulty(b, 0);
+  assert.equal(mult(a), 1, "난이도가 같으면 둘 다 감소 없음");
+  assert.equal(mult(b), 1);
+});

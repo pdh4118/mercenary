@@ -74,6 +74,8 @@ import {
   inCastleZone,
   SIEGE,
   RING,
+  SOUTH_TOP,
+  GATE_Y,
   GATE_X,
   SPRITE_BY_ID,
   anchorOf,
@@ -2422,9 +2424,14 @@ async function main() {
     {
       // 공성전: 성이 서서히 드러나고(성벽이 솟고 그 자리의 바위·나무가 사라진다), 성문 체력이 보인다
       const sg = latest.g?.siege ?? null;
-      if (sg && !castle) castle = createCastle(enemyLayer);
+      if (sg && !castle) castle = createCastle(enemyLayer, terrainHigh);
       if (sg && castle) {
-        castle.update(sg.reveal / 100, sg.gate, sg.open, performance.now(), sg.sortie);
+        const inBehind = (x: number, y: number): boolean => Math.abs(x) < 650 && y > SOUTH_TOP - 8 && y < GATE_Y; // 남쪽 성벽 앞 층 뒤(안쪽)에 선 유닛
+        let behindCastle = false;
+        for (const v of players.views.values()) if (!behindCastle && inBehind(v.x, v.y)) behindCastle = true;
+        if (!behindCastle) for (const v of mercs.views.values()) if (inBehind(v.x, v.y)) behindCastle = true;
+        if (!behindCastle) for (const [id, v] of enemies.views) if (inBehind(v.x, v.y) && (((latest?.enemies.find((q) => q[0] === id)?.[14] ?? 0) & EF_POST) === 0)) behindCastle = true;
+        castle.update(sg.reveal / 100, sg.gate, sg.open, performance.now(), sg.sortie, behindCastle);
         for (const tv of tviews) {
           if (!inCastleZone(tv.x, tv.footY)) continue;
           tv.sp.alpha = Math.max(0, 1 - sg.reveal / 35);
@@ -3419,6 +3426,7 @@ async function main() {
           tv.high = behind;
           (behind ? terrainHigh : terrainLow).addChild(tv.sp);
         }
+        if (!(latest?.g?.siege && inCastleZone(tv.x, tv.footY))) tv.sp.alpha += ((behind ? 0.5 : 1) - tv.sp.alpha) * 0.25; // 유닛을 가리면 반투명해져 위치가 보인다
       }
     }
     // 카메라와 HUD
