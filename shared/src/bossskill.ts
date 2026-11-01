@@ -662,6 +662,7 @@ export const BOSS_LORD = {
   guardsReduce: 0.2, // 근위대 한 명이 살아 있을 때마다 군주가 받는 피해 감소 비율
   guardsHp: 2, // 근위대 체력 배율
   guardsDmg: 1.2,
+  guardsLeash: 420, // 근위대가 군주에게서 이 거리 안에서만 쫓아온다
   scepterTele: 1.0, // 홀 내려찍기: 안쪽 원이 예고되는 시간
   scepterRadius: 240, // 안쪽 원 반지름
   scepterWave: 440, // 충격파가 퍼지는 바깥 반지름

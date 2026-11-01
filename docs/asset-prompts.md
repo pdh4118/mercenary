@@ -1022,3 +1022,16 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 ### 12-6. 우선순위
 
 1. 군주 3포즈(12-1) 2. 성문 5상태(12-3) 3. 성벽·탑(12-2) 4. 근위대·정예 기병(12-5) 5. 이펙트(12-4)
+
+### 12-7. 옆 성벽(동쪽·서쪽 성벽) - `assets/fx/boss10_wall_side_a~c`
+
+지금 옆 성벽은 정면 성벽 그림을 세로로 이어 붙여 계단처럼 보입니다. 화면에서 **위아래로 길게 뻗은 성벽**을 비스듬히 내려다본 모습이 필요합니다(윗면 통로와 성가퀴, 그리고 화면 쪽을 향한 끝면이 보입니다).
+
+```
+Hand-painted cartoon strategy-game art, thick dark outlines, slightly desaturated colors, three-quarter top-down view, transparent background, generous empty margin (at least 20px) around each image.
+A sheet of 3 images in a row with a caption below each: "boss10_wall_side_a", "boss10_wall_side_b", "boss10_wall_side_c".
+Each is a segment of a stone castle wall that runs vertically on the screen (from the top of the image to the bottom), seen from a raised angle: the top surface of the wall (a flat stone walkway with crenellation blocks along both long edges) is clearly visible, and the left face of the wall (gray stone bricks, slightly darker) is visible on the left side. The wall segment is about 70 px wide and 200 px tall. The top and bottom ends are cut straight and match exactly, so copies stack seamlessly one above the other. (a) plain stone, (b) with a small crimson banner hanging on the left face, (c) with a few cracks and moss.
+Also add one extra image captioned "boss10_wall_side_end": the same wall ending in a square end cap, for the top and bottom ends of the wall.
+```
+
+동쪽 성벽은 같은 그림을 좌우로 뒤집어 씁니다(그래서 **왼쪽 면만** 그리라고 했습니다).

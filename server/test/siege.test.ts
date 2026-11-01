@@ -261,3 +261,21 @@ test("공성전 안뜰: 처형령은 결계 밖 대상만 최대 체력 비율�
   assert.ok(out.hp <= 1000 * (1 - BOSS_LORD.executePct) + 1, `결계 밖은 크게 다친다(${out.hp})`);
   assert.equal(ip.hp, 1000, "결계 안은 무사");
 });
+
+test("공성전 안뜰: 근위대는 군주에게서 일정 범위 안에서만 쫓아온다", () => {
+  const { g, a } = setup(BSK_GUARDS);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  openGate(g);
+  for (let i = 0; i < TICK_RATE * 3 && g.guardCount() < 4; i++) g.step();
+  assert.equal(g.guardCount(), 4);
+  let far = 0;
+  for (let i = 0; i < TICK_RATE * 8; i++) {
+    p.x = SIEGE.lordX + 120; // 성 밖 먼 곳이 아니라 범위 바로 바깥에 서서 끌어낸다
+    p.y = GATE_Y + 900;
+    g.step();
+    p.hp = p.maxHp;
+    for (const e of (g as any).enemies.values()) if (e.guard) far = Math.max(far, Math.hypot(e.x - SIEGE.lordX, e.y - SIEGE.lordY));
+  }
+  assert.ok(far <= BOSS_LORD.guardsLeash + 60, `근위대가 범위를 넘지 않는다(${Math.round(far)})`);
+});

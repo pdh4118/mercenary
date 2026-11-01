@@ -71,6 +71,8 @@ import {
   meleeArc,
   TerrainMap,
   inCastleZone,
+  SIEGE,
+  GATE_X,
   SPRITE_BY_ID,
   anchorOf,
   TK_PLATEAU,
@@ -2212,6 +2214,20 @@ async function main() {
     if (terrain) {
       for (const p of terrain.plateaus) if (terrain.liveObj(p.obj)) for (const t of p.tops) g.ellipse(sx(t.x), sy(t.y), Math.max(1.5, (t.rx / WORLD_SIZE) * S), Math.max(1, (t.ry / WORLD_SIZE) * S)).fill({ color: 0x8a6b3a, alpha: 0.55 });
       for (const c of terrain.solids) if (terrain.liveObj(c.obj)) g.circle(sx(c.x), sy(c.y), Math.max(0.8, (c.r / WORLD_SIZE) * S)).fill({ color: c.arrow ? 0x9aa0a8 : 0x3f6b38, alpha: 0.8 });
+    }
+    // 공성전: 성(성벽 테두리·성문·모서리 탑). 드러난 정도만큼 서서히 나타난다
+    const sgm = st.g?.siege;
+    if (sgm && sgm.reveal > 0) {
+      const rv = sgm.reveal / 100;
+      const cx0 = sx(SIEGE.cx - SIEGE.hw);
+      const cx1 = sx(SIEGE.cx + SIEGE.hw);
+      const cy0 = sy(SIEGE.cy - SIEGE.hh);
+      const cy1 = sy(SIEGE.cy + SIEGE.hh);
+      g.rect(cx0, cy0, cx1 - cx0, cy1 - cy0).fill({ color: 0x8b8f9f, alpha: 0.22 * rv }).stroke({ width: 2.2, color: 0xd5d9e6, alpha: 0.95 * rv });
+      for (const [tx, ty] of [[cx0, cy0], [cx1, cy0], [cx0, cy1], [cx1, cy1]] as const) g.circle(tx, ty, 3).fill({ color: 0xb85a4a, alpha: rv }).stroke({ width: 1, color: 0x1a0c08, alpha: rv });
+      const gx0 = sx(GATE_X - SIEGE.gateHalf);
+      const gx1 = sx(GATE_X + SIEGE.gateHalf);
+      g.rect(gx0, cy1 - 1.8, gx1 - gx0, 3.6).fill(sgm.open ? 0x6fe08a : sgm.sortie ? 0xff6a4a : 0xd8b24a); // 성문(열리면 초록, 개방 돌격 중 붉은색)
     }
     // 지점 방어 깃발
     for (const hp of st.players) {

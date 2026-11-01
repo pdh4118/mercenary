@@ -2358,6 +2358,12 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "피해 배율",
   "hint": ""
  },
+ "BOSS_LORD.guardsLeash": {
+  "boss": "군주",
+  "skill": "근위대 소집",
+  "label": "근위대가 군주에게서 이 거리 안에서만 쫓아온",
+  "hint": "근위대가 군주에게서 이 거리 안에서만 쫓아온다"
+ },
  "BOSS_LORD.scepterTele": {
   "boss": "군주",
   "skill": "홀 내려찍기",

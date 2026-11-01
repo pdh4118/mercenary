@@ -1765,7 +1765,23 @@ export class Game {
     s.t += dt;
     s.sortieT = Math.max(0, s.sortieT - dt);
     if (!s.solid && s.t >= SIEGE.revealSec * SIEGE.solidAt) this.siegeSolidify();
+    if (s.open || this.phase === "boss") this.leashGuards();
     if (this.phase === "boss" && this.autoSpawn) this.stepSiegeWaves(dt);
+  }
+
+  /** 근위대는 군주에게서 일정 범위 안에서만 쫓아온다(범위 밖으로 나가려 하면 경계에서 멈춘다) */
+  private leashGuards(): void {
+    const R = BOSS_LORD.guardsLeash;
+    for (const e of this.enemies.values()) {
+      if (!e.guard) continue;
+      const dx = e.x - SIEGE.lordX;
+      const dy = e.y - SIEGE.lordY;
+      const d = Math.hypot(dx, dy);
+      if (d > R) {
+        e.x = SIEGE.lordX + (dx / d) * R;
+        e.y = SIEGE.lordY + (dy / d) * R;
+      }
+    }
   }
 
   /** 군주가 성을 지키는 동안 필드에는 졸개가 끊임없이 몰려온다. 시간이 갈수록 무리가 커지고 간격이 짧아지며 졸개도 강해진다. */
