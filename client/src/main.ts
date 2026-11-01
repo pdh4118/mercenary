@@ -72,6 +72,7 @@ import {
   TerrainMap,
   inCastleZone,
   SIEGE,
+  RING,
   GATE_X,
   SPRITE_BY_ID,
   anchorOf,
@@ -2219,10 +2220,10 @@ async function main() {
     const sgm = st.g?.siege;
     if (sgm && sgm.reveal > 0) {
       const rv = sgm.reveal / 100;
-      const cx0 = sx(SIEGE.cx - SIEGE.hw);
-      const cx1 = sx(SIEGE.cx + SIEGE.hw);
-      const cy0 = sy(SIEGE.cy - SIEGE.hh);
-      const cy1 = sy(SIEGE.cy + SIEGE.hh);
+      const cx0 = sx(SIEGE.cx - RING.ex);
+      const cx1 = sx(SIEGE.cx + RING.ex);
+      const cy0 = sy(RING.north);
+      const cy1 = sy(RING.south);
       g.rect(cx0, cy0, cx1 - cx0, cy1 - cy0).fill({ color: 0x8b8f9f, alpha: 0.22 * rv }).stroke({ width: 2.2, color: 0xd5d9e6, alpha: 0.95 * rv });
       for (const [tx, ty] of [[cx0, cy0], [cx1, cy0], [cx0, cy1], [cx1, cy1]] as const) g.circle(tx, ty, 3).fill({ color: 0xb85a4a, alpha: rv }).stroke({ width: 1, color: 0x1a0c08, alpha: rv });
       const gx0 = sx(GATE_X - SIEGE.gateHalf);

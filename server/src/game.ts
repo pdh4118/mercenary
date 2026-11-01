@@ -283,7 +283,7 @@ import {
 import { resolveHit, type Hit, type HitResult } from "./combat.js";
 import { BossSystem } from "./boss/system.js";
 import type { BossKitState } from "./boss/types.js";
-import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, RAMP_Y, SIEGE, WALL_STRIP_HALF, WALL_STRIP_Y0, WALL_STRIP_Y1, castleSolids, clampToWallTop, inCastleZone, rampSideAt, wallX, type SiegeInfo } from "@mercenary/shared";
+import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, RAMP_DOWN_AT, RAMP_OUT, RAMP_TOP_AT, RAMP_Y0, RAMP_Y1, RING, SIEGE, WALL_STRIPS, castleSolids, clampToWallTop, inCastleZone, inCourtyard, rampSideAt, type SiegeInfo } from "@mercenary/shared";
 import { SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
@@ -855,14 +855,10 @@ export class Game {
         const wo = o as { wall?: boolean };
         const rs = rampSideAt(x, y);
         if (rs !== 0) {
-          const along = Math.abs(x - wallX(rs));
-          if (!wo.wall && along <= 40) wo.wall = true; // 계단 위쪽 끝에 닿으면 성벽 위에 올라선다
-          else if (wo.wall && along >= 110) wo.wall = false; // 계단 아래쪽 끝에 닿으면 내려온다
+          if (!wo.wall && Math.abs(x) >= RAMP_TOP_AT) wo.wall = true; // 계단 높은 끝(모서리 쪽)에 닿으면 성벽 위에 올라선다
+          else if (wo.wall && Math.abs(x) <= RAMP_DOWN_AT) wo.wall = false; // 계단 낮은 끝(중앙 쪽)에 닿으면 내려온다
         }
-        if (wo.wall) {
-          const side = x < SIEGE.cx ? -1 : 1;
-          [x, y] = clampToWallTop(side, x, y);
-        }
+        if (wo.wall) [x, y] = clampToWallTop(x, y);
         if (wo.wall || rs !== 0) pass = this.terrain!.items.length + 7;
       }
       [x, y] = t.pushOut(x, y, u.r, pass);
@@ -1767,7 +1763,7 @@ export class Game {
     if (!this.siege || this.siege.open) return;
     this.siege.open = true;
     // 성벽 윗면 통로는 높은 곳이다(아래에서 올려다보며 쏘면 약하고, 위에서 쏘면 강하다)
-    for (const side of [-1, 1]) this.terrain?.addHighRect(wallX(side) - WALL_STRIP_HALF, WALL_STRIP_Y0, wallX(side) + WALL_STRIP_HALF, WALL_STRIP_Y1);
+    for (const r of WALL_STRIPS) this.terrain?.addHighRect(r[0], r[1], r[2], r[3]);
   }
 
   /** 성문이 부서진 뒤 안뜰의 아군 궁병 용병은 가까운 계단으로 성벽에 올라 통로에 흩어져 선다 */
@@ -1779,19 +1775,19 @@ export class Game {
       if (m.type !== ARCHER || m.respawn > 0) continue;
       if (m.cmd) continue;
       wo.climb = false;
-      const slotY = WALL_STRIP_Y0 + 40 + (((m.id * 53) % 100) / 100) * (WALL_STRIP_Y1 - WALL_STRIP_Y0 - 80);
+      // 성벽 위: 북쪽 통로에 흩어져 선다
+      const slotX = -RING.ex + 60 + (((m.id * 53) % 100) / 100) * (2 * RING.ex - 120);
       if (wo.wall) {
-        const side = m.x < SIEGE.cx ? -1 : 1;
-        if (Math.abs(m.y - slotY) > 30) {
-          m.cmd = { kind: "move", type: 0, x: wallX(side), y: slotY, left: 8 };
+        if (Math.abs(m.x - slotX) > 40 || Math.abs(m.y - RING.north) > 30) {
+          m.cmd = { kind: "move", type: 0, x: slotX, y: RING.north, left: 8 };
           wo.climb = true;
         }
         continue;
       }
-      // 안뜰(성 안)에 있는 궁병만 오른다
-      if (Math.abs(m.x - SIEGE.cx) > SIEGE.hw - 60 || Math.abs(m.y - SIEGE.cy) > SIEGE.hh - 40) continue;
+      // 안뜰에 있는 궁병만 오른다(가까운 계단의 높은 끝으로)
+      if (!inCourtyard(m.x, m.y)) continue;
       const side = m.x < SIEGE.cx ? -1 : 1;
-      m.cmd = { kind: "move", type: 0, x: wallX(side), y: RAMP_Y, left: 12 };
+      m.cmd = { kind: "move", type: 0, x: side * (RAMP_OUT - 12), y: (RAMP_Y0 + RAMP_Y1) / 2, left: 12 };
       wo.climb = true;
     }
   }

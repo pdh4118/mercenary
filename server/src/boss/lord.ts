@@ -1,4 +1,4 @@
-import { BFX_BOLT, BFX_IMPACT, BFX_MACEBOOM, BFX_RALLY, BFX_SLAM, BFX_SUMMON, BOSS_CAV, BOSS_LORD as C, BSK_ARROWSTORM, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_EXECUTE, HZ_WARD, TELE_BAND, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, EF_INVULN, GATE_X, GATE_Y, HZ_EDICT, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TELE_CIRCLE } from "@mercenary/shared";
+import { COURT, BFX_BOLT, BFX_IMPACT, BFX_MACEBOOM, BFX_RALLY, BFX_SLAM, BFX_SUMMON, BOSS_CAV, BOSS_LORD as C, BSK_ARROWSTORM, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_EXECUTE, HZ_WARD, TELE_BAND, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, EF_INVULN, GATE_X, GATE_Y, HZ_EDICT, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TELE_CIRCLE } from "@mercenary/shared";
 import type { Foe } from "../game.js";
 import type { Ctx, KitDef, SkillDef } from "./types.js";
 
@@ -281,8 +281,8 @@ const execute: SkillDef = {
     // 결계: 안마당 안 아무 곳(서로 겹치지 않게)
     const spots: [number, number][] = [];
     for (let tries = 0; tries < 60 && spots.length < C.executeWards; tries++) {
-      const x = SIEGE.cx + (Math.random() - 0.5) * 2 * (SIEGE.hw - 140);
-      const y = SIEGE.cy + (Math.random() - 0.5) * 2 * (SIEGE.hh - 110);
+      const x = COURT.cx + (Math.random() - 0.5) * 2 * (COURT.hw - 40);
+      const y = COURT.cy + (Math.random() - 0.5) * 2 * (COURT.hh - 30);
       if (spots.every(([sx, sy]) => Math.hypot(sx - x, sy - y) > C.executeWardRadius * 1.7)) spots.push([x, y]);
     }
     for (const [x, y] of spots) sys.addHazard({ kind: HZ_WARD, x, y, a: C.executeWardRadius, t: C.executeTele + 1.1, total: C.executeTele + 1.1, src: e.id });
@@ -299,8 +299,8 @@ const execute: SkillDef = {
       }
       // 볼거리: 결계 밖 빈 땅에도 벼락이 내리꽂힌다
       for (let i = 0, made = 0; i < 40 && made < 6; i++) {
-        const x = SIEGE.cx + (Math.random() - 0.5) * 2 * (SIEGE.hw - 90);
-        const y = SIEGE.cy + (Math.random() - 0.5) * 2 * (SIEGE.hh - 70);
+        const x = COURT.cx + (Math.random() - 0.5) * 2 * (COURT.hw + 40);
+        const y = COURT.cy + (Math.random() - 0.5) * 2 * (COURT.hh + 20);
         if (wards.some((w) => Math.hypot(x - w.x, y - w.y) <= w.a + 30)) continue;
         sys.fx(x, y, 0, BFX_BOLT);
         made++;
