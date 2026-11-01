@@ -10,6 +10,10 @@ import {
   BFX_MTHRUST,
   BFX_MSWING,
   BFX_DRIFT,
+  BFX_BOLT,
+  BFX_RALLY,
+  BFX_SUMMON,
+  BFX_SLAM,
   MELEE_TEAM_ALLY,
   MELEE_TEAM_BOSS,
   MELEE_TEAM_ENEMY,
@@ -187,6 +191,11 @@ export async function createBossFx(d: BossFxDeps) {
     orb: ["boss9_orb", [0, 1, 2]],
     flurryArc: ["boss5_flurry_arc", [0, 1, 2]],
     oil: ["boss10_oil", [0, 1, 2, 3]],
+    ward: ["boss10_ward", [0, 1, 2, 3]],
+    bolt: ["boss10_bolt", [0, 1, 2, 3]],
+    rally: ["boss10_rally", [0, 1, 2, 3]],
+    summon: ["boss10_summon", [0, 1, 2, 3]],
+    slam: ["boss10_slam", [0, 1, 2, 3, 4]],
     flurryHit: ["boss5_flurry_hit", [0, 1, 2]],
     riceGlint: ["rice_glint", [0, 1]],
     riceEat: ["rice_eat", [0, 1, 2]],
@@ -254,11 +263,11 @@ export async function createBossFx(d: BossFxDeps) {
 
   // --- 효과 컷(순서대로) ---------------------------------------------------------
   const seqFx: { sp: Sprite; frames: Tex[]; age: number; dur: number; maxA: number }[] = [];
-  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5, flipY = false, maxA = 1, tint = 0xffffff) => {
+  const playSeq = (frames: Tex[], x: number, y: number, dur: number, scale: number, rot: number, anchorX = 0.5, flipY = false, maxA = 1, tint = 0xffffff, anchorY = 0.5) => {
     const f = first(frames);
     if (!f || seqFx.length > 60) return;
     const sp = new Sprite(f);
-    sp.anchor.set(anchorX, 0.5);
+    sp.anchor.set(anchorX, anchorY);
     sp.scale.set(scale, flipY ? -scale : scale);
     sp.rotation = rot;
     sp.tint = tint;
@@ -345,6 +354,17 @@ export async function createBossFx(d: BossFxDeps) {
     } else if (val === BFX_MACEBOOM) {
       if (!d.maceBoom(x, y, ang * 100)) playSeq(T.impact, x, y, 0.55, 1, 0);
       d.sound("skill_mace_hit", x, y);
+    } else if (val === BFX_BOLT) {
+      // 처형령 벼락: 위에서 내리꽂혀 닿는 자리에서 터진다(그림 아랫부분이 닿는 자리)
+      playSeq(T.bolt, x, y, 0.55, 0.7, 0, 0.5, false, 0.95, 0xffffff, 0.9);
+      d.sound("skill_wall_break", x, y, 0.5);
+    } else if (val === BFX_RALLY) {
+      playSeq(T.rally, x, y, 0.9, 2.2, 0, 0.5, false, 0.9, 0xffffff, 0.57);
+      d.sound("boss_warning", x, y, 0.8);
+    } else if (val === BFX_SUMMON) {
+      playSeq(T.summon, x, y, 1.0, 1.7, 0, 0.5, false, 0.95, 0xffffff, 0.79);
+    } else if (val === BFX_SLAM) {
+      playSeq(T.slam, x, y, 0.6, (len * 2) / 190, 0, 0.5, false, 0.9, 0xffffff, 0.64);
     } else if (val === BFX_DRIFT) {
       // 전차 장군 급선회 파쇄: 꼬리(바퀴)가 후방 부채꼴을 쓸며 흙먼지가 퍼지고, 바퀴 자국 호와 충격이 남는다
       const half = (Math.PI * 100) / 180;
@@ -870,7 +890,25 @@ export async function createBossFx(d: BossFxDeps) {
   let edictNow: { rule: number; left: number; grace: boolean } | null = null;
 
   /** 결계(처형령에서 안전한 곳): 푸른 빛의 원과 돌아가는 룬 */
+  const wardSprites = new Map<number, Sprite>();
+  const wardSeen = new Set<number>();
   const drawWard = (id: number, x: number, y: number, r: number, now: number): void => {
+    const wt = pick(T.ward, Math.floor(now / 160 + id) % 3); // 반복 컷(0~2). 마지막 컷은 사라질 때용이라 반복에서 뺀다
+    if (wt) {
+      let sp = wardSprites.get(id);
+      if (!sp) {
+        sp = new Sprite(wt);
+        sp.anchor.set(0.5, 0.5);
+        d.groundFx.addChild(sp);
+        wardSprites.set(id, sp);
+      }
+      wardSeen.add(id);
+      sp.texture = wt;
+      sp.scale.set((r * 2.1) / Math.max(1, wt.width));
+      sp.position.set(x, y);
+      sp.alpha = 0.95;
+      return;
+    }
     const pulse = 0.5 + 0.5 * Math.sin(now / 160 + id);
     caltropG.ellipse(x, y, r, r * 0.72).fill({ color: 0x9ae0ff, alpha: 0.3 + 0.15 * pulse }).stroke({ width: 6, color: 0xe6f8ff, alpha: 1 });
     caltropG.ellipse(x, y, r * 0.7, r * 0.5).stroke({ width: 2, color: 0x9ad8ff, alpha: 0.55 });
@@ -889,6 +927,12 @@ export async function createBossFx(d: BossFxDeps) {
     necroG.clear();
     wallG.clear();
     caltropG.clear();
+    for (const [wid, wsp] of wardSprites) {
+      if (wardSeen.has(wid)) continue;
+      wsp.destroy();
+      wardSprites.delete(wid);
+    }
+    wardSeen.clear();
     for (const [oid, osp] of oilSprites) {
       if (oilSeen.has(oid)) continue;
       osp.destroy();

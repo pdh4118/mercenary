@@ -31,7 +31,7 @@
 | 기마궁수 본체 2포즈·이펙트 | 받음, 보관 (`assets/units/boss7_gallop`, `boss7_shoot`, `assets/fx/boss7_fire_0~2`, `boss7_fire_out`, `boss7_lasso`, `boss7_lasso_hit`, `boss7_bound`, `boss7_cornered_0~2`). **후방 사격 `boss7_back`은 못 씀**: 한 칸에 두 자세가 서로 겹쳐 그려져 있어 떼어 낼 수 없다. 다시 받아야 한다(한 자세만 따로, 말 위에서 몸을 뒤로 틀어 왼쪽으로 쏘는 모습) |
 | 전차 본체 2상태·이펙트 | 받음, 보관 (`assets/units/boss8_normal`, `boss8_mad`(광분, 바퀴가 붉게 달아오른 모습)와 같은 시안의 다른 한 장 `boss8_normal_b`, `boss8_mad_b`, `assets/fx/boss8_rampage_0~3`, `boss8_crash_1~4`, `boss8_dazed_0~3`, `boss8_scythe_0~3`, `boss8_heat_0~3`, `boss8_dust_0~3`). 시안에 같은 상태가 두 장씩 세로로 붙어 있어 가까운 쪽으로 갈라 냈다(`_b` 쪽은 가장자리에 다른 그림 조각이 조금 남아 있다). 충돌 섬광 `boss8_crash_0`은 흰 섬광이라 못 씀(`boss1_impact_0`으로 대신) |
 | 공성전 1차 그림 | 적용됨(베타 1.190): `assets/units/boss10_idle·scepter·cast`(군주), `boss10_guard_*`(근위대·정예 기병), `assets/fx/boss10_gate_0~2·open·ruin`(성문), `boss10_wall_a~c`·`boss10_tower`(성벽·탑), `boss10_oil_0~3`(끓는 기름). 시트의 칸 선은 `tools/slice_siege.py`로 지웠다 |
-| 공성전 이펙트 6종 | **아직 못 받음**: 결계 `boss10_ward`, 벼락 `boss10_bolt`, 호령 `boss10_rally`, 근위대 소집 `boss10_summon`, 홀 내려찍기 `boss10_slam`, 바위 `boss10_boulder`(받은 그림이 파일로 전달되지 않았다. 다시 보내 주세요) |
+| 공성전 이펙트 5종 | 적용됨(베타 1.191): 결계 `boss10_ward_0~3`, 벼락 `boss10_bolt_0~3`, 호령 `boss10_rally_0~3`, 근위대 소집 `boss10_summon_0~3`, 홀 내려찍기 `boss10_slam_0~4`. 칸마다 같은 기준점으로 잘랐다(`tools/slice_siege.py --cells`). **아직 못 받음**: 성루 투석 바위 `boss10_boulder` |
 | 효과음·음악 | 이 문서 10번 |
 | 스페이스 스킬 아이콘 6종 | 완료, 적용됨 (`assets/ui/skill_icon_*.png`, 철퇴는 시안 2개 중 `skill_icon_mace`를 쓰고 `skill_icon_mace_b`는 보관) |
 | 방벽 상태 3컷(평면 띠 시안) | 보관 (`assets/fx/skill_wall_0~2.png`). 조각 그림이 있으면 쓰이지 않음 |

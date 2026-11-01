@@ -1,4 +1,4 @@
-import { BFX_IMPACT, BFX_MACEBOOM, BFX_ROAR, BOSS_CAV, BOSS_LORD as C, BSK_ARROWSTORM, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_EXECUTE, HZ_WARD, TELE_BAND, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, EF_INVULN, GATE_X, GATE_Y, HZ_EDICT, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TELE_CIRCLE } from "@mercenary/shared";
+import { BFX_BOLT, BFX_IMPACT, BFX_MACEBOOM, BFX_RALLY, BFX_SLAM, BFX_SUMMON, BOSS_CAV, BOSS_LORD as C, BSK_ARROWSTORM, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_EXECUTE, HZ_WARD, TELE_BAND, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, EF_INVULN, GATE_X, GATE_Y, HZ_EDICT, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TELE_CIRCLE } from "@mercenary/shared";
 import type { Foe } from "../game.js";
 import type { Ctx, KitDef, SkillDef } from "./types.js";
 
@@ -203,7 +203,7 @@ const guards: SkillDef = {
     const { e, k, sys } = c;
     if (k.ph === 0 && k.t <= 0) {
       (sys.g as any).spawnGuards();
-      sys.fx(e.x, e.y + 90, 0, BFX_ROAR);
+      sys.fx(e.x, e.y + 90, 0, BFX_SUMMON);
       k.ph = 1;
       k.t = 0.8;
     } else if (k.ph === 1 && k.t <= 0) sys.end(c);
@@ -225,6 +225,7 @@ const scepter: SkillDef = {
     if (k.ph === 0 && k.t <= 0) {
       for (const f of foes) if (sys.dist(f, e) <= C.scepterRadius + f.r) sys.hitFoe(e, f, C.scepterDmg, C.scepterKnock);
       sys.fx(e.x, e.y, C.scepterRadius / 100, BFX_MACEBOOM);
+      sys.fx(e.x, e.y, 0, BFX_SLAM, C.scepterRadius);
       k.ph = 1;
       k.t = C.scepterWaveDelay;
       k.total = C.scepterWaveDelay;
@@ -234,6 +235,7 @@ const scepter: SkillDef = {
         if (d > C.scepterRadius - f.r && d <= C.scepterWave + f.r) sys.hitFoe(e, f, C.scepterWaveDmg, 120);
       }
       sys.fx(e.x, e.y, C.scepterWave / 100, BFX_MACEBOOM);
+      sys.fx(e.x, e.y, 0, BFX_SLAM, C.scepterWave);
       k.ph = 2;
       k.t = 0.7;
     } else if (k.ph === 2 && k.t <= 0) sys.end(c);
@@ -260,7 +262,7 @@ const rally: SkillDef = {
         m.buffMult = C.rallyMult;
         m.dmgMult *= C.rallyMult;
       }
-      sys.fx(e.x, e.y, 0, BFX_ROAR);
+      sys.fx(e.x, e.y, 0, BFX_RALLY);
       k.ph = 1;
       k.t = 0.8;
     } else if (k.ph === 1 && k.t <= 0) sys.end(c);
@@ -293,7 +295,15 @@ const execute: SkillDef = {
       for (const f of foes) {
         if (wards.some((w) => Math.hypot(f.x - w.x, f.y - w.y) <= w.a)) continue; // 결계 안은 안전
         sys.pctHit(e, f, C.executePct);
-        sys.fx(f.x, f.y, 0, BFX_IMPACT);
+        sys.fx(f.x, f.y, 0, BFX_BOLT);
+      }
+      // 볼거리: 결계 밖 빈 땅에도 벼락이 내리꽂힌다
+      for (let i = 0, made = 0; i < 40 && made < 6; i++) {
+        const x = SIEGE.cx + (Math.random() - 0.5) * 2 * (SIEGE.hw - 90);
+        const y = SIEGE.cy + (Math.random() - 0.5) * 2 * (SIEGE.hh - 70);
+        if (wards.some((w) => Math.hypot(x - w.x, y - w.y) <= w.a + 30)) continue;
+        sys.fx(x, y, 0, BFX_BOLT);
+        made++;
       }
       k.ph = 1;
       k.t = 1;

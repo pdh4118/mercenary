@@ -179,6 +179,10 @@ export const BFX_CHAINBREAK = 14; // 영혼 사슬이 끊어짐(ang = 사슬 방
 export const BFX_BACKSTEP = 11; // 뒤로 훌쩍 물러나는 먼지(ang = 물러나는 방향)
 export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)
 export const BFX_MTHRUST = 17; // 일반 근접 유닛(적·용병·주인공·장군 기본 공격)의 찌르기 줄기(ang = 방향, owner = 사거리 x 4 + 편)
+export const BFX_BOLT = 21; // 군주 처형령 벼락(맞은 자리, 위에서 내리꽂힌다)
+export const BFX_RALLY = 22; // 군주 호령: 군주 중심으로 번지는 진홍색 고리
+export const BFX_SUMMON = 23; // 군주 근위대 소집: 소환진(위치 = 소환진 중심)
+export const BFX_SLAM = 24; // 군주 홀 내려찍기 충격파(owner = 반지름)
 export const BFX_DRIFT = 20; // 전차 장군 급선회 파쇄: 후방 부채꼴로 먼지와 바퀴 자국이 퍼진다(ang = 후방, owner = 사거리)
 export const BFX_MSWING = 18; // 일반 근접 유닛의 휘두르기 호(ang = 방향, owner = 사거리 x 4 + 편)
 export const MELEE_TEAM_ALLY = 0; // 내 편(주인공·용병)
