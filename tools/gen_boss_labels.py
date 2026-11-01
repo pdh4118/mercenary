@@ -5,7 +5,7 @@ bossskill.ts에 수치를 추가한 뒤 `python3 tools/gen_boss_labels.py`로 �
 import re, json, sys, pathlib
 root = pathlib.Path(__file__).resolve().parent.parent
 src = (root / "shared/src/bossskill.ts").read_text()
-BOSSES = {"BOSS_CAV": "기병 장군", "BOSS_SPEAR": "창병 장군", "BOSS_ARCHER": "궁병 장군", "BOSS_SHIELD": "검방병 장군", "BOSS_BLUNT": "둔기병 장군", "BOSS_MAGE": "마법사 장군", "BOSS_MOUNT": "기마궁수", "BOSS_CHARIOT": "전차", "BOSS_NECRO": "네크로맨서"}
+BOSSES = {"BOSS_CAV": "기병 장군", "BOSS_SPEAR": "창병 장군", "BOSS_ARCHER": "궁병 장군", "BOSS_SHIELD": "검방병 장군", "BOSS_BLUNT": "둔기병 장군", "BOSS_MAGE": "마법사 장군", "BOSS_MOUNT": "기마궁수", "BOSS_CHARIOT": "전차", "BOSS_NECRO": "네크로맨서", "BOSS_LORD": "군주"}
 SUFFIX = [
     ("Strikes", "타격 횟수"), ("Fade", "사라지는 시간(초)"), ("Fan", "부채꼴 범위"), ("PerPlayer", "인원당 개수"), ("Area", "범위"), ("Crash", "부딪혀 기절(초)"), ("Dizzy", "어지러움(초)"), ("Pieces", "조각 수"), ("Absorb", "흡수량"), ("Threat", "위협 판단 거리"), ("Shots", "발사 수"), ("Flee", "도주 시간(초)"), ("Dps", "초당 피해"), ("Root", "속박 시간(초)"),
     ("Tele", "예고 시간(초)"), ("Cd", "재사용 대기(초)"), ("Dmg", "피해 배율"), ("Damage", "피해 배율"), ("Knock", "넉백 거리"),
@@ -24,6 +24,7 @@ PREFIX = {
     "BOSS_MAGE": {"blink": "순간이동", "meteor": "운석", "prison": "얼음 감옥", "ring": "확산 불꽃", "shield": "매직 쉴드"},
     "BOSS_MOUNT": {"break": "막혔을 때", "cornered": "궁지에 몰렸을 때", "flee": "도주", "hit": "치고 빠지기", "keep": "거리 유지", "lasso": "올가미 화살", "orbit": "선회 사격", "shot": "사격", "speed": "이동 속도", "blind": "실명 화살"},
     "BOSS_CHARIOT": {"accel": "가속 돌진", "drift": "급선회 파쇄", "front": "정면 충돌", "rampage": "폭주", "caltrop": "마름쇠 질주", "weak": "약점"},
+    "BOSS_LORD": {"catapult": "성루 투석", "oil": "끓는 기름", "wave": "필드 졸개 물량", "field": "필드 졸개 물량", "gate": "성문"},
     "BOSS_NECRO": {"chain": "영혼 사슬", "corpse": "시체", "drain": "생명 흡수", "fog": "암흑 안개", "keep": "거리 유지", "orb": "영혼 구슬(평타)", "revive": "뼈 소생", "skel": "스켈레톤"},
 }
 out = {}

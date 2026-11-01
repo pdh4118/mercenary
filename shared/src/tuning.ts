@@ -4,7 +4,7 @@ import { TUNE, MERC_STATS, ENEMY_STATS, MERC_BASE_PRICE, MERC_RESPAWN_SEC, ENEMY
 import { MERC_XP_NEED, TIER_HP, TIER_DMG } from "./tiers.js";
 import { WEAPONS, DIFFICULTY_REDUCTION, DIFFICULTY_NAMES } from "./index.js";
 import { CARD_TUNE, HERO_STATS, LEGEND_CONST, MERC_STAT_BASE, MERC_STAT_LABEL, RARITY, RARITY_NAMES, SCALE_CARD, rebuildCards, type MercStat } from "./cards.js";
-import { SUPPLY, BOSS_CAV, BOSS_SPEAR, BOSS_ARCHER, BOSS_SHIELD, BOSS_BLUNT, BOSS_MAGE, BOSS_MOUNT, BOSS_CHARIOT, BOSS_NECRO } from "./bossskill.js";
+import { SUPPLY, BOSS_CAV, BOSS_SPEAR, BOSS_ARCHER, BOSS_SHIELD, BOSS_BLUNT, BOSS_MAGE, BOSS_MOUNT, BOSS_CHARIOT, BOSS_NECRO, BOSS_LORD } from "./bossskill.js";
 import { BOSS_LABELS } from "./bosslabels.js";
 import { TENT, BOSS_BASIC } from "./rules.js";
 import { GHOST } from "./ghost.js";
@@ -352,7 +352,7 @@ function build(): Map<string, Entry> {
   });
 
   // --- 보스 스킬 수치(자동 이름표: shared/src/bosslabels.ts) ---
-  const bossObjs: Record<string, object> = { BOSS_CAV, BOSS_SPEAR, BOSS_ARCHER, BOSS_SHIELD, BOSS_BLUNT, BOSS_MAGE, BOSS_MOUNT, BOSS_CHARIOT, BOSS_NECRO };
+  const bossObjs: Record<string, object> = { BOSS_CAV, BOSS_SPEAR, BOSS_ARCHER, BOSS_SHIELD, BOSS_BLUNT, BOSS_MAGE, BOSS_MOUNT, BOSS_CHARIOT, BOSS_NECRO, BOSS_LORD };
   for (const [key, info] of Object.entries(BOSS_LABELS)) {
     const [objName, field] = key.split(".") as [string, string];
     const o = bossObjs[objName] as Record<string, number> | undefined;

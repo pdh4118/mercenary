@@ -5,6 +5,7 @@ import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
 import { createBossFx } from "./bossfx.js";
+import { createCastle, type Castle } from "./castle.js";
 import { bindAudioUi, createAudio } from "./audio.js";
 import { createMercPanel, isReady } from "./mercpanel.js";
 import {
@@ -68,6 +69,7 @@ import {
   TOURNAMENT_ARENA_RADIUS,
   meleeArc,
   TerrainMap,
+  inCastleZone,
   SPRITE_BY_ID,
   anchorOf,
   TK_PLATEAU,
@@ -391,6 +393,8 @@ async function main() {
     if (text !== null) loadingMsgEl.textContent = text;
     loadingEl.classList.toggle("open", text !== null);
   };
+  let castle: Castle | null = null; // 공성전의 성(스테이지 10)
+  let siegeSeen = 0; // 0 아직, 1 드러나는 중, 2 완성, 3 성문 붕괴(알림을 한 번씩만 띄우려고)
   let terrain: TerrainMap | null = null;
   let tviews: TView[] = [];
   let terrainSeq = 0;
@@ -2350,6 +2354,37 @@ async function main() {
     });
     // 장군 스킬 예고·장판·효과 컷
     bossFx.frame(latest.bt ?? [], latest.hz ?? [], latest.g?.stage ?? 1, ticker.deltaMS, performance.now());
+    {
+      // 공성전: 성이 서서히 드러나고(성벽이 솟고 그 자리의 바위·나무가 사라진다), 성문 체력이 보인다
+      const sg = latest.g?.siege ?? null;
+      if (sg && !castle) castle = createCastle(enemyLayer);
+      if (sg && castle) {
+        castle.update(sg.reveal / 100, sg.gate, sg.open, performance.now());
+        for (const tv of tviews) {
+          if (!inCastleZone(tv.x, tv.footY)) continue;
+          tv.sp.alpha = Math.max(0, 1 - sg.reveal / 35);
+          tv.sp.visible = tv.sp.alpha > 0.01;
+        }
+        if (siegeSeen === 0) say("땅이 갈라지며 성이 모습을 드러냅니다!", 4);
+        siegeSeen = 1;
+        if (sg.reveal >= 100 && siegeSeen === 1) {
+          siegeSeen = 2;
+          say("성이 완성되었습니다. 군주가 성을 지키고 있습니다", 4);
+        }
+        if (sg.open && siegeSeen < 3) {
+          siegeSeen = 3;
+          say("성문이 무너졌습니다! 군주를 쓰러뜨리세요", 5);
+        }
+      } else if (!sg && castle) {
+        castle.destroy();
+        castle = null;
+        siegeSeen = 0;
+        for (const tv of tviews) {
+          tv.sp.alpha = 1;
+          tv.sp.visible = true;
+        }
+      }
+    }
     bossFx.riceFrame(latest.rice ?? [], performance.now());
     bossFx.endEnemies();
     bullets.update(latest.bullets, k, (v, w) => {
@@ -3601,7 +3636,8 @@ async function main() {
         toastLeft = 1.2;
       }
       lastTourIn = tin;
-      if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · 보스군 도착까지 ${mmss(gi.timer)}${squadText}`;
+      if (gi.phase === "grow") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${gi.siege ? "군주의 성 공성전까지" : "보스군 도착까지"} ${mmss(gi.timer)}${squadText}`;
+      else if (gi.phase === "boss" && gi.siege) stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${bossLabel(gi.stage)}의 성 · ${gi.siege.open ? "성문 붕괴! 군주를 쓰러뜨리세요" : `성문 ${gi.siege.gate}%`}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}` : ""}`;
       else if (gi.phase === "boss") stageText.text = `스테이지 ${gi.stage}/${STAGE_COUNT} · ${bossLabel(gi.stage)}의 군대 ${gi.armyLeft}/${gi.armyTotal}${gi.rage > 0 ? ` · 격노 Lv.${gi.rage}${gi.timer > 0 ? ` (다음 ${gi.timer}초)` : " (최대)"}` : gi.timer > 0 ? ` · 격노까지 ${gi.timer}초` : ""}`;
       else if (gi.phase === "tournament") stageText.text = ""; // 위쪽 대진 배너가 대신한다
       else if ((gi.tourIn ?? 0) > 0) stageText.text = `스테이지 ${gi.stage} 클리어! 토너먼트가 ${gi.tourIn}초 뒤에 시작됩니다`;

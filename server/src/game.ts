@@ -282,6 +282,7 @@ import {
 import { resolveHit, type Hit, type HitResult } from "./combat.js";
 import { BossSystem } from "./boss/system.js";
 import type { BossKitState } from "./boss/types.js";
+import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, SIEGE, castleSolids, inCastleZone, type SiegeInfo } from "@mercenary/shared";
 import { SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
@@ -797,6 +798,8 @@ export class Game {
   // --- 지형 ---------------------------------------------------------------
   /** 이번 판의 지형(없으면 평지). 방이 게임을 시작할 때 generateTerrain()으로 만든다. */
   terrain: TerrainMap | null = null;
+  /** 공성전(스테이지 10): 성이 드러나는 중이거나 드러난 상태. 아니면 null */
+  siege: { t: number; solid: boolean; open: boolean; waveT: number; clock: number } | null = null;
   private terrainTrack: { o: { x: number; y: number }; px: number; py: number; r: number }[] = [];
 
   /** 이번 판의 지형을 새로 만든다(시작 지점 둘레는 비워 둔다) */
@@ -877,6 +880,7 @@ export class Game {
 
   reset(): void {
     this.terrain = null;
+    this.siege = null;
     const old = [...this.slots.values()];
     this.slots.clear();
     this.enemies.clear();
@@ -1288,6 +1292,7 @@ export class Game {
     this.terrainBegin();
     this.stepPlayers(dt);
     this.stepStage(dt);
+    this.stepSiege(dt);
     this.stepChests(dt);
     this.stepRice(dt);
     this.stepTents(dt);
@@ -1514,6 +1519,7 @@ export class Game {
       squads: this.squads.size,
       tourIn: Math.ceil(this.tourCountdown),
       tour: this.phase === "tournament" ? this.tourInfo() : null,
+      siege: this.siegeInfo(),
     };
   }
 
@@ -1707,6 +1713,122 @@ export class Game {
     }
   }
 
+  // --- 공성전(스테이지 10) -------------------------------------------------------
+
+  /** 스테이지 10에 들어가면 성이 드러나기 시작한다. instant면 곧바로 다 드러난 상태로(보스 연습·테스트) */
+  private siegeEnsure(instant: boolean): void {
+    if (!this.siege) {
+      this.siege = { t: instant ? SIEGE.revealSec : 0, solid: false, open: false, waveT: BOSS_LORD.waveFirst, clock: 0 };
+      this.terrain ??= new TerrainMap([], TOURNAMENT_ARENA_RADIUS + 60);
+      this.terrain.clearWhere((it) => inCastleZone(it[1], it[2])); // 성 자리와 성문 앞 마당의 바위·나무를 치운다
+    } else if (instant) this.siege.t = Math.max(this.siege.t, SIEGE.revealSec);
+    if (instant && !this.siege.solid) this.siegeSolidify();
+  }
+
+  /** 성벽이 단단해지고 성문이 선다 */
+  private siegeSolidify(): void {
+    const s = this.siege;
+    if (!s || s.solid || !this.terrain) return;
+    s.solid = true;
+    this.terrain.addSolids(castleSolids(), this.terrain.items.length + 7);
+    this.siegePlaceGate();
+  }
+
+  private siegePlaceGate(): void {
+    const s = this.siege;
+    if (!s || !s.solid || s.open) return;
+    this.boss.hazards = this.boss.hazards.filter((h) => h.kind !== HZ_GATE);
+    const hp = SIEGE.gateHp * (1 + 0.4 * Math.max(0, this.slots.size - 1));
+    this.boss.addHazard({ kind: HZ_GATE, x: GATE_X, y: GATE_Y, ang: 0, a: SIEGE.gateHalf, b: 100, t: 9999, total: 9999, hp, hpMax: hp, solid: 0, d: { ht: 30, idle: 0 } });
+  }
+
+  /** 성문이 부서졌다(장군 시스템이 부른다) */
+  siegeGateBroken(): void {
+    if (this.siege) this.siege.open = true;
+  }
+
+  private siegeInfo(): SiegeInfo | null {
+    const s = this.siege;
+    if (!s) return null;
+    const gate = this.boss.hazards.find((h) => h.kind === HZ_GATE && h.t > 0);
+    return { reveal: Math.round(Math.min(1, s.t / SIEGE.revealSec) * 100), gate: s.open ? 0 : gate ? Math.max(1, Math.ceil((100 * gate.hp) / gate.hpMax)) : 100, open: s.open };
+  }
+
+  private stepSiege(dt: number): void {
+    if (this.stage >= STAGE_COUNT && this.phase !== "tournament") this.siegeEnsure(false);
+    const s = this.siege;
+    if (!s) return;
+    s.t += dt;
+    if (!s.solid && s.t >= SIEGE.revealSec * SIEGE.solidAt) this.siegeSolidify();
+    if (this.phase === "boss" && this.autoSpawn) this.stepSiegeWaves(dt);
+  }
+
+  /** 군주가 성을 지키는 동안 필드에는 졸개가 끊임없이 몰려온다. 시간이 갈수록 무리가 커지고 간격이 짧아지며 졸개도 강해진다. */
+  private stepSiegeWaves(dt: number): void {
+    const s = this.siege!;
+    s.clock += dt;
+    s.waveT -= dt;
+    if (s.waveT > 0) return;
+    const C = BOSS_LORD;
+    s.waveT = Math.max(C.waveGapMin, C.waveGapStart - C.waveGapDrop * s.clock);
+    let field = 0;
+    for (const e of this.enemies.values()) if (!e.boss) field++;
+    const want = Math.min(C.waveMax, Math.round((C.waveBase + C.waveGrow * s.clock) * (1 + 0.25 * (this.slots.size - 1))), C.fieldCap - field);
+    if (want > 0) this.spawnSiegeWave(want);
+  }
+
+  /** 졸개 n기를 플레이어 둘레 먼 곳(성 반대쪽 위주)에서 등장시킨다. 만든 수를 돌려준다. */
+  spawnSiegeWave(n: number): number {
+    const alive = this.presentPlayers();
+    if (alive.length === 0) return 0;
+    const tgt = alive[Math.floor(this.rng() * alive.length)]!.state;
+    const half = WORLD_SIZE / 2 - 80;
+    let x = 0;
+    let y = half;
+    for (let k = 0; k < 10; k++) {
+      const ang = this.rng() * Math.PI * 2;
+      const r = 900 + this.rng() * 300;
+      const px = tgt.x + Math.cos(ang) * r;
+      const py = tgt.y + Math.sin(ang) * r;
+      if (Math.abs(px) < half && Math.abs(py) < half && !inCastleZone(px, py, 80)) {
+        x = px;
+        y = py;
+        break;
+      }
+      x = Math.max(-half, Math.min(half, (this.rng() - 0.5) * 2 * half));
+    }
+    const comp = armyComposition(this.stage, n);
+    const types: number[] = [];
+    comp.forEach((c, t) => { for (let i = 0; i < c; i++) types.push(t); });
+    const clock = this.siege?.clock ?? 0;
+    const hpM = 1 + Math.min(2, clock / 240);
+    const dmgM = 1 + Math.min(1, clock / 480);
+    let made = 0;
+    for (const type of types.slice(0, n)) {
+      const e = this.makeEnemy(clampToWorld(x + (this.rng() - 0.5) * 220, 14), clampToWorld(y + (this.rng() - 0.5) * 220, 14), type, {});
+      e.maxHp *= hpM;
+      e.hp *= hpM;
+      e.shield *= hpM;
+      e.shieldMax *= hpM;
+      e.dmgMult *= dmgM;
+      made++;
+    }
+    return made;
+  }
+
+  /** 보스 단계의 공성전: 군주는 성 안마당에 서 있고(성문이 부서질 때까지 무적), 졸개가 몰려오기 시작한다 */
+  private startSiegeBoss(): void {
+    this.siegeEnsure(true);
+    this.siegePlaceGate();
+    this.army = null;
+    const s = this.siege!;
+    s.clock = 0;
+    s.waveT = BOSS_LORD.waveFirst;
+    this.makeEnemy(SIEGE.lordX, SIEGE.lordY, bossTypeOf(this.stage), { boss: true, face: Math.PI / 2 });
+    this.armyTotal = 1;
+    this.armyBase = 1;
+  }
+
   /** 보스군 등장: 먼 곳에서 진형을 갖춘 채 병종별로 줄지어 행군해 온다 */
   private startArmy(): void {
     const alive = this.alivePlayers();
@@ -1717,6 +1839,10 @@ export class Game {
     this.boss.reset();
     this.rage = 0;
     this.rageT = 0;
+    if (this.stage >= STAGE_COUNT) {
+      this.startSiegeBoss();
+      return;
+    }
     const cx = alive.reduce((a, s) => a + s.state.x, 0) / alive.length;
     const cy = alive.reduce((a, s) => a + s.state.y, 0) / alive.length;
     const layout = armyLayout(this.stage, armySize(this.stage, this.slots.size));
@@ -2521,7 +2647,7 @@ export class Game {
       const y = clampToWorld(around.y + Math.sin(angle) * dist, 150);
       if ([...this.tents.values()].some((c) => Math.hypot(c.x - x, c.y - y) < 500)) continue;
       if ([...this.camps.values()].some((c) => Math.hypot(c.x - x, c.y - y) < 260)) continue; // 캠프와 겹치지 않게
-      if (this.terrain?.blocked(x, y, 90)) continue;
+      if (this.terrain?.blocked(x, y, 90) || (this.siege && inCastleZone(x, y, 100))) continue;
       this.spawnTentAt(x, y);
       return;
     }
@@ -3233,7 +3359,7 @@ export class Game {
       const x = clampToWorld(around.x + Math.cos(angle) * dist, 150);
       const y = clampToWorld(around.y + Math.sin(angle) * dist, 150);
       if ([...this.camps.values()].some((c) => Math.hypot(c.x - x, c.y - y) < 300)) continue;
-      if (this.terrain?.blocked(x, y, 90)) continue; // 바위·고지대 위에는 캠프를 세우지 않는다
+      if (this.terrain?.blocked(x, y, 90) || (this.siege && inCastleZone(x, y, 100))) continue; // 바위·고지대·성 자리에는 캠프를 세우지 않는다
       this.spawnCampAt(x, y, this.pickOffers());
       return;
     }
@@ -5142,7 +5268,7 @@ export class Game {
 
   /** 운석이 떨어져 폭발한다: 반경 안의 적(토너먼트에서는 상대 선수)에게 방패를 무시한 큰 피해. 중심이 가장 세고 가장자리는 약하다. */
   private landMeteor(x: number, y: number, radius: number, damage: number, ownerId: number, crit: boolean, src?: Merc): void {
-    this.boss.meteorBarriers(x, y, radius); // 얼음벽은 범위 공격이 맞은 조각마다 1회 깎인다
+    this.boss.meteorBarriers(x, y, radius, damage); // 얼음벽은 범위 공격이 맞은 조각마다 1회 깎인다
     this.pushEvent(EVT_METEOR, x, y, src ? 0 : 2, radius, ownerId); // owner = 쏜 플레이어, ang 2 = 주인공이 직접 쏜 마법(파랑), 용병 마법사는 초록
     const scale = (d: number) => 1 - TUNE.MAGE_FALLOFF * Math.min(1, d / radius);
     if (this.phase === "tournament") {

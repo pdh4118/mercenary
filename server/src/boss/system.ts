@@ -10,7 +10,10 @@ import {
   EVT_BOSSFX,
   EVT_INVULN,
   EVT_KNOCK,
+  BOSS_LORD,
   HZ_CALTROP,
+  HZ_GATE,
+  HZ_OIL,
   HZ_FIRE,
   HZ_GHOST,
   HZ_ICE,
@@ -410,6 +413,29 @@ export class BossSystem {
       }
       h.t -= dt;
       switch (h.kind) {
+        case HZ_GATE: {
+          // 성문: 한동안 맞지 않으면 천천히 회복한다
+          h.d.idle = (h.d.idle ?? 0) + dt;
+          if (h.d.idle > BOSS_LORD.gateRegenWait && h.hp < h.hpMax) {
+            h.hp = Math.min(h.hpMax, h.hp + (h.hpMax * BOSS_LORD.gateRegenPct * dt) / 100);
+            h.b = Math.ceil((100 * h.hp) / h.hpMax);
+          }
+          break;
+        }
+        case HZ_OIL: {
+          // 끓는 기름: 0.5초마다 안에 있는 아군에게 피해, 위에 서 있는 동안 느려진다
+          h.tick -= dt;
+          const boss = src(h.src);
+          const hurt = h.tick <= 0;
+          if (hurt) h.tick += 0.5;
+          if (!boss) break;
+          for (const f of friendlies) {
+            if (Math.hypot(f.x - h.x, f.y - h.y) > h.a + f.radius * 0.5) continue;
+            f.status(ST_SLOW, 0.7, BOSS_LORD.oilSlowMult);
+            if (hurt) this.hitFriendly(boss, f, h.dmg, 0);
+          }
+          break;
+        }
         case HZ_CALTROP: {
           // 마름쇠: 밟은 아군에게 피해와 둔화(한 무더기가 같은 대상을 두 번 찌르지 않는다)
           const boss = src(h.src);
@@ -518,14 +544,14 @@ export class BossSystem {
 
   /** 막는 장애물(거대 방패·얼음벽·박힌 창·철퇴)이 아군(주인공·용병)을 통과시키지 않게 밀어낸다 */
   private pushOut(friendlies: Friendly[]): void {
-    const barriers = this.hazards.filter((h) => h.delay <= 0 && (h.solid > 0 || h.kind === HZ_SHIELD || h.kind === HZ_ICE));
+    const barriers = this.hazards.filter((h) => h.delay <= 0 && (h.solid > 0 || h.kind === HZ_SHIELD || h.kind === HZ_ICE || h.kind === HZ_GATE));
     if (barriers.length === 0) return;
     for (const f of friendlies) {
       let moved = false;
       let x = f.x;
       let y = f.y;
       for (const h of barriers) {
-        if (h.kind === HZ_SHIELD || h.kind === HZ_ICE) {
+        if (h.kind === HZ_SHIELD || h.kind === HZ_ICE || h.kind === HZ_GATE) {
           const c = Math.cos(h.ang);
           const s = Math.sin(h.ang);
           const dx = x - h.x;
@@ -584,10 +610,10 @@ export class BossSystem {
   /** 아군 투사체가 거대 방패·얼음벽에 막힌다. 막혔으면 true. (적 투사체는 거대 방패를 지나간다) */
   blockBullet(b: { hostile: boolean; damage: number; radius: number }, px: number, py: number): boolean {
     for (const h of this.hazards) {
-      if (h.delay > 0 || (h.kind !== HZ_SHIELD && h.kind !== HZ_ICE)) continue;
-      if (b.hostile && h.kind === HZ_SHIELD) continue;
+      if (h.delay > 0 || (h.kind !== HZ_SHIELD && h.kind !== HZ_ICE && h.kind !== HZ_GATE)) continue;
+      if (b.hostile && (h.kind === HZ_SHIELD || h.kind === HZ_GATE)) continue;
       if (!this.inRect(h, px, py, b.radius)) continue;
-      if (!b.hostile) this.damageBarrier(h, b.damage);
+      if (!b.hostile) this.damageBarrier(h, h.kind === HZ_GATE ? b.damage * BOSS_LORD.gateBulletMult : b.damage);
       return true;
     }
     return false;
@@ -597,9 +623,14 @@ export class BossSystem {
   private damageBarrier(h: Hazard, dmg: number): void {
     if (h.kind === HZ_ICE) h.hp -= 1;
     else h.hp -= dmg;
+    if (h.kind === HZ_GATE) {
+      h.d.idle = 0;
+      h.b = Math.max(0, Math.ceil((100 * h.hp) / h.hpMax));
+    }
     if (h.hp <= 0) {
       h.t = 0;
       this.g.pushEvent(EVT_BOSSFX, h.x, h.y, 0, h.kind === HZ_ICE ? BFX_ICEBREAK : BFX_SHIELDBREAK);
+      if (h.kind === HZ_GATE) (this.g as any).siegeGateBroken();
     }
   }
 
@@ -620,28 +651,28 @@ export class BossSystem {
         if (Math.hypot(x - h.x, y - h.y) <= reach + 18) this.hitCorpse(h);
         continue;
       }
-      if (h.delay > 0 || (h.kind !== HZ_SHIELD && h.kind !== HZ_ICE)) continue;
+      if (h.delay > 0 || (h.kind !== HZ_SHIELD && h.kind !== HZ_ICE && h.kind !== HZ_GATE)) continue;
       const dx = x - h.x;
       const dy = y - h.y;
       const u = Math.max(-h.a, Math.min(h.a, dx * Math.cos(h.ang) + dy * Math.sin(h.ang)));
       const cx = h.x + Math.cos(h.ang) * u;
       const cy = h.y + Math.sin(h.ang) * u;
       if (Math.hypot(x - cx, y - cy) > reach + (h.d.ht ?? 12) + 10) continue;
-      this.damageBarrier(h, dmg);
+      this.damageBarrier(h, h.kind === HZ_GATE ? dmg * BOSS_LORD.gateMeleeMult : dmg);
     }
   }
 
   /** 아군 운석이 얼음벽을 때린다(범위 공격은 맞은 조각마다 1회) */
-  meteorBarriers(x: number, y: number, radius: number): void {
+  meteorBarriers(x: number, y: number, radius: number, damage = 0): void {
     for (const h of this.hazards) {
       if (h.kind === HZ_CORPSE && h.t > 0 && Math.hypot(h.x - x, h.y - y) <= radius + 14) {
         h.hp = 0;
         this.hitCorpse(h, true); // 범위 공격은 시체를 한꺼번에 부순다
         continue;
       }
-      if (h.delay > 0 || h.kind !== HZ_ICE) continue;
+      if (h.delay > 0 || (h.kind !== HZ_ICE && h.kind !== HZ_GATE)) continue;
       if (Math.hypot(h.x - x, h.y - y) > radius + h.a) continue;
-      this.damageBarrier(h, 0);
+      this.damageBarrier(h, h.kind === HZ_GATE ? damage * BOSS_LORD.gateMeteorMult : 0);
     }
   }
 

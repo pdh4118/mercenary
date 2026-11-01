@@ -81,6 +81,8 @@ export class TerrainMap {
   private inArena: boolean[] = [];
   private duel = false;
   private grid = new Map<number, number[]>();
+  /** 중간에 치운 물체(공성전: 성 자리의 지형) */
+  private readonly dead = new Set<number>();
 
   constructor(readonly items: readonly TerrainWire[], arenaRadius = 0) {
     items.forEach((it, n) => {
@@ -111,19 +113,47 @@ export class TerrainMap {
       }
       this.inArena.push(arenaRadius > 0 && Math.hypot(x, y) < arenaRadius + extent);
     });
-    this.solids.forEach((c, idx) => {
-      const x0 = Math.floor((c.x - c.r) / CELL);
-      const x1 = Math.floor((c.x + c.r) / CELL);
-      const y0 = Math.floor((c.y - c.r) / CELL);
-      const y1 = Math.floor((c.y + c.r) / CELL);
-      for (let gx = x0; gx <= x1; gx++)
-        for (let gy = y0; gy <= y1; gy++) {
-          const k = key(gx, gy);
-          const cell = this.grid.get(k);
-          if (cell) cell.push(idx);
-          else this.grid.set(k, [idx]);
-        }
+    this.solids.forEach((_c, idx) => this.indexSolid(idx));
+  }
+
+  private indexSolid(idx: number): void {
+    const c = this.solids[idx]!;
+    const x0 = Math.floor((c.x - c.r) / CELL);
+    const x1 = Math.floor((c.x + c.r) / CELL);
+    const y0 = Math.floor((c.y - c.r) / CELL);
+    const y1 = Math.floor((c.y + c.r) / CELL);
+    for (let gx = x0; gx <= x1; gx++)
+      for (let gy = y0; gy <= y1; gy++) {
+        const k = key(gx, gy);
+        const cell = this.grid.get(k);
+        if (cell) cell.push(idx);
+        else this.grid.set(k, [idx]);
+      }
+  }
+
+  /** 판 도중에 단단한 원을 더한다(공성전 성벽). obj는 items 번호와 겹치지 않는 값 */
+  addSolids(list: readonly { x: number; y: number; r: number }[], obj: number): void {
+    for (const s of list) {
+      this.solids.push({ x: s.x, y: s.y, r: s.r, arrow: true, obj });
+      this.indexSolid(this.solids.length - 1);
+    }
+    this.nav = null;
+  }
+
+  /** 조건에 맞는 지형 물체(items 번호)를 치운다. 치운 개수를 돌려준다 */
+  clearWhere(pred: (it: TerrainWire, n: number) => boolean): number {
+    let k = 0;
+    this.items.forEach((it, n) => {
+      if (!this.dead.has(n) && pred(it, n)) {
+        this.dead.add(n);
+        k++;
+      }
     });
+    if (k > 0) this.nav = null;
+    return k;
+  }
+  isDead(n: number): boolean {
+    return this.dead.has(n);
   }
 
   /** 토너먼트 중에는 경기장에 걸친 지형이 사라진다 */
@@ -131,7 +161,7 @@ export class TerrainMap {
     this.duel = on;
   }
   private live(obj: number): boolean {
-    return !(this.duel && this.inArena[obj]);
+    return !this.dead.has(obj) && !(this.duel && this.inArena[obj]);
   }
 
   /** 이 물체가 지금 있는 것으로 치는가(토너먼트 중에는 경기장에 걸친 것이 사라진다) */

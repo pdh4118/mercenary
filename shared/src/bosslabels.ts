@@ -2075,5 +2075,197 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "skill": "영혼 사슬",
   "label": "재사용 대기(초)",
   "hint": ""
+ },
+ "BOSS_LORD.firstDelay": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "등장 뒤 첫 스킬까지(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.idleMin": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "스킬 사이 쉬는 시간 최소(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.idleMax": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "스킬 사이 쉬는 시간 최대(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.catapultTele": {
+  "boss": "군주",
+  "skill": "성루 투석",
+  "label": "예고 시간(초)",
+  "hint": "성루 투석: 바위가 떨어지기까지(원 예고 시간)"
+ },
+ "BOSS_LORD.catapultShots": {
+  "boss": "군주",
+  "skill": "성루 투석",
+  "label": "발사 수",
+  "hint": "한 번에 쏘는 바위 수"
+ },
+ "BOSS_LORD.catapultGap": {
+  "boss": "군주",
+  "skill": "성루 투석",
+  "label": "간격",
+  "hint": "바위 사이 간격"
+ },
+ "BOSS_LORD.catapultRadius": {
+  "boss": "군주",
+  "skill": "성루 투석",
+  "label": "반경",
+  "hint": "바위 폭발 반지름"
+ },
+ "BOSS_LORD.catapultDmg": {
+  "boss": "군주",
+  "skill": "성루 투석",
+  "label": "피해 배율",
+  "hint": "바위 피해(배율)"
+ },
+ "BOSS_LORD.catapultKnock": {
+  "boss": "군주",
+  "skill": "성루 투석",
+  "label": "넉백 거리",
+  "hint": ""
+ },
+ "BOSS_LORD.catapultRange": {
+  "boss": "군주",
+  "skill": "성루 투석",
+  "label": "사용 거리",
+  "hint": "군주 기준 이 거리 안의 대상을 노린다"
+ },
+ "BOSS_LORD.catapultCd": {
+  "boss": "군주",
+  "skill": "성루 투석",
+  "label": "재사용 대기(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.oilTele": {
+  "boss": "군주",
+  "skill": "끓는 기름",
+  "label": "예고 시간(초)",
+  "hint": "끓는 기름: 깔리기 전 예고"
+ },
+ "BOSS_LORD.oilPatches": {
+  "boss": "군주",
+  "skill": "끓는 기름",
+  "label": "한 번에 깔리는 장판 수",
+  "hint": "한 번에 깔리는 장판 수"
+ },
+ "BOSS_LORD.oilRadius": {
+  "boss": "군주",
+  "skill": "끓는 기름",
+  "label": "반경",
+  "hint": ""
+ },
+ "BOSS_LORD.oilSec": {
+  "boss": "군주",
+  "skill": "끓는 기름",
+  "label": "지속 시간(초)",
+  "hint": "장판이 남는 시간"
+ },
+ "BOSS_LORD.oilDmg": {
+  "boss": "군주",
+  "skill": "끓는 기름",
+  "label": "피해 배율",
+  "hint": "0.5초마다 들어오는 피해(배율)"
+ },
+ "BOSS_LORD.oilSlowMult": {
+  "boss": "군주",
+  "skill": "끓는 기름",
+  "label": "배율",
+  "hint": "장판 위 이동 속도 배율"
+ },
+ "BOSS_LORD.oilGateRange": {
+  "boss": "군주",
+  "skill": "끓는 기름",
+  "label": "사용 거리",
+  "hint": "성문 둘레 이 거리 안의 대상을 노린다"
+ },
+ "BOSS_LORD.oilCd": {
+  "boss": "군주",
+  "skill": "끓는 기름",
+  "label": "재사용 대기(초)",
+  "hint": ""
+ },
+ "BOSS_LORD.waveFirst": {
+  "boss": "군주",
+  "skill": "필드 졸개 물량",
+  "label": "첫 무리까지",
+  "hint": "첫 무리까지(초)"
+ },
+ "BOSS_LORD.waveGapStart": {
+  "boss": "군주",
+  "skill": "필드 졸개 물량",
+  "label": "무리 사이 간격",
+  "hint": "무리 사이 간격(처음)"
+ },
+ "BOSS_LORD.waveGapMin": {
+  "boss": "군주",
+  "skill": "필드 졸개 물량",
+  "label": "최소",
+  "hint": "무리 사이 간격(가장 짧게)"
+ },
+ "BOSS_LORD.waveGapDrop": {
+  "boss": "군주",
+  "skill": "필드 졸개 물량",
+  "label": "1초마다 줄어드는 간격",
+  "hint": "1초마다 줄어드는 간격"
+ },
+ "BOSS_LORD.waveBase": {
+  "boss": "군주",
+  "skill": "필드 졸개 물량",
+  "label": "무리 하나의 처음 수",
+  "hint": "무리 하나의 처음 수"
+ },
+ "BOSS_LORD.waveGrow": {
+  "boss": "군주",
+  "skill": "필드 졸개 물량",
+  "label": "1초마다 늘어나는 수",
+  "hint": "1초마다 늘어나는 수"
+ },
+ "BOSS_LORD.waveMax": {
+  "boss": "군주",
+  "skill": "필드 졸개 물량",
+  "label": "최대",
+  "hint": "무리 하나의 최대 수"
+ },
+ "BOSS_LORD.fieldCap": {
+  "boss": "군주",
+  "skill": "필드 졸개 물량",
+  "label": "필드에 동시에 있을 수 있는 졸개 수 상한",
+  "hint": "필드에 동시에 있을 수 있는 졸개 수 상한"
+ },
+ "BOSS_LORD.gateMeleeMult": {
+  "boss": "군주",
+  "skill": "성문",
+  "label": "배율",
+  "hint": "성문이 근접·주문에 받는 피해 배율"
+ },
+ "BOSS_LORD.gateBulletMult": {
+  "boss": "군주",
+  "skill": "성문",
+  "label": "배율",
+  "hint": "성문이 화살 등에 받는 피해 배율"
+ },
+ "BOSS_LORD.gateMeteorMult": {
+  "boss": "군주",
+  "skill": "성문",
+  "label": "배율",
+  "hint": "성문이 운석에 받는 피해 배율"
+ },
+ "BOSS_LORD.gateRegenWait": {
+  "boss": "군주",
+  "skill": "성문",
+  "label": "이만큼 안 맞으면 성문이 회복을 시작한다",
+  "hint": "이만큼 안 맞으면 성문이 회복을 시작한다"
+ },
+ "BOSS_LORD.gateRegenPct": {
+  "boss": "군주",
+  "skill": "성문",
+  "label": "회복 속도",
+  "hint": "회복 속도(초당 체력 %)"
  }
 };

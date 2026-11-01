@@ -14,6 +14,8 @@ export * from "./terrain.js";
 export * from "./voice.js";
 export * from "./cardsummary.js";
 export * from "./ghost.js";
+export * from "./siege.js";
+import type { SiegeInfo } from "./siege.js";
 import { ARCHER, BLUNT, CAVALRY, MAGE, SHIELD, SPEAR } from "./rules.js";
 import type { HazardWire, TeleWire } from "./bossskill.js";
 
@@ -272,6 +274,7 @@ export interface GameInfo {
   squads: number; // 지금 다가오는 소대 수
   tourIn?: number; // 토너먼트가 시작되기까지 남은 초(예고 중일 때만, 아니면 0)
   tour?: TourInfo | null; // 토너먼트 단계에서만
+  siege?: SiegeInfo | null; // 공성전(스테이지 10)에서만
 }
 
 /** 토너먼트 진행 상황(토너먼트 단계일 때만 있다) */

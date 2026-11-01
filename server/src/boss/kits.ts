@@ -8,6 +8,7 @@ import { mageKit } from "./mage.js";
 import { mountedKit } from "./mounted.js";
 import { chariotKit } from "./chariot.js";
 import { necroKit } from "./necro.js";
+import { lordKit } from "./lord.js";
 
 /** 스테이지 번호 → 그 스테이지 장군의 스킬 목록 */
 export const KITS: Record<number, KitDef> = {
@@ -20,4 +21,5 @@ export const KITS: Record<number, KitDef> = {
   7: mountedKit,
   8: chariotKit,
   9: necroKit,
+  10: lordKit,
 };

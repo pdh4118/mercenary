@@ -70,6 +70,7 @@ import {
   EF_WHIRL,
   HZ_FIRE,
   HZ_CALTROP,
+  HZ_OIL,
   HZ_GHOST,
   HZ_ICE,
   HZ_MACE,
@@ -810,6 +811,24 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
+  /** 끓는 기름 장판(그림 없이 코드로 그린다): 예고 중에는 붉은 원, 깔리면 검갈색 웅덩이에서 거품이 올라오고 가장자리가 타오른다 */
+  const drawOil = (id: number, x: number, y: number, r: number, left: number, state: number, now: number): void => {
+    if (state === 0) {
+      const pulse = 0.5 + 0.5 * Math.sin(now / 70 + id);
+      caltropG.ellipse(x, y, r, r * 0.7).fill({ color: 0xff7a2a, alpha: 0.1 + 0.14 * pulse }).stroke({ width: 3, color: 0xff9a4a, alpha: 0.5 + 0.35 * pulse });
+      return;
+    }
+    const fade = Math.min(1, left / 10 / 0.8);
+    caltropG.ellipse(x, y, r, r * 0.7).fill({ color: 0x2a1a0c, alpha: 0.72 * fade }).stroke({ width: 3, color: 0xff8a3a, alpha: 0.7 * fade });
+    caltropG.ellipse(x - r * 0.15, y - r * 0.1, r * 0.6, r * 0.4).fill({ color: 0x4a2c12, alpha: 0.5 * fade });
+    for (let i = 0; i < 6; i++) {
+      const ph = (now / 600 + i * 0.37 + id * 0.11) % 1;
+      const bx = x + Math.cos(i * 2.4 + id) * r * 0.62;
+      const by = y + Math.sin(i * 1.9 + id) * r * 0.4 - ph * 14;
+      caltropG.circle(bx, by, 3 + (1 - ph) * 3).stroke({ width: 1.5, color: 0xffb25a, alpha: (1 - ph) * 0.85 * fade });
+    }
+  };
+
   const frame = (bt: TeleWire[], hz: HazardWire[], stage: number, dtMs: number, now: number) => {
     drawWhirls(now);
     drawThrustCores(dtMs);
@@ -828,6 +847,10 @@ export async function createBossFx(d: BossFxDeps) {
       seen.add(id);
       if (kind === HZ_CALTROP) {
         drawCaltrop(id, x, y, a, left, state, now);
+        continue;
+      }
+      if (kind === HZ_OIL) {
+        drawOil(id, x, y, a, left, state, now);
         continue;
       }
       let v = hzViews.get(id);

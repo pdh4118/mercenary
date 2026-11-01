@@ -35,6 +35,8 @@ export const BSK_BLINDARROW = 28; // 기마궁수: 실명 화살(맞으면 시�
 export const BSK_LASSO = 29; // 기마궁수: 올가미 화살
 export const BSK_ACCEL = 30; // 전차: 가속 돌진
 export const BSK_CALTROP = 31; // 전차: 마름쇠 질주
+export const BSK_CATAPULT = 40; // 군주: 성루 투석
+export const BSK_OIL = 41; // 군주: 끓는 기름
 export const BSK_DRIFT = 32; // 전차: 급선회 파쇄
 export const BSK_RAMPAGE = 33; // 전차: 폭주
 export const BSK_FOG = 34; // 네크로맨서: 암흑 안개
@@ -79,6 +81,8 @@ export const BOSS_SKILL_NAMES: Record<number, string> = {
   [BSK_LASSO]: "올가미 화살",
   [BSK_ACCEL]: "가속 돌진",
   [BSK_CALTROP]: "마름쇠 질주",
+  [BSK_CATAPULT]: "성루 투석",
+  [BSK_OIL]: "끓는 기름",
   [BSK_DRIFT]: "급선회 파쇄",
   [BSK_RAMPAGE]: "폭주",
 };
@@ -110,6 +114,8 @@ export const HZ_LEECH = 11; // 생명 흡수 선: 위치 = 보스, 방향 = 대�
 export const HZ_CHAIN = 12; // 영혼 사슬: 위치 = 보스, 방향 = 대상 쪽, a = 길이, b = 남은 끊기 횟수
 export const HZ_DRAINRING = 13; // 생명 흡수 범위 고리: a = 반지름(예고 중에는 state 0)
 export const HZ_CALTROP = 14; // 마름쇠: a = 반지름(예고 중에는 state 0), 밟으면 피해와 둔화
+export const HZ_GATE = 15; // 성문(공성전): 위치 = 성문 중심, a = 반길이, b = 남은 체력 %
+export const HZ_OIL = 16; // 끓는 기름 장판(공성전): a = 반지름(예고 중에는 state 0)
 export const HZ_RING = 8; // 퍼지는 불꽃 고리: a = 현재 반지름, b = 틈 반각(라디안), 방향 = 틈 중심
 export type HazardWire = [id: number, kind: number, x: number, y: number, ang: number, a: number, b: number, left: number, total: number, state: number];
 
@@ -583,6 +589,43 @@ export const SUPPLY = {
   riceRadius: 36,
   healFrac: 0.2, // 회복량 = 최대 체력의 20% + healFlat
   healFlat: 15,
+} as const;
+
+/** 군주(스테이지 10, 공성전) 수치. 제안값이라 플레이하며 조정한다. */
+export const BOSS_LORD = {
+  firstDelay: 4,
+  idleMin: 1.6,
+  idleMax: 3,
+  catapultTele: 1.1, // 성루 투석: 바위가 떨어지기까지(원 예고 시간)
+  catapultShots: 4, // 한 번에 쏘는 바위 수
+  catapultGap: 0.55, // 바위 사이 간격
+  catapultRadius: 120, // 바위 폭발 반지름
+  catapultDmg: 4, // 바위 피해(배율)
+  catapultKnock: 120,
+  catapultRange: 1500, // 군주 기준 이 거리 안의 대상을 노린다
+  catapultCd: 7,
+  oilTele: 0.9, // 끓는 기름: 깔리기 전 예고
+  oilPatches: 4, // 한 번에 깔리는 장판 수
+  oilRadius: 95,
+  oilSec: 8, // 장판이 남는 시간
+  oilDmg: 2, // 0.5초마다 들어오는 피해(배율)
+  oilSlowMult: 0.7, // 장판 위 이동 속도 배율
+  oilGateRange: 520, // 성문 둘레 이 거리 안의 대상을 노린다
+  oilCd: 9,
+  // 물량: 보스 단계 동안 아래쪽에서 끊임없이 몰려온다
+  waveFirst: 6, // 첫 무리까지(초)
+  waveGapStart: 7, // 무리 사이 간격(처음)
+  waveGapMin: 3.2, // 무리 사이 간격(가장 짧게)
+  waveGapDrop: 0.05, // 1초마다 줄어드는 간격
+  waveBase: 6, // 무리 하나의 처음 수
+  waveGrow: 0.045, // 1초마다 늘어나는 수
+  waveMax: 18, // 무리 하나의 최대 수
+  fieldCap: 150, // 필드에 동시에 있을 수 있는 졸개 수 상한
+  gateMeleeMult: 1, // 성문이 근접·주문에 받는 피해 배율
+  gateBulletMult: 0.3, // 성문이 화살 등에 받는 피해 배율
+  gateMeteorMult: 2.2, // 성문이 운석에 받는 피해 배율
+  gateRegenWait: 6, // 이만큼 안 맞으면 성문이 회복을 시작한다
+  gateRegenPct: 1.5, // 회복 속도(초당 체력 %)
 } as const;
 
 /** 스테이지별 장군 호칭과 이름(스테이지 표시줄에 보인다). 10스테이지는 마지막 대장군이다. */
