@@ -51,7 +51,7 @@ const catapult: SkillDef = {
           return n > best.n ? { f, n } : best;
         }, { f: inR[0]!, n: 0 }).f;
       }
-      sys.addHazard({ kind: HZ_RAIN, x: jitter(tgt.x, 40), y: jitter(tgt.y, 40), a: C.catapultRadius, b: 1, delay: C.catapultTele, t: 0.35, total: 0.35, src: e.id, dmg: C.catapultDmg, d: { knock: C.catapultKnock } });
+      sys.addHazard({ kind: HZ_RAIN, x: jitter(tgt.x, 40), y: jitter(tgt.y, 40), a: C.catapultRadius, b: 2, delay: C.catapultTele, t: 0.35, total: 0.35, src: e.id, dmg: C.catapultDmg, d: { knock: C.catapultKnock } });
       k.d.shot!++;
       k.d.next = C.catapultGap;
       return;

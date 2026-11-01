@@ -79,7 +79,7 @@ test("공성전: 성루 투석은 큰 원 예고를 연달아 만든다", () => 
   for (let i = 0; i < TICK_RATE * 5; i++) {
     g.step();
     p.hp = p.maxHp;
-    for (const h of (g as any).boss.hazards as any[]) if (h.kind === HZ_RAIN && h.b === 1) ids.add(h.id);
+    for (const h of (g as any).boss.hazards as any[]) if (h.kind === HZ_RAIN && h.b === 2) ids.add(h.id);
   }
   assert.ok(ids.size >= BOSS_LORD.catapultShots, `바위 예고가 연달아 나온다(${ids.size})`);
   void b;
@@ -125,7 +125,7 @@ test("공성전: 화살 소나기는 성문 앞에 화살비를 여러 개 뿌�
   for (let i = 0; i < TICK_RATE * 3; i++) {
     g.step();
     p.hp = p.maxHp;
-    for (const h of (g as any).boss.hazards as any[]) if (h.kind === HZ_RAIN && h.b !== 1) ids.add(h.id);
+    for (const h of (g as any).boss.hazards as any[]) if (h.kind === HZ_RAIN && h.b !== 1 && h.b !== 2) ids.add(h.id);
   }
   assert.ok(ids.size >= BOSS_LORD.arrowCount, `화살비 ${ids.size}개`);
 });

@@ -214,6 +214,7 @@ export async function createBossFx(d: BossFxDeps) {
     drainBeam: "boss9_drain_beam",
     chainLink: "boss9_chain_link",
     riceDrop: "rice_drop",
+    boulder: "boss10_boulder",
   } as const;
   const loadTex = (url: string): Promise<Tex> => Assets.load<Texture>(url).catch(() => null);
   const oneLoaded = new Map<string, Tex>();
@@ -551,7 +552,7 @@ export async function createBossFx(d: BossFxDeps) {
         break;
       case HZ_RAIN: {
         if (state === 1) {
-          if (b === 1) {
+          if (b === 1 || b === 2) {
             const tex = pick(T.quake, Math.floor((1 - left / Math.max(1, total)) * 5));
             if (tex) sp.texture = tex;
             sp.anchor.set(0.5, 0.7);
@@ -588,7 +589,7 @@ export async function createBossFx(d: BossFxDeps) {
       case HZ_FIRE:
         return first(T.fire);
       case HZ_RAIN:
-        return b === 1 ? first(T.quake) : T.rainStuck;
+        return b === 1 || b === 2 ? first(T.quake) : T.rainStuck;
       case HZ_GHOST:
         return null;
       default:
@@ -890,6 +891,8 @@ export async function createBossFx(d: BossFxDeps) {
   let edictNow: { rule: number; left: number; grace: boolean } | null = null;
 
   /** 결계(처형령에서 안전한 곳): 푸른 빛의 원과 돌아가는 룬 */
+  const boulderSprites = new Map<number, Sprite>();
+  const boulderSeen = new Set<number>();
   const wardSprites = new Map<number, Sprite>();
   const wardSeen = new Set<number>();
   const drawWard = (id: number, x: number, y: number, r: number, now: number): void => {
@@ -927,6 +930,12 @@ export async function createBossFx(d: BossFxDeps) {
     necroG.clear();
     wallG.clear();
     caltropG.clear();
+    for (const [bid, bsp] of boulderSprites) {
+      if (boulderSeen.has(bid)) continue;
+      bsp.destroy();
+      boulderSprites.delete(bid);
+    }
+    boulderSeen.clear();
     for (const [wid, wsp] of wardSprites) {
       if (wardSeen.has(wid)) continue;
       wsp.destroy();
@@ -992,9 +1001,25 @@ export async function createBossFx(d: BossFxDeps) {
         }
         const remain = Math.max(0, ((v.endAt ?? now) - now) / 1000);
         const pr = Math.min(1, Math.max(0, 1 - remain / Math.max(0.1, v.t0 / 10)));
-        if (b === 1) {
+        if (b === 1 || b === 2) {
           teleG.circle(x, y, a).fill({ color: 0xff3a2a, alpha: 0.1 + 0.2 * pr }).stroke({ width: 2, color: 0xff3a2a, alpha: 0.7 });
           if (v.sp) v.sp.visible = false;
+          if (b === 2 && T.boulder) {
+            // 성루 투석: 바위가 위에서 날아와 원 안에 떨어진다(꼬리가 위를 향하도록 돌린다)
+            let bs = boulderSprites.get(id);
+            if (!bs) {
+              bs = new Sprite(T.boulder);
+              bs.anchor.set(0.6, 0.5);
+              bs.rotation = Math.PI / 2;
+              d.skyLayer.addChild(bs);
+              boulderSprites.set(id, bs);
+            }
+            boulderSeen.add(id);
+            const fall = (1 - pr) * (1 - pr);
+            bs.position.set(x, y - 30 - fall * 760);
+            bs.scale.set((a * 0.62) / Math.max(1, T.boulder.height) * (0.8 + 0.5 * pr));
+            bs.alpha = 1;
+          }
           continue;
         }
         // 화살비: 떨어질 자리를 또렷하게 알린다(진해지는 붉은 원 + 줄어드는 고리 + 십자 표시). 화살은 마지막 순간에만 아주 빠르게 내리꽂힌다.

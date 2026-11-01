@@ -410,7 +410,7 @@ export class BossSystem {
                 if (h.d.stun) f.status(ST_STUN, h.d.stun);
               }
             }
-            if (h.b === 1) this.g.pushEvent(EVT_BOSSFX, h.x, h.y, 0, BFX_IMPACT); // 철퇴 착탄만 충격 효과가 나온다(화살비는 땅에 박힌 화살만 남는다)
+            if (h.b === 1 || h.b === 2) this.g.pushEvent(EVT_BOSSFX, h.x, h.y, 0, BFX_IMPACT); // 철퇴 착탄만 충격 효과가 나온다(화살비는 땅에 박힌 화살만 남는다)
             h.t = 0.35;
             h.total = 0.35;
             h.d.fell = 1;
