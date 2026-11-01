@@ -26,9 +26,9 @@ export const UPGRADE_COST_MULT = [1.2, 2.2, 3.6, 5.5] as const;
 
 /** 용병 경험치: 다음 단계로 강화하려면 이만큼 모아야 한다(현재 단계 기준). 피해를 주고받으면 조금씩, 막타를 치면 많이 오른다. */
 export const MERC_XP_NEED = [200, 450, 900, 1600] as const;
-export const MERC_XP_PER_DAMAGE = 0.08; // 준 피해 1당
-export const MERC_XP_PER_HURT = 0.12; // 받은 피해 1당
-export const MERC_XP_KILL = 14; // 막타(보스는 x4). 적 병종과 무관한 기본값
+export const MERC_XP_PER_DAMAGE = 0.05; // 준 피해 1당
+export const MERC_XP_PER_HURT = 0.07; // 받은 피해 1당
+export const MERC_XP_KILL = 9; // 막타(보스는 x4). 적 병종과 무관한 기본값
 export const MERC_XP_OVERFLOW = 1.5; // 필요량의 이 배수까지는 쌓아 둔다
 export const mercXpNeed = (tier: number): number => MERC_XP_NEED[tier] ?? Infinity;
 
@@ -39,7 +39,11 @@ export const unitCost = (type: number, tier: number): number => (UNIT_COST[type]
 export const TIER_BUY_MULT = [1, 2.64, 5.28, 9.6, 16.2] as const;
 /** 캠프에 이 시간(초)이 지날 때마다 나올 수 있는 최고 단계가 1씩 오른다 */
 export const CAMP_TIER_SEC = 240;
-export const campMaxTier = (time: number): number => Math.min(MAX_TIER, Math.floor(time / CAMP_TIER_SEC));
+/** 상점(캠프)에서는 3단계까지만 나온다(4단계는 강화로만 만든다) */
+export const CAMP_TIER_CAP = 3;
+/** 단계가 높을수록 상점에 덜 나온다: 단계 t의 가중치 = CAMP_TIER_DECAY^t */
+export const CAMP_TIER_DECAY = 0.6;
+export const campMaxTier = (time: number): number => Math.min(CAMP_TIER_CAP, MAX_TIER, Math.floor(time / CAMP_TIER_SEC));
 /** 캠프 선택지는 병종 + 10 x 단계 한 숫자로 보낸다 */
 export const encodeOffer = (type: number, tier: number): number => type + 10 * tier;
 export const decodeOffer = (code: number): { type: number; tier: number } => ({ type: code % 10, tier: Math.floor(code / 10) });

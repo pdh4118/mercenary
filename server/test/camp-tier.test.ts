@@ -14,6 +14,7 @@ import {
   TIER_BUY_MULT,
   TIER_RESPAWN_EXTRA,
   campMaxTier,
+  CAMP_TIER_CAP,
   decodeOffer,
   encodeOffer,
   mercPrice,
@@ -56,7 +57,8 @@ test("강화에는 통솔력 +1이 필요하다", () => {
 test("캠프는 시간이 지날수록 높은 단계 용병을 내놓는다", () => {
   assert.equal(campMaxTier(0), 0);
   assert.equal(campMaxTier(CAMP_TIER_SEC * 2 + 1), 2);
-  assert.equal(campMaxTier(1e9), MAX_TIER);
+  assert.equal(campMaxTier(1e9), CAMP_TIER_CAP, "상점은 3단계까지만 나온다(4단계는 강화로만)");
+  assert.ok(CAMP_TIER_CAP < MAX_TIER);
   assert.deepEqual(decodeOffer(encodeOffer(3, 2)), { type: 3, tier: 2 });
   const tiersAt = (time: number) => {
     const g = new Game(() => Math.random());
@@ -72,7 +74,7 @@ test("캠프는 시간이 지날수록 높은 단계 용병을 내놓는다", ()
     return Math.max(...seen);
   };
   assert.equal(tiersAt(10), 0);
-  assert.ok(tiersAt(CAMP_TIER_SEC * 4 + 1) === MAX_TIER);
+  assert.equal(tiersAt(CAMP_TIER_SEC * 4 + 1), CAMP_TIER_CAP);
 });
 
 test("높은 단계 용병은 비싸게 사고, 단계 그대로 합류한다", () => {

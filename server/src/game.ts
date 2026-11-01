@@ -231,6 +231,7 @@ import {
   isTournamentStage,
   tournamentRoundName,
   CAMP_TIER_SEC,
+  CAMP_TIER_DECAY,
   SHAKEN_DEATHS,
   SQUAD_CLEAR_GOLD,
   SQUAD_FIRST_SEC,
@@ -3576,7 +3577,20 @@ export class Game {
     const offers: number[] = [];
     while (offers.length < CAMP_OFFERS && pool.length > 0) {
       const type = pool.splice(Math.floor(this.rng() * pool.length), 1)[0]!;
-      const tier = cap === 0 ? 0 : this.rng() < 0.45 ? cap : Math.floor(this.rng() * (cap + 1));
+      let tier = 0;
+      if (cap > 0) {
+        // 높은 단계일수록 덜 나온다(가중치 0.6^단계)
+        let total = 0;
+        for (let t = 0; t <= cap; t++) total += CAMP_TIER_DECAY ** t;
+        let roll = this.rng() * total;
+        for (let t = 0; t <= cap; t++) {
+          roll -= CAMP_TIER_DECAY ** t;
+          if (roll <= 0) {
+            tier = t;
+            break;
+          }
+        }
+      }
       offers.push(encodeOffer(type, tier));
     }
     return offers;
