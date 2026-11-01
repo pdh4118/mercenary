@@ -1037,3 +1037,5 @@ Also add one extra image captioned "boss10_wall_side_end": the same wall ending 
 동쪽 성벽은 같은 그림을 좌우로 뒤집어 씁니다(그래서 **왼쪽 면만** 그리라고 했습니다).
 
 받음·적용(베타 1.194): `assets/fx/boss10_wall_side_a~c`(옆 성벽 3종)와 `boss10_wall_side_end`(끝 마개, 아직 쓰지 않고 보관). 받은 그림은 비스듬한 등각 시점이라 정면 성벽과 시점이 조금 다르다.
+
+받음·적용(베타 1.195): `assets/fx/boss10_wall_front_a~c`(정면 성벽), `boss10_wall_side2_a~c`(윗면이 보이는 옆 성벽), `boss10_tower_round`(둥근 탑). 보관(아직 쓰지 않음): `boss10_wall_corner_left·right`, `boss10_wall_side2_end`, `boss10_stairs_left·right`(계단), `boss10_wall_archer_slot`(궁병 자리). 계단·궁병 자리는 성벽 위로 오르는 기능을 만들 때 쓴다.
