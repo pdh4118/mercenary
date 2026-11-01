@@ -1,7 +1,7 @@
 import { Assets, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
 import { GATE_X, GATE_Y, RAMP_HALF, RAMP_LEN, RAMP_Y, SIEGE, castleSolids, wallX } from "@mercenary/shared";
 
-const CASTLE_TEX = ["boss10_wall_a", "boss10_wall_b", "boss10_wall_c", "boss10_tower", "boss10_gate_0", "boss10_gate_1", "boss10_gate_2", "boss10_gate_open", "boss10_gate_ruin", "boss10_wall_side_a", "boss10_wall_side_b", "boss10_wall_side_c", "boss10_wall_side_end", "boss10_wall_front2_a", "boss10_wall_front2_b", "boss10_wall_front2_c", "boss10_tower_round2", "boss10_wall_front_a", "boss10_wall_front_b", "boss10_wall_front_c", "boss10_wall_side2_a", "boss10_wall_side2_b", "boss10_wall_side2_c", "boss10_tower_round"] as const;
+const CASTLE_TEX = ["boss10_wall_a", "boss10_wall_b", "boss10_wall_c", "boss10_tower", "boss10_gate_0", "boss10_gate_1", "boss10_gate_2", "boss10_gate_open", "boss10_gate_ruin", "boss10_wall_side_a", "boss10_wall_side_b", "boss10_wall_side_c", "boss10_wall_side_end", "boss10_wall_front2_a", "boss10_wall_front2_b", "boss10_wall_front2_c", "boss10_tower_round2", "boss10_wall_front_a", "boss10_wall_front_b", "boss10_wall_front_c", "boss10_wall_side4_a", "boss10_wall_side4_b", "boss10_wall_side4_c", "boss10_wall_side2_a", "boss10_wall_side2_b", "boss10_wall_side2_c", "boss10_tower_round"] as const;
 
 /**
  * 공성전의 성(그림 없이 코드로 그린다). 스테이지 10에 들어가면 성이 드러난 정도(reveal 0..1)에 따라 성벽 돌덩이가 하나씩 솟는다.
@@ -74,14 +74,14 @@ export function createCastle(layer: Container): Castle {
     if (hasNew) {
       // 새 성벽 세트: 정면 성벽(남북)·윗면이 보이는 옆 성벽(동서, 위아래로 이어 붙임)·둥근 탑(윗면이 넓어 궁병이 선다)
       const frontName = (i: number) => ((tex.boss10_wall_front2_a ? ["boss10_wall_front2_a", "boss10_wall_front2_b", "boss10_wall_front2_c"] : ["boss10_wall_front_a", "boss10_wall_front_b", "boss10_wall_front_c"]) as readonly string[])[Math.floor(hash(i + 9) * 3)]!;
-      const sideName = (i: number) => (["boss10_wall_side2_a", "boss10_wall_side2_b", "boss10_wall_side2_c"] as const)[Math.floor(hash(i + 21) * 3)]!;
+      const sideName = (i: number) => ((tex.boss10_wall_side4_a ? ["boss10_wall_side4_a", "boss10_wall_side4_b", "boss10_wall_side4_c"] : ["boss10_wall_side2_a", "boss10_wall_side2_b", "boss10_wall_side2_c"]) as readonly string[])[Math.floor(hash(i + 21) * 3)]!;
       const fs = 64 / Math.max(1, (tex.boss10_wall_front2_a ?? tex.boss10_wall_front_a)!.width - 12); // 정면 성벽 한 칸을 가로 약 64px로
       for (let x = x0 + 40; x < x1 - 30; x += 60) {
         add(frontName(n), x, y0 + 14, fs, 8, n++); // 북쪽
         if (Math.abs(x - GATE_X) > SIEGE.gateHalf + 70) add(frontName(n), x, y1 + 14, fs, 8, n++); // 남쪽(성문 둘레는 탑과 성문이 채운다)
       }
-      const sw = tex.boss10_wall_side2_a!;
-      const ss = 70 / Math.max(1, sw.width - 12); // 옆 성벽 통로 폭 약 70px
+      const sw = (tex.boss10_wall_side4_a ?? tex.boss10_wall_side2_a)!;
+      const ss = (tex.boss10_wall_side4_a ? 84 : 70) / Math.max(1, sw.width - 12); // 옆 성벽 통로 폭 약 70px
       const sh = (sw.height - 12) * ss - 4; // 위아래로 이어 붙이는 간격
       for (let y = y0 + 90; y < y1 - 60; y += sh) {
         add(sideName(n), x0, y, ss, 8, n++, false, true);

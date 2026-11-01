@@ -73,7 +73,7 @@ export const inCourtyard = (x: number, y: number): boolean => Math.abs(x - SIEGE
  * 계단 상자(ramp)는 성벽 안쪽에 붙은 가로로 긴 상자이고, 성벽 윗면(strip)은 성벽 중심선을 따라 세로로 긴 상자이다.
  */
 export const WALL_X = SIEGE.hw - 30; // 동·서 성벽 중심선의 중심에서의 거리
-export const WALL_STRIP_HALF = 30; // 성벽 윗면 통로의 절반 폭
+export const WALL_STRIP_HALF = 34; // 성벽 윗면 통로의 절반 폭
 export const WALL_STRIP_Y0 = SIEGE.cy - (SIEGE.hh - 30) + 90; // 통로가 시작하는 y(모서리 탑 아래)
 export const WALL_STRIP_Y1 = SIEGE.cy + (SIEGE.hh - 30) - 90;
 export const RAMP_Y = SIEGE.cy; // 계단의 가운데 y
