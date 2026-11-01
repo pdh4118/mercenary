@@ -1046,3 +1046,16 @@ Also add one extra image captioned "boss10_wall_side_end": the same wall ending 
 문제: 성벽이 납작해 높이감이 없고, 동서 성벽 윗면 통로가 좁아 궁병이 설 자리가 없어 보인다. 모든 조각을 **같은 카메라 규칙**으로 한 대화에서 이어서 요청한다(이미 받은 정면 성벽·탑 그림을 참고 이미지로 붙인다).
 
 공통 규칙: oblique (cabinet) projection, camera looks straight at the scene from the front and slightly down. Vertical faces face the viewer as flat undistorted rectangles. Ground depth is foreshortened to 0.5, so a walkway 100 units deep appears as a band 50 px tall on a front wall. Never isometric, never diagonal.
+
+### 12-9. 성벽 위 수비병(궁병·마법사, 성벽 위에 서 있음)
+
+```
+Hand-painted cartoon strategy-game character sheet, thick dark outlines, slightly desaturated colors, transparent background, generous empty margin (at least 20px) around every figure, no grid lines, no captions.
+Same camera and style as the attached royal guard units: a straight-on front view slightly from above, each figure facing right, about 120 x 130 px.
+Four elite wall defenders in a row, black plate armor with purple cape and gold trim like the royal guards, but standing on a castle wall:
+(1) "post_archer_aim": a royal guard archer standing upright in a ranged stance, drawing a long recurve war bow with an arrow aimed to the right, a quiver on the back.
+(2) "post_archer_idle": the same archer standing at ease, bow held low.
+(3) "post_mage_cast": a royal guard mage in black and purple robes raising a glowing staff with both hands, purple-gold energy swirling at its tip.
+(4) "post_mage_idle": the same mage standing at ease, staff planted on the ground.
+Each figure is drawn from the feet up with the feet clearly visible and flat (no ground, no shadow), so it can stand on a wall walkway.
+```

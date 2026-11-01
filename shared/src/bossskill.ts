@@ -693,6 +693,7 @@ export const BOSS_LORD = {
   postMax: 18,
   postRespawn: 4, // 모자라면 이 간격(초)마다 한 명씩 다시 나온다
   postMage: 0.3, // 마법사 비율
+  postReach: 1.9, // 사거리 배율(일반 궁병·마법사 대비)
   postHp: 1.5, // 수비병 체력 배율
   postDmg: 1.1,
   garrisonRow: 8, // 성 안 수비대: 줄마다 수(기본)

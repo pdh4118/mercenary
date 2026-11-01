@@ -5968,7 +5968,7 @@ export class Game {
         this.stepSupply(e, dt, friendlies);
         continue;
       }
-      const st = e.boss ? bossBasicStats(e.type) : ENEMY_STATS[e.type]!; // 장군의 기본 공격은 더 멀리·넓게·세게 나간다
+      const st = e.boss ? bossBasicStats(e.type) : e.post ? { ...ENEMY_STATS[e.type]!, reach: ENEMY_STATS[e.type]!.reach * BOSS_LORD.postReach } : ENEMY_STATS[e.type]!; // 성벽 위 수비병은 사거리가 훨씬 길다 // 장군의 기본 공격은 더 멀리·넓게·세게 나간다
       this.regenShield(e, e.shieldMax, dt);
       e.cd = Math.max(0, e.cd - dt);
 

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RAMP_OUT, RAMP_Y0, RAMP_Y1, RING, WALL_STRIPS, BOSS_CAV, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_WARD, BOSS_LORD, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, HZ_EDICT, GATE_X, GATE_Y, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TICK_RATE, castleSolids, inCastleZone } from "@mercenary/shared";
-import { ARCHER, BLUNT, MAGE, SHIELD, SPEAR } from "@mercenary/shared";
+import { ENEMY_STATS, ARCHER, BLUNT, MAGE, SHIELD, SPEAR } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -381,4 +381,26 @@ test("공성전 수비: 성문이 뚫리기 전에는 성벽 위에 궁병·마�
     p.y = GATE_Y + 300;
   }
   assert.ok(([...(g as any).enemies.values()] as any[]).filter((e) => e.post).length >= posts.length, "죽으면 다시 채워진다");
+});
+
+test("공성전 수비: 성벽 위 수비병은 일반 궁병보다 사거리 훨씬 먼 대상을 쏜다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  const id = g.spawnWallPost();
+  const e = (g as any).enemies.get(id);
+  e.type = ARCHER;
+  const normal = ENEMY_STATS[ARCHER]!.reach;
+  p.x = e.x;
+  p.y = e.y + normal * 1.5; // 일반 궁병 사거리 밖, 수비병 사거리 안
+  let shot = false;
+  for (let i = 0; i < TICK_RATE * 4; i++) {
+    g.step();
+    p.x = e.x;
+    p.y = e.y + normal * 1.5;
+    p.hp = Math.min(p.hp, p.maxHp);
+    if (p.hp < p.maxHp) shot = true;
+    p.hp = p.maxHp;
+  }
+  assert.ok(shot || e.atkT > 0 || e.cd > 0, "사거리 밖 일반 궁병이 못 맞히는 거리에서 쏜다");
 });

@@ -2538,6 +2538,12 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "마법사 비율",
   "hint": "마법사 비율"
  },
+ "BOSS_LORD.postReach": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "사거리 배율",
+  "hint": "사거리 배율(일반 궁병·마법사 대비)"
+ },
  "BOSS_LORD.postHp": {
   "boss": "군주",
   "skill": "성벽 위 수비병",
