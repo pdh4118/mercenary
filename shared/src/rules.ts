@@ -258,7 +258,7 @@ export const MERC_STATS: readonly UnitStats[] = [
   // 둔기병: 범위 공격(splash)과 방패 특화(SHIELD_DAMAGE_FACTOR). 한 방이 세지만 휘두르기 전 준비 동작이 길다.
   { hp: 225, speed: 75, reach: 40, damage: 32.4, windup: 0.9, cooldown: 1.5, arc: deg(100), ranged: false, radius: 15, leash: 75, shield: 0, splash: 46 },
   // 마법사: 느리고 약하지만 2초 동안 주문을 외운 뒤 지정한 곳에 운석을 떨어뜨린다. 피해가 크고 범위(splash)가 매우 넓으며 방패도 무시한다.
-  { hp: 88, speed: 65, reach: 280, damage: 56, windup: 3, cooldown: 3, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 96 },
+  { hp: 88, speed: 65, reach: 280, damage: 50, windup: 3, cooldown: 3, arc: 0, ranged: true, radius: 12, leash: 60, shield: 0, splash: 100 },
 ];
 
 export const ENEMY_STATS: readonly UnitStats[] = [
@@ -268,7 +268,7 @@ export const ENEMY_STATS: readonly UnitStats[] = [
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },
   { hp: 36, speed: 60, reach: 38, damage: 8.55, windup: 0.9, cooldown: 1.8, arc: deg(90), ranged: false, radius: 14, leash: 0, shield: 0, splash: 40 },
   // 적 마법사: 드물게 나온다. 3.5초 주문 뒤 모여 있는 아군에게 운석을 떨어뜨린다(낙하 지점이 미리 보이니 피할 수 있다). 넉백이나 둔기병의 타격으로 밀려나면 주문이 끊긴다.
-  { hp: 22, speed: 55, reach: 260, damage: 55, windup: 3.5, cooldown: 4, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 110 },
+  { hp: 22, speed: 55, reach: 260, damage: 50, windup: 3.5, cooldown: 4, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 100 },
 ];
 
 /** 적 생성 비율(기병, 창병, 궁병, 검방병, 둔기병) */
@@ -282,7 +282,7 @@ export const ENEMY_ARROW_SPEED = 260;
 // 용병 고용
 export const MERC_BASE_PRICE = [70, 40, 45, 50, 60, 90] as const;
 /** 통솔력 비용: 보유 용병의 비용 합이 통솔력(최대 병력 규모)을 넘을 수 없다. 기병만 2. */
-export const UNIT_COST = [2, 1, 1, 1, 1, 2] as const;
+export const UNIT_COST = [2, 1, 1, 1, 1, 3] as const;
 /** 통솔력과 별개로 개체 수를 묶어 두는 안전 한도 */
 /** 쓰러진 뒤 부활까지(초). 기병은 유지 부담으로 더 오래 걸린다. */
 export const MERC_RESPAWN_SEC = [40, 30, 30, 30, 30, 40] as const;

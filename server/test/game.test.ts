@@ -324,8 +324,8 @@ test("고용 검증: 금화 부족·거리·잘못된 선택·보유 한도", ()
   assert.equal(g.buy(a, near, 1).ok, false, "통솔력이 다하면 더 못 산다");
 });
 
-test("통솔력 비용: 기병과 마법사만 2, 나머지는 1", () => {
-  assert.deepEqual([...UNIT_COST], [2, 1, 1, 1, 1, 2]);
+test("통솔력 비용: 기병 2, 마법사 3, 나머지는 1", () => {
+  assert.deepEqual([...UNIT_COST], [2, 1, 1, 1, 1, 3]);
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
