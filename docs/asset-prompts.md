@@ -960,3 +960,63 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 5. 시전 신호(`skill_cast`)와 방벽 생성(`skill_wall_rise`)은 나중에.
 
 넘겨 주신 파일은 이름이 위 표와 같으면 바로 연결하고, 다르면 제가 이름을 맞춰 옮기겠습니다. 소리는 `shared/src/audio.ts`의 `SOUNDS`에 항목(음량, 겹침 제한)을 추가하고, 이펙트는 서버가 보내는 `EVT_SKILL` 이벤트(무기 번호, 발동/적중/부서짐 구분)에 연결합니다.
+
+## 12. 공성전(스테이지 10) 에셋
+
+지금은 성·성문·군주를 코드로 그린 임시 모양입니다. 아래를 받으면 교체합니다. 모두 **투명 PNG**, 시트로 한 번에 받아 주시면 `tools/slice_sheet.py`로 제가 자릅니다. 기존 장군 그림과 같은 결(굵은 외곽선, 손으로 그린 카툰 느낌, 채도 낮은 색, 비스듬한 위쪽 시점)로 맞춰 주세요. 그림 가장자리에 **여백 20px 이상**을 두어 주세요(전차 바퀴가 잘렸던 일을 막으려고).
+
+**공통 문구(모든 프롬프트 앞에 붙이세요)**: `hand-painted cartoon strategy-game art, thick dark outlines, slightly desaturated colors, three-quarter top-down view, transparent background, generous empty margin around the subject`
+
+### 12-1. 군주 "파멸의 군주 그라크" 본체 (한 시트, 3포즈, 가로로 나란히) - `assets/units/boss10_*`
+
+| 파일 이름 | 쓰임 | 크기 | 문구 |
+| --- | --- | --- | --- |
+| `boss10_idle` | 평소(성 안마당에 서 있음) | 약 260x320 | `a towering tyrant warlord king in black and dark purple plate armor with gold trim, a jagged iron crown, a torn crimson cape, holding a huge spiked iron scepter planted on the ground, menacing stance, facing right` |
+| `boss10_scepter` | 홀 내려찍기(치켜든 자세) | 약 280x340 | `the same warlord raising his giant spiked scepter high above his head with both hands, about to slam it down, cape flaring, facing right` |
+| `boss10_cast` | 칙령·호령·처형령(한 손을 들어올림) | 약 260x320 | `the same warlord with one gauntleted hand raised toward the sky, the scepter in the other hand, dark purple energy swirling around his fist, commanding pose, facing right` |
+
+### 12-2. 성벽·탑 (코드로 그린 돌덩이 대체) - `assets/tiles/castle_*`
+
+| 파일 이름 | 쓰임 | 크기 | 문구 |
+| --- | --- | --- | --- |
+| `castle_wall_a~c` | 성벽 한 칸(가로로 이어 붙임, 3가지 변형) | 192x160 | `a stone castle wall segment seen from the front in a slightly raised view, gray stone bricks, flat top with crenellations, left and right edges cut straight so copies tile seamlessly, three variants (a plain, b with a small banner, c with some cracks)` |
+| `castle_tower` | 성 모서리·성문 옆 탑 | 200x320 | `a round stone castle tower with a red conical roof, arrow slits, a small crimson banner, stone base, same style` |
+| `castle_wall_top` | 성벽 윗면(성 안쪽에서 보이는 부분, 선택) | 192x64 | `top surface of a castle wall walkway seen from above, stone slabs, crenellation shadows` |
+
+### 12-3. 성문 5상태 - `assets/tiles/castle_gate_*` (크기 모두 약 360x260, 문틀 포함)
+
+| 파일 이름 | 쓰임 | 문구 |
+| --- | --- | --- |
+| `castle_gate_0` | 온전한 성문 | `a massive double wooden castle gate with iron bands and studs, set in a stone arch between two towers, closed, intact` |
+| `castle_gate_1` | 체력 66% 이하 | `the same gate with deep cracks and a few splintered planks` |
+| `castle_gate_2` | 체력 33% 이하 | `the same gate heavily damaged, large splintered holes, one iron band hanging loose, smoke and dust` |
+| `castle_gate_open` | 성문 개방 돌격(문짝이 양옆으로 활짝 열림) | `the same gate with both doors swung wide open, dark interior visible through the arch` |
+| `castle_gate_ruin` | 부서진 뒤 | `the gate destroyed: empty stone arch, broken planks and iron bands scattered on the ground in front, dust` |
+
+### 12-4. 군주 스킬 이펙트 - `assets/fx/boss10_*`
+
+| 파일 이름 | 쓰임 | 크기 | 컷 수 | 문구 |
+| --- | --- | --- | --- | --- |
+| `boss10_boulder` | 성루 투석 바위(떨어지는 모습) | 96x96 | 1 | `a rough gray boulder with trailing dust and a hint of fire, seen slightly from above` |
+| `boss10_oil_0~3` | 끓는 기름 웅덩이(반복) | 192x144 | 4 | `a pool of boiling black oil seen from above, bubbles bursting, orange glow at the edges, small flames, 4-frame loop` |
+| `boss10_ward_0~3` | 처형령 결계(반복) | 256x192 | 4 | `a glowing pale-blue magic circle with runes seen from above, gently pulsing light motes rising, 4-frame loop` |
+| `boss10_bolt_0~3` | 처형령 벼락 | 128x320 | 4 | `a thick white-violet lightning bolt striking down from the sky, impact flash at the bottom, 4-frame sequence` |
+| `boss10_rally_0~3` | 호령(군주 중심으로 퍼지는 고리) | 320x240 | 4 | `an expanding crimson shockwave ring with sharp war-banner shapes around it, seen from above, 4-frame sequence` |
+| `boss10_summon_0~3` | 근위대 소집 | 256x192 | 4 | `a dark purple summoning circle with golden sigils on the ground, rising smoke and sparks, 4-frame sequence` |
+| `boss10_slam_0~4` | 홀 내려찍기 충격파(반지름 약 440) | 512x384 | 5 | `a heavy ground slam shockwave expanding outward, cracked earth ring and flying stone chunks, seen from above, 5-frame sequence` |
+
+### 12-5. 근위대 정예 4종 (일반 적과 구분되는 왕실 근위) - `assets/units/guard_*`
+
+일반 적 유닛과 같은 크기(약 120x110), **오른쪽을 향함**. 검은 갑옷 + 자주색 망토 + 금 장식으로 통일해 주세요.
+
+| 파일 이름 | 문구 |
+| --- | --- |
+| `guard_sword` | `a royal guard knight with a tower shield and sword, black plate armor with purple cape and gold trim, same size and style as the other enemy units` |
+| `guard_spear` | `a royal guard spearman in black armor with purple plume and gold trim, long spear` |
+| `guard_archer` | `a royal guard archer in black hooded armor with gold trim, longbow` |
+| `guard_mage` | `a royal guard mage in black and purple robes with gold trim, glowing staff` |
+| `guard_cavalry` | `an elite royal cavalryman on a black armored horse with purple barding and gold trim, lowered lance (for the gate sortie)` |
+
+### 12-6. 우선순위
+
+1. 군주 3포즈(12-1) 2. 성문 5상태(12-3) 3. 성벽·탑(12-2) 4. 근위대·정예 기병(12-5) 5. 이펙트(12-4)
