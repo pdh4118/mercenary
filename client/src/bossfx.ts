@@ -119,6 +119,8 @@ export interface BossFxDeps {
   standLayer: Container;
   /** 위쪽 효과(컷 연출) */
   fxLayer: Container;
+  /** 유닛 위에 그리는 지형 층(유닛이 뒤에 서면 장애물을 이 층으로 올리고 반투명하게 한다) */
+  highLayer?: Container;
   /** 맨 위(이름표) */
   skyLayer: Container;
   spawnFloat: (text: string, x: number, y: number, style: Record<string, unknown>, life: number, pop: number) => void;
@@ -414,7 +416,14 @@ export async function createBossFx(d: BossFxDeps) {
     sx?: number; // 서버 위치가 마지막으로 바뀐 때의 값과 시각(빠르게 움직이는 분신을 매끄럽게 그리려고)
     sy?: number;
     st?: number;
+    see?: number; // 유닛에 가려질 때의 투명 배율(1 = 불투명)
+    high?: boolean;
   }
+  /** 이번 프레임의 주인공·용병·적 위치(장애물 뒤에 선 유닛을 찾는 데 쓴다) */
+  let unitPos: { x: number; y: number }[] = [];
+  const setUnits = (list: { x: number; y: number }[]): void => {
+    unitPos = list;
+  };
   const hzViews = new Map<number, HzView>();
   /** 분신이 달려간 길에 남는 어두운 잔상(0.32초 동안 옅어지며 사라진다) */
   const trails: { sp: Sprite; age: number }[] = [];
@@ -1061,7 +1070,22 @@ export async function createBossFx(d: BossFxDeps) {
         teleG.arc(x, y, a, ang + gap, ang + Math.PI * 2 - gap).stroke({ width: 30, color: 0xff6a1a, alpha: 0.35 }).arc(x, y, a, ang + gap, ang + Math.PI * 2 - gap).stroke({ width: 14, color: 0xffd27a, alpha: 0.9 });
         continue;
       }
-      if (v.sp) hzSprite(h, v, now, stage);
+      if (v.sp) {
+        hzSprite(h, v, now, stage);
+        if (d.highLayer && (kind === HZ_SPEAR || kind === HZ_MACE || kind === HZ_SHIELD || kind === HZ_ICE)) {
+          // 유닛이 장애물 뒤에 서 있으면 장애물을 유닛 위로 올리고 반투명하게 해 위치가 보이게 한다(바위·나무와 같은 규칙)
+          const sp = v.sp;
+          const hw = sp.width / 2 + 8;
+          const top = sp.y - sp.height;
+          const behind = unitPos.some((u) => Math.abs(u.x - sp.x) < hw && u.y < sp.y && u.y > top);
+          if (behind !== !!v.high) {
+            v.high = behind;
+            (behind ? d.highLayer : d.standLayer).addChild(sp);
+          }
+          v.see = (v.see ?? 1) + ((behind ? 0.5 : 1) - (v.see ?? 1)) * 0.25;
+          sp.alpha *= v.see;
+        }
+      }
     }
     for (const [id, nvw] of necroViews) {
       if (seen.has(id)) continue;
@@ -1224,6 +1248,6 @@ export async function createBossFx(d: BossFxDeps) {
     }
   };
 
-  return { art, frame, edict: () => edictNow, execute: () => executeNow, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, eliteTex, postTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
+  return { art, frame, setUnits, edict: () => edictNow, execute: () => executeNow, playFx, enemyMarks, wheelHeat, stunMark, reflectFlash, endEnemies, bulletLook, skelTex, eliteTex, postTex, supply, riceFrame, riceEvent, T, ready: Promise.all(pendingLoads) };
 }
 

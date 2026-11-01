@@ -362,6 +362,7 @@ async function main() {
     standLayer: enemyLayer,
     fxLayer,
     skyLayer,
+    highLayer: terrainHigh,
     spawnFloat: (text, x, y, style, life, pop) => spawnFloat(text, x, y, style as TextStyleOptions, life, pop),
     sound: (name, x, y, vol) => audio.play(name as never, { x, y, vol }),
     maceBoom: (x, y, r) => {
@@ -2391,6 +2392,13 @@ async function main() {
       setPoison(v.sprite, w[12] === 1);
     });
     // 장군 스킬 예고·장판·효과 컷
+    {
+      const up: { x: number; y: number }[] = [];
+      for (const v of players.views.values()) up.push(v);
+      for (const v of mercs.views.values()) up.push(v);
+      for (const v of enemies.views.values()) up.push(v);
+      bossFx.setUnits(up);
+    }
     bossFx.frame(latest.bt ?? [], latest.hz ?? [], latest.g?.stage ?? 1, ticker.deltaMS, performance.now());
     {
       // 처형령(공성전): 화면이 점점 어두워지고 카운트다운, 벼락이 치는 순간 번쩍인다
@@ -3118,6 +3126,7 @@ async function main() {
             pc.high = behind;
             (behind ? terrainHigh : terrainLow).addChild(pc.sp);
           }
+          pc.sp.alpha += ((behind ? 0.5 : 1) - pc.sp.alpha) * 0.25; // 유닛을 가리면 반투명
         }
         for (let k = n; k < pcs.length; k++) pcs[k]!.sp.destroy();
         pcs.length = n;
