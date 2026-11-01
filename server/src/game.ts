@@ -284,7 +284,7 @@ import {
 import { resolveHit, type Hit, type HitResult } from "./combat.js";
 import { BossSystem } from "./boss/system.js";
 import type { BossKitState } from "./boss/types.js";
-import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, RAMP_DOWN_AT, RAMP_OUT, RAMP_TOP_AT, RAMP_Y0, RAMP_Y1, RING, SIEGE, WALL_STRIPS, castleSolids, clampToWallTop, inCastleZone, inCourtyard, rampSideAt, type SiegeInfo } from "@mercenary/shared";
+import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, RAMP_DOWN_AT, RAMP_OUT, RAMP_TOP_AT, RAMP_Y0, RAMP_Y1, RING, SIEGE, WALL_STRIPS, castleSolids, clampToWallTop, wallPathAt, WALL_CORNER_S, WALL_PATH_LEN, inCastleZone, inCourtyard, rampSideAt, type SiegeInfo } from "@mercenary/shared";
 import { SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
@@ -496,6 +496,7 @@ export interface Enemy extends Fighter {
   elite?: boolean; // 군주의 정예(근위대·성문 개방 돌격 기병): 전용 그림으로 그린다
   hold?: boolean; // 제자리를 지킨다(움직이지 않고 사거리 안의 대상만 공격). 성 안 수비대는 성문이 뚫리면 풀린다
   art?: boolean; // 성 안 수비대 전용 그림(성문이 뚫려 움직여도 유지)
+  postS?: number; // 성벽 위 수비병이 서 있는 길 위치(WALL_PATH)
   post?: boolean; // 성벽 위 수비병(성벽 통로 안에 갇혀 있다)
   guard?: boolean; // 군주의 근위대(살아 있는 동안 군주가 받는 피해가 줄어든다)
   maxHp: number;
@@ -1820,6 +1821,7 @@ export class Game {
       if (s.open) this.stepSiegeWaves(dt);
       else this.stepWallPosts(dt);
     }
+    if (this.phase === "boss") this.moveWallPosts(dt);
   }
 
   /** 근위대는 군주에게서 일정 범위 안에서만 쫓아온다(범위 밖으로 나가려 하면 경계에서 멈춘다) */
@@ -1850,13 +1852,14 @@ export class Game {
     this.spawnWallPost();
   }
 
-  /** 성벽 위 통로 아무 데나에 궁병(주로)·마법사 수비병 한 명 */
+  /** 모서리 탑(북서·북동 중 수비병이 적은 쪽)에서 궁병(주로)·마법사 수비병 한 명이 나와 성문 쪽으로 걸어간다 */
   spawnWallPost(): number {
-    const pick = this.rng();
-    const r = WALL_STRIPS[pick < 0.5 ? 0 : pick < 0.75 ? 1 : 2]!;
-    const x = r[0] + 20 + this.rng() * (r[2] - r[0] - 40);
-    const y = r[1] + 20 + this.rng() * (r[3] - r[1] - 40);
-    const e = this.makeEnemy(x, y, this.rng() < BOSS_LORD.postMage ? MAGE : ARCHER, { hold: true, post: true, face: Math.PI / 2 });
+    let left = 0;
+    let right = 0;
+    for (const o of this.enemies.values()) if (o.post) (o.postS ?? 0) < WALL_PATH_LEN / 2 ? left++ : right++;
+    const sp = left <= right ? WALL_CORNER_S[0] : WALL_CORNER_S[1];
+    const q = wallPathAt(sp);
+    const e = this.makeEnemy(q.x, q.y, this.rng() < BOSS_LORD.postMage ? MAGE : ARCHER, { hold: true, post: true, postS: sp, face: Math.PI / 2 });
     const m = 1 + Math.min(1.5, (this.siege?.clock ?? 0) / 300);
     e.maxHp *= BOSS_LORD.postHp * m;
     e.hp *= BOSS_LORD.postHp * m;
@@ -1864,10 +1867,35 @@ export class Game {
     return e.id;
   }
 
+  /**
+   * 성벽 위 수비병은 성문 양옆(남쪽 성벽 윗면)으로 걸어가 촘촘히(postGap) 줄지어 서서 성문을 부수려는 대상을 방해한다.
+   * 한 명이 쓰러지면 뒤의 수비병이 걸어서 빈자리를 메우고, 새로 나온 수비병은 탑에서 걸어와 줄 끝에 선다.
+   */
+  private moveWallPosts(dt: number): void {
+    const left: Enemy[] = [];
+    const right: Enemy[] = [];
+    for (const e of this.enemies.values()) if (e.post) ((e.postS ?? 0) < WALL_PATH_LEN / 2 ? left : right).push(e);
+    const place = (list: Enemy[], fromEnd: boolean) => {
+      list.sort((a, b) => (fromEnd ? (b.postS ?? 0) - (a.postS ?? 0) : (a.postS ?? 0) - (b.postS ?? 0))); // 성문에 가까운 쪽부터
+      list.forEach((e, i) => {
+        const target = fromEnd ? WALL_PATH_LEN - i * BOSS_LORD.postGap : i * BOSS_LORD.postGap;
+        const cur = e.postS ?? target;
+        const step = BOSS_LORD.postSpeed * dt;
+        e.postS = Math.abs(target - cur) <= step ? target : cur + Math.sign(target - cur) * step;
+        const q = wallPathAt(e.postS);
+        const off = (i % 2 === 0 ? 1 : -1) * 16; // 두 줄로 어긋나게 서서 촘촘하다
+        e.x = q.x + q.nx * off;
+        e.y = q.y + q.ny * off;
+      });
+    };
+    place(left, false);
+    place(right, true);
+  }
+
   /** 성 안 수비대: 안뜰에 검방병·창병·둔기병이 열을 맞춰 서 있다가 성문이 뚫리면 움직인다 */
   private spawnGarrison(): number {
     const per = Math.min(BOSS_LORD.garrisonMax, BOSS_LORD.garrisonRow + BOSS_LORD.garrisonPerPlayer * Math.max(0, this.slots.size - 1));
-    const rows: [number, number][] = [[SHIELD, -1385], [SPEAR, -1435], [BLUNT, -1485]];
+    const rows: [number, number][] = [[SHIELD, -1480], [SPEAR, -1520], [BLUNT, -1560]];
     let made = 0;
     for (const [type, y] of rows) {
       for (let i = 0; i < per; i++) {
@@ -5999,6 +6027,10 @@ export class Game {
           const d = Math.hypot(f.x - e.x, f.y - e.y);
           if (home !== null && d > aggro) continue;
           let w = this.enemyTargetWeight(e, f, d);
+          if (e.post) {
+            if (f.ranged && f.type !== NO_TYPE) w *= BOSS_LORD.postCounter; // 활·마법사에 대한 대응사격
+            if (Math.hypot(f.x - GATE_X, f.y - GATE_Y) < BOSS_LORD.postGateRange) w *= BOSS_LORD.postGateFocus; // 성문을 부수려는 대상 방해
+          }
           if (f.ranged && f.type !== NO_TYPE && !e.boss) w *= 1 + 0.5 * (hardOf.get(f.f.merc ? f.f.merc.owner : f.f.ownerId) ?? 0.5);
           const crowd = !st.ranged && !e.boss ? 1 + 0.3 * (load.get(f) ?? 0) : 1;
           const sc = (d / w) * crowd;

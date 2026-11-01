@@ -15,7 +15,7 @@ export const SIEGE = {
   revealSec: 16, // 성이 드러나는 데 걸리는 시간
   solidAt: 0.55, // 이 비율을 넘으면 성벽이 단단해진다(그 전에는 솟는 중)
   lordX: 0,
-  lordY: -1570,
+  lordY: -1620,
   gateHp: 6000, // 성문 체력(주인공 근접 한 번 피해 기준)
   clearMargin: 160, // 성 둘레에서 지형을 치우는 여유
   clearApron: 330, // 성문 앞 마당
@@ -29,7 +29,9 @@ export const GATE_Y = CASTLE_WALL_Y;
 /** 모서리 탑 중심(성벽 바깥쪽으로 튀어나온다) */
 export const TOWERS: readonly (readonly [number, number])[] = [[-530, -1781], [530, -1781], [-530, -1249], [530, -1249]];
 /** 안뜰 바닥 범위(성벽 안쪽) */
-export const COURT = { cx: 0, cy: -1495, hw: 330, hh: 150 } as const;
+export const COURT = { cx: 0, cy: -1540, hw: 330, hh: 100 } as const; // 그림에서 보이는 안뜰 바닥(남쪽 성벽 윗면 뒤는 가려진다)
+/** 남쪽 성벽 윗면 통로의 중심 y(그림에서 성벽 윗면이 보이는 높이 = 성벽 바닥보다 약 150 위) */
+export const SOUTH_TOP = RING.south - 150;
 
 export interface CastleSolid {
   x: number;
@@ -73,12 +75,15 @@ export const inCourtyard = (x: number, y: number): boolean => Math.abs(x - COURT
  * 성벽 위(서·북·동 성벽의 윗면 통로)와 오르는 계단. 성문이 부서진 뒤 안뜰의 계단으로만 오를 수 있다.
  * 계단 두 개는 북쪽 성벽 안쪽 면을 따라 놓여 있고(그림 `boss10_castle`), 바깥 끝(모서리 쪽)이 성벽 위 통로로 이어진다.
  */
-export const WALL_STRIP_HALF = 46; // 성벽 윗면 통로의 절반 폭
+export const WALL_STRIP_HALF = 46;
+const GATE_OPEN_HALF = 70; // 남쪽 성벽 윗면에서 성문 둘레 비워 두는 폭 // 성벽 윗면 통로의 절반 폭
 type Rect = readonly [number, number, number, number]; // x0, y0, x1, y1
 export const WALL_STRIPS: readonly Rect[] = [
   [-RING.ex - WALL_STRIP_HALF, RING.north - WALL_STRIP_HALF, RING.ex + WALL_STRIP_HALF, RING.north + WALL_STRIP_HALF], // 북쪽
-  [-RING.ex - WALL_STRIP_HALF, RING.north, -RING.ex + WALL_STRIP_HALF, RING.south - 70], // 서쪽
-  [RING.ex - WALL_STRIP_HALF, RING.north, RING.ex + WALL_STRIP_HALF, RING.south - 70], // 동쪽
+  [-RING.ex - WALL_STRIP_HALF, RING.north, -RING.ex + WALL_STRIP_HALF, SOUTH_TOP + WALL_STRIP_HALF], // 서쪽
+  [RING.ex - WALL_STRIP_HALF, RING.north, RING.ex + WALL_STRIP_HALF, SOUTH_TOP + WALL_STRIP_HALF], // 동쪽
+  [-RING.ex - WALL_STRIP_HALF, SOUTH_TOP - WALL_STRIP_HALF, -GATE_OPEN_HALF, SOUTH_TOP + WALL_STRIP_HALF], // 남쪽 성문 왼쪽
+  [GATE_OPEN_HALF, SOUTH_TOP - WALL_STRIP_HALF, RING.ex + WALL_STRIP_HALF, SOUTH_TOP + WALL_STRIP_HALF], // 남쪽 성문 오른쪽
 ];
 export const RAMP_Y0 = -1672; // 계단 상자(북쪽 성벽 안쪽 면을 따라)
 export const RAMP_Y1 = -1592;
@@ -122,4 +127,51 @@ export interface SiegeInfo {
   open: boolean; // 성문이 부서져 군주를 칠 수 있다
   guards?: number; // 살아 있는 근위대 수
   sortie?: boolean; // 성문이 열려 정예가 쏟아져 나오는 중(그림)
+}
+
+/** 성벽 위 수비병이 오가는 길: 성문 왼쪽(남쪽 성벽) → 서쪽 성벽 → 북쪽 성벽 → 동쪽 성벽 → 성문 오른쪽(남쪽 성벽). 양 끝이 성문 위다 */
+export const WALL_PATH: readonly (readonly [number, number])[] = [
+  [-GATE_OPEN_HALF, SOUTH_TOP],
+  [-RING.ex, SOUTH_TOP],
+  [-RING.ex, RING.north],
+  [RING.ex, RING.north],
+  [RING.ex, SOUTH_TOP],
+  [GATE_OPEN_HALF, SOUTH_TOP],
+];
+const SEG = WALL_PATH.slice(1).map((p, i) => Math.hypot(p[0] - WALL_PATH[i]![0], p[1] - WALL_PATH[i]![1]));
+export const WALL_PATH_LEN = SEG.reduce((a, b) => a + b, 0);
+/** 북서·북동 모서리 탑의 길 위치(새 수비병이 여기서 나온다) */
+export const WALL_CORNER_S: readonly [number, number] = [SEG[0]! + SEG[1]!, SEG[0]! + SEG[1]! + SEG[2]!];
+
+/** 길 위 s(0..길이)의 점과 옆(왼쪽) 방향 단위 벡터 */
+export function wallPathAt(s: number): { x: number; y: number; nx: number; ny: number } {
+  let d = Math.max(0, Math.min(WALL_PATH_LEN, s));
+  for (let i = 0; i < SEG.length; i++) {
+    if (d <= SEG[i]! || i === SEG.length - 1) {
+      const a = WALL_PATH[i]!;
+      const b = WALL_PATH[i + 1]!;
+      const t = SEG[i]! > 0 ? Math.min(1, d / SEG[i]!) : 0;
+      const dx = (b[0] - a[0]) / SEG[i]!;
+      const dy = (b[1] - a[1]) / SEG[i]!;
+      return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, nx: dy, ny: -dx };
+    }
+    d -= SEG[i]!;
+  }
+  return { x: 0, y: 0, nx: 0, ny: 1 };
+}
+
+/** 점 (x,y)에서 가장 가까운 길 위 s와 거리 */
+export function wallPathNearest(x: number, y: number): { s: number; d: number } {
+  let best = { s: 0, d: Infinity };
+  let base = 0;
+  for (let i = 0; i < SEG.length; i++) {
+    const a = WALL_PATH[i]!;
+    const b = WALL_PATH[i + 1]!;
+    const l2 = SEG[i]! * SEG[i]!;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - a[0]) * (b[0] - a[0]) + (y - a[1]) * (b[1] - a[1])) / l2)) : 0;
+    const d = Math.hypot(x - (a[0] + (b[0] - a[0]) * t), y - (a[1] + (b[1] - a[1]) * t));
+    if (d < best.d) best = { s: base + t * SEG[i]!, d };
+    base += SEG[i]!;
+  }
+  return best;
 }

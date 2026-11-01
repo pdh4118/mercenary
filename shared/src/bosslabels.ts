@@ -2538,6 +2538,36 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "마법사 비율",
   "hint": "마법사 비율"
  },
+ "BOSS_LORD.postSpeed": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "속도",
+  "hint": "자리를 채우러 성벽을 걷는 속도"
+ },
+ "BOSS_LORD.postGap": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "간격",
+  "hint": "수비병 사이 간격(밀도: 좁을수록 촘촘하다)"
+ },
+ "BOSS_LORD.postCounter": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "궁병·마법사",
+  "hint": "궁병·마법사(원거리) 대상을 우선하는 정도(대응사격)"
+ },
+ "BOSS_LORD.postGateRange": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "사용 거리",
+  "hint": "성문에서 이 거리 안의 대상을 방해한다"
+ },
+ "BOSS_LORD.postGateFocus": {
+  "boss": "군주",
+  "skill": "성벽 위 수비병",
+  "label": "성문을 부수려는 대상을 우선하는 정도",
+  "hint": "성문을 부수려는 대상을 우선하는 정도"
+ },
  "BOSS_LORD.postReach": {
   "boss": "군주",
   "skill": "성벽 위 수비병",

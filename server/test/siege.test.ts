@@ -404,3 +404,29 @@ test("공성전 수비: 성벽 위 수비병은 일반 궁병보다 사거리 �
   }
   assert.ok(shot || e.atkT > 0 || e.cd > 0, "사거리 밖 일반 궁병이 못 맞히는 거리에서 쏜다");
 });
+
+test("공성전 수비: 성벽 위 수비병은 성문 양옆으로 걸어가 촘촘히 서고, 한 명이 죽으면 뒤 수비병이 빈자리를 메운다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  const ids: number[] = [];
+  for (let i = 0; i < 8; i++) ids.push(g.spawnWallPost());
+  const stand = () => {
+    p.x = 0;
+    p.y = GATE_Y + 600;
+    g.step();
+    p.hp = p.maxHp;
+  };
+  for (let i = 0; i < TICK_RATE * 20; i++) stand();
+  const posts = () => ids.map((id) => (g as any).enemies.get(id)).filter(Boolean) as any[];
+  const near = posts().filter((e) => Math.hypot(e.x - GATE_X, e.y - GATE_Y) < 320);
+  assert.ok(near.length >= 6, `성문 가까이에 모인다(${near.length}/8)`);
+  const left = posts().filter((e) => e.x < 0).length;
+  assert.ok(left >= 2 && left <= 6, `양옆으로 나뉜다(왼쪽 ${left})`);
+  const victim = posts().filter((e) => e.x < 0).sort((a, b) => Math.hypot(a.x - GATE_X, a.y - GATE_Y) - Math.hypot(b.x - GATE_X, b.y - GATE_Y))[0];
+  const gapX = victim.x;
+  (g as any).enemies.delete(victim.id);
+  for (let i = 0; i < TICK_RATE * 6; i++) stand();
+  const filled = posts().some((e) => Math.abs(e.x - gapX) < 20 && e.x < 0);
+  assert.ok(filled, "빈자리를 다른 수비병이 메운다");
+});

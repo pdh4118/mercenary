@@ -694,6 +694,11 @@ export const BOSS_LORD = {
   postMax: 18,
   postRespawn: 4, // 모자라면 이 간격(초)마다 한 명씩 다시 나온다
   postMage: 0.3, // 마법사 비율
+  postSpeed: 170, // 자리를 채우러 성벽을 걷는 속도
+  postGap: 44, // 수비병 사이 간격(밀도: 좁을수록 촘촘하다)
+  postCounter: 2.5, // 궁병·마법사(원거리) 대상을 우선하는 정도(대응사격)
+  postGateRange: 320, // 성문에서 이 거리 안의 대상을 방해한다
+  postGateFocus: 1.8, // 성문을 부수려는 대상을 우선하는 정도
   postReach: 1.9, // 사거리 배율(일반 궁병·마법사 대비)
   postHp: 1.5, // 수비병 체력 배율
   postDmg: 1.1,
