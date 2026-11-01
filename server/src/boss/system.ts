@@ -10,6 +10,7 @@ import {
   EVT_BOSSFX,
   EVT_INVULN,
   EVT_KNOCK,
+  HZ_CALTROP,
   HZ_FIRE,
   HZ_GHOST,
   HZ_ICE,
@@ -18,6 +19,7 @@ import {
   HZ_SHIELD,
   NO_TYPE,
   PLAYER_RADIUS,
+  ST_SLOW,
   ST_STUN,
   clampToWorld,
   type HazardWire,
@@ -408,6 +410,19 @@ export class BossSystem {
       }
       h.t -= dt;
       switch (h.kind) {
+        case HZ_CALTROP: {
+          // 마름쇠: 밟은 아군에게 피해와 둔화(한 무더기가 같은 대상을 두 번 찌르지 않는다)
+          const boss = src(h.src);
+          if (!boss) break;
+          for (const f of friendlies) {
+            const key = f.merc ? f.merc.id : -f.ownerId;
+            if (h.hit.has(key) || Math.hypot(f.x - h.x, f.y - h.y) > h.a + f.radius * 0.5) continue;
+            h.hit.add(key);
+            this.hitFriendly(boss, f, h.dmg, 0);
+            f.status(ST_SLOW, h.d.slow ?? 2, h.d.mult ?? 0.5);
+          }
+          break;
+        }
         case HZ_FIRE: {
           // 불길 장판: 0.5초마다 안에 있는 아군에게 피해
           h.tick -= dt;

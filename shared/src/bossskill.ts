@@ -34,7 +34,7 @@ export const BSK_ORBITSHOT = 27; // 기마궁수: 선회 사격
 export const BSK_BLINDARROW = 28; // 기마궁수: 실명 화살(맞으면 시야가 크게 좁아진다)
 export const BSK_LASSO = 29; // 기마궁수: 올가미 화살
 export const BSK_ACCEL = 30; // 전차: 가속 돌진
-export const BSK_SCYTHE = 31; // 전차: 낫 바퀴
+export const BSK_CALTROP = 31; // 전차: 마름쇠 질주
 export const BSK_DRIFT = 32; // 전차: 급선회 파쇄
 export const BSK_RAMPAGE = 33; // 전차: 폭주
 export const BSK_FOG = 34; // 네크로맨서: 암흑 안개
@@ -78,7 +78,7 @@ export const BOSS_SKILL_NAMES: Record<number, string> = {
   [BSK_BLINDARROW]: "실명 화살",
   [BSK_LASSO]: "올가미 화살",
   [BSK_ACCEL]: "가속 돌진",
-  [BSK_SCYTHE]: "낫 바퀴",
+  [BSK_CALTROP]: "마름쇠 질주",
   [BSK_DRIFT]: "급선회 파쇄",
   [BSK_RAMPAGE]: "폭주",
 };
@@ -94,7 +94,6 @@ export const EF_STUN = 64; // 기절·그로기
 export const EF_MAD = 128; // 광분(바퀴가 붉게 달아오름)
 export const EF_SUPPLY = 2048; // (일반 적) 군량병: 공격 없이 도망만 치고, 쓰러지면 쌀을 떨군다
 export const EF_SKEL = 1024; // (일반 적) 안개 속 시체에서 되살아난 스켈레톤
-export const EF_SCYTHE = 256; // 낫 바퀴
 export const EF_WHIRL = 512; // 휠윈드로 도는 중(칼날바람 소용돌이)
 
 /** 장판·장애물(hazard) 종류. 전송값: [id, 종류, x, y, 방향, a, b, 남은 시간(0.1초), 전체 시간(0.1초), 상태(0 예고, 1 작동)] */
@@ -110,6 +109,7 @@ export const HZ_CORPSE = 10; // 시체: a = 병종, b = 남은 공격 횟수, �
 export const HZ_LEECH = 11; // 생명 흡수 선: 위치 = 보스, 방향 = 대상 쪽, a = 길이
 export const HZ_CHAIN = 12; // 영혼 사슬: 위치 = 보스, 방향 = 대상 쪽, a = 길이, b = 남은 끊기 횟수
 export const HZ_DRAINRING = 13; // 생명 흡수 범위 고리: a = 반지름(예고 중에는 state 0)
+export const HZ_CALTROP = 14; // 마름쇠: a = 반지름(예고 중에는 state 0), 밟으면 피해와 둔화
 export const HZ_RING = 8; // 퍼지는 불꽃 고리: a = 현재 반지름, b = 틈 반각(라디안), 방향 = 틈 중심
 export type HazardWire = [id: number, kind: number, x: number, y: number, ang: number, a: number, b: number, left: number, total: number, state: number];
 
@@ -156,7 +156,6 @@ export const BFX_BACKSTEP = 11; // 뒤로 훌쩍 물러나는 먼지(ang = 물�
 export const BFX_THRUST = 10; // 창을 앞으로 찌르는 줄기(ang = 찌르는 방향, 길이는 이벤트의 owner 값)
 export const BFX_MTHRUST = 17; // 일반 근접 유닛(적·용병·주인공·장군 기본 공격)의 찌르기 줄기(ang = 방향, owner = 사거리 x 4 + 편)
 export const BFX_DRIFT = 20; // 전차 장군 급선회 파쇄: 후방 부채꼴로 먼지와 바퀴 자국이 퍼진다(ang = 후방, owner = 사거리)
-export const BFX_SCYTHE = 19; // 전차 장군 낫 바퀴: 몸 옆으로 낫이 휩쓰는 호(ang = 휘두르는 쪽, owner = 사거리)
 export const BFX_MSWING = 18; // 일반 근접 유닛의 휘두르기 호(ang = 방향, owner = 사거리 x 4 + 편)
 export const MELEE_TEAM_ALLY = 0; // 내 편(주인공·용병)
 export const MELEE_TEAM_ENEMY = 1; // 일반 적
@@ -483,13 +482,21 @@ export const BOSS_CHARIOT = {
   accelStun: 3,
   accelRest: 1,
   accelCd: 10,
-  scytheTele: 0.9,
-  scytheSec: 4,
-  scytheStep: 0.25,
-  scytheRange: 120,
-  scytheDmg: 3,
-  scytheKnock: 60,
-  scytheCd: 12,
+  caltropTele: 0.9, // 질주 시작 전 예고
+  caltropLegs: 3, // 꺾어 달리는 횟수(직선 구간 수)
+  caltropLegLen: 520, // 한 구간 길이
+  caltropSpeed: 560, // 달리는 속도
+  caltropTurn: 110, // 구간마다 꺾는 각도(도)
+  caltropEvery: 70, // 마름쇠를 뿌리는 간격(px)
+  caltropWarn: 0.45, // 뿌린 뒤 깔리기 전 예고 시간
+  caltropLife: 9, // 마름쇠가 남아 있는 시간
+  caltropRadius: 32, // 마름쇠 한 무더기 반지름
+  caltropDmg: 2.5, // 밟았을 때 피해(배율)
+  caltropSlowSec: 2.5, // 둔화 시간
+  caltropSlowMult: 0.5, // 둔화 속도 배율
+  caltropRam: 2, // 달리는 몸에 닿았을 때 피해(배율)
+  caltropRest: 0.6, // 다 달린 뒤 숨 고르는 시간
+  caltropCd: 12,
   driftTele: 0.9,
   driftRange: 230,
   driftHalf: (Math.PI * 100) / 180,

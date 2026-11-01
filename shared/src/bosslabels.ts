@@ -1644,45 +1644,93 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "재사용 대기(초)",
   "hint": ""
  },
- "BOSS_CHARIOT.scytheTele": {
+ "BOSS_CHARIOT.caltropTele": {
   "boss": "전차",
-  "skill": "낫 바퀴",
+  "skill": "마름쇠 질주",
   "label": "예고 시간(초)",
-  "hint": ""
+  "hint": "질주 시작 전 예고"
  },
- "BOSS_CHARIOT.scytheSec": {
+ "BOSS_CHARIOT.caltropLegs": {
   "boss": "전차",
-  "skill": "낫 바퀴",
-  "label": "지속 시간(초)",
-  "hint": ""
+  "skill": "마름쇠 질주",
+  "label": "꺾어 달리는 횟수",
+  "hint": "꺾어 달리는 횟수(직선 구간 수)"
  },
- "BOSS_CHARIOT.scytheStep": {
+ "BOSS_CHARIOT.caltropLegLen": {
   "boss": "전차",
-  "skill": "낫 바퀴",
-  "label": "간격(초)",
-  "hint": ""
+  "skill": "마름쇠 질주",
+  "label": "길이",
+  "hint": "한 구간 길이"
  },
- "BOSS_CHARIOT.scytheRange": {
+ "BOSS_CHARIOT.caltropSpeed": {
   "boss": "전차",
-  "skill": "낫 바퀴",
-  "label": "사용 거리",
-  "hint": ""
+  "skill": "마름쇠 질주",
+  "label": "속도",
+  "hint": "달리는 속도"
  },
- "BOSS_CHARIOT.scytheDmg": {
+ "BOSS_CHARIOT.caltropTurn": {
   "boss": "전차",
-  "skill": "낫 바퀴",
+  "skill": "마름쇠 질주",
+  "label": "구간마다 꺾는 각도",
+  "hint": "구간마다 꺾는 각도(도)"
+ },
+ "BOSS_CHARIOT.caltropEvery": {
+  "boss": "전차",
+  "skill": "마름쇠 질주",
+  "label": "마름쇠를 뿌리는 간격",
+  "hint": "마름쇠를 뿌리는 간격(px)"
+ },
+ "BOSS_CHARIOT.caltropWarn": {
+  "boss": "전차",
+  "skill": "마름쇠 질주",
+  "label": "뿌린 뒤 깔리기 전 예고 시간",
+  "hint": "뿌린 뒤 깔리기 전 예고 시간"
+ },
+ "BOSS_CHARIOT.caltropLife": {
+  "boss": "전차",
+  "skill": "마름쇠 질주",
+  "label": "마름쇠가 남아 있는 시간",
+  "hint": "마름쇠가 남아 있는 시간"
+ },
+ "BOSS_CHARIOT.caltropRadius": {
+  "boss": "전차",
+  "skill": "마름쇠 질주",
+  "label": "반경",
+  "hint": "마름쇠 한 무더기 반지름"
+ },
+ "BOSS_CHARIOT.caltropDmg": {
+  "boss": "전차",
+  "skill": "마름쇠 질주",
   "label": "피해 배율",
-  "hint": ""
+  "hint": "밟았을 때 피해(배율)"
  },
- "BOSS_CHARIOT.scytheKnock": {
+ "BOSS_CHARIOT.caltropSlowSec": {
   "boss": "전차",
-  "skill": "낫 바퀴",
-  "label": "넉백 거리",
-  "hint": ""
+  "skill": "마름쇠 질주",
+  "label": "지속 시간(초)",
+  "hint": "둔화 시간"
  },
- "BOSS_CHARIOT.scytheCd": {
+ "BOSS_CHARIOT.caltropSlowMult": {
   "boss": "전차",
-  "skill": "낫 바퀴",
+  "skill": "마름쇠 질주",
+  "label": "배율",
+  "hint": "둔화 속도 배율"
+ },
+ "BOSS_CHARIOT.caltropRam": {
+  "boss": "전차",
+  "skill": "마름쇠 질주",
+  "label": "달리는 몸에 닿았을 때 피해",
+  "hint": "달리는 몸에 닿았을 때 피해(배율)"
+ },
+ "BOSS_CHARIOT.caltropRest": {
+  "boss": "전차",
+  "skill": "마름쇠 질주",
+  "label": "끝난 뒤 멈춤(초)",
+  "hint": "다 달린 뒤 숨 고르는 시간"
+ },
+ "BOSS_CHARIOT.caltropCd": {
+  "boss": "전차",
+  "skill": "마름쇠 질주",
   "label": "재사용 대기(초)",
   "hint": ""
  },

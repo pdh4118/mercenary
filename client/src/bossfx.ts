@@ -9,7 +9,6 @@ import {
   BFX_THRUST,
   BFX_MTHRUST,
   BFX_MSWING,
-  BFX_SCYTHE,
   BFX_DRIFT,
   MELEE_TEAM_ALLY,
   MELEE_TEAM_BOSS,
@@ -70,6 +69,7 @@ import {
   EF_STUN,
   EF_WHIRL,
   HZ_FIRE,
+  HZ_CALTROP,
   HZ_GHOST,
   HZ_ICE,
   HZ_MACE,
@@ -327,10 +327,6 @@ export async function createBossFx(d: BossFxDeps) {
     } else if (val === BFX_MACEBOOM) {
       if (!d.maceBoom(x, y, ang * 100)) playSeq(T.impact, x, y, 0.55, 1, 0);
       d.sound("skill_mace_hit", x, y);
-    } else if (val === BFX_SCYTHE) {
-      // 전차 장군 낫 바퀴: 판정 범위(len)에 맞춘 철청색 호가 양 옆을 휩쓴다
-      meleeFlip = !meleeFlip;
-      playSeq(T.flurryArc, x, y - 14, 0.28, Math.max(0.3, (len * 1.7) / 300), ang, 0.53, meleeFlip, 0.85, 0xa8c8e0);
     } else if (val === BFX_DRIFT) {
       // 전차 장군 급선회 파쇄: 꼬리(바퀴)가 후방 부채꼴을 쓸며 흙먼지가 퍼지고, 바퀴 자국 호와 충격이 남는다
       const half = (Math.PI * 100) / 180;
@@ -783,11 +779,43 @@ export async function createBossFx(d: BossFxDeps) {
     whirls.length = 0;
   };
 
+  /** 마름쇠 장판(그림 없이 코드로 그린다): 깔리기 전에는 붉은 점선 원, 깔린 뒤에는 쇠못 세 개 */
+  const caltropG = new Graphics();
+  d.groundFx.addChild(caltropG);
+  const drawCaltrop = (id: number, x: number, y: number, r: number, left: number, state: number, now: number): void => {
+    if (state === 0) {
+      const pulse = 0.5 + 0.5 * Math.sin(now / 70 + id);
+      caltropG.circle(x, y, r).fill({ color: 0xff5a3a, alpha: 0.08 + 0.12 * pulse }).stroke({ width: 2, color: 0xff7a4a, alpha: 0.45 + 0.35 * pulse });
+      return;
+    }
+    const fade = Math.min(1, left / 10 / 0.8); // 사라지기 직전에 흐려진다
+    caltropG.ellipse(x, y + 2, r * 1.05, r * 0.7).fill({ color: 0x14161b, alpha: 0.28 * fade }).stroke({ width: 1.5, color: 0xff8a5a, alpha: 0.35 * fade }); // 밟으면 안 되는 자리가 보이도록 바닥을 어둡게
+    // 한 무더기에 못 세 개: 번호로 자리와 방향을 정해 매번 같은 모양이다
+    for (let i = 0; i < 3; i++) {
+      const seed = id * 7.13 + i * 2.1;
+      const cx = x + Math.cos(seed) * r * 0.55;
+      const cy = y + Math.sin(seed * 1.7) * r * 0.4;
+      const rot = seed * 1.3;
+      const L = 15;
+      for (let k = 0; k < 4; k++) {
+        const a = rot + (k * Math.PI) / 2;
+        const tx = cx + Math.cos(a) * L;
+        const ty = cy + Math.sin(a) * L * 0.7; // 비스듬한 시점이라 세로를 눌러 그린다
+        const nx = -Math.sin(a) * 3.4;
+        const ny = Math.cos(a) * 3.4 * 0.7;
+        caltropG.poly([cx + nx, cy + ny, tx, ty, cx - nx, cy - ny]).fill({ color: 0x8e95a3, alpha: fade }).stroke({ width: 1.2, color: 0x16181d, alpha: fade });
+        caltropG.circle(tx, ty, 1.2).fill({ color: 0xe8ecf4, alpha: fade });
+      }
+      caltropG.circle(cx, cy, 3).fill({ color: 0x5b616e, alpha: fade }).stroke({ width: 1, color: 0x16181d, alpha: fade });
+    }
+  };
+
   const frame = (bt: TeleWire[], hz: HazardWire[], stage: number, dtMs: number, now: number) => {
     drawWhirls(now);
     drawThrustCores(dtMs);
     necroG.clear();
     wallG.clear();
+    caltropG.clear();
     for (const gw of guardWalls) drawCurvedWall(gw.x + Math.cos(gw.ang) * 48, gw.y + 8 + Math.sin(gw.ang) * 48 * 0.6, gw.ang + Math.PI / 2, gw.ang, 96, 44, 104, 0.95, 100, now);
     guardWalls.length = 0;
     teleG.clear();
@@ -798,6 +826,10 @@ export async function createBossFx(d: BossFxDeps) {
     for (const h of hz) {
       const [id, kind, x, y, ang, a, b, left, total, state] = h;
       seen.add(id);
+      if (kind === HZ_CALTROP) {
+        drawCaltrop(id, x, y, a, left, state, now);
+        continue;
+      }
       let v = hzViews.get(id);
       if (!v) {
         const tex = hzTexture(kind, b);

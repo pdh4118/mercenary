@@ -6,6 +6,8 @@ import {
   BOSS_CHARIOT,
   BSK_CLONE,
   BSK_RAMPAGE,
+  BSK_CALTROP,
+  HZ_CALTROP,
   BSK_GUARD,
   BSK_THROW,
   BSK_TRIPLE,
@@ -350,4 +352,30 @@ test("전차 장군 폭주: 사방팔방으로 방향을 바꿔 날뛰며 닿으
   assert.ok(heads.size >= 3, `여러 방향으로 달린다(${heads.size}방향)`);
   assert.ok(hit, "닿으면 피해를 준다");
   assert.ok(b.stunT > 0, "다 날뛰면 지쳐 멈춘다");
+});
+
+test("전차 장군 마름쇠 질주: 꺾어 달리며 마름쇠를 뿌리고, 밟은 주인공은 피해와 둔화를 받는다", () => {
+  const { g, b, ids } = setup(8, BSK_CALTROP);
+  const p = hero(g, ids[0]!);
+  place(b, 0, 0);
+  place(p, 300, 0);
+  p.maxHp = 1e9;
+  p.hp = p.maxHp;
+  let maxHz = 0;
+  const total = Math.round(TICK_RATE * (BOSS_CHARIOT.caltropTele + 6));
+  for (let i = 0; i < total; i++) {
+    g.step();
+    maxHz = Math.max(maxHz, ((g as any).boss.hazards as any[]).filter((h) => h.kind === HZ_CALTROP).length);
+    p.hp = Math.max(p.hp, 0);
+  }
+  assert.ok(maxHz >= 10, `달리는 길에 마름쇠가 여러 무더기 깔린다(${maxHz})`);
+  // 마름쇠 위에 서면 피해와 둔화
+  const hz = ((g as any).boss.hazards as any[]).find((h) => h.kind === HZ_CALTROP && h.delay <= 0 && h.t > 1);
+  if (hz) {
+    p.hp = p.maxHp;
+    place(p, hz.x, hz.y);
+    for (let i = 0; i < 4; i++) g.step();
+    assert.ok(p.hp < p.maxHp, "밟으면 피해");
+    assert.ok(((g as any).slots.get(ids[0]!).slowT ?? 0) > 0, "밟으면 둔화");
+  }
 });

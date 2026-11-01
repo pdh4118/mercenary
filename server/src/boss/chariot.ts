@@ -3,13 +3,12 @@ import {
   BSK_ACCEL,
   BSK_DRIFT,
   BSK_RAMPAGE,
-  BSK_SCYTHE,
+  BSK_CALTROP,
   BFX_CRASH,
   BFX_IMPACT,
-  BFX_SCYTHE,
   BFX_DRIFT,
   EF_MAD,
-  EF_SCYTHE,
+  HZ_CALTROP,
   HZ_MACE,
   HZ_SPEAR,
   TELE_CIRCLE,
@@ -75,53 +74,82 @@ const accel: SkillDef = {
   tele: ({ k }) => [[TELE_LINE, r1(k.x), r1(k.y), r2(k.ang), C.accelLen, C.accelWidth, ...lt(k), BSK_ACCEL]],
 };
 
-/** 낫 바퀴: 4초 동안 움직이며 양 옆(측면)을 낫이 휩쓴다 */
-const scythe: SkillDef = {
-  id: BSK_SCYTHE,
-  cd: C.scytheCd,
+/** 마름쇠 질주: 꺾어 달리며(U자·지그재그) 지나간 길에 마름쇠를 뿌린다. 잠깐 예고된 뒤 깔리고, 밟으면 피해와 둔화. 시간이 갈수록 안전한 땅이 줄어든다. */
+const caltrop: SkillDef = {
+  id: BSK_CALTROP,
+  cd: C.caltropCd,
   weight: 3.5,
-  can: ({ e, foes, sys }) => !!sys.nearestFoe(foes, e, 650),
-  begin: ({ k }) => {
-    k.t = k.total = C.scytheTele;
+  can: ({ e, foes, sys }) => !!sys.nearestFoe(foes, e, 800),
+  begin: ({ e, k, foes, sys }) => {
+    const t = sys.nearestFoe(foes, e, 1500)!;
+    k.ang = Math.atan2(t.y - e.y, t.x - e.x);
+    k.d.sgn = Math.random() < 0.5 ? 1 : -1; // 꺾는 방향
+    k.d.leg = 0;
+    e.face = k.ang;
+    k.t = k.total = C.caltropTele;
   },
   run: (c) => {
-    const { e, k, foes, sys, dt } = c;
-    const g = sys.g as any;
+    const { e, k, sys, dt } = c;
     if (k.ph === 0) {
+      e.face = k.ang;
       if (k.t > 0) return;
       k.ph = 1;
-      k.t = C.scytheSec;
-      k.d.next = 0;
+      k.t = 99;
+      k.d.trav = 0;
+      k.d.drop = 0;
+      k.hit.clear();
     }
     if (k.ph === 1) {
-      const t = sys.nearestFoe(foes, e, 1500);
-      if (t) {
-        g.moveToward(e, t.x, t.y, g.enemySpeed(e) * 1.1, dt, 20);
-        e.face = Math.atan2(t.y - e.y, t.x - e.x);
+      const px = e.x;
+      const py = e.y;
+      const res = sys.dashStep(
+        c,
+        C.caltropSpeed,
+        C.caltropLegLen,
+        BODY * 1.4,
+        (f) => {
+          sys.hitFoe(e, f, C.caltropRam, 120);
+          sys.fx(f.x, f.y, k.ang, BFX_IMPACT);
+        },
+        BODY,
+        () => sys.fx(e.x, e.y, k.ang, BFX_IMPACT), // 방벽은 부수고 지나간다
+      );
+      // 지나온 길에 일정 간격으로 마름쇠를 뿌린다
+      k.d.drop! += Math.hypot(e.x - px, e.y - py);
+      while (k.d.drop! >= C.caltropEvery) {
+        k.d.drop! -= C.caltropEvery;
+        sys.addHazard({ kind: HZ_CALTROP, x: e.x - Math.cos(k.ang) * 30, y: e.y - Math.sin(k.ang) * 30, a: C.caltropRadius, t: C.caltropLife, total: C.caltropLife, delay: C.caltropWarn, dmg: C.caltropDmg, src: e.id, d: { slow: C.caltropSlowSec, mult: C.caltropSlowMult } });
       }
-      k.d.next! -= dt;
-      if (k.d.next! <= 0) {
-        k.d.next = C.scytheStep;
-        // 낫이 양 옆을 휩쓰는 호(판정이 들어가는 순간마다 좌우로 하나씩)
-        sys.fx(e.x, e.y, e.face + Math.PI / 2, BFX_SCYTHE, BODY + C.scytheRange);
-        sys.fx(e.x, e.y, e.face - Math.PI / 2, BFX_SCYTHE, BODY + C.scytheRange);
-        for (const f of foes) {
-          const d = sys.dist(f, e);
-          if (d > BODY + C.scytheRange + f.r) continue;
-          const rel = Math.abs(angDiff(Math.atan2(f.y - e.y, f.x - e.x), e.face));
-          if (rel < 0.8 || rel > 2.35) continue; // 정면·후면이 아니라 양 옆
-          sys.hitFoe(e, f, C.scytheDmg, C.scytheKnock);
-          sys.fx(f.x, f.y, e.face, BFX_IMPACT);
+      if (res !== "run") {
+        // 한 구간이 끝나면(또는 벽·바위에 막히면) 방향을 꺾어 다음 구간으로
+        k.d.leg = (k.d.leg ?? 0) + 1;
+        k.ang += (k.d.sgn ?? 1) * ((C.caltropTurn * Math.PI) / 180);
+        k.d.trav = 0;
+        k.hit.clear();
+        if (k.d.leg >= C.caltropLegs) {
+          k.ph = 2;
+          k.t = C.caltropRest;
         }
       }
-      if (k.t <= 0) sys.end(c);
+      return;
     }
+    if (k.ph === 2 && k.t <= 0) sys.end(c);
+    void dt;
   },
-  // 예고: 판정과 같은 양옆 부채꼴 두 개(정면·후면은 안전)
-  tele: ({ e, k }) => [
-    [TELE_CONE, r1(e.x), r1(e.y), r2(e.face + 1.575), 0.775, BODY + C.scytheRange, ...lt(k), BSK_SCYTHE],
-    [TELE_CONE, r1(e.x), r1(e.y), r2(e.face - 1.575), 0.775, BODY + C.scytheRange, ...lt(k), BSK_SCYTHE],
-  ],
+  // 예고: 달릴 길(꺾이는 구간 전체)을 선으로 보여 준다
+  tele: ({ e, k }) => {
+    const out: any[] = [];
+    let x = e.x;
+    let y = e.y;
+    let a = k.ang;
+    for (let i = 0; i < C.caltropLegs; i++) {
+      out.push([TELE_LINE, r1(x), r1(y), r2(a), C.caltropLegLen, BODY * 1.4, ...lt(k), BSK_CALTROP]);
+      x += Math.cos(a) * C.caltropLegLen;
+      y += Math.sin(a) * C.caltropLegLen;
+      a += (k.d.sgn ?? 1) * ((C.caltropTurn * Math.PI) / 180);
+    }
+    return out;
+  },
 };
 
 /** 급선회 파쇄: 급선회하며 꼬리가 후방 부채꼴을 휩쓴다. 끝나면 멈춰 후방 약점이 드러난다. */
@@ -222,7 +250,7 @@ export const chariotKit: KitDef = {
   firstDelay: C.firstDelay,
   idleMin: C.idleMin,
   idleMax: C.idleMax,
-  skills: [accel, scythe, drift, rampage],
+  skills: [accel, caltrop, drift, rampage],
   /** 정면은 단단하고 측면·후면이 약점이다 */
   preHit: ({ e }, hit) => {
     if (hit.dot) return hit;
@@ -230,7 +258,7 @@ export const chariotKit: KitDef = {
     const mult = rel <= C.frontHalf ? C.frontMult : C.weakMult;
     return { ...hit, damage: hit.damage * mult };
   },
-  flags: ({ k }) => (k.cur?.id === BSK_RAMPAGE ? EF_MAD : 0) | (k.cur?.id === BSK_SCYTHE && k.ph === 1 ? EF_SCYTHE : 0),
+  flags: ({ k }) => (k.cur?.id === BSK_RAMPAGE ? EF_MAD : 0),
 };
 
 void ({} as Enemy | Ctx);
