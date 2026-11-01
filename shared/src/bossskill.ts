@@ -111,6 +111,7 @@ export const EF_BUBBLE = 32; // 매직 쉴드
 export const EF_STUN = 64; // 기절·그로기
 export const EF_MAD = 128; // 광분(바퀴가 붉게 달아오름)
 export const EF_SUPPLY = 2048; // (일반 적) 군량병: 공격 없이 도망만 치고, 쓰러지면 쌀을 떨군다
+export const EF_POST = 8192; // (일반 적) 성벽 위 수비병(궁병·마법사, 전용 그림. EF_ELITE와 함께 켜진다)
 export const EF_ELITE = 4096; // (일반 적) 군주의 근위대·정예(전용 그림)
 export const EF_SKEL = 1024; // (일반 적) 안개 속 시체에서 되살아난 스켈레톤
 export const EF_WHIRL = 512; // 휠윈드로 도는 중(칼날바람 소용돌이)

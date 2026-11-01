@@ -204,6 +204,7 @@ import {
   BOSS_NECRO,
   EF_SKEL,
   EF_ELITE,
+  EF_POST,
   ST_BIT_STUN,
   ST_BIT_ROOT,
   ST_BIT_SLOW,
@@ -1397,7 +1398,7 @@ export class Game {
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
       e.bk?.show ?? 0,
-      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0) | (e.elite ? EF_ELITE : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
+      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0) | (e.elite ? EF_ELITE : 0) | (e.post ? EF_ELITE | EF_POST : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
       Math.round(ghostAlpha(e.ghost) * 100),
     ]);
   }
