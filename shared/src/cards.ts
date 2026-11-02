@@ -147,16 +147,16 @@ export const SCALE_CARD = {
   leadWeight: 40,
   leadPctBase: 0.07, // 일반 7%: 통솔력 약 14에서 +1 카드와 같아지고, 그보다 낮을 때는 +N 카드가 낫고 높을수록 % 카드가 낫다
   leadPctWeight: 14,
-  priceBase: 0.15,
-  priceWeight: 5,
+  priceBase: 0.2, // 고용 비용 할인(일반 20%, 희귀·영웅은 배율)
+  priceWeight: 9,
   xpBase: 0.15,
   xpWeight: 6,
   luckBase: 0.2,
   luckWeight: 4,
-  bountyBase: 0.3,
-  bountyWeight: 4,
-  goldBase: 0.25,
-  goldWeight: 5,
+  bountyBase: 0.45, // 보상금 증가(일반 45%)
+  bountyWeight: 8,
+  goldBase: 0.4, // 전리품 금화 증가(일반 40%)
+  goldWeight: 9,
 };
 /** 용병 공용 흡혈 카드는 효과가 작아 다른 공용 카드의 5배로 준다(궁병 50%·마법사 25%는 따로 적용) */
 export const GLOBAL_LIFESTEAL_BOOST = 5; // 기본값

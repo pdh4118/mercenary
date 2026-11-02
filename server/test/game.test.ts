@@ -724,16 +724,16 @@ test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
   assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 19 + lvHp2);
   void lvHp;
   forceCard(g, a, "priceMult");
-  assert.ok(Math.abs(g.getPlayer(a)!.priceMult - 0.85) < 1e-9);
+  assert.ok(Math.abs(g.getPlayer(a)!.priceMult - 0.8) < 1e-9);
   const p = me(g, a);
   const camp = g.spawnCampAt(p.x + 10, p.y, [SPEAR, ARCHER, SHIELD]);
   const gold = g.getPlayer(a)!.gold;
   assert.equal(g.buy(a, camp, 0).ok, true);
-  assert.equal(g.getPlayer(a)!.gold, gold - Math.round(mercPrice(SPEAR, 0) * 0.85));
+  assert.equal(g.getPlayer(a)!.gold, gold - Math.round(mercPrice(SPEAR, 0) * 0.8));
   forceCard(g, a, "goldMult");
   const g0 = g.getPlayer(a)!.gold;
   killOne(g, a, SPEAR);
-  assert.equal(g.getPlayer(a)!.gold, g0 + Math.round(ENEMY_GOLD[SPEAR]! * 1.25));
+  assert.equal(g.getPlayer(a)!.gold, g0 + Math.round(ENEMY_GOLD[SPEAR]! * 1.4));
 });
 
 test("카드 효과: 주인공 이동 속도와 체력 재생", () => {

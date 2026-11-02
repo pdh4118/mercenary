@@ -36,7 +36,7 @@ export const mercXpNeed = (tier: number): number => MERC_XP_NEED[tier] ?? Infini
 export const unitCost = (type: number, tier: number): number => (UNIT_COST[type] ?? 1) + tier;
 
 /** 캠프에서 단계가 높은 용병을 바로 사는 값 배율(0단계는 1). 하나씩 강화하는 비용의 합에 20%를 더한 값이다. */
-export const TIER_BUY_MULT = [1, 2.64, 5.28, 9.6, 16.2] as const;
+export const TIER_BUY_MULT = [1, 4.2, 9, 16, 28] as const; // 높은 단계를 상점에서 바로 사면 강화 비용의 합보다 훨씬 비싸다(강화로 키우는 쪽이 싸다)
 /** 캠프에 이 시간(초)이 지날 때마다 나올 수 있는 최고 단계가 1씩 오른다 */
 export const CAMP_TIER_SEC = 240;
 /** 상점(캠프)에서는 3단계까지만 나온다(4단계는 강화로만 만든다) */
