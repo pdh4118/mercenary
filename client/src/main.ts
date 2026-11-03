@@ -3477,8 +3477,12 @@ async function main() {
     if (meState) audio.setListener(meState.x, meState.y);
     // 쿨타임: 주문·공격이 끝난 뒤 다시 쏠 수 있을 때까지. 왜 발사가 안 되는지 머리 위에 알려 준다.
     const recovering = !!meState && !meState.down && WEAPONS[meState.weapon]?.type === MAGE_TYPE && meState.wind <= 0 && meState.fcd >= 0.4; // 마법사 주인공만
-    recoverLabel.visible = recovering;
-    if (recovering && meState) {
+    const dryNow = !!meState && !meState.down && !!meState.dry;
+    recoverLabel.visible = recovering || dryNow;
+    if (dryNow && meState) {
+      recoverLabel.text = "금화 부족! 화살을 쏠 수 없습니다 (다른 무기로 바꾸세요)";
+      recoverLabel.position.set(meState.x, meState.y - 78);
+    } else if (recovering && meState) {
       recoverLabel.text = `쿨타임 ${meState.fcd.toFixed(1)}초`;
       recoverLabel.position.set(meState.x, meState.y - 78);
     }

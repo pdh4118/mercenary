@@ -129,6 +129,7 @@ export interface PlayerState {
   down: boolean; // 쓰러짐(스스로 일어나지 못하고, 동료가 부활시켜야 한다)
   revive: number; // 부활 진행도 0..1
   invuln: number; // 부활 직후·스킬 무적 남은 시간(초)
+  dry?: boolean; // 활을 쏘려 했지만 금화가 모자라 쏘지 못했다(잠깐 true)
   fcd: number; // 다음 공격까지 남은 후딜레이(초, 주문·휘두르기가 끝난 뒤). 0이면 바로 쏠 수 있다
   alpha: number; // 투명도 0..100(100이면 보통). 활 은신 스킬 중에 줄었다 돌아온다
   sk: number; // 스페이스 스킬 쿨타임이 남은 시간(초, 무기를 바꿔도 공유)

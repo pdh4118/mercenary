@@ -362,3 +362,35 @@ test("활 스킬(은신): 투명한 동안 공격하거나 무기를 바꾸면 �
     assert.equal(p.alpha, 100, `${how}: 다 풀렸다`);
   }
 });
+
+test("활 화살 값: 한 발에 0.5금화, 멀티샷은 화살 수만큼 들고, 금화가 없으면 쏘지 못한다(토너먼트는 무료)", () => {
+  const { g, a } = start(0);
+  const p = g.getPlayer(a)!;
+  p.gold = 10;
+  const s = (g as any).slots.get(a);
+  const shoot = () => {
+    s.fireCd = 0;
+    (g as any).useWeapon(s);
+  };
+  const before = (g as any).bullets.length;
+  shoot();
+  shoot(); // 두 발 = 금화 1
+  assert.equal((g as any).bullets.length - before, 2);
+  assert.equal(p.gold, 9, "두 발에 금화 1");
+  p.gold = 0;
+  s.arrowCredit = 0;
+  shoot();
+  assert.equal((g as any).bullets.length - before, 2, "금화가 없으면 쏘지 못한다");
+  assert.ok(s.dryT > 0, "못 쏜 표시가 켜진다");
+  s.mods.heroMulti = 2;
+  p.gold = 5;
+  const b2 = (g as any).bullets.length;
+  shoot(); // 화살 3발 = 1.5금화 → 금화 2를 내고 0.5가 남는다
+  assert.equal((g as any).bullets.length - b2, 3);
+  assert.equal(p.gold, 3);
+  (g as any).phase = "tournament";
+  p.gold = 0;
+  const b3 = (g as any).bullets.length;
+  shoot();
+  assert.ok((g as any).bullets.length - b3 >= 1, "토너먼트는 금화 없이도 쏜다");
+});

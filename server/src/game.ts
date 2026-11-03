@@ -389,6 +389,8 @@ export interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
+  arrowCredit: number; // 이미 치른 화살 값(금화 단위). 1금화는 화살 1/ARROW_COST발
+  dryT: number; // 금화가 모자라 못 쏜 표시가 남은 시간
   stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
   stunT?: number; // 기절 남은 시간(움직이지도 공격하지도 못한다)
   rootT?: number; // 속박 남은 시간(움직이지 못한다)
@@ -995,6 +997,7 @@ export class Game {
         invuln: 0,
         alpha: 100,
         fcd: 0,
+        dry: false,
         sk: 0,
         skMax: 0,
         bst: 0,
@@ -1006,6 +1009,8 @@ export class Game {
       switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
+      arrowCredit: 0,
+      dryT: 0,
       windT: 0,
       skillCd: 0,
       skillMax: 0,
@@ -3063,6 +3068,8 @@ export class Game {
       p.skMax = s.skillMax;
       s.fireCd = Math.max(0, s.fireCd - dt);
       p.fcd = Math.round(Math.max(0, s.fireCd - s.windT) * 10) / 10;
+      s.dryT = Math.max(0, s.dryT - dt);
+      p.dry = s.dryT > 0;
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
       const hpBefore = p.hp;
@@ -3186,7 +3193,27 @@ export class Game {
   }
 
   /** 주인공 공격. 활은 투사체를 쏘고, 나머지는 조준 방향 부채꼴을 즉시 휘두른다. 무기마다 방패·범위 규칙이 다르다. */
+  /** 주인공 궁수의 화살 값을 치른다. 못 치르면 false(쏘지 못한다). 토너먼트에서는 무료. */
+  private payArrows(s: Slot, n: number): boolean {
+    if (TUNE.ARROW_COST <= 0 || this.phase === "tournament") return true;
+    const need = n * TUNE.ARROW_COST;
+    if (s.arrowCredit + 1e-9 < need) {
+      // 금화 1을 내고 그만큼의 화살 값을 쌓는다(남는 값은 다음 화살에 쓴다)
+      const pay = Math.ceil(need - s.arrowCredit - 1e-9);
+      if (s.state.gold < pay) return false;
+      s.state.gold -= pay;
+      s.arrowCredit += pay;
+    }
+    s.arrowCredit -= need;
+    return true;
+  }
+
   private useWeapon(s: Slot): void {
+    const w0 = WEAPONS[s.state.weapon]!;
+    if (w0.type === ARCHER && w0.ranged && !this.payArrows(s, 1 + Math.round(s.mods.heroMulti))) {
+      s.dryT = 0.8; // 금화가 모자라 쏠 수 없다: 다른 무기로 바꾸거나 금화를 벌어야 한다
+      return;
+    }
     if (s.ghost) releaseGhost(s.ghost); // 은신 중 공격하면 서서히 투명이 풀리기 시작한다
     const p = s.state;
     const w = WEAPONS[p.weapon]!;
