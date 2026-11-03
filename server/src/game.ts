@@ -3222,7 +3222,7 @@ export class Game {
 
   private startReload(s: Slot): boolean {
     if (s.reloadT > 0 || s.ammo >= TUNE.QUIVER_SIZE) return false;
-    if (this.phase !== "tournament" && TUNE.ARROW_COST > 0 && s.state.gold < Math.ceil(TUNE.ARROW_COST)) return false; // 금화가 한 푼도 없으면 채울 수 없다
+    if (TUNE.ARROW_COST > 0 && s.state.gold < Math.ceil(TUNE.ARROW_COST)) return false; // 금화가 한 푼도 없으면 채울 수 없다
     s.reloadT = TUNE.RELOAD_SEC;
     return true;
   }
@@ -3231,7 +3231,7 @@ export class Game {
   private finishReload(s: Slot): void {
     const missing = TUNE.QUIVER_SIZE - s.ammo;
     let n = missing;
-    if (this.phase !== "tournament" && TUNE.ARROW_COST > 0) {
+    if (TUNE.ARROW_COST > 0) {
       n = Math.min(missing, Math.floor(s.state.gold / TUNE.ARROW_COST + 1e-9));
       s.state.gold -= Math.ceil(n * TUNE.ARROW_COST - 1e-9);
     }

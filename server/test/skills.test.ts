@@ -363,7 +363,7 @@ test("활 스킬(은신): 투명한 동안 공격하거나 무기를 바꾸면 �
   }
 });
 
-test("활 전통: 30발, 쏠 때마다 줄고(멀티샷은 화살 수만큼), 다 쓰면 못 쏘고, 2초 채우면 금화를 내고 가득 찬다(토너먼트는 무료)", () => {
+test("활 전통: 30발, 쏠 때마다 줄고(멀티샷은 화살 수만큼), 다 쓰면 못 쏘고, 2초 채우면 금화를 내고 가득 찬다(토너먼트도 동일)", () => {
   const { g, a } = start(0);
   const p = g.getPlayer(a)!;
   p.gold = 100;
@@ -409,14 +409,16 @@ test("활 전통: 30발, 쏠 때마다 줄고(멀티샷은 화살 수만큼), �
   g.reload(a);
   g.setWeapon(a, 1);
   assert.equal(s.reloadT, 0);
-  // 토너먼트는 무료
+  // 토너먼트도 똑같이 금화를 낸다
   g.setWeapon(a, 0);
   (g as any).phase = "tournament";
   p.gold = 0;
   s.ammo = 0;
   s.reloadT = 0;
-  assert.equal((g as any).startReload(s), true, "금화가 없어도 시작한다");
+  assert.equal((g as any).startReload(s), false, "금화가 없으면 토너먼트에서도 장전할 수 없다");
+  p.gold = 10;
+  assert.equal((g as any).startReload(s), true);
   (g as any).finishReload(s);
-  assert.equal(s.ammo, 30);
-  assert.equal(p.gold, 0, "토너먼트는 무료");
+  assert.equal(s.ammo, 20, "금화 10G로 20발");
+  assert.equal(p.gold, 0);
 });
