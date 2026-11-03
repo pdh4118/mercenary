@@ -430,7 +430,7 @@ test("용병 급여: 주기마다 낸다, 못 내면 공격력이 줄고 계속 
   const ids = [g.addMerc(a, 1, p.x + 50, p.y), g.addMerc(a, 1, p.x + 60, p.y), g.addMerc(a, 2, p.x + 70, p.y)];
   (g as any).mercs.get(ids[2]!).tier = 3;
   p.gold = 100;
-  const step = (sec: number) => { for (let i = 0; i < Math.round(sec * 20); i++) g.step(1 / 20); };
+  const step = (sec: number) => { for (let i = 0; i < Math.round(sec * TICK_RATE); i++) g.step(); };
   step(1);
   assert.ok(p.salary > 0 && p.payT > 0, "급여 정보가 보인다");
   const salary = p.salary;
