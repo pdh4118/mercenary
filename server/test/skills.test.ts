@@ -363,34 +363,60 @@ test("활 스킬(은신): 투명한 동안 공격하거나 무기를 바꾸면 �
   }
 });
 
-test("활 화살 값: 한 발에 0.5금화, 멀티샷은 화살 수만큼 들고, 금화가 없으면 쏘지 못한다(토너먼트는 무료)", () => {
+test("활 전통: 30발, 쏠 때마다 줄고(멀티샷은 화살 수만큼), 다 쓰면 못 쏘고, 2초 채우면 금화를 내고 가득 찬다(토너먼트는 무료)", () => {
   const { g, a } = start(0);
   const p = g.getPlayer(a)!;
-  p.gold = 10;
+  p.gold = 100;
   const s = (g as any).slots.get(a);
+  assert.equal(s.ammo, 30);
   const shoot = () => {
     s.fireCd = 0;
     (g as any).useWeapon(s);
   };
-  const before = (g as any).bullets.length;
+  const b0 = (g as any).bullets.length;
   shoot();
-  shoot(); // 두 발 = 금화 1
-  assert.equal((g as any).bullets.length - before, 2);
-  assert.equal(p.gold, 9, "두 발에 금화 1");
-  p.gold = 0;
-  s.arrowCredit = 0;
-  shoot();
-  assert.equal((g as any).bullets.length - before, 2, "금화가 없으면 쏘지 못한다");
-  assert.ok(s.dryT > 0, "못 쏜 표시가 켜진다");
+  assert.equal(s.ammo, 29);
   s.mods.heroMulti = 2;
-  p.gold = 5;
-  const b2 = (g as any).bullets.length;
-  shoot(); // 화살 3발 = 1.5금화 → 금화 2를 내고 0.5가 남는다
-  assert.equal((g as any).bullets.length - b2, 3);
-  assert.equal(p.gold, 3);
+  shoot(); // 3발
+  assert.equal(s.ammo, 26);
+  assert.equal((g as any).bullets.length - b0, 4);
+  s.mods.heroMulti = 0;
+  s.ammo = 0;
+  shoot();
+  assert.equal((g as any).bullets.length - b0, 4, "화살이 없으면 쏘지 못한다");
+  assert.ok(s.dryT > 0 && s.reloadT > 0, "못 쏜 표시와 함께 자동으로 채우기가 시작된다");
+  s.fireCd = 0;
+  s.ammo = 3;
+  shoot(); // 채우는 중에는 쏠 수 없다
+  assert.equal(s.ammo, 3);
+  const x0 = p.x;
+  g.setInput(a, { dx: 1, dy: 0, aim: 0, fire: false });
+  run(g, 1);
+  assert.ok(p.x > x0 + 20, "채우는 중에도 움직일 수 있다");
+  run(g, 1.2);
+  assert.equal(s.ammo, 30, "2초 뒤 가득 찬다");
+  assert.equal(p.gold, 100 - Math.ceil(27 * 0.5), "빈 27발만큼 금화를 낸다");
+  // 금화가 모자라면 살 수 있는 만큼만 채운다
+  s.ammo = 0;
+  p.gold = 4;
+  assert.equal(g.reload(a), true);
+  run(g, 2.3);
+  assert.equal(s.ammo, 8);
+  assert.equal(p.gold, 0);
+  // 무기를 바꾸면 채우기가 멈춘다
+  s.ammo = 5;
+  p.gold = 50;
+  g.reload(a);
+  g.setWeapon(a, 1);
+  assert.equal(s.reloadT, 0);
+  // 토너먼트는 무료
+  g.setWeapon(a, 0);
   (g as any).phase = "tournament";
   p.gold = 0;
-  const b3 = (g as any).bullets.length;
-  shoot();
-  assert.ok((g as any).bullets.length - b3 >= 1, "토너먼트는 금화 없이도 쏜다");
+  s.ammo = 0;
+  s.reloadT = 0;
+  assert.equal((g as any).startReload(s), true, "금화가 없어도 시작한다");
+  (g as any).finishReload(s);
+  assert.equal(s.ammo, 30);
+  assert.equal(p.gold, 0, "토너먼트는 무료");
 });

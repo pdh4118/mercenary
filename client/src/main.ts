@@ -352,6 +352,9 @@ async function main() {
   const chargeLabel = new Text({ text: "돌격", style: { fill: 0xffc27a, fontSize: 13 } });
   chargeLabel.anchor.set(0.5, 1);
   chargeMark.visible = chargeLabel.visible = false;
+  const ammoLabel = new Text({ text: "", style: { fill: 0xe6e9f0, fontSize: 13, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+  ammoLabel.anchor.set(0.5, 0);
+  ammoLabel.visible = false;
   const recoverLabel = new Text({ text: "", style: { fill: 0xffc27a, fontSize: 15, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } } });
   recoverLabel.anchor.set(0.5, 1);
   recoverLabel.visible = false;
@@ -360,7 +363,7 @@ async function main() {
   const dmgLayer = new Container(); // 피해 숫자는 모든 그림 위에
   const terrainHigh = new Container(); // 유닛이 뒤에 서 있는 바위·나무: 유닛을 가린다
   terrainHigh.sortableChildren = true;
-  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, dbgG, dmgLayer);
+  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, ammoLabel, dbgG, dmgLayer);
   // 장군 스킬 표현(예고·장판·상태 표시·효과 컷). 서 있는 물건은 적과 함께 깊이 정렬된다.
   const bossFx = await createBossFx({
     groundFx,
@@ -1763,6 +1766,10 @@ async function main() {
     }
     if (k === "r" && !e.repeat) {
       const mine = latest?.players.find((p) => p.id === myId);
+      if (mine && mine.offer.length === 0) {
+        send({ t: "reload" }); // 카드 선택이 없으면 R은 활의 전통 채우기
+        return;
+      }
       if (mine && mine.offer.length > 0 && mine.rerolls > 0) audio.play("card_reroll");
       send({ t: "reroll" });
       return;
@@ -3477,10 +3484,18 @@ async function main() {
     if (meState) audio.setListener(meState.x, meState.y);
     // 쿨타임: 주문·공격이 끝난 뒤 다시 쏠 수 있을 때까지. 왜 발사가 안 되는지 머리 위에 알려 준다.
     const recovering = !!meState && !meState.down && WEAPONS[meState.weapon]?.type === MAGE_TYPE && meState.wind <= 0 && meState.fcd >= 0.4; // 마법사 주인공만
-    const dryNow = !!meState && !meState.down && !!meState.dry;
+    const archerNow = !!meState && !meState.down && WEAPONS[meState.weapon]?.type === ARCHER_TYPE && WEAPONS[meState.weapon]?.ranged === true && meState.ammo !== undefined;
+    ammoLabel.visible = archerNow;
+    if (archerNow && meState) {
+      const reloading = (meState.rl ?? 0) > 0;
+      ammoLabel.text = reloading ? `장전 중 ${(meState.rl ?? 0).toFixed(1)}초` : `화살 ${meState.ammo}/${meState.ammoMax}${meState.ammo === 0 ? " (R: 장전)" : ""}`;
+      ammoLabel.style.fill = reloading ? 0xffc27a : meState.ammo! <= 5 ? 0xff6a5a : 0xe6e9f0;
+      ammoLabel.position.set(meState.x, meState.y + 40);
+    }
+    const dryNow = !!meState && !meState.down && !!meState.dry && archerNow;
     recoverLabel.visible = recovering || dryNow;
     if (dryNow && meState) {
-      recoverLabel.text = "금화 부족! 화살을 쏠 수 없습니다 (다른 무기로 바꾸세요)";
+      recoverLabel.text = (meState.rl ?? 0) > 0 ? "장전 중에는 쏠 수 없습니다" : "화살이 없습니다! R로 장전하세요";
       recoverLabel.position.set(meState.x, meState.y - 78);
     } else if (recovering && meState) {
       recoverLabel.text = `쿨타임 ${meState.fcd.toFixed(1)}초`;

@@ -129,7 +129,10 @@ export interface PlayerState {
   down: boolean; // 쓰러짐(스스로 일어나지 못하고, 동료가 부활시켜야 한다)
   revive: number; // 부활 진행도 0..1
   invuln: number; // 부활 직후·스킬 무적 남은 시간(초)
-  dry?: boolean; // 활을 쏘려 했지만 금화가 모자라 쏘지 못했다(잠깐 true)
+  dry?: boolean; // 활을 쏘려 했지만 화살이 없거나 장전 중이라 쏘지 못했다(잠깐 true)
+  ammo?: number; // 남은 화살(주인공 궁수)
+  ammoMax?: number; // 전통 크기
+  rl?: number; // 전통을 채우는 데 남은 시간(초). 0이면 채우는 중이 아니다
   fcd: number; // 다음 공격까지 남은 후딜레이(초, 주문·휘두르기가 끝난 뒤). 0이면 바로 쏠 수 있다
   alpha: number; // 투명도 0..100(100이면 보통). 활 은신 스킬 중에 줄었다 돌아온다
   sk: number; // 스페이스 스킬 쿨타임이 남은 시간(초, 무기를 바꿔도 공유)
@@ -386,6 +389,7 @@ export type ClientMsg =
   | { t: "buy"; camp: number; slot: number }
   | { t: "weapon"; index: number } // 무기 변경(WEAPONS 인덱스)
   | { t: "skill" } // 스페이스: 지금 든 무기의 스킬
+  | { t: "reload" } // R: 활의 전통을 채운다(카드 선택이 없을 때)
   | { t: "formation"; zones: number[]; spacing: number } // 진형 변경(병종별 구역 + 간격)
   | { t: "pick"; index: number } // 레벨업 카드 선택(0..2)
   | { t: "reroll" } // 지금 제시된 카드를 새로 뽑는다(새로고침 1회 소모)

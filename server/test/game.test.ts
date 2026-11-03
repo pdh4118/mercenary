@@ -157,8 +157,6 @@ test("적은 여러 병종으로 생성된다", () => {
 // --- 주인공 공격과 골드 -------------------------------------------------------
 
 test("주인공 투사체로 적을 처치하면 처치 수와 금화가 오른다", () => {
-  const costNow = TUNE.ARROW_COST;
-  (TUNE as any).ARROW_COST = 0; // 화살 값은 따로 시험한다(skills.test.ts)
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
@@ -167,7 +165,6 @@ test("주인공 투사체로 적을 처치하면 처치 수와 금화가 오른�
   run(g, 6);
   assert.ok(me(g, a).kills >= 1);
   assert.equal(me(g, a).gold, TUNE.START_GOLD + ENEMY_GOLD[SPEAR]!);
-  (TUNE as any).ARROW_COST = costNow;
 });
 
 test("연사 속도(쿨다운)가 지켜진다", () => {
@@ -718,8 +715,6 @@ test("카드 효과: 병종 단련은 그 병종만 강화한다", () => {
 });
 
 test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
-  const costNow = TUNE.ARROW_COST;
-  (TUNE as any).ARROW_COST = 0;
   const g = quiet();
   const a = g.addPlayer("a")!;
   const lvHp = (TUNE.HERO_HP_PER_LEVEL) * (g.getPlayer(a)!.level - 1); // 레벨업마다 최대 체력이 오른다
@@ -739,7 +734,6 @@ test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
   const g0 = g.getPlayer(a)!.gold;
   killOne(g, a, SPEAR);
   assert.equal(g.getPlayer(a)!.gold, g0 + Math.round(ENEMY_GOLD[SPEAR]! * 1.4));
-  (TUNE as any).ARROW_COST = costNow;
 });
 
 test("카드 효과: 주인공 이동 속도와 체력 재생", () => {

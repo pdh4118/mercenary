@@ -389,7 +389,9 @@ export interface Slot {
   state: PlayerState;
   input: PlayerInput;
   fireCd: number;
-  arrowCredit: number; // 이미 치른 화살 값(금화 단위). 1금화는 화살 1/ARROW_COST발
+  ammo: number; // 주인공 궁수의 남은 화살
+  reloadT: number; // 전통을 채우는 데 남은 시간(0이면 채우는 중이 아니다)
+  arrowShots: number; // 이번 사격에서 나가는 화살 수
   dryT: number; // 금화가 모자라 못 쏜 표시가 남은 시간
   stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
   stunT?: number; // 기절 남은 시간(움직이지도 공격하지도 못한다)
@@ -998,6 +1000,9 @@ export class Game {
         alpha: 100,
         fcd: 0,
         dry: false,
+        ammo: TUNE.QUIVER_SIZE,
+        ammoMax: TUNE.QUIVER_SIZE,
+        rl: 0,
         sk: 0,
         skMax: 0,
         bst: 0,
@@ -1009,7 +1014,9 @@ export class Game {
       switchCd: 0,
       input: { dx: 0, dy: 0, aim: 0, fire: false, revive: false },
       fireCd: 0,
-      arrowCredit: 0,
+      ammo: TUNE.QUIVER_SIZE,
+      reloadT: 0,
+      arrowShots: 1,
       dryT: 0,
       windT: 0,
       skillCd: 0,
@@ -3031,6 +3038,7 @@ export class Game {
         }
       }
       if (p.down) {
+        s.reloadT = 0;
         p.chargeLeft = 0;
         s.windT = 0;
         p.wind = 0;
@@ -3070,6 +3078,16 @@ export class Game {
       p.fcd = Math.round(Math.max(0, s.fireCd - s.windT) * 10) / 10;
       s.dryT = Math.max(0, s.dryT - dt);
       p.dry = s.dryT > 0;
+      if (s.reloadT > 0) {
+        s.reloadT -= dt;
+        if (s.reloadT <= 0) {
+          s.reloadT = 0;
+          this.finishReload(s);
+        }
+      }
+      p.ammo = s.ammo;
+      p.ammoMax = TUNE.QUIVER_SIZE;
+      p.rl = Math.round(s.reloadT * 10) / 10;
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
       const hpBefore = p.hp;
@@ -3193,26 +3211,48 @@ export class Game {
   }
 
   /** 주인공 공격. 활은 투사체를 쏘고, 나머지는 조준 방향 부채꼴을 즉시 휘두른다. 무기마다 방패·범위 규칙이 다르다. */
-  /** 주인공 궁수의 화살 값을 치른다. 못 치르면 false(쏘지 못한다). 토너먼트에서는 무료. */
-  private payArrows(s: Slot, n: number): boolean {
-    if (TUNE.ARROW_COST <= 0 || this.phase === "tournament") return true;
-    const need = n * TUNE.ARROW_COST;
-    if (s.arrowCredit + 1e-9 < need) {
-      // 금화 1을 내고 그만큼의 화살 값을 쌓는다(남는 값은 다음 화살에 쓴다)
-      const pay = Math.ceil(need - s.arrowCredit - 1e-9);
-      if (s.state.gold < pay) return false;
-      s.state.gold -= pay;
-      s.arrowCredit += pay;
-    }
-    s.arrowCredit -= need;
+  /** 전통 채우기를 시작한다(R). 움직일 수는 있지만 채우는 동안은 쏠 수 없다. 이미 가득이거나 채우는 중이면 아무 일도 없다. */
+  reload(playerId: number): boolean {
+    const s = this.slots.get(playerId);
+    if (!s || s.state.down) return false;
+    const w = WEAPONS[s.state.weapon]!;
+    if (w.type !== ARCHER || !w.ranged) return false;
+    return this.startReload(s);
+  }
+
+  private startReload(s: Slot): boolean {
+    if (s.reloadT > 0 || s.ammo >= TUNE.QUIVER_SIZE) return false;
+    if (this.phase !== "tournament" && TUNE.ARROW_COST > 0 && s.state.gold < Math.ceil(TUNE.ARROW_COST)) return false; // 금화가 한 푼도 없으면 채울 수 없다
+    s.reloadT = TUNE.RELOAD_SEC;
     return true;
+  }
+
+  /** 채우기가 끝났다: 빈 만큼 채우되 금화가 모자라면 살 수 있는 만큼만 채운다(토너먼트는 무료) */
+  private finishReload(s: Slot): void {
+    const missing = TUNE.QUIVER_SIZE - s.ammo;
+    let n = missing;
+    if (this.phase !== "tournament" && TUNE.ARROW_COST > 0) {
+      n = Math.min(missing, Math.floor(s.state.gold / TUNE.ARROW_COST + 1e-9));
+      s.state.gold -= Math.ceil(n * TUNE.ARROW_COST - 1e-9);
+    }
+    s.ammo += Math.max(0, n);
   }
 
   private useWeapon(s: Slot): void {
     const w0 = WEAPONS[s.state.weapon]!;
-    if (w0.type === ARCHER && w0.ranged && !this.payArrows(s, 1 + Math.round(s.mods.heroMulti))) {
-      s.dryT = 0.8; // 금화가 모자라 쏠 수 없다: 다른 무기로 바꾸거나 금화를 벌어야 한다
-      return;
+    if (w0.type === ARCHER && w0.ranged) {
+      if (s.reloadT > 0) {
+        s.dryT = 0.4; // 채우는 동안은 쏠 수 없다
+        return;
+      }
+      if (s.ammo <= 0) {
+        s.dryT = 0.8;
+        this.startReload(s); // 화살이 떨어진 채 쏘려 하면 자동으로 채우기 시작한다
+        return;
+      }
+      const n = Math.min(1 + Math.round(s.mods.heroMulti), s.ammo);
+      s.arrowShots = n;
+      s.ammo -= n;
     }
     if (s.ghost) releaseGhost(s.ghost); // 은신 중 공격하면 서서히 투명이 풀리기 시작한다
     const p = s.state;
@@ -3303,7 +3343,7 @@ export class Game {
       return;
     }
     if (w.ranged) {
-      const n = 1 + Math.round(s.mods.heroMulti);
+      const n = Math.max(1, s.arrowShots);
       for (let i = 0; i < n; i++) {
         const ang = p.aim + fanOffset(i, n);
         this.bullets.push({
@@ -3565,6 +3605,7 @@ export class Game {
     if (s.state.weapon === index) return false;
     s.state.weapon = index;
     if (s.ghost) releaseGhost(s.ghost); // 은신 중 무기를 바꾸면 서서히 투명이 풀리기 시작한다
+    s.reloadT = 0; // 채우던 중에 무기를 바꾸면 채우기가 멈춘다
     s.switchCd = WEAPON_SWITCH_DELAY_SEC;
     s.windT = 0;
     s.chargeT = 0;

@@ -113,7 +113,9 @@ export const TUNE = {
   SPEAR_HALF_WIDTH_FAR: 15, // 사거리 끝의 반폭(px)
   CAV_HALF_WIDTH: 20, // 기병 찌르기(직사각형)의 반폭(px). 창병보다 사거리가 짧고 폭은 조금 넓다
   LEADERSHIP_PER_LEVEL: 1, // 주인공 레벨업 1회당 통솔력 증가
-  ARROW_COST: 0.5, // 주인공 궁수가 화살 한 발을 쏠 때마다 드는 금화(토너먼트는 무료). 멀티샷은 화살 수만큼 든다. 금화가 없으면 쏘지 못한다
+  ARROW_COST: 0.5, // 화살 한 발을 장전할 때 드는 금화(토너먼트는 무료)
+  QUIVER_SIZE: 30, // 주인공 궁수의 전통 크기(화살 수). 쏠 때마다 줄고 멀티샷은 화살 수만큼 준다
+  RELOAD_SEC: 2, // 전통을 채우는 시간(초). 움직일 수는 있지만 채우는 동안은 쏠 수 없다
   HERO_HP_PER_LEVEL: 10, // 주인공 레벨업 1회당 최대 체력 증가
   PLAYER_MAX_HP: 80, // 주인공은 약하게, 용병이 더 많은 역할을 하도록
   PLAYER_SPEED: 220, // px/s

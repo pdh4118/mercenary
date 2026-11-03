@@ -220,6 +220,9 @@ export class RoomManager {
       case "skill":
         room.game.useSkill(id);
         return;
+      case "reload":
+        room.game.reload(id);
+        return;
       case "formation":
         room.game.setFormation(id, msg);
         return;
