@@ -39,6 +39,7 @@ import {
   dodgeChanceOf,
   EVT_DODGE,
   EVT_INVULN,
+  EVT_QUIT,
   EVT_WALL_HIT,
   EVT_HEAL,
   EVT_RICE,
@@ -4102,6 +4103,7 @@ export class Game {
     }
     if (!pick) return;
     this.mercs.delete(pick.id);
+    this.pushEvent(EVT_QUIT, pick.x, pick.y, pick.tier, pick.type, owner);
   }
 
   private stepMercs(dt: number): void {

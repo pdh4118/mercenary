@@ -35,6 +35,7 @@ import {
   EVT_CRIT,
   EVT_DODGE,
   EVT_INVULN,
+  EVT_QUIT,
   EVT_WALL_HIT,
   EVT_HEAL,
   EVT_BACKSTAB,
@@ -1555,6 +1556,13 @@ async function main() {
           else if (duelNow && owner !== myId && kind === EVT_DMG_POISON_ALLY) spawnFloat(numFmt(val), x, y, { fill: 0xc77dff, fontSize: 14, fontWeight: "700", stroke: { color: 0x2a0a40, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xff5a5a, fontSize: 17, fontWeight: "700", stroke: { color: 0x2a0000, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DODGE) spawnFloat("회피!", x, y, { fill: 0xd8e0ee, fontSize: 18, fontWeight: "800", fontStyle: "italic", stroke: { color: 0x000000, width: 4 } }, 0.9, 0.15);
+          else if (kind === EVT_QUIT) {
+            const nm = UNIT_NAMES[val] ?? "용병";
+            spawnFloat(`${nm} 이탈!`, x, y - 20, { fill: 0xff8f6a, fontSize: 20, fontWeight: "900", stroke: { color: 0x3a1000, width: 5 } }, 1.8, 0.4);
+            spawnFloat("급여 미지급", x, y + 2, { fill: 0xffd0b8, fontSize: 13, fontWeight: "700", stroke: { color: 0x3a1000, width: 3 } }, 1.8, 0.2);
+            audio.play("morale_break");
+            if (owner === myId) shake(3, 0.2);
+          }
           else if (owner === myId && kind === EVT_INVULN) spawnFloat("무적!", x, y, { fill: 0x9be8ff, fontSize: 18, fontWeight: "800", stroke: { color: 0x0a2a3a, width: 4 } }, 0.9, 0.15);
           if (kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) {
             const hit = nearestSprite(enemies.views, x, y, 60);
