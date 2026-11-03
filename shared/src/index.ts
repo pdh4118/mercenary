@@ -117,6 +117,9 @@ export interface PlayerState {
   legends: string[]; // 고른 전설 능력(LegendId)
   luck: number; // 행운(높은 등급 카드 확률)
   swarm: number; // 군세 보너스(용병 공격력 +swarm)
+  unpaid: number; // 연속으로 급여를 못 준 횟수(0이면 정상, 많을수록 용병 공격력이 줄고 떠난다)
+  payT: number; // 다음 급여까지 남은 시간(초). 용병이 없거나 급여가 멈춘 단계면 0
+  salary: number; // 다음 급여 총액(금화)
   shaken: number; // 사기 저하가 남은 시간(초), 0이면 정상
   offer: number[]; // 지금 고를 수 있는 카드(CARDS 인덱스). 없으면 빈 배열
   priceMult: number; // 고용 가격 배율(할인 카드)

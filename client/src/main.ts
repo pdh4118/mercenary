@@ -3583,6 +3583,11 @@ async function main() {
       hudLead.text = `통솔력 ${used}/${meState.leadership}`;
       hudMercs.text = `용병 ${mine.length}명`;
       const extra: string[] = [];
+      if (meState.salary > 0 && meState.payT > 0) extra.push(`급여 ${Math.ceil(meState.payT)}초 후 -${meState.salary}G${meState.gold < meState.salary ? " (금화 부족!)" : ""}`);
+      if (meState.unpaid > 0) {
+        extra.push(`급여 미지급 ${meState.unpaid}회: 용병 공격력 -${Math.round(Math.min(meState.unpaid, 3) * 15)}%`);
+        if (meState.unpaid > 3) extra.push("용병이 떠나는 중!");
+      }
       if (meState.shaken > 0) extra.push(`공포! 용병이 도망칩니다 (${Math.ceil(meState.shaken)}초)`);
       else if (meState.swarm > 0) extra.push(`군세: 공격력 +${Math.round(meState.swarm * 100)}%`);
       if (meState.luck > 0) extra.push(`행운 +${Math.round(meState.luck * 100)}%`);
@@ -3593,7 +3598,7 @@ async function main() {
       }
       if (down > 0) extra.push(`용병 ${down}명 쓰러짐 (부활 대기)`);
       hudExtra.text = extra.join("\n");
-      hudExtra.style.fill = meState.shaken > 0 ? 0xff9b8f : 0xffe08a;
+      hudExtra.style.fill = meState.shaken > 0 || meState.unpaid > 0 ? 0xff9b8f : 0xffe08a;
       drawHudBg(hudExtra.text ? 148 + hudExtra.height + 10 : 148);
       const hpFrac = Math.max(0, Math.min(1, meState.hp / meState.maxHp));
       hudBars

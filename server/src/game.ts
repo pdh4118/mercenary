@@ -987,6 +987,9 @@ export class Game {
         luck: 0,
         swarm: 0,
         shaken: 0,
+        unpaid: 0,
+        payT: 0,
+        salary: 0,
         offer: [],
         priceMult: 1,
         leadership: TUNE.START_LEADERSHIP,
@@ -4061,6 +4064,46 @@ export class Game {
     return st.leash * (assault ? (type === CAVALRY ? ASSAULT_LEASH_MULT_CAVALRY : TUNE.ASSAULT_LEASH_MULT) : type === CAVALRY ? 1 : TUNE.DEFEND_LEASH_MULT);
   }
 
+  /** 용병 급여: 성장·보스 단계에서 PAY_INTERVAL초마다 살아 있는 용병 몫을 낸다. 못 내면 사기가 꺾여 공격력이 줄고, 계속 못 내면 높은 단계 용병부터 떠난다. */
+  private stepPayroll(dt: number): void {
+    const running = this.phase === "grow" || this.phase === "boss";
+    for (const sl of this.slots.values()) {
+      const st = sl.state;
+      let salary = 0;
+      for (const m of this.mercs.values()) if (m.owner === st.id && m.respawn <= 0) salary += unitCost(m.type, m.tier) * TUNE.PAY_PER_COST;
+      salary = Math.ceil(salary - 1e-9);
+      st.salary = salary;
+      if (!running || TUNE.PAY_PER_COST <= 0 || this.countMercs(st.id) === 0) {
+        st.payT = 0;
+        if (this.countMercs(st.id) === 0) st.unpaid = 0;
+        continue;
+      }
+      if (st.payT <= 0) st.payT = TUNE.PAY_INTERVAL;
+      st.payT -= dt;
+      if (st.payT > 0) continue;
+      st.payT = TUNE.PAY_INTERVAL;
+      if (salary <= 0) continue;
+      if (st.gold >= salary) {
+        st.gold -= salary;
+        st.unpaid = 0;
+        continue;
+      }
+      st.unpaid++;
+      if (st.unpaid > TUNE.UNPAID_QUIT) this.quitOneMerc(st.id);
+    }
+  }
+
+  /** 급여를 못 받은 용병 한 명이 용병단을 떠난다(가장 높은 단계 먼저, 환급 없음). */
+  private quitOneMerc(owner: number): void {
+    let pick: Merc | null = null;
+    for (const m of this.mercs.values()) {
+      if (m.owner !== owner) continue;
+      if (!pick || m.tier > pick.tier || (m.tier === pick.tier && m.paid > pick.paid)) pick = m;
+    }
+    if (!pick) return;
+    this.mercs.delete(pick.id);
+  }
+
   private stepMercs(dt: number): void {
     const alive = new Map<number, number>();
     for (const m of this.mercs.values()) if (m.respawn <= 0) alive.set(m.owner, (alive.get(m.owner) ?? 0) + 1);
@@ -4071,6 +4114,7 @@ export class Game {
         if (sl.state.shaken === 0) sl.shakenGrace = SHAKEN_GRACE_SEC;
       } else sl.shakenGrace = Math.max(0, sl.shakenGrace - dt);
     }
+    this.stepPayroll(dt);
     // 병종별 지시: 시간이 다하면 풀리고, 공격 지시는 쫓던 적이 있으면 그 적의 위치를 따라간다(죽었으면 곧 풀린다)
     for (const sl of this.slots.values()) {
       for (const t of UNIT_TYPES) {
@@ -5984,7 +6028,7 @@ export class Game {
       ...base,
       hp: Math.round(base.hp * hpMult),
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
-      damage: base.damage * this.pstat(m, mods, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)),
+      damage: base.damage * this.pstat(m, mods, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)),
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier),
       cooldown: base.cooldown / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier),

@@ -422,3 +422,35 @@ test("활 전통: 30발, 쏠 때마다 줄고(멀티샷은 화살 수만큼), �
   assert.equal(s.ammo, 20, "금화 10G로 20발");
   assert.equal(p.gold, 0);
 });
+
+test("용병 급여: 주기마다 낸다, 못 내면 공격력이 줄고 계속 못 내면 높은 단계부터 떠난다, 내면 바로 회복", () => {
+  const { g, a } = start(0);
+  const p = g.getPlayer(a)!;
+  const s = (g as any).slots.get(a);
+  const ids = [g.addMerc(a, 1, p.x + 50, p.y), g.addMerc(a, 1, p.x + 60, p.y), g.addMerc(a, 2, p.x + 70, p.y)];
+  (g as any).mercs.get(ids[2]!).tier = 3;
+  p.gold = 100;
+  const step = (sec: number) => { for (let i = 0; i < Math.round(sec * 20); i++) g.step(1 / 20); };
+  step(1);
+  assert.ok(p.salary > 0 && p.payT > 0, "급여 정보가 보인다");
+  const salary = p.salary;
+  step(TUNE.PAY_INTERVAL + 1);
+  assert.equal(p.unpaid, 0);
+  assert.ok(p.gold <= 100 - salary + 5, "급여를 냈다"); // 사이에 번 금화 여유
+  // 못 내는 경우
+  p.gold = 0;
+  step(TUNE.PAY_INTERVAL);
+  assert.equal(p.unpaid, 1);
+  assert.equal(g.countMercs(a), 3);
+  step(TUNE.PAY_INTERVAL * 2);
+  assert.equal(p.unpaid, 3);
+  assert.equal(g.countMercs(a), 3, "떠나기 전");
+  p.gold = 0;
+  step(TUNE.PAY_INTERVAL);
+  assert.equal(g.countMercs(a), 2, "높은 단계 용병이 떠났다");
+  assert.equal((g as any).mercs.has(ids[2]!), false);
+  // 급여를 내면 회복
+  p.gold = 500;
+  step(TUNE.PAY_INTERVAL);
+  assert.equal(p.unpaid, 0);
+});
