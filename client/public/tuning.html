@@ -635,21 +635,35 @@
             add.className = "vadd";
             const ai = document.createElement("input");
             ai.type = "text";
-            ai.placeholder = alias ? "들린말=맞는말 (예: 귀병=기병), Enter" : "단어 추가 (여러 개는 띄어쓰기), Enter";
+            ai.placeholder = alias ? "들린말=맞는말 (예: 귀병=기병 또는 귀병 -> 기병), Enter" : "단어 추가 (여러 개는 띄어쓰기), Enter";
+            const amsg = document.createElement("span");
+            amsg.className = "status err";
             const doAdd = () => {
-              const parts = ai.value.split(alias ? /[,\s]+/ : /[,\s]+/).map((x) => x.trim()).filter(Boolean);
+              let v = ai.value;
+              // 별칭: 전각 등호(＝)·화살표(→, ->)·콜론도 '='로 받고, '=' 둘레의 띄어쓰기는 무시한다("귀병 = 기병"도 한 쌍)
+              if (alias) v = v.replace(/[＝﹦]|->|=>|→|⇒|＞|>|[:：]/g, "=").replace(/\s*=\s*/g, "=");
+              const parts = v.split(/[,，;；\s]+/).map((x) => x.trim()).filter(Boolean);
               if (!parts.length) return;
               const cur = vdraft[g.key] || [];
-              for (const w of parts) if (!cur.includes(w) && (!alias || /^[^=]+=[^=]+$/.test(w))) cur.push(w);
+              const bad = [];
+              for (const w of parts) {
+                if (alias && !/^[^=]+=[^=]+$/.test(w)) bad.push(w);
+                else if (!cur.includes(w)) cur.push(w);
+              }
+              if (bad.length) {
+                amsg.textContent = "'들린말=맞는말' 형태가 아닙니다: " + bad.join(", ");
+                ai.value = bad.join(" ");
+                return;
+              }
               vdraft[g.key] = cur;
               render();
             };
-            ai.onkeydown = (e) => e.key === "Enter" && doAdd();
+            ai.onkeydown = (e) => e.key === "Enter" && !e.isComposing && doAdd(); // 한글 조합 중의 Enter는 글자 확정이므로 무시
             const ab = document.createElement("button");
             ab.className = "small";
             ab.textContent = "추가";
             ab.onclick = doAdd;
-            add.append(ai, ab);
+            add.append(ai, ab, amsg);
             if (!vSame(vdraft[g.key] || [], g.words)) box.classList.add("changed");
             box.append(h, chips, add);
             wrap.append(box);

@@ -69,3 +69,8 @@ test("이어 말하기: 연결 말이 없으면 이전처럼 명령 하나, 5조
   applyVoiceWords({ link: [...voiceWords("link"), "하다"] });
   assert.equal(splitVoice("기병 돌격하다 궁병 산개").length, 2);
 });
+
+test("별칭 입력: 전각 등호·화살표·콜론도 '='로 받는다", () => {
+  applyVoiceWords({ alias: ["귀병＝기병", "공병 -> 궁병", "참병→창병", "마법싸:마법사", "잘못"] });
+  assert.deepEqual(voiceWords("alias"), ["귀병=기병", "공병=궁병", "참병=창병", "마법싸=마법사"]);
+});

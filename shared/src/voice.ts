@@ -65,6 +65,7 @@ const cleanWord = (w: unknown, alias: boolean): string | null => {
   if (typeof w !== "string") return null;
   let t = w.replace(/\s+/g, "");
   if (alias) {
+    t = t.replace(/[＝﹦]|->|=>|→|⇒|＞|>|[:：]/g, "="); // 전각 등호·화살표·콜론도 '='로 본다
     const [a, b, ...rest] = t.split("=");
     if (!a || !b || rest.length) return null;
     t = `${a}=${b}`;
