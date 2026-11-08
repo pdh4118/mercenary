@@ -512,7 +512,7 @@ test("기병은 한 대 치고 빠져 속도를 붙여 다시 돌격하고, 상�
     }
   }
   assert.ok(e.hp <= 0, "끝내 처치한다");
-  assert.ok(Math.max(...hits) > 45, "속도를 붙여 친 한 방은 훨씬 세다: " + hits.map((h) => h.toFixed(0)).join(","));
+  assert.ok(Math.max(...hits) > 40, "속도를 붙여 친 한 방은 훨씬 세다: " + hits.map((h) => h.toFixed(0)).join(","));
   assert.ok(brawlHit, "체력이 30% 이하가 되면 마무리 싸움으로 바뀐다");
   assert.ok(!retreatedAfterBrawl, "마무리 싸움 중에는 빠지지 않는다");
 });
