@@ -2067,11 +2067,11 @@ async function main() {
   };
   window.addEventListener("keydown", (e) => {
     const tag = (document.activeElement as HTMLElement | null)?.tagName;
-    if (e.key.toLowerCase() !== "f" || e.repeat || e.ctrlKey || e.metaKey || e.altKey || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || myId < 0) return;
+    if ((e.key.toLowerCase() !== "f" && e.code !== "KeyF") || e.repeat || e.ctrlKey || e.metaKey || e.altKey || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || myId < 0) return;
     startVoice();
   });
   window.addEventListener("keyup", (e) => {
-    if (e.key.toLowerCase() === "f") stopVoice();
+    if (e.key.toLowerCase() === "f" || e.code === "KeyF") stopVoice(); // 한글 입력 상태에서는 e.key가 ㄹ로 와서 물리 키(KeyF)도 본다
   });
   window.addEventListener("blur", stopVoice);
   window.addEventListener("keyup", (e) => (keys.delete(e.key.toLowerCase()), pushInput()));
