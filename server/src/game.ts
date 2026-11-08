@@ -335,6 +335,7 @@ interface Mods {
   heroRange: number;
   heroPierce: number;
   heroMulti: number;
+  heroQuiver: number; // 전통 크기 추가(발)
   heroPoison: number;
   heroArmor: number;
   heroCrit: number;
@@ -366,6 +367,7 @@ const newMods = (): Mods => ({
   heroRange: 1,
   heroPierce: 0,
   heroMulti: 0,
+  heroQuiver: 0,
   heroPoison: 0,
   heroArmor: 0,
   heroCrit: 0,
@@ -3090,7 +3092,7 @@ export class Game {
         }
       }
       p.ammo = s.ammo;
-      p.ammoMax = TUNE.QUIVER_SIZE;
+      p.ammoMax = this.quiverMax(s);
       p.rl = Math.round(s.reloadT * 10) / 10;
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
@@ -3224,8 +3226,13 @@ export class Game {
     return this.startReload(s);
   }
 
+  /** 전통 크기: 기본 + 화살통 카드 */
+  private quiverMax(s: Slot): number {
+    return TUNE.QUIVER_SIZE + Math.round(s.mods.heroQuiver);
+  }
+
   private startReload(s: Slot): boolean {
-    if (s.reloadT > 0 || s.ammo >= TUNE.QUIVER_SIZE) return false;
+    if (s.reloadT > 0 || s.ammo >= this.quiverMax(s)) return false;
     if (TUNE.ARROW_COST > 0 && s.state.gold < Math.ceil(TUNE.ARROW_COST)) return false; // 금화가 한 푼도 없으면 채울 수 없다
     s.reloadT = TUNE.RELOAD_SEC;
     return true;
@@ -3233,7 +3240,7 @@ export class Game {
 
   /** 채우기가 끝났다: 빈 만큼 채우되 금화가 모자라면 살 수 있는 만큼만 채운다(토너먼트는 무료) */
   private finishReload(s: Slot): void {
-    const missing = TUNE.QUIVER_SIZE - s.ammo;
+    const missing = this.quiverMax(s) - s.ammo;
     let n = missing;
     if (TUNE.ARROW_COST > 0) {
       n = Math.min(missing, Math.floor(s.state.gold / TUNE.ARROW_COST + 1e-9));
@@ -5967,6 +5974,7 @@ export class Game {
       case "heroRange": m.heroRange += e.v; break;
       case "heroPierce": m.heroPierce += e.v; break;
       case "heroMulti": m.heroMulti += e.v; break;
+      case "heroQuiver": m.heroQuiver += Math.round(e.v); s.ammo += Math.round(e.v); break;
       case "heroPoison": m.heroPoison += e.v; break;
       case "heroArmor": m.heroArmor += e.v; break;
       case "heroCrit": m.heroCrit += e.v; break;

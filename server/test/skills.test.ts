@@ -454,3 +454,19 @@ test("용병 급여: 주기마다 낸다, 못 내면 공격력이 줄고 계속 
   step(TUNE.PAY_INTERVAL);
   assert.equal(p.unpaid, 0);
 });
+
+test("화살통 카드: 전통 크기가 늘고 고르는 즉시 그만큼 채워지며, 장전은 늘어난 크기까지 채운다", () => {
+  const { g, a } = start(0);
+  const p = g.getPlayer(a)!;
+  const s = (g as any).slots.get(a);
+  p.gold = 500;
+  (g as any).applyCard(s, { k: "heroQuiver", v: 10 });
+  assert.equal(s.ammo, 40);
+  s.ammo = 5;
+  g.step();
+  assert.equal(p.ammoMax, 40);
+  g.reload(a);
+  for (let i = 0; i < Math.round((TUNE.RELOAD_SEC + 0.5) * TICK_RATE); i++) g.step();
+  assert.equal(s.ammo, 40);
+  assert.equal(p.gold, 500 - Math.ceil(35 * TUNE.ARROW_COST));
+});

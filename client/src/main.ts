@@ -1059,6 +1059,7 @@ async function main() {
       case "heroRange":
       case "heroPierce":
       case "heroMulti":
+      case "heroQuiver":
       case "heroPoison": return ARCHER_TYPE;
       default: return -1;
     }
