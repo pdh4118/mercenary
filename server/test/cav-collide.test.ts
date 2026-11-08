@@ -189,3 +189,21 @@ test("기병: 공격력 카드가 돌격 추가 피해와 충돌 피해에도 �
   const strong = make(2);
   assert.ok(Math.abs(strong / base - 2) < 0.05, `공격력 x2 → 충돌 피해 ${base.toFixed(1)} → ${strong.toFixed(1)}`);
 });
+
+test("기병: 치명타가 뜨면 돌격 추가 피해와 충돌 피해도 함께 커진다", () => {
+  const dealt = (crit: boolean) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    const id = g.addMerc(a, CAVALRY, p.x + 300, p.y);
+    const m = (g as any).mercs.get(id);
+    const e = dummy(g, m.x + 20, m.y, 0);
+    m.momentum = 1;
+    (g as any).rollCrit = () => crit;
+    (g as any).cavBump(m, (g as any).mercStats(m), null, 10, 0);
+    return 5000 - e.hp;
+  };
+  const plain = dealt(false);
+  const crit = dealt(true);
+  assert.ok(crit > plain * 1.3, `치명타 충돌 ${plain.toFixed(1)} → ${crit.toFixed(1)}`);
+});
