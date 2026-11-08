@@ -108,6 +108,8 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   CAV_DAMAGE_PER_SPEED: ["기병 속도당 돌격 추가 피해", G.combat, 0, 1, 0.005],
   ENEMY_CAV_RAM_FRAC: ["충돌로 공격하는 적 기병 비율", G.enemy, 0, 1, 0.05],
   CAV_COUNTER_MULT: ["창병 카운터 피해 배율(기병이 되돌려받는 돌격 피해)", G.combat, 0, 10, 0.1],
+  CAV_BOOST_LOSS_MULT: ["기마 가속 중 충돌로 잃는 속도 배율", G.combat, 0, 1, 0.05],
+  CAV_BOOST_REGAIN: ["기마 가속 중 속도 회복 배율", G.combat, 0, 20, 0.5],
   CAV_COLLIDE_MIN_MOM: ["기병 충돌 피해에 필요한 속도(최고 속도 대비)", G.combat, 0, 1, 0.05],
   CAV_COLLIDE_LOSS: ["기병이 부딪힐 때 잃는 속도 비율", G.combat, 0, 0.9, 0.05],
   CAV_COLLIDE_MULT: ["기병 충돌 피해 배율(잃은 속도 x 돌격 계수 x 이 값)", G.combat, 0, 30, 0.5],

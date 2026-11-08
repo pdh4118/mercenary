@@ -3119,7 +3119,7 @@ export class Game {
       const moving = !frozen && !casting && !stunned && !rooted && (s.input.dx !== 0 || s.input.dy !== 0);
       if (s.boostT > 0) s.boostT = Math.max(0, s.boostT - dt);
       p.bst = Math.round(s.boostT * 10) / 10;
-      s.mom = mounted && s.boostT > 0 ? 1 : mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
+      s.mom = mounted && s.boostT > 0 ? Math.min(1, s.mom + (dt / TUNE.CAV_RAMP_SEC) * TUNE.CAV_BOOST_REGAIN) : mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
       const bowFiring = WEAPONS[p.weapon]!.ranged && WEAPONS[p.weapon]!.type === ARCHER && s.input.fire && !frozen; // 활을 쏘는 동안은 느려진다
       const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1) * slowK;
       const hx0 = p.x;
@@ -6742,7 +6742,7 @@ export class Game {
       const mom0 = s.mom;
       s.mom = mom0 * (1 - TUNE.CAV_COLLIDE_LOSS);
       const lost = before - this.heroSpeedNow(s); // 피해는 카드로 줄이기 전의 기본 손실 기준(충돌 피해는 그대로)
-      s.mom = mom0 * (1 - TUNE.CAV_COLLIDE_LOSS * s.mods.cavLossMult); // 실제로 잃는 속도는 충돌 감속 카드로 줄어든다
+      s.mom = mom0 * (1 - TUNE.CAV_COLLIDE_LOSS * s.mods.cavLossMult * (s.boostT > 0 ? TUNE.CAV_BOOST_LOSS_MULT : 1)); // 실제로 잃는 속도는 충돌 감속 카드로 줄고, 가속 중에는 절반만 잃는다(피해는 그대로)
       const crit = this.rollCrit(s.mods.heroCrit);
       const dmg = TUNE.CAV_DAMAGE_PER_SPEED * lost * TUNE.CAV_COLLIDE_MULT * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1);
       this.pushEvent(EVT_KNOCK, v.x, v.y, Math.atan2(v.y - p.y, v.x - p.x));

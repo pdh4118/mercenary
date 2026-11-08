@@ -314,3 +314,30 @@ test("기마 주인공 충돌: 달리다 적과 부딪히면 속도를 잃고 �
   assert.ok(Math.abs(a1.mom - (1 - TUNE.CAV_COLLIDE_LOSS * 0.5)) < 1e-9);
   assert.ok(Math.abs(a1.dmg - a0.dmg) < 1e-9, "피해는 그대로");
 });
+
+test("기마 가속 중 충돌: 속도를 절반만 잃고 곧 다시 붙으며, 피해는 줄지 않는다", () => {
+  const go = (boost: boolean) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    g.setWeapon(a, 5);
+    for (let i = 0; i < TICK_RATE; i++) g.step();
+    const s = (g as any).slots.get(a);
+    (g as any).rollCrit = () => false;
+    const e = dummy(g, p.x + 20, p.y, 0);
+    s.mom = 1;
+    s.boostT = boost ? 2 : 0;
+    (g as any).heroBump(s, 10, 0);
+    const right = s.mom;
+    if (boost) {
+      for (let i = 0; i < TICK_RATE / 2; i++) g.step();
+    }
+    return { right, later: s.mom, dmg: 5000 - e.hp };
+  };
+  const plain = go(false);
+  const boosted = go(true);
+  assert.ok(Math.abs(plain.right - (1 - TUNE.CAV_COLLIDE_LOSS)) < 1e-9);
+  assert.ok(Math.abs(boosted.right - (1 - TUNE.CAV_COLLIDE_LOSS * TUNE.CAV_BOOST_LOSS_MULT)) < 1e-9, "가속 중에는 손실이 절반");
+  assert.ok(boosted.later > boosted.right, "가속 중에는 속도가 빨리 다시 붙는다");
+  assert.ok(Math.abs(boosted.dmg / plain.dmg - TUNE.SKILL_BOOST_MULT) < 1e-6, "피해는 가속으로 빨라진 속도에 비례해 오히려 커진다(손실을 줄여도 줄지 않는다)");
+});
