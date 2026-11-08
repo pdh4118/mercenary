@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
-import { applyTuning, applyVoiceWords, parseVoiceMulti, resetTuning, tuneDefs, tuneOverrides, tuneValues, VOICE_GROUPS, voiceAll, voiceOverrides } from "@mercenary/shared";
+import { applyTuning, applyVoiceWords, parseVoiceMulti, resetTuning, tuneDefs, tuneOverrides, tuneValues, VOICE_GROUPS, voiceAll, voiceMaxWords, voiceOverrides } from "@mercenary/shared";
 
 /** 수치 조정 값이 저장되는 파일. 서버를 다시 켜도 이 값이 적용된다. */
 export const TUNING_FILE = process.env.MERC_TUNING_FILE ?? join(process.cwd(), "tuning.json");
@@ -103,7 +103,7 @@ export async function handleTuningApi(req: IncomingMessage, res: ServerResponse,
 export async function handleVoiceApi(req: IncomingMessage, res: ServerResponse, onChange: (words: Record<string, string[]>) => void): Promise<void> {
   if (!tuningAllowed(req)) return json(res, 403, { error: "이 컴퓨터에서만 열 수 있습니다. 밖에서 쓰려면 서버에 MERC_ADMIN_TOKEN을 정하고 ?token=값 으로 여세요." });
   const path = (req.url ?? "").split("?")[0]!;
-  const snapshot = () => ({ groups: VOICE_GROUPS, words: voiceAll() });
+  const snapshot = () => ({ groups: VOICE_GROUPS.map((g) => ({ ...g, max: voiceMaxWords(g.key) })), words: voiceAll() });
   try {
     if (req.method === "GET" && path === "/api/voice") return json(res, 200, snapshot());
     if (req.method === "POST" && path === "/api/voice") {

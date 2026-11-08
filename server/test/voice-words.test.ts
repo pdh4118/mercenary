@@ -1,6 +1,6 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { applyVoiceWords, parseVoice, parseVoiceBest, voiceOverrides, voiceWords, VOICE_GROUPS, voiceTypes, ARCHER, MAGE } from "@mercenary/shared";
+import { applyVoiceWords, parseVoice, parseVoiceBest, voiceMaxWords, voiceOverrides, voiceWords, VOICE_GROUPS, voiceTypes, ARCHER, MAGE } from "@mercenary/shared";
 
 afterEach(() => applyVoiceWords(null, true));
 
@@ -73,4 +73,12 @@ test("이어 말하기: 연결 말이 없으면 이전처럼 명령 하나, 5조
 test("별칭 입력: 전각 등호·화살표·콜론도 '='로 받는다", () => {
   applyVoiceWords({ alias: ["귀병＝기병", "공병 -> 궁병", "참병→창병", "마법싸:마법사", "잘못"] });
   assert.deepEqual(voiceWords("alias"), ["귀병=기병", "공병=궁병", "참병=창병", "마법싸=마법사"]);
+});
+
+test("음성 단어: 묶음마다 넣을 수 있는 수가 넉넉하다(별칭 400개, 그 밖 150개)", () => {
+  const many = Array.from({ length: 300 }, (_, i) => `오인${i}=정답${i}`);
+  applyVoiceWords({ alias: many, attack: Array.from({ length: 200 }, (_, i) => `공격어${i}`) });
+  assert.equal(voiceWords("alias").length, 300);
+  assert.equal(voiceWords("attack").length, 150);
+  assert.equal(voiceMaxWords("alias"), 400);
 });

@@ -55,7 +55,8 @@ export const VOICE_GROUPS: readonly VoiceGroupDef[] = [
 
 const GROUP_DEFAULTS = new Map<string, readonly string[]>(VOICE_GROUPS.map((g) => [g.key, g.words]));
 let wordNow = new Map<string, string[]>(VOICE_GROUPS.map((g) => [g.key, [...g.words]]));
-const MAX_WORDS = 80;
+/** 한 묶음에 넣을 수 있는 단어 수(별칭은 많이 쌓일 수 있어 더 넉넉하다) */
+export const voiceMaxWords = (key: string): number => (key === "alias" ? 400 : 150);
 const MAX_WORD_LEN = 14;
 
 /** 지금 쓰는 단어들 */
@@ -88,7 +89,7 @@ export function applyVoiceWords(values: unknown, replace = false): number {
         seen.add(c);
         out.push(c);
       }
-      if (out.length >= MAX_WORDS) break;
+      if (out.length >= voiceMaxWords(k)) break;
     }
     wordNow.set(k, out);
     n++;

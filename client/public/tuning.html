@@ -619,6 +619,9 @@
               render();
             };
             h.append(rs);
+            const cnt = document.createElement("small");
+            cnt.textContent = (vdraft[g.key] || []).length + " / " + g.max + "개";
+            h.append(cnt);
             const chips = document.createElement("div");
             chips.className = "chips";
             const others = (w) => list.filter((o) => o.key !== g.key && o.key !== "alias" && (vdraft[o.key] || []).includes(w)).map((o) => o.label);
@@ -655,9 +658,19 @@
               if (!parts.length) return;
               const cur = vdraft[g.key] || [];
               const bad = [];
+              let full = 0;
               for (const w of parts) {
                 if (alias && !/^[^=]+=[^=]+$/.test(w)) bad.push(w);
-                else if (!cur.includes(w)) cur.push(w);
+                else if (!cur.includes(w)) {
+                  if (cur.length >= g.max) full++;
+                  else cur.push(w);
+                }
+              }
+              if (full) {
+                amsg.textContent = "이 묶음은 " + g.max + "개까지만 넣을 수 있어 " + full + "개는 넣지 못했습니다";
+                vdraft[g.key] = cur;
+                render();
+                return;
               }
               if (bad.length) {
                 amsg.textContent = "'들린말=맞는말' 형태가 아닙니다: " + bad.join(", ");
