@@ -2134,7 +2134,7 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "boss": "군주",
   "skill": "성루 투석",
   "label": "사용 거리",
-  "hint": "군주 기준 이 거리 안의 대상을 노린다"
+  "hint": "군주 기준 이 거리 안의 대상을 노린다(성문에서 남쪽으로 약 600px까지. 성에서 멀리 떨어진 곳에는 떨어지지 않는다)"
  },
  "BOSS_LORD.catapultCd": {
   "boss": "군주",

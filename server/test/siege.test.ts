@@ -74,15 +74,34 @@ test("공성전: 성루 투석은 큰 원 예고를 연달아 만든다", () => 
   const p = g.getPlayer(a)!;
   p.maxHp = p.hp = 1e9; // 한 방에 쓰러져 판이 끝나지 않게
   p.x = 0;
-  p.y = GATE_Y + 500;
+  p.y = GATE_Y + 300;
   const ids = new Set<number>();
   for (let i = 0; i < TICK_RATE * 5; i++) {
     g.step();
     p.hp = p.maxHp;
+    p.x = 0;
+    p.y = GATE_Y + 300; // 바위에 맞아 밀려나도 제자리에서 계속 노려지게 한다
     for (const h of (g as any).boss.hazards as any[]) if (h.kind === HZ_RAIN && h.b === 2) ids.add(h.id);
   }
   assert.ok(ids.size >= BOSS_LORD.catapultShots, `바위 예고가 연달아 나온다(${ids.size})`);
   void b;
+});
+
+test("공성전: 성루 투석은 성에서 멀리 떨어진 대상에게는 바위를 떨어뜨리지 않는다", () => {
+  const { g, a } = setup(BSK_CATAPULT);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  p.x = 0;
+  p.y = 0; // 필드 한가운데(성에서 1600px)
+  let rocks = 0;
+  for (let i = 0; i < TICK_RATE * 8; i++) {
+    g.step();
+    p.hp = p.maxHp;
+    p.x = 0;
+    p.y = 0;
+    for (const h of (g as any).boss.hazards as any[]) if (h.kind === HZ_RAIN && h.b === 2) rocks++;
+  }
+  assert.equal(rocks, 0, "멀리 있는 대상에게는 투석하지 않는다");
 });
 
 test("공성전: 끓는 기름은 성문 앞 대상 발밑에 장판을 깔고 피해와 둔화를 준다", () => {

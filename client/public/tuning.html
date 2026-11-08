@@ -144,6 +144,17 @@
       const vClone = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, [...v]]));
       const vSame = (a, b) => a.length === b.length && a.every((w, i) => w === b[i]);
       const vDirty = () => !!vg && vg.groups.some((g) => !vSame(vdraft[g.key] || [], vsaved[g.key] || []));
+      const vChanged = () => (vg ? vg.groups.filter((g) => !vSame(vdraft[g.key] || [], vsaved[g.key] || [])).length : 0);
+      /** 고친 음성 단어 묶음을 서버에 저장한다(성공하면 true) */
+      async function saveVoice() {
+        if (!vg || !vChanged()) return true;
+        const changes = {};
+        for (const g of vg.groups) if (!vSame(vdraft[g.key] || [], vsaved[g.key] || [])) changes[g.key] = vdraft[g.key];
+        vg = await api("/api/voice", { words: changes });
+        vsaved = vClone(vg.words);
+        vdraft = vClone(vg.words);
+        return true;
+      }
       let tabs = [];
       let defs = [];
       let saved = {}; // 서버에 저장된 현재 값
@@ -205,7 +216,7 @@
       }
 
       function refreshCounts() {
-        const n = dirtyKeys().length;
+        const n = dirtyKeys().length + vChanged(); // 숫자 수치 + 음성 단어 묶음
         $("save").disabled = n === 0;
         $("revert").disabled = n === 0;
         $("save").textContent = n ? "저장하고 적용 (" + n + "개)" : "저장하고 적용";
@@ -524,14 +535,10 @@
           vsave.textContent = n ? "음성 단어 저장하고 적용 (" + n + "묶음)" : "음성 단어 저장하고 적용";
         };
         const vsaveNow = async () => {
-          if (!vDirty()) return;
-          const changes = {};
-          for (const g of vg.groups) if (!vSame(vdraft[g.key] || [], vsaved[g.key] || [])) changes[g.key] = vdraft[g.key];
+          if (!vChanged()) return;
           try {
             vstat.textContent = "저장하는 중...";
-            vg = await api("/api/voice", { words: changes });
-            vsaved = vClone(vg.words);
-            vdraft = vClone(vg.words);
+            await saveVoice();
             render();
             setStatus("음성 단어를 저장하고 적용했습니다", "ok");
           } catch (e) {
@@ -675,24 +682,32 @@
           view.append(section(tname, list.length, "voice|" + tname, wrap));
         }
         updBar();
-        window.__voiceSave = vsaveNow;
+        refreshCounts(); // 위쪽 저장 버튼도 음성 단어 변경을 센다
       }
 
       $("q").oninput = render;
       $("revert").onclick = () => {
         draft = { ...saved };
+        if (vg) vdraft = vClone(vsaved);
         render();
         setStatus("변경을 취소했습니다");
       };
       const save = async () => {
-        if (!dirtyKeys().length) return;
-        const changes = {};
-        for (const k of dirtyKeys()) changes[k] = draft[k];
+        const nNum = dirtyKeys().length;
+        const nVoice = vChanged();
+        if (!nNum && !nVoice) return;
         try {
           setStatus("저장하는 중...");
-          const data = await api("/api/tuning", { values: changes });
-          load(data);
-          setStatus(Object.keys(changes).length + "개를 저장하고 적용했습니다", "ok");
+          if (nNum) {
+            const changes = {};
+            for (const k of dirtyKeys()) changes[k] = draft[k];
+            load(await api("/api/tuning", { values: changes }));
+          }
+          if (nVoice) {
+            await saveVoice();
+            render();
+          }
+          setStatus((nNum ? nNum + "개 수치" : "") + (nNum && nVoice ? "와 " : "") + (nVoice ? "음성 단어 " + nVoice + "묶음" : "") + "을 저장하고 적용했습니다", "ok");
         } catch (e) {
           setStatus(e.message, "err");
         }
@@ -701,8 +716,7 @@
       window.addEventListener("keydown", (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
           e.preventDefault();
-          if (curTab === VOICE_TAB && !$("q").value.trim() && window.__voiceSave) window.__voiceSave();
-          else save();
+          save();
         }
       });
       $("resetAll").onclick = async () => {
@@ -715,7 +729,7 @@
         }
       };
       window.addEventListener("beforeunload", (e) => {
-        if (dirtyKeys().length || vDirty()) e.preventDefault();
+        if (dirtyKeys().length || vChanged()) e.preventDefault();
       });
       api("/api/tuning").then(load).catch((e) => setStatus(e.message, "err"));
     </script>

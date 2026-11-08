@@ -625,7 +625,7 @@ export const BOSS_LORD = {
   catapultRadius: 120, // 바위 폭발 반지름
   catapultDmg: 4, // 바위 피해(배율)
   catapultKnock: 120,
-  catapultRange: 1500, // 군주 기준 이 거리 안의 대상을 노린다
+  catapultRange: 850, // 군주 기준 이 거리 안의 대상을 노린다(성문에서 남쪽으로 약 600px까지. 성에서 멀리 떨어진 곳에는 떨어지지 않는다)
   catapultCd: 7,
   oilTele: 0.9, // 끓는 기름: 깔리기 전 예고
   oilPatches: 4, // 한 번에 깔리는 장판 수
