@@ -92,12 +92,11 @@ test("철퇴는 같은 횟수로 화살보다 훨씬 빨리 방패를 깬다", (
   assert.ok(hitsToBreak(ARCHER, 8) >= 20);
 });
 
-test("창병은 기병의 돌격 피해를 받지 않는다", () => {
+test("창병도 기병의 돌격 피해를 그대로 받는다(카운터는 기병이 돌격하기 전에 창에 먼저 찔릴 때만)", () => {
   const spear: Guard = { type: SPEAR, shield: 0, face: 0 };
   const r = resolveHit(spear, front(CAVALRY, 8, 16));
-  assert.equal(r.body, 8, "기본 피해만 받는다");
+  assert.equal(r.body, 24, "돌격 피해까지 받는다");
   assert.equal(r.reflected, 0, "반사는 돌격이 들어갈 때가 아니라 기병이 창에 먼저 맞을 때 일어난다");
-  // 다른 병종은 돌격 피해를 그대로 받고 반사는 없다
   for (const t of [CAVALRY, ARCHER, SHIELD, BLUNT]) {
     const o = resolveHit({ type: t, shield: 0, face: 0 }, front(CAVALRY, 8, 16));
     assert.equal(o.reflected, 0);
@@ -105,10 +104,10 @@ test("창병은 기병의 돌격 피해를 받지 않는다", () => {
   }
 });
 
-test("창을 든 주인공도 돌격 피해를 받지 않는다", () => {
+test("창을 든 주인공도 돌격 피해를 그대로 받는다", () => {
   const spearHero: Guard = { type: -1, spearStance: true, shield: 0, face: 0 };
   const r = resolveHit(spearHero, front(CAVALRY, 4, 13));
-  assert.equal(r.body, 4);
+  assert.equal(r.body, 17);
   assert.equal(r.reflected, 0);
 });
 
@@ -141,9 +140,9 @@ test("배후 공격: 등 뒤(반각 60도)에서 오면 피해와 돌격 피해�
   const shielded = resolveHit({ type: SHIELD, shield: 50, face: 0 }, { damage: 10, charge: 0, srcType: BLUNT, fromAngle: Math.PI });
   assert.equal(shielded.shield, 0);
   close(shielded.body, 15);
-  // 창병은 뒤에서 와도 돌격 피해를 받지 않고 받지 않는다
+  // 창병도 돌격 피해를 받고, 뒤에서 오면 1.5배
   const sp = resolveHit({ type: SPEAR, shield: 0, face: 0 }, { damage: 10, charge: 8, srcType: CAVALRY, fromAngle: Math.PI });
-  close(sp.body, 15);
+  close(sp.body, 27);
   assert.equal(sp.reflected, 0);
 });
 

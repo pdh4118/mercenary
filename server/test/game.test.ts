@@ -913,7 +913,7 @@ test("철퇴는 맞힌 대상 주변의 다른 적에게 절반 피해(범위 �
   assert.equal(g.getEnemy(far)!.hp, ENEMY_STATS[SPEAR]!.hp);
 });
 
-test("검을 들면 정면 피해가 절반이고, 창을 들면 기병의 돌격이 반사된다", () => {
+test("검을 들면 정면 피해가 절반이고, 창을 들어도 기병의 돌격 피해는 그대로 받는다", () => {
   const regen = TUNE.HERO_SHIELD_REGEN_PCT;
   TUNE.HERO_SHIELD_REGEN_PCT = 0; // 방패가 다시 차오르지 않게
   try {
@@ -945,7 +945,7 @@ function swordAndSpearCase(): void {
   const vsBow = hpLost(0, CAVALRY, 1);
   assert.ok(Math.abs(vsBow.lost - (ENEMY_STATS[CAVALRY]!.damage + bonus)) < 1e-6);
   const vsSpear = hpLost(1, CAVALRY, 1);
-  assert.ok(Math.abs(vsSpear.lost - ENEMY_STATS[CAVALRY]!.damage) < 1e-6, "창을 들면 돌격 피해가 없다");
+  assert.ok(Math.abs(vsSpear.lost - (ENEMY_STATS[CAVALRY]!.damage + bonus)) < 1e-6, "창을 들어도 돌격 피해는 그대로 받는다(카운터는 먼저 찔렀을 때만)");
 }
 
 test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며, 돌격 피해는 속도에 비례한다", () => {
@@ -974,7 +974,7 @@ test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며,
   assert.ok(g.getMerc(c)!.momentum < before * 0.9, "공격하면 속도가 줄어든다");
 });
 
-test("기병 용병이 창병 적에게 돌격해도 창병은 돌격 피해를 받지 않는다", () => {
+test("기병 용병이 창병 적에게 돌격하면 창병도 돌격 피해를 받는다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);
@@ -986,7 +986,7 @@ test("기병 용병이 창병 적에게 돌격해도 창병은 돌격 피해를 
   const full = g.getMerc(c)!.hp;
   run(g, 0.4);
   void full;
-  assert.ok(g.getEnemy(e)!.hp > ENEMY_STATS[SPEAR]!.hp - MERC_STATS[CAVALRY]!.damage * (1 + SWARM_PER_MERC) - 1e-6, "창병은 돌격 피해를 받지 않는다");
+  assert.ok((g.getEnemy(e)?.hp ?? 0) < ENEMY_STATS[SPEAR]!.hp - MERC_STATS[CAVALRY]!.damage * (1 + SWARM_PER_MERC) - 1e-6, "창병도 기본 피해에 더해 돌격 피해를 받는다");
 });
 
 test("방패는 깨져도 일정 시간 뒤 다시 생기고, 재생 중에는 정면에서도 막지 못한다", () => {

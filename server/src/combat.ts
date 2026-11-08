@@ -38,19 +38,18 @@ export interface HitResult {
 
 /**
  * 한 번의 공격이 방어자에게 어떻게 들어가는지 계산한다.
- * - 창병(또는 창을 든 주인공)은 돌격 피해를 받지 않고, 그 피해를 공격자에게 되돌려준다.
+ * - 창병(또는 창을 든 주인공)도 돌격 피해를 그대로 받는다. 대신 기병이 돌격하기 전에 창에 먼저 찔리면 기병이 속도를 잃고 쌓은 돌격 피해를 되돌려받는다(카운터).
  * - 방패가 있고 정면에서 오는 공격이면 방패 체력이 대신 깎인다(공격자 병종별 배율). 넘치는 피해는 몸에 들어간다.
  * - 방패가 없거나(깨진 경우 포함) 옆·뒤에서 오는 공격은 몸에 그대로 들어간다. 깨진 방패에 따로 약점 배율은 두지 않는다.
  *   검방병의 약점은 방패가 사라진 상태에서 드러나는 짧은 사거리와 낮은 공격력이다.
  */
 export function resolveHit(g: Guard, h: Hit): HitResult {
   if (h.pierceGuard) return { body: h.damage, shield: 0, reflected: 0, shieldBroke: false, backstab: false };
-  const spear = g.type === SPEAR || g.spearStance === true;
-  const reflected = 0; // 창병의 카운터는 돌격이 들어갈 때가 아니라, 기병이 돌격하기 전에 창에 맞을 때 일어난다(Game.counterCharge)
+  const reflected = 0; // 창병의 카운터는 돌격이 들어갈 때가 아니라, 기병이 돌격하기 전에 창에 맞을 때 일어난다(Game.counterCharge). 창병이 먼저 찌르지 못했다면 돌격 피해도 그대로 받는다.
   // 등 뒤에서 오는 공격은 피해가 늘어난다(돌격 피해도 포함). 방패는 정면만 막으므로 등 뒤에서는 어차피 소용없다.
   const backstab = Math.abs(angleDiff(h.fromAngle, g.face + Math.PI)) <= BACKSTAB_ARC;
   const mult = backstab ? TUNE.BACKSTAB_MULT : 1;
-  const base = (h.damage + (spear ? 0 : h.charge)) * mult;
+  const base = (h.damage + h.charge) * mult;
   const frontal = Math.abs(angleDiff(h.fromAngle, g.face)) <= SHIELD_FRONT_ARC;
 
   if (g.shield > 0 && frontal) {

@@ -5073,7 +5073,7 @@ export class Game {
     return true;
   }
 
-  /** 기병이 달리다 몸으로 부딪힌다: 속도를 일부 잃고, 잃은 속도만큼 대상에게 피해를 준다(창병에게는 카운터를 맞는다) */
+  /** 기병이 달리다 몸으로 부딪힌다: 속도를 일부 잃고, 잃은 속도만큼 대상에게 피해를 준다(창병도 똑같이 받는다) */
   /** 기병의 공격력 배율(공격력 카드·군세·급여 미지급 등. 단계 배율은 돌격 배수가 따로 있어 뺀다). 돌격·충돌 추가 피해에도 곱한다. */
   private cavAtkMult(m: Merc, st: UnitStats): number {
     return st.damage / (MERC_STATS[CAVALRY]!.damage * TIER_DMG[m.tier]!);
@@ -5085,7 +5085,7 @@ export class Game {
     const dl = Math.hypot(dx, dy);
     const fx = dl > 0.5 ? dx / dl : Math.cos(m.face);
     const fy = dl > 0.5 ? dy / dl : Math.sin(m.face);
-    const try1 = (vx: number, vy: number, vr: number, key: string, vType: number, apply: (h: Hit) => number): void => {
+    const try1 = (vx: number, vy: number, vr: number, key: string, apply: (h: Hit) => number): void => {
       const d = Math.hypot(vx - m.x, vy - m.y);
       if (d > (st.radius + vr) * Math.max(1, TUNE.MERC_SPACING) + 6 || // 용병끼리는 서로 밀려나므로 간격이 벌어지는 만큼 여유를 둔다
  ((vx - m.x) * fx + (vy - m.y) * fy) / (d || 1) < 0.2) return; // 앞에 있는 대상만
@@ -5093,16 +5093,6 @@ export class Game {
       this.rams.set(key, this.tick + Math.ceil(TUNE.CAV_COLLIDE_CD * TICK_RATE)); // 시간은 토너먼트에서 멈추므로 틱으로 센다
       const before = cavSpeed(st.speed, m.momentum);
       this.pushEvent(EVT_KNOCK, vx, vy, Math.atan2(vy - m.y, vx - m.x));
-      if (vType === SPEAR) {
-        // 창병에게 정면으로 부딪히면 돌격과 같이 카운터: 속도를 모두 잃고 속도만큼 되돌려받는다
-        const amount = TUNE.CAV_DAMAGE_PER_SPEED * before;
-        if (amount >= COUNTER_MIN) {
-          m.momentum = 0;
-          this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, amount, m.owner);
-          this.hurtMerc(m, amount);
-          return;
-        }
-      }
       m.momentum *= 1 - TUNE.CAV_COLLIDE_LOSS;
       const lost = before - cavSpeed(st.speed, m.momentum);
       const mods = this.slots.get(m.owner)?.mods ?? newMods();
@@ -5117,11 +5107,11 @@ export class Game {
       }
     };
     if (foes) {
-      for (const f of foes) try1(f.x, f.y, f.radius, `${m.id}:${f.merc ? f.merc.id : -f.ownerId}`, f.merc ? f.merc.type : -1, (h) => f.hit(h));
+      for (const f of foes) try1(f.x, f.y, f.radius, `${m.id}:${f.merc ? f.merc.id : -f.ownerId}`, (h) => f.hit(h));
     } else {
       for (const e of this.enemies.values()) {
         if (e.hp <= 0) continue;
-        try1(e.x, e.y, radiusOf(e), `${m.id}:${e.id}`, e.type, (h) => this.damageEnemy(e, h, m.owner, m));
+        try1(e.x, e.y, radiusOf(e), `${m.id}:${e.id}`, (h) => this.damageEnemy(e, h, m.owner, m));
       }
     }
     if (this.rams.size > 600) for (const [k, until] of this.rams) if (until <= this.tick) this.rams.delete(k);

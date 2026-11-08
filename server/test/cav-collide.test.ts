@@ -38,7 +38,7 @@ test("기병 충돌: 부딪히면 속도를 일부 잃고 잃은 속도만큼 �
   assert.ok(Math.abs(m.momentum - (1 - TUNE.CAV_COLLIDE_LOSS)) < 1e-9, "속도도 더 잃지 않는다");
 });
 
-test("기병 충돌: 방패 없는 대상에게 피해가 들어가고, 속도가 모자라면 아무 일도 없고, 창병에게는 카운터를 맞는다", () => {
+test("기병 충돌: 방패 없는 대상에게 피해가 들어가고, 속도가 모자라면 아무 일도 없고, 창병도 똑같이 피해를 받는다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
@@ -53,7 +53,7 @@ test("기병 충돌: 방패 없는 대상에게 피해가 들어가고, 속도�
   (g as any).cavBump(m, st, null, 10, 0);
   assert.ok(e.hp < 5000, "피해가 들어갔다");
   assert.ok(5000 - e.hp > 5 && 5000 - e.hp < 60, `피해 ${5000 - e.hp}`);
-  // 창병
+  // 창병도 똑같이 피해를 받는다(카운터는 창병이 먼저 찔렀을 때만 일어난다)
   const g2 = quiet();
   const a2 = g2.addPlayer("a")!;
   const p2 = g2.getPlayer(a2)!;
@@ -63,9 +63,9 @@ test("기병 충돌: 방패 없는 대상에게 피해가 들어가고, 속도�
   m2.momentum = 1;
   const hp0 = m2.hp;
   (g2 as any).cavBump(m2, st, null, 10, 0);
-  assert.equal(sp.hp, 5000, "창병은 피해를 받지 않는다");
-  assert.equal(m2.momentum, 0, "속도를 모두 잃는다");
-  assert.ok(m2.hp < hp0, "카운터 피해를 받는다");
+  assert.ok(sp.hp < 5000, "창병도 충돌 피해를 받는다");
+  assert.ok(m2.momentum > 0, "속도를 일부만 잃는다");
+  assert.equal(m2.hp, hp0, "되돌려받는 피해는 없다");
 });
 
 test("기병 진형 파괴: 적 진형의 옆을 길이 방향으로 지나가며 충돌 피해를 준다", () => {
