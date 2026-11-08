@@ -109,6 +109,7 @@ import {
   personalityOf,
   intentLine,
   parseVoiceBest,
+  applyVoiceWords,
   UNIT_TYPES,
   WORLD_SIZE,
   mercPrice,
@@ -1432,6 +1433,10 @@ async function main() {
     };
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data) as ServerMsg;
+      if (msg.t === "voice") {
+        applyVoiceWords(msg.words, true); // 서버에서 고친 음성 명령 단어를 같이 쓴다
+        return;
+      }
       if (msg.t === "tuning") {
         applyTuning(msg.values, true); // 서버에서 조정한 수치를 같이 쓴다(화면의 사거리·범위 표시 등)
         return;

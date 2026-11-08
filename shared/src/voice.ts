@@ -14,15 +14,99 @@ export interface VoiceMerc {
   num?: number; // 머리 위에 표시되는 번호(3번)
 }
 
-const TYPE_WORDS: [number, string[]][] = [
-  [CAVALRY, ["기병", "기마", "말탄"]],
-  [SPEAR, ["창병", "창"]],
-  [ARCHER, ["궁병", "궁수", "활", "아처"]],
-  [SHIELD, ["검방병", "방패병", "방패", "검병", "검"]],
-  [BLUNT, ["둔기병", "철퇴", "망치", "둔기"]],
-  [MAGE, ["마법사", "법사", "마법", "메이지"]],
+// --- 음성 단어 표(수치 조정 화면의 "음성 명령" 탭에서 고친다) --------------------------------------
+
+export interface VoiceGroupDef {
+  key: string;
+  tab: string; // 화면에서 묶는 이름
+  label: string;
+  hint: string;
+  words: readonly string[]; // 기본 단어
+}
+
+/** 단어 묶음. 같은 단어가 여러 묶음에 있으면 아래 설명의 순서대로 먼저 맞는 묶음이 이긴다. */
+export const VOICE_GROUPS: readonly VoiceGroupDef[] = [
+  { key: "type0", tab: "병종 이름", label: "기병", hint: "기병을 부르는 말", words: ["기병", "기마", "말탄", "기마병", "기병대", "기마대", "카발리"] },
+  { key: "type1", tab: "병종 이름", label: "창병", hint: "창병을 부르는 말", words: ["창병", "창", "창잡이", "장창", "창병대", "랜서"] },
+  { key: "type2", tab: "병종 이름", label: "궁병", hint: "궁병을 부르는 말", words: ["궁병", "궁수", "활", "아처", "아쳐", "활잡이", "활병", "궁병대", "궁수대"] },
+  { key: "type3", tab: "병종 이름", label: "검방병", hint: "검방병을 부르는 말", words: ["검방병", "방패병", "방패", "검병", "검", "검방", "검사", "소드"] },
+  { key: "type4", tab: "병종 이름", label: "둔기병", hint: "둔기병을 부르는 말", words: ["둔기병", "철퇴", "망치", "둔기", "둔기대", "해머", "곤봉", "철퇴병", "망치병"] },
+  { key: "type5", tab: "병종 이름", label: "마법사", hint: "마법사를 부르는 말", words: ["마법사", "법사", "마법", "메이지", "마도사", "마술사", "위자드", "마법병"] },
+  { key: "all", tab: "병종 이름", label: "전체", hint: "모든 병종에게 한 번에 지시하는 말", words: ["전체", "전원", "모두", "다들", "전부", "모든", "다같이", "너희", "여러분"] },
+  { key: "charge", tab: "진형 명령", label: "돌격 진형", hint: "돌격 진형으로 바꾸는 말(수비·산개보다 먼저 확인)", words: ["돌격", "돌진", "돌파", "밀어", "쳐들어", "몰아붙", "들이쳐", "러시", "총공격"] },
+  { key: "spread", tab: "진형 명령", label: "산개 진형", hint: "산개 진형으로 바꾸는 말", words: ["산개", "흩어", "분산", "퍼져", "퍼지", "벌려", "넓게"] },
+  { key: "hold", tab: "진형 명령", label: "수비(지점 방어)", hint: "그 자리·지정한 지점을 지키는 말", words: ["수비", "지켜", "지키", "방어", "사수", "버텨", "막아", "고수", "홀드"] },
+  { key: "guard", tab: "진형 명령", label: "호위 진형", hint: "주인공 곁으로 물러나 지키는 말", words: ["호위", "엄호", "보호", "후퇴", "물러", "뒤로", "철수", "퇴각"] },
+  { key: "base", tab: "진형 명령", label: "기본 진형", hint: "기본 진형으로 모이는 말", words: ["기본", "집결", "모여", "모이", "복귀", "돌아와", "따라와", "따라오", "대형", "정렬", "집합", "뭉쳐", "원위치"] },
+  { key: "attack", tab: "행동 명령", label: "공격", hint: "지정한 위치의 적을 공격하라는 말", words: ["공격", "쳐", "싸워", "죽여", "처치", "때려", "섬멸", "공략", "타격", "사냥", "해치워", "없애", "제거", "박살", "무찔러", "격파", "쏴"] },
+  { key: "move", tab: "행동 명령", label: "이동", hint: "지정한 위치로 가라는 말", words: ["이동", "가라", "가자", "움직", "진격", "전진", "출발", "가서", "건너가", "가봐"] },
+  { key: "mouse", tab: "행동 명령", label: "위치(마우스)", hint: "수비 등에서 '마우스 위치'를 가리키는 말", words: ["여기", "저기", "거기", "마우스", "이쪽", "저쪽", "커서", "이곳", "저곳", "그곳", "이리", "저리"] },
+  { key: "m_clear", tab: "용병 개인 명령(번호·이름)", label: "해제", hint: "개인 명령을 풀고 부대로 돌아오라는 말", words: ["해제", "풀어", "그만", "취소", "복귀", "돌아와", "따라와", "자유", "원래대로"] },
+  { key: "m_mark", tab: "용병 개인 명령(번호·이름)", label: "마크", hint: "특정 병종 적을 전담해 막으라는 말(뒤에 적 병종을 말한다)", words: ["마크", "견제", "전담", "붙어", "따라붙", "맡아", "상대해"] },
+  { key: "m_attack", tab: "용병 개인 명령(번호·이름)", label: "개인 공격", hint: "그 용병만 지정 위치를 공격하라는 말", words: ["공격", "쳐", "싸워", "죽여", "처치", "때려"] },
+  { key: "m_stay", tab: "용병 개인 명령(번호·이름)", label: "제자리 대기", hint: "그 용병만 제자리를 지키라는 말", words: ["수비", "지켜", "멈춰", "대기", "제자리", "가만", "정지", "스톱", "서있어"] },
+  { key: "m_move", tab: "용병 개인 명령(번호·이름)", label: "개인 이동", hint: "그 용병만 지정 위치로 가라는 말", words: ["이동", "가라", "가자", "움직", "여기", "저기", "가서", "출발", "전진"] },
+  { key: "alias", tab: "잘못 알아듣는 말 바로잡기", label: "별칭", hint: "'들린말=맞는말' 형태. 음성 인식기가 자주 틀리게 적는 말을 바로잡는다(예: 귀병=기병)", words: ["귀병=기병", "기뱅=기병", "기빙=기병", "공병=궁병", "궁뱅=궁병", "궁빙=궁병", "참병=창병", "창뱅=창병", "창빙=창병", "검방뱅=검방병", "검방빙=검방병", "둔기뱅=둔기병", "둔기빙=둔기병", "마법싸=마법사", "돌겨=돌격", "돌적=돌격", "돌객=돌격", "수빈=수비", "수빙=수비", "산게=산개", "상개=산개", "공걱=공격", "공겨=공격", "마커=마크", "이둥=이동"] },
 ];
-const ALL_WORDS = ["전체", "전원", "모두", "다들", "전부"];
+
+const GROUP_DEFAULTS = new Map<string, readonly string[]>(VOICE_GROUPS.map((g) => [g.key, g.words]));
+let wordNow = new Map<string, string[]>(VOICE_GROUPS.map((g) => [g.key, [...g.words]]));
+const MAX_WORDS = 80;
+const MAX_WORD_LEN = 14;
+
+/** 지금 쓰는 단어들 */
+export const voiceWords = (key: string): readonly string[] => wordNow.get(key) ?? [];
+
+const cleanWord = (w: unknown, alias: boolean): string | null => {
+  if (typeof w !== "string") return null;
+  let t = w.replace(/\s+/g, "");
+  if (alias) {
+    const [a, b, ...rest] = t.split("=");
+    if (!a || !b || rest.length) return null;
+    t = `${a}=${b}`;
+  } else t = t.replace(/[=,]/g, "");
+  return t.length >= 1 && t.length <= MAX_WORD_LEN + (alias ? MAX_WORD_LEN : 0) ? t : null;
+};
+
+/** 고친 단어들을 적용한다(모르는 묶음·이상한 값은 무시). replace면 먼저 모두 기본 단어로 되돌린다. 바뀐 묶음 수를 돌려준다. */
+export function applyVoiceWords(values: unknown, replace = false): number {
+  if (replace) wordNow = new Map(VOICE_GROUPS.map((g) => [g.key, [...g.words]]));
+  if (!values || typeof values !== "object") return 0;
+  let n = 0;
+  for (const [k, v] of Object.entries(values as Record<string, unknown>)) {
+    if (!GROUP_DEFAULTS.has(k) || !Array.isArray(v)) continue;
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const w of v) {
+      const c = cleanWord(w, k === "alias");
+      if (c && !seen.has(c)) {
+        seen.add(c);
+        out.push(c);
+      }
+      if (out.length >= MAX_WORDS) break;
+    }
+    wordNow.set(k, out);
+    n++;
+  }
+  return n;
+}
+
+/** 기본과 다른 묶음만(저장·전송용) */
+export function voiceOverrides(): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [k, def] of GROUP_DEFAULTS) {
+    const cur = wordNow.get(k)!;
+    if (cur.length !== def.length || cur.some((w, i) => w !== def[i])) out[k] = [...cur];
+  }
+  return out;
+}
+
+/** 지금 단어 전부(화면용) */
+export const voiceAll = (): Record<string, string[]> => Object.fromEntries([...wordNow].map(([k, v]) => [k, [...v]]));
+
+const typeWords = (): [number, string[]][] => [CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE].map((ty, i) => [ty, [...voiceWords(`type${i}`)]] as [number, string[]]);
+const allWords = (): readonly string[] => voiceWords("all");
+const aliasPairs = (): [string, string][] => voiceWords("alias").map((w) => w.split("=") as [string, string]);
 export const VOICE_TYPE_NAMES = ["기병", "창병", "궁병", "검방병", "둔기병", "마법사"];
 
 // --- 한글 소리 비교 ------------------------------------------------------------
@@ -96,22 +180,6 @@ const closest = <T,>(t: string, fuzzy: boolean, items: readonly (readonly [T, st
   return best;
 };
 
-/** 인식기가 자주 잘못 알아듣는 말을 바로잡는다(발견되는 대로 늘린다) */
-const ALIASES: [RegExp, string][] = [
-  [/귀병|기뱅|기빙|기병해|기병이/g, "기병"],
-  [/공병|궁뱅|궁빙|궁병이/g, "궁병"],
-  [/참병|창뱅|창빙|창병이/g, "창병"],
-  [/검방뱅|검방빙|검방병이/g, "검방병"],
-  [/둔기뱅|둔기빙|둔기병이/g, "둔기병"],
-  [/마법싸|마법사가/g, "마법사"],
-  [/돌겨|돌적|돌객|돌격해/g, "돌격"],
-  [/수빈|수빙|수비해/g, "수비"],
-  [/산게|상개|산개해/g, "산개"],
-  [/공걱|공겨|공격해/g, "공격"],
-  [/마커|마크해(?!제)/g, "마크"],
-  [/이둥|이동해/g, "이동"],
-];
-
 // --- 번호 ----------------------------------------------------------------------
 
 const SINO: Record<string, number> = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 };
@@ -149,11 +217,11 @@ export function extractNumbers(text: string): { nums: number[]; rest: string } {
 /** 말한 문장에서 병종을 찾는다. 병종을 말하지 않았으면 null(선택한 병종), "전원"이면 모든 병종 */
 export function voiceTypes(text: string, fuzzy = false): number | null {
   const t = text.replace(/\s+/g, "");
-  if (ALL_WORDS.some((w) => t.includes(w))) return (1 << 6) - 1;
+  if (allWords().some((w) => t.includes(w))) return (1 << 6) - 1;
   let mask = 0;
   // 긴 단어부터 맞춰 "둔기병"의 "기병"이나 "검방병"의 "방병" 같은 겹침을 피한다
   let rest = t;
-  const words = TYPE_WORDS.flatMap(([ty, ws]) => ws.map((w) => [ty, w] as const)).sort((a, b) => b[1].length - a[1].length);
+  const words = typeWords().flatMap(([ty, ws]) => ws.map((w) => [ty, w] as const)).sort((a, b) => b[1].length - a[1].length);
   for (const [ty, w] of words) {
     if (rest.includes(w)) {
       mask |= 1 << ty;
@@ -162,7 +230,7 @@ export function voiceTypes(text: string, fuzzy = false): number | null {
   }
   if (mask === 0 && fuzzy) {
     // 정확히 맞는 병종이 없으면 소리가 가장 비슷한 병종 하나를 고른다
-    const ty = closest(t, true, TYPE_WORDS.flatMap(([ty, ws]) => ws.filter((w) => w.length >= 2).map((w) => [ty, w] as const)));
+    const ty = closest(t, true, typeWords().flatMap(([ty, ws]) => ws.filter((w) => w.length >= 2).map((w) => [ty, w] as const)));
     if (ty !== null) mask = 1 << ty;
   }
   return mask === 0 ? null : mask;
@@ -210,7 +278,7 @@ function voiceMercs(text: string, roster: readonly VoiceMerc[]): { ids: number[]
  */
 export function parseVoice(text: string, roster: readonly VoiceMerc[] = [], fuzzy = false): VoiceCmd | null {
   let t0 = text.replace(/[\s.,!?]+/g, "");
-  for (const [re, to] of ALIASES) t0 = t0.replace(re, to);
+  for (const [from, to] of aliasPairs()) if (from && t0.includes(from)) t0 = t0.split(from).join(to);
   if (!t0) return null;
   const named = roster.length > 0 || /번/.test(t0) ? voiceMercs(t0, roster) : null;
   if (named && named.unknownNum && named.ids.length === 0) return null; // 없는 번호를 불렀다: 엉뚱한 병종 명령으로 해석하지 않는다
@@ -219,28 +287,28 @@ export function parseVoice(text: string, roster: readonly VoiceMerc[] = [], fuzz
     const who = named.names.join("·");
     const ids = named.ids;
     const names = named.names;
-    if (has(r, fuzzy, "해제", "풀어", "그만", "취소", "복귀", "돌아와", "따라와")) return { kind: "merc", ids, names, action: "clear", label: `${who} 개인 명령 해제` };
-    if (has(r, fuzzy, "마크", "견제", "전담", "붙어", "따라붙")) {
+    if (has(r, fuzzy, ...voiceWords("m_clear"))) return { kind: "merc", ids, names, action: "clear", label: `${who} 개인 명령 해제` };
+    if (has(r, fuzzy, ...voiceWords("m_mark"))) {
       const mask = voiceTypes(r, fuzzy);
       if (mask === null) return null;
       const ty = [0, 1, 2, 3, 4, 5].find((x) => mask & (1 << x))!;
       return { kind: "merc", ids, names, action: "mark", markType: ty, label: `${who} → 적 ${VOICE_TYPE_NAMES[ty]} 마크` };
     }
-    if (has(r, fuzzy, "공격", "쳐", "싸워", "죽여")) return { kind: "merc", ids, names, action: "attack", label: `${who} 공격(지정 위치)` };
-    if (has(r, fuzzy, "수비", "지켜", "멈춰", "대기", "제자리")) return { kind: "merc", ids, names, action: "stay", label: `${who} 제자리 대기` };
-    if (has(r, fuzzy, "이동", "가라", "가자", "움직", "여기", "저기")) return { kind: "merc", ids, names, action: "move", label: `${who} 이동(지정 위치)` };
+    if (has(r, fuzzy, ...voiceWords("m_attack"))) return { kind: "merc", ids, names, action: "attack", label: `${who} 공격(지정 위치)` };
+    if (has(r, fuzzy, ...voiceWords("m_stay"))) return { kind: "merc", ids, names, action: "stay", label: `${who} 제자리 대기` };
+    if (has(r, fuzzy, ...voiceWords("m_move"))) return { kind: "merc", ids, names, action: "move", label: `${who} 이동(지정 위치)` };
     return null;
   }
   const t = t0;
   const types = voiceTypes(t, fuzzy);
-  const mouse = has(t, fuzzy, "여기", "저기", "거기", "마우스", "이쪽", "저쪽");
-  if (has(t, fuzzy, "돌격", "돌진", "밀어", "쳐들어")) return { kind: "stance", v: 1, types, label: "돌격 진형" };
-  if (has(t, fuzzy, "산개", "흩어", "분산", "퍼져")) return { kind: "stance", v: 4, types, label: "산개 진형" };
-  if (has(t, fuzzy, "수비", "지켜", "지키", "방어", "사수")) return mouse ? { kind: "hold", at: "mouse", types, label: "그 지점 수비" } : { kind: "hold", at: "hero", types, label: "수비(제자리)" };
-  if (has(t, fuzzy, "호위", "엄호", "보호", "후퇴", "물러", "뒤로")) return { kind: "stance", v: 3, types, label: "호위 진형" };
-  if (has(t, fuzzy, "기본", "집결", "모여", "모이", "복귀", "돌아와", "따라와", "대형")) return { kind: "stance", v: 0, types, label: "기본 진형" };
-  if (has(t, fuzzy, "공격", "쳐", "싸워", "죽여", "처치", "때려", "섬멸")) return { kind: "order", types, label: "공격 지시(지정 위치)" };
-  if (has(t, fuzzy, "이동", "가라", "가자", "움직", "진격")) return { kind: "order", types, label: "이동 지시(지정 위치)" };
+  const mouse = has(t, fuzzy, ...voiceWords("mouse"));
+  if (has(t, fuzzy, ...voiceWords("charge"))) return { kind: "stance", v: 1, types, label: "돌격 진형" };
+  if (has(t, fuzzy, ...voiceWords("spread"))) return { kind: "stance", v: 4, types, label: "산개 진형" };
+  if (has(t, fuzzy, ...voiceWords("hold"))) return mouse ? { kind: "hold", at: "mouse", types, label: "그 지점 수비" } : { kind: "hold", at: "hero", types, label: "수비(제자리)" };
+  if (has(t, fuzzy, ...voiceWords("guard"))) return { kind: "stance", v: 3, types, label: "호위 진형" };
+  if (has(t, fuzzy, ...voiceWords("base"))) return { kind: "stance", v: 0, types, label: "기본 진형" };
+  if (has(t, fuzzy, ...voiceWords("attack"))) return { kind: "order", types, label: "공격 지시(지정 위치)" };
+  if (has(t, fuzzy, ...voiceWords("move"))) return { kind: "order", types, label: "이동 지시(지정 위치)" };
   return null;
 }
 

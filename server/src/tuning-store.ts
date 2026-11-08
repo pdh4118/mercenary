@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
-import { applyTuning, resetTuning, tuneDefs, tuneOverrides, tuneValues } from "@mercenary/shared";
+import { applyTuning, applyVoiceWords, parseVoiceBest, resetTuning, tuneDefs, tuneOverrides, tuneValues, VOICE_GROUPS, voiceAll, voiceOverrides } from "@mercenary/shared";
 
 /** 수치 조정 값이 저장되는 파일. 서버를 다시 켜도 이 값이 적용된다. */
 export const TUNING_FILE = process.env.MERC_TUNING_FILE ?? join(process.cwd(), "tuning.json");
@@ -13,6 +13,8 @@ export function loadTuning(file = TUNING_FILE): number {
   try {
     if (!existsSync(file)) return 0;
     const raw = JSON.parse(readFileSync(file, "utf8")) as unknown;
+    const voice = (raw as { voice?: unknown })?.voice;
+    applyVoiceWords(voice, true);
     return applyTuning((raw as { values?: unknown })?.values ?? raw, true);
   } catch (err) {
     console.error("[mercenary] 수치 조정 파일을 읽지 못했습니다(기본값으로 시작합니다):", err);
@@ -21,7 +23,7 @@ export function loadTuning(file = TUNING_FILE): number {
 }
 
 export function saveTuning(file = TUNING_FILE): void {
-  writeFileSync(file, JSON.stringify({ values: tuneOverrides() }, null, 2) + "\n");
+  writeFileSync(file, JSON.stringify({ values: tuneOverrides(), voice: voiceOverrides() }, null, 2) + "\n");
 }
 
 /**
@@ -90,6 +92,43 @@ export async function handleTuningApi(req: IncomingMessage, res: ServerResponse,
       saveTuning();
       onChange(tuneOverrides());
       return json(res, 200, snapshot());
+    }
+    return json(res, 404, { error: "not found" });
+  } catch {
+    return json(res, 400, { error: "잘못된 요청입니다" });
+  }
+}
+
+/** /api/voice 요청: 음성 명령 단어를 보고(GET), 고치고(POST), 되돌리고(/reset), 문장이 어떻게 해석되는지 시험한다(/test). */
+export async function handleVoiceApi(req: IncomingMessage, res: ServerResponse, onChange: (words: Record<string, string[]>) => void): Promise<void> {
+  if (!tuningAllowed(req)) return json(res, 403, { error: "이 컴퓨터에서만 열 수 있습니다. 밖에서 쓰려면 서버에 MERC_ADMIN_TOKEN을 정하고 ?token=값 으로 여세요." });
+  const path = (req.url ?? "").split("?")[0]!;
+  const snapshot = () => ({ groups: VOICE_GROUPS, words: voiceAll() });
+  try {
+    if (req.method === "GET" && path === "/api/voice") return json(res, 200, snapshot());
+    if (req.method === "POST" && path === "/api/voice") {
+      const body = (await readBody(req)) as { words?: unknown };
+      const n = applyVoiceWords(body.words);
+      saveTuning();
+      onChange(voiceOverrides());
+      return json(res, 200, { applied: n, ...snapshot() });
+    }
+    if (req.method === "POST" && path === "/api/voice/reset") {
+      const body = (await readBody(req)) as { keys?: unknown };
+      if (Array.isArray(body.keys)) {
+        const back: Record<string, string[]> = {};
+        for (const g of VOICE_GROUPS) if (body.keys.includes(g.key)) back[g.key] = [...g.words];
+        applyVoiceWords(back);
+      } else applyVoiceWords(null, true);
+      saveTuning();
+      onChange(voiceOverrides());
+      return json(res, 200, snapshot());
+    }
+    if (req.method === "POST" && path === "/api/voice/test") {
+      const body = (await readBody(req)) as { text?: unknown };
+      const text = typeof body.text === "string" ? body.text.slice(0, 200) : "";
+      const hit = parseVoiceBest([text]);
+      return json(res, 200, { ok: !!hit, label: hit?.cmd.label ?? "", fuzzy: hit?.fuzzy ?? false });
     }
     return json(res, 404, { error: "not found" });
   } catch {

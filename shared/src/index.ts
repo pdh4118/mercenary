@@ -411,6 +411,7 @@ export type ClientMsg =
 export type ServerMsg =
   | { t: "rooms"; rooms: RoomInfo[] } // 로비에 있는 동안 방 목록이 바뀔 때마다 온다
   | { t: "terrain"; items: [number, number, number, number, number][] } // 이번 판의 지형(스프라이트 번호, x, y, 배율, 뒤집기). 비면 평지
+  | { t: "voice"; words: Record<string, string[]> } // 음성 명령 단어(기본과 다른 묶음만). 받으면 기본 단어로 되돌린 뒤 적용한다
   | { t: "tuning"; values: Record<string, number> } // 수치 조정 값(기본값과 다른 것만). 받으면 기본값으로 되돌린 뒤 적용한다
   | { t: "welcome"; id: number; tick: number; code: string; token: string } // token은 재접속에 쓴다
   | { t: "room"; code: string; name: string; hostId: number; phase: RoomPhase; private: boolean; ranked: boolean; players: RoomMember[] } // 방 구성이 바뀔 때마다
