@@ -336,6 +336,7 @@ interface Mods {
   heroPierce: number;
   heroMulti: number;
   heroQuiver: number; // 전통 크기 추가(발)
+  cavLossMult: number; // 기병·기마가 충돌로 잃는 속도 배율(충돌 감속 카드마다 곱해서 줄어든다)
   heroPoison: number;
   heroArmor: number;
   heroCrit: number;
@@ -368,6 +369,7 @@ const newMods = (): Mods => ({
   heroPierce: 0,
   heroMulti: 0,
   heroQuiver: 0,
+  cavLossMult: 1,
   heroPoison: 0,
   heroArmor: 0,
   heroCrit: 0,
@@ -489,6 +491,8 @@ export interface Enemy extends Fighter {
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   ram?: boolean; // 충돌형 기병: 창으로 찌르지 않고 몸으로 부딪혀 밀고 지나간다
   ramT?: number; // 부딪힌 뒤 빠져나가 속도를 다시 붙이는 남은 시간
+  ramKey?: number; // 마지막으로 공격 방식(충돌/찌르기)을 정한 대상
+  ramHold?: number; // 방식을 다시 정할 수 있기까지 남은 시간(대상이 오락가락해도 방식이 떨리지 않게)
   ramMin?: number; // 이번 돌진에서 대상에 가장 가까웠던 거리(이보다 멀어지면 지나친 것)
   rage?: number; // 보스군 격노 단계(이동 속도가 단계마다 조금씩 빨라진다)
   poisonT?: number; // 독이 남은 시간
@@ -1549,8 +1553,6 @@ export class Game {
       const chance = Math.min(TUNE.VENOM_CHANCE_MAX, TUNE.VENOM_CHANCE_PER_STAGE * (this.stage - 1));
       e.venom = chance > 0 && this.rng() < chance;
     }
-    // 적 기병의 일부는 충돌형: 번호로 정해서(난수를 쓰지 않아 다른 장면의 난수 순서는 그대로) 약 ENEMY_CAV_RAM_FRAC가 된다
-    if (type === CAVALRY && !e.boss && !e.elite && e.ram === undefined) e.ram = ((id * 2654435761) >>> 0) % 1000 < TUNE.ENEMY_CAV_RAM_FRAC * 1000;
     this.enemies.set(id, e);
     return e;
   }
@@ -3120,6 +3122,8 @@ export class Game {
       s.mom = mounted && s.boostT > 0 ? 1 : mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
       const bowFiring = WEAPONS[p.weapon]!.ranged && WEAPONS[p.weapon]!.type === ARCHER && s.input.fire && !frozen; // 활을 쏘는 동안은 느려진다
       const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1) * slowK;
+      const hx0 = p.x;
+      const hy0 = p.y;
       if (frozen) s.dashT = 0;
       if (!frozen && s.dashT > 0) {
         // 돌진·후퇴: 입력과 상관없이 정해진 방향으로 빠르게 움직인다
@@ -3143,6 +3147,7 @@ export class Game {
           p.y *= TOURNAMENT_ARENA_RADIUS / r;
         }
       }
+      if (mounted && !p.down && !frozen) this.heroBump(s, p.x - hx0, p.y - hy0); // 달리다 부딪히면 속도를 잃고 피해를 준다
       p.aim = s.input.aim;
       const turn = FORMATION_TURN_RATE * dt;
       s.facing += Math.max(-turn, Math.min(turn, angleDiff(p.aim, s.facing)));
@@ -5109,9 +5114,9 @@ export class Game {
       this.rams.set(key, this.tick + Math.ceil(TUNE.CAV_COLLIDE_CD * TICK_RATE)); // 시간은 토너먼트에서 멈추므로 틱으로 센다
       const before = cavSpeed(st.speed, m.momentum);
       this.pushEvent(EVT_KNOCK, vx, vy, Math.atan2(vy - m.y, vx - m.x));
-      m.momentum *= 1 - TUNE.CAV_COLLIDE_LOSS;
-      const lost = before - cavSpeed(st.speed, m.momentum);
       const mods = this.slots.get(m.owner)?.mods ?? newMods();
+      const lost = before - cavSpeed(st.speed, m.momentum * (1 - TUNE.CAV_COLLIDE_LOSS)); // 피해는 카드로 줄이기 전의 기본 손실 기준(충돌 피해는 그대로)
+      m.momentum *= 1 - TUNE.CAV_COLLIDE_LOSS * mods.cavLossMult; // 실제로 잃는 속도는 충돌 감속 카드로 줄어든다
       const critChance = this.pstat(m, mods, "crit");
       const crit = this.rollCrit(critChance);
       const critMult = critDamageMult(critChance, TUNE.CRIT_BASE_MULT + mstat(mods, CAVALRY, "critMult"));
@@ -6208,6 +6213,7 @@ export class Game {
       case "heroRange": m.heroRange += e.v; break;
       case "heroPierce": m.heroPierce += e.v; break;
       case "heroMulti": m.heroMulti += e.v; break;
+      case "cavKeep": m.cavLossMult *= 1 - e.v; break;
       case "heroQuiver": m.heroQuiver += Math.round(e.v); s.ammo += Math.round(e.v); break;
       case "heroPoison": m.heroPoison += e.v; break;
       case "heroArmor": m.heroArmor += e.v; break;
@@ -6424,6 +6430,18 @@ export class Game {
         }
       }
       if (target && !st.ranged && !e.boss) load.set(target, (load.get(target) ?? 0) + 1);
+      if (e.type === CAVALRY && !e.boss && !e.elite) {
+        // 적 기병은 공격 대상을 새로 정할 때마다 약 ENEMY_CAV_RAM_FRAC의 확률로 충돌(몸으로 부딪히기)을, 아니면 창으로 찌르기를 택한다
+        e.ramHold = Math.max(0, (e.ramHold ?? 0) - dt);
+        const tk = target ? (target.f.merc ? target.f.merc.id : -target.f.ownerId) : undefined;
+        if (tk !== undefined && tk !== e.ramKey && e.ramHold <= 0) {
+          e.ramKey = tk;
+          e.ramHold = 1.5;
+          e.ram = this.rng() < TUNE.ENEMY_CAV_RAM_FRAC;
+          e.ramT = 0;
+          e.ramMin = Infinity;
+        }
+      }
       if (!target) {
         // 진형 소속은 자리를 지키며 대열과 함께 움직인다
         if (home) {
@@ -6698,6 +6716,40 @@ export class Game {
     e.x += ux * step;
     e.y += uy * step;
     this.updateMomentum(e, true, dt);
+  }
+
+  /** 기마 주인공이 달리다 적(토너먼트에서는 상대 선수의 용병·주인공)과 몸으로 부딪힌다: 속도를 일부 잃고, 잃은 속도만큼 피해를 준다. */
+  private heroBump(s: Slot, dx: number, dy: number): void {
+    const p = s.state;
+    if (s.mom < TUNE.CAV_COLLIDE_MIN_MOM || TUNE.CAV_COLLIDE_MULT <= 0) return;
+    const dl = Math.hypot(dx, dy);
+    if (dl < 0.5) return;
+    const fx = dx / dl;
+    const fy = dy / dl;
+    const duel = this.phase === "tournament";
+    const victims: { x: number; y: number; r: number; key: string; hit: (h: Hit) => number }[] = [];
+    if (duel) {
+      for (const f of this.duelFoes(p.id)) victims.push({ x: f.x, y: f.y, r: f.radius, key: `h${p.id}:${f.merc ? f.merc.id : -f.ownerId}`, hit: (h) => f.hit(h) });
+    } else {
+      for (const e of this.enemies.values()) if (e.hp > 0) victims.push({ x: e.x, y: e.y, r: radiusOf(e), key: `h${p.id}:${e.id}`, hit: (h) => this.damageEnemy(e, h, p.id) });
+    }
+    for (const v of victims) {
+      const d = Math.hypot(v.x - p.x, v.y - p.y);
+      if (d > PLAYER_RADIUS + v.r + 6 || ((v.x - p.x) * fx + (v.y - p.y) * fy) / (d || 1) < 0.2) continue;
+      if ((this.rams.get(v.key) ?? 0) > this.tick || s.mom < TUNE.CAV_COLLIDE_MIN_MOM) continue;
+      this.rams.set(v.key, this.tick + Math.ceil(TUNE.CAV_COLLIDE_CD * TICK_RATE));
+      const before = this.heroSpeedNow(s);
+      const mom0 = s.mom;
+      s.mom = mom0 * (1 - TUNE.CAV_COLLIDE_LOSS);
+      const lost = before - this.heroSpeedNow(s); // 피해는 카드로 줄이기 전의 기본 손실 기준(충돌 피해는 그대로)
+      s.mom = mom0 * (1 - TUNE.CAV_COLLIDE_LOSS * s.mods.cavLossMult); // 실제로 잃는 속도는 충돌 감속 카드로 줄어든다
+      const crit = this.rollCrit(s.mods.heroCrit);
+      const dmg = TUNE.CAV_DAMAGE_PER_SPEED * lost * TUNE.CAV_COLLIDE_MULT * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1);
+      this.pushEvent(EVT_KNOCK, v.x, v.y, Math.atan2(v.y - p.y, v.x - p.x));
+      const back = v.hit({ damage: dmg, charge: 0, srcType: CAVALRY, fromAngle: Math.atan2(p.y - v.y, p.x - v.x), crit });
+      if (back > 0) this.hurtHeroReflect(s, back);
+    }
+    if (this.rams.size > 600) for (const [k, until] of this.rams) if (until <= this.tick) this.rams.delete(k);
   }
 
   /** 충돌형 적 기병이 달리다 아군(용병·주인공)과 부딪힌다: 속도를 일부 잃고 잃은 속도만큼 피해를 준 뒤, 빠져나가 다시 달려든다. */

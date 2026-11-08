@@ -230,14 +230,22 @@ test("창 카운터: 쌓아 둔 돌격 피해 x 카운터 배율 x 공격력, �
   assert.ok(Math.abs(counter(2, 0) / base - 2) < 0.05, "공격력이 곱해진다");
 });
 
-test("적 기병: 약 20%는 충돌형이고, 충돌형은 창으로 찌르지 않고 몸으로 부딪혀 피해를 준다", () => {
+test("적 기병: 공격 대상을 정할 때 약 20%가 충돌을 택하고, 충돌을 택하면 창으로 찌르지 않고 몸으로 부딪혀 피해를 준다", () => {
   const g = quiet();
   g.addPlayer("a");
-  const total = 1000;
-  let rams = 0;
-  for (let i = 0; i < total; i++) if ((g as any).enemies.get(g.spawnEnemyAt(1000, 1000, CAVALRY)).ram) rams++;
-  assert.ok(rams > total * 0.15 && rams < total * 0.25, `충돌형 비율 ${(rams / total).toFixed(2)}`);
+  // 공격 대상을 정할 때 약 20%가 충돌을 택한다(첫 틱에 대상을 정한다)
+  TUNE.ENEMY_CAV_RAM_FRAC = 0.2;
+  const gm = quiet();
+  const am = gm.addPlayer("a")!;
+  gm.addMerc(am, 3, 600, 0);
+  const total = 600;
+  const list: any[] = [];
+  for (let i = 0; i < total; i++) list.push((gm as any).enemies.get(gm.spawnEnemyAt(900 + (i % 30) * 4, (Math.floor(i / 30) - 10) * 20, CAVALRY)));
+  gm.step();
+  const rams = list.filter((e) => e.ram).length;
+  assert.ok(rams > total * 0.14 && rams < total * 0.26, `충돌을 택한 비율 ${(rams / total).toFixed(2)}`);
 
+  TUNE.ENEMY_CAV_RAM_FRAC = 1; // 이제부터는 충돌을 택하게 한다
   const g2 = quiet();
   const a = g2.addPlayer("a")!;
   const p = g2.getPlayer(a)!;
@@ -245,7 +253,6 @@ test("적 기병: 약 20%는 충돌형이고, 충돌형은 창으로 찌르지 �
   const m = (g2 as any).mercs.get(g2.addMerc(a, 3, p.x + 900, p.y)); // 검방병 용병(제자리에서 맞는다)
   const hp0 = m.hp + m.shield;
   const e = (g2 as any).enemies.get(g2.spawnEnemyAt(m.x + 500, m.y, CAVALRY));
-  e.ram = true;
   let stabbed = false;
   let maxMom = 0;
   for (let i = 0; i < 6 * TICK_RATE; i++) {
@@ -259,4 +266,51 @@ test("적 기병: 약 20%는 충돌형이고, 충돌형은 창으로 찌르지 �
   assert.ok(!stabbed, "충돌형은 창으로 찌르지 않는다");
   assert.ok(m.hp + m.shield < hp0, `몸으로 부딪혀 피해를 줬다(${(hp0 - m.hp - m.shield).toFixed(1)})`);
   assert.ok(maxMom > 0.5, "속도를 붙여 달렸다");
+  TUNE.ENEMY_CAV_RAM_FRAC = 0;
+});
+
+test("충돌 감속 카드: 잃는 속도는 곱해서 줄고 충돌 피해는 그대로다(용병 기병)", () => {
+  const run1 = (cards: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    const id = g.addMerc(a, CAVALRY, p.x + 300, p.y);
+    const m = (g as any).mercs.get(id);
+    const e = dummy(g, m.x + 20, m.y, 0);
+    (g as any).rollCrit = () => false;
+    for (let i = 0; i < cards; i++) (g as any).applyCard((g as any).slots.get(a), { k: "cavKeep", v: 0.5 });
+    m.momentum = 1;
+    (g as any).cavBump(m, (g as any).mercStats(m), null, 10, 0);
+    return { mom: m.momentum, dmg: 5000 - e.hp };
+  };
+  const none = run1(0);
+  const one = run1(1);
+  const two = run1(2);
+  assert.ok(Math.abs(none.mom - (1 - TUNE.CAV_COLLIDE_LOSS)) < 1e-9);
+  assert.ok(Math.abs(one.mom - (1 - TUNE.CAV_COLLIDE_LOSS * 0.5)) < 1e-9, "카드 하나: 손실이 절반");
+  assert.ok(Math.abs(two.mom - (1 - TUNE.CAV_COLLIDE_LOSS * 0.25)) < 1e-9, "카드 둘: 곱해서 4분의 1");
+  assert.ok(Math.abs(one.dmg - none.dmg) < 1e-9 && Math.abs(two.dmg - none.dmg) < 1e-9, "충돌 피해는 그대로");
+});
+
+test("기마 주인공 충돌: 달리다 적과 부딪히면 속도를 잃고 피해를 주며, 충돌 감속 카드로 손실이 줄어도 피해는 그대로다", () => {
+  const go = (cards: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    g.setWeapon(a, 5); // 기마
+    for (let i = 0; i < TICK_RATE; i++) g.step();
+    const s = (g as any).slots.get(a);
+    (g as any).rollCrit = () => false;
+    for (let i = 0; i < cards; i++) (g as any).applyCard(s, { k: "cavKeep", v: 0.5 });
+    const e = dummy(g, p.x + 20, p.y, 0);
+    s.mom = 1;
+    (g as any).heroBump(s, 10, 0);
+    return { mom: s.mom, dmg: 5000 - e.hp };
+  };
+  const a0 = go(0);
+  const a1 = go(1);
+  assert.ok(a0.dmg > 5, `충돌 피해 ${a0.dmg.toFixed(1)}`);
+  assert.ok(Math.abs(a0.mom - (1 - TUNE.CAV_COLLIDE_LOSS)) < 1e-9);
+  assert.ok(Math.abs(a1.mom - (1 - TUNE.CAV_COLLIDE_LOSS * 0.5)) < 1e-9);
+  assert.ok(Math.abs(a1.dmg - a0.dmg) < 1e-9, "피해는 그대로");
 });

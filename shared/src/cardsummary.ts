@@ -51,6 +51,7 @@ export function summarizePicks(picks: readonly number[]): CardSummary {
   let xp = 0;
   let luck = 0;
   let bounty = 0;
+  let keep = 1; // 충돌 감속 감소: 곱해서 줄어든다
   let gold = 0;
   let count = 0;
   const add = (key: string, col: number, v: number) => {
@@ -72,6 +73,7 @@ export function summarizePicks(picks: readonly number[]): CardSummary {
     else if (e.k === "xpMult") xp += e.v;
     else if (e.k === "luck") luck += e.v;
     else if (e.k === "bounty") bounty += e.v;
+    else if (e.k === "cavKeep") keep *= 1 - e.v;
     else if (e.k === "goldMult") gold += e.v;
     else {
       const row = HERO_ROW[e.k];
@@ -103,6 +105,7 @@ export function summarizePicks(picks: readonly number[]): CardSummary {
   if (xp > 0) extras.push({ label: "경험치", text: `+${Math.round(xp * 100)}%` });
   if (gold > 0) extras.push({ label: "전리품", text: `+${Math.round(gold * 100)}%` });
   if (bounty > 0) extras.push({ label: "보상금", text: `+${Math.round(bounty * 100)}%` });
+  if (keep < 1) extras.push({ label: "충돌 감속", text: `-${Math.round((1 - keep) * 100)}%` });
   if (luck > 0) extras.push({ label: "행운", text: `+${Math.round(luck * 100)}%` });
   return { rows, legends, extras, count };
 }

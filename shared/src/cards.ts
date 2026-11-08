@@ -73,6 +73,7 @@ export type CardEffect =
   | { k: "goldMult"; v: number } // 금화 획득 +v(비율)
   | { k: "xpMult"; v: number } // 주인공 경험치 획득 +v(비율)
   | { k: "luck"; v: number } // 행운 +v: 높은 등급 카드가 나올 확률이 올라간다
+  | { k: "cavKeep"; v: number } // 기병·기마가 충돌로 잃는 속도 비율을 v만큼 줄인다(곱셈: 여러 장이면 (1-v1)(1-v2)...). 충돌 피해는 그대로
   | { k: "bounty"; v: number } // 스테이지·소대 클리어 금화 +v(비율)
   | { k: "mercStat"; stat: MercStat; v: number; type?: number } // 용병 능력치. type을 생략하면 모든 용병(효과는 작다)
   | { k: "legend"; id: LegendId; scope: LegendScope }
@@ -154,6 +155,8 @@ export const SCALE_CARD = {
   xpWeight: 6,
   luckBase: 0.2,
   luckWeight: 4,
+  cavKeepBase: 0.15, // 충돌 감속 감소 카드(일반 15%)
+  cavKeepWeight: 4,
   bountyBase: 0.45, // 보상금 증가(일반 45%)
   bountyWeight: 8,
   goldBase: 0.4, // 전리품 금화 증가(일반 40%)
@@ -320,6 +323,7 @@ const scaleCards = (): CardDef[] =>
       { name: `경험치 +${pct(C.xpBase * m.mult)}%`, desc: `주인공이 얻는 경험치가 ${pct(C.xpBase * m.mult)}% 늘어난다 (더 빨리 레벨업)`, category: 0, rarity: rr, weight: C.xpWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "xpMult", v: round3(C.xpBase * m.mult) } },
       { name: `행운 +${pct(C.luckBase * m.mult)}%`, desc: `희귀·영웅·전설 카드가 나올 확률이 올라간다 (행운 +${pct(C.luckBase * m.mult)}%)`, category: 0, rarity: rr, weight: C.luckWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "luck", v: round3(C.luckBase * m.mult) } },
       { name: `보상금 +${pct(C.bountyBase * m.mult)}%`, desc: `스테이지·소대를 정리했을 때 받는 금화가 ${pct(C.bountyBase * m.mult)}% 늘어난다`, category: 0, rarity: rr, weight: C.bountyWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "bounty", v: round3(C.bountyBase * m.mult) } },
+      { name: `충돌 감속 -${pct(C.cavKeepBase * m.mult)}%`, desc: `용병 기병과 기마 주인공이 몸으로 부딪힐 때 잃는 속도가 ${pct(C.cavKeepBase * m.mult)}% 줄어든다 (충돌 피해는 그대로이고, 여러 장은 곱해서 줄어든다)`, category: 0, rarity: rr, weight: C.cavKeepWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "cavKeep", v: round3(C.cavKeepBase * m.mult) } },
       { name: `전리품 +${pct(gold)}%`, desc: `적을 잡아 얻는 금화가 ${pct(gold)}% 늘어난다`, category: 0, rarity: rr, weight: C.goldWeight * m.weight, stars: r + 1, minLevel: m.minLevel, effect: { k: "goldMult", v: gold } },
     ];
   });

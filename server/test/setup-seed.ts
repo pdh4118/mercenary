@@ -13,3 +13,7 @@ Math.random = (): number => {
 
 // 용병 성격(능력치 보정·지시 무시)은 시험에서 끈다: 기존 시험은 용병이 지시를 항상 따르고 능력치가 기본값이라고 가정한다. 성격 시험은 game.personality = true로 켠다.
 process.env.MERC_NO_PERSONALITY = "1";
+
+// 충돌형 적 기병(대상을 정할 때마다 일정 확률로 찌르지 않고 몸으로 부딪힌다)은 시험에서 끈다: 기존 시험은 적 기병이 항상 창으로 찌른다고 가정한다. 충돌형 시험은 TUNE.ENEMY_CAV_RAM_FRAC를 직접 켠다.
+import { TUNE } from "@mercenary/shared";
+TUNE.ENEMY_CAV_RAM_FRAC = 0;
