@@ -573,7 +573,7 @@
           try {
             const r = await api("/api/voice/test", { text: ti.value });
             tr.className = "vres " + (r.ok ? "ok" : "no");
-            tr.textContent = r.ok ? "→ " + r.label + (r.fuzzy ? " (비슷한 소리로 알아들음)" : "") : "→ 알아듣지 못함";
+            tr.textContent = r.ok ? "→ " + r.labels.join("  →  ") + (r.skipped ? "  (못 알아들은 조각 " + r.skipped + "개는 건너뜀)" : "") : "→ 알아듣지 못함";
           } catch (e) {
             tr.className = "vres no";
             tr.textContent = e.message;

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
-import { applyTuning, applyVoiceWords, parseVoiceBest, resetTuning, tuneDefs, tuneOverrides, tuneValues, VOICE_GROUPS, voiceAll, voiceOverrides } from "@mercenary/shared";
+import { applyTuning, applyVoiceWords, parseVoiceMulti, resetTuning, tuneDefs, tuneOverrides, tuneValues, VOICE_GROUPS, voiceAll, voiceOverrides } from "@mercenary/shared";
 
 /** 수치 조정 값이 저장되는 파일. 서버를 다시 켜도 이 값이 적용된다. */
 export const TUNING_FILE = process.env.MERC_TUNING_FILE ?? join(process.cwd(), "tuning.json");
@@ -127,8 +127,8 @@ export async function handleVoiceApi(req: IncomingMessage, res: ServerResponse, 
     if (req.method === "POST" && path === "/api/voice/test") {
       const body = (await readBody(req)) as { text?: unknown };
       const text = typeof body.text === "string" ? body.text.slice(0, 200) : "";
-      const hit = parseVoiceBest([text]);
-      return json(res, 200, { ok: !!hit, label: hit?.cmd.label ?? "", fuzzy: hit?.fuzzy ?? false });
+      const hit = parseVoiceMulti([text]);
+      return json(res, 200, { ok: !!hit, labels: hit?.steps.map((s) => s.cmd.label + (s.fuzzy ? " (비슷한 소리)" : "")) ?? [], skipped: hit?.skipped ?? 0 });
     }
     return json(res, 404, { error: "not found" });
   } catch {

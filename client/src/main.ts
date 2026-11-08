@@ -108,8 +108,9 @@ import {
   SUMMARY_COLUMNS,
   personalityOf,
   intentLine,
-  parseVoiceBest,
+  parseVoiceMulti,
   applyVoiceWords,
+  type VoiceCmd,
   UNIT_TYPES,
   WORLD_SIZE,
   mercPrice,
@@ -1969,28 +1970,37 @@ async function main() {
   };
   const runVoice = (alts: string[]) => {
     const roster = (latest?.mercs ?? []).filter((w) => w[5] === myId).map((w) => ({ id: w[0], name: mercName(w[16]), num: w[22] }));
-    const best = parseVoiceBest(alts, roster);
+    const best = parseVoiceMulti(alts, roster);
     const text = best?.text ?? alts[0] ?? "";
-    if (!best) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 3번 기병 마크해 · 카일 저기 공격)`, 4);
-    const cmd = best.cmd;
-    if (best.fuzzy) cmd.label += " (비슷한 소리로 해석)";
-    if (cmd.kind === "merc") {
-      const { x: wx, y: wy } = targetPoint();
-      if (cmd.action === "stay") {
-        for (const w of latest?.mercs ?? []) if (cmd.ids.includes(w[0])) send({ t: "mercCmd", ids: [w[0]], kind: "move", x: w[1], y: w[2] });
-      } else send({ t: "mercCmd", ids: cmd.ids, kind: cmd.action, type: cmd.markType, x: wx, y: wy });
-      return say(`🎤 "${text}" → ${cmd.label}`, 3);
+    if (!best) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 3번 기병 마크해 · 카일 저기 공격 · 기병 돌격하고 궁병 산개)`, 4);
+    // 명령 하나를 보내고 화면에 보일 이름을 돌려준다
+    const exec = (cmd: VoiceCmd, fuzzy: boolean): string | null => {
+      const fz = fuzzy ? " (비슷한 소리)" : "";
+      if (cmd.kind === "merc") {
+        const { x: wx, y: wy } = targetPoint();
+        if (cmd.action === "stay") {
+          for (const w of latest?.mercs ?? []) if (cmd.ids.includes(w[0])) send({ t: "mercCmd", ids: [w[0]], kind: "move", x: w[1], y: w[2] });
+        } else send({ t: "mercCmd", ids: cmd.ids, kind: cmd.action, type: cmd.markType, x: wx, y: wy });
+        return cmd.label + fz;
+      }
+      const tf = cmd.types === null ? typesField() : cmd.types === ALL_MASK ? undefined : cmd.types;
+      const me = latest?.players.find((p) => p.id === myId);
+      const who = cmd.types === null ? (selMask === ALL_MASK ? "전체" : "선택한 병종") : cmd.types === ALL_MASK ? "전체" : UNIT_TYPES.filter((t) => cmd.types! & (1 << t)).map((t) => UNIT_NAMES[t]).join("·");
+      const tp = targetPoint();
+      if (cmd.kind === "stance") send({ t: "stance", v: cmd.v, types: tf });
+      else if (cmd.kind === "hold") {
+        if (!me) return null;
+        send({ t: "hold", x: cmd.at === "mouse" ? tp.x : me.x, y: cmd.at === "mouse" ? tp.y : me.y, types: tf });
+      } else if (me) send({ t: "order", x: tp.x, y: tp.y, types: tf, kind: cmd.label.startsWith("이동") ? "move" : "attack" });
+      return `${who} ${cmd.label}${fz}`;
+    };
+    const done: string[] = [];
+    for (const st of best.steps) {
+      const label = exec(st.cmd, st.fuzzy);
+      if (label) done.push(label);
     }
-    const tf = cmd.types === null ? typesField() : cmd.types === ALL_MASK ? undefined : cmd.types;
-    const me = latest?.players.find((p) => p.id === myId);
-    const who = cmd.types === null ? (selMask === ALL_MASK ? "전체" : "선택한 병종") : cmd.types === ALL_MASK ? "전체" : UNIT_TYPES.filter((t) => cmd.types! & (1 << t)).map((t) => UNIT_NAMES[t]).join("·");
-    const tp = targetPoint();
-    if (cmd.kind === "stance") send({ t: "stance", v: cmd.v, types: tf });
-    else if (cmd.kind === "hold") {
-      if (!me) return;
-      send({ t: "hold", x: cmd.at === "mouse" ? tp.x : me.x, y: cmd.at === "mouse" ? tp.y : me.y, types: tf });
-    } else if (me) send({ t: "order", x: tp.x, y: tp.y, types: tf, kind: cmd.label.startsWith("이동") ? "move" : "attack" });
-    say(`🎤 "${text}" → ${who} ${cmd.label}`, 3);
+    if (done.length === 0) return;
+    say(`🎤 "${text}" → ${done.join(" → ")}${best.skipped ? `  (못 알아들은 ${best.skipped}개 건너뜀)` : ""}`, done.length > 1 ? 4.5 : 3);
   };
   const startVoice = () => {
     if (voiceOn) return;

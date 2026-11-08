@@ -46,6 +46,7 @@ export const VOICE_GROUPS: readonly VoiceGroupDef[] = [
   { key: "m_attack", tab: "용병 개인 명령(번호·이름)", label: "개인 공격", hint: "그 용병만 지정 위치를 공격하라는 말", words: ["공격", "쳐", "싸워", "죽여", "처치", "때려"] },
   { key: "m_stay", tab: "용병 개인 명령(번호·이름)", label: "제자리 대기", hint: "그 용병만 제자리를 지키라는 말", words: ["수비", "지켜", "멈춰", "대기", "제자리", "가만", "정지", "스톱", "서있어"] },
   { key: "m_move", tab: "용병 개인 명령(번호·이름)", label: "개인 이동", hint: "그 용병만 지정 위치로 가라는 말", words: ["이동", "가라", "가자", "움직", "여기", "저기", "가서", "출발", "전진"] },
+  { key: "link", tab: "이어 말하기", label: "연결 말", hint: "한 문장에 명령 여러 개를 이어 말할 때 명령 사이를 나누는 말(쉼표·마침표로 끊어 말해도 나뉜다). 앞 명령의 병종은 뒤 명령이 병종을 말하지 않으면 이어받는다", words: ["하고", "그리고", "그다음", "그러고", "그런다음", "한뒤", "한후", "다음에", "이어서", "그뒤에", "그후에", "하면서", "한다음"] },
   { key: "alias", tab: "잘못 알아듣는 말 바로잡기", label: "별칭", hint: "'들린말=맞는말' 형태. 음성 인식기가 자주 틀리게 적는 말을 바로잡는다(예: 귀병=기병)", words: ["귀병=기병", "기뱅=기병", "기빙=기병", "공병=궁병", "궁뱅=궁병", "궁빙=궁병", "참병=창병", "창뱅=창병", "창빙=창병", "검방뱅=검방병", "검방빙=검방병", "둔기뱅=둔기병", "둔기빙=둔기병", "마법싸=마법사", "돌겨=돌격", "돌적=돌격", "돌객=돌격", "수빈=수비", "수빙=수비", "산게=산개", "상개=산개", "공걱=공격", "공겨=공격", "마커=마크", "이둥=이동"] },
 ];
 
@@ -310,6 +311,54 @@ export function parseVoice(text: string, roster: readonly VoiceMerc[] = [], fuzz
   if (has(t, fuzzy, ...voiceWords("attack"))) return { kind: "order", types, label: "공격 지시(지정 위치)" };
   if (has(t, fuzzy, ...voiceWords("move"))) return { kind: "order", types, label: "이동 지시(지정 위치)" };
   return null;
+}
+
+/** 한 번에 실행하는 이어 말하기 명령 수의 한계(인식 실수로 문장이 엉뚱하게 길어져도 폭주하지 않게) */
+export const VOICE_MAX_CHAIN = 5;
+
+/** 문장을 연결 말·쉼표·마침표에서 조각으로 나눈다(조각이 하나면 이어 말한 것이 아니다) */
+export function splitVoice(text: string): string[] {
+  const t = text.replace(/[.,;!?]+/g, "|").replace(/\s+/g, "");
+  const links = [...voiceWords("link")].filter((w) => w).sort((a, b) => b.length - a.length).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const re = new RegExp(["\\|", ...links].join("|"), "g");
+  return t.split(re).filter((x) => x.length > 0);
+}
+
+export interface VoiceStep {
+  cmd: VoiceCmd;
+  text: string; // 이 명령이 된 조각
+  fuzzy: boolean;
+}
+
+/**
+ * 이어 말한 문장을 순서대로 여러 명령으로 해석한다(연결 말이 없으면 명령 하나). 조각마다 해석하고, 병종을 말하지 않은 조각은
+ * 앞 명령의 병종을 이어받는다. 못 알아들은 조각은 건너뛰고(skipped), 하나도 못 알아들으면 null.
+ */
+export function parseVoiceMulti(alts: readonly string[], roster: readonly VoiceMerc[] = []): { steps: VoiceStep[]; text: string; skipped: number } | null {
+  let partial: { steps: VoiceStep[]; text: string; skipped: number } | null = null;
+  for (const text of alts) {
+    const segs = splitVoice(text);
+    if (segs.length < 2) continue;
+    const used = segs.slice(0, VOICE_MAX_CHAIN);
+    const steps: VoiceStep[] = [];
+    let prevTypes: number | null = null;
+    for (const seg of used) {
+      const b = parseVoiceBest([seg], roster);
+      if (!b) continue;
+      const cmd = b.cmd;
+      if (cmd.kind !== "merc") {
+        if (cmd.types === null && prevTypes !== null) cmd.types = prevTypes;
+        if (cmd.types !== null) prevTypes = cmd.types;
+      }
+      steps.push({ cmd, text: seg, fuzzy: b.fuzzy });
+    }
+    const r = { steps, text, skipped: used.length - steps.length };
+    if (steps.length >= 2 && r.skipped === 0) return r;
+    if (steps.length >= 2 && (!partial || steps.length > partial.steps.length)) partial = r;
+  }
+  if (partial) return partial;
+  const one = parseVoiceBest(alts, roster);
+  return one ? { steps: [{ cmd: one.cmd, text: one.text, fuzzy: one.fuzzy }], text: one.text, skipped: 0 } : null;
 }
 
 /**
