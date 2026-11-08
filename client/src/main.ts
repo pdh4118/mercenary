@@ -3523,16 +3523,16 @@ async function main() {
       const reloading = (meState.rl ?? 0) > 0;
       ammoLabel.text = reloading ? `장전 중 ${(meState.rl ?? 0).toFixed(1)}초` : `화살 ${meState.ammo}/${meState.ammoMax}${meState.ammo === 0 ? " (R: 장전)" : ""}`;
       ammoLabel.style.fill = reloading ? 0xffc27a : meState.ammo! <= 5 ? 0xff6a5a : 0xe6e9f0;
-      ammoLabel.position.set(meState.x, meState.y + 40);
+      ammoLabel.position.set(Math.round(me?.x ?? meState.x), Math.round((me?.y ?? meState.y) + 40)); // 주인공 그림과 같은 보간된 위치를 쓴다(서버 좌표는 1초에 20번만 바뀌어 움직이면 떨린다)
     }
     const dryNow = !!meState && !meState.down && !!meState.dry && archerNow;
     recoverLabel.visible = recovering || dryNow;
     if (dryNow && meState) {
       recoverLabel.text = (meState.rl ?? 0) > 0 ? "장전 중에는 쏠 수 없습니다" : "화살이 없습니다! R로 장전하세요";
-      recoverLabel.position.set(meState.x, meState.y - 78);
+      recoverLabel.position.set(Math.round(me?.x ?? meState.x), Math.round((me?.y ?? meState.y) - 78));
     } else if (recovering && meState) {
       recoverLabel.text = `쿨타임 ${meState.fcd.toFixed(1)}초`;
-      recoverLabel.position.set(meState.x, meState.y - 78);
+      recoverLabel.position.set(Math.round(me?.x ?? meState.x), Math.round((me?.y ?? meState.y) - 78));
     }
     {
       const blindNow = !!meState && ((meState.status ?? 0) & ST_BIT_BLIND) !== 0;
