@@ -46,6 +46,7 @@ export const TUNE = {
   SHIELD_REGEN_SEC: 8, // 방패가 깨진 뒤 재생될 때까지
   SPLASH_FACTOR: 0.5,
   CAV_DAMAGE_PER_SPEED: 0.055, // 현재 속도(px/s) 1당 돌격 추가 피해
+  ENEMY_CAV_RAM_FRAC: 0.2, // 적 기병 중 창으로 찌르지 않고 몸으로 부딪혀 밀고 들어가는(충돌) 기병의 비율
   CAV_COUNTER_MULT: 1.5, // 창에 먼저 찔린 기병이 되돌려받는 카운터 피해 배율(쌓아 둔 돌격 피해 x 공격력·치명타 x 이 값 x 창병 단계)
   CAV_COLLIDE_MIN_MOM: 0.35, // 기병이 몸으로 부딪혀 피해를 주려면 필요한 속도(최고 속도 대비 0~1)
   CAV_COLLIDE_LOSS: 0.25, // 몸으로 부딪힐 때마다 잃는 속도 비율(남은 속도 x (1 - 이 값))

@@ -106,6 +106,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   SHIELD_REGEN_SEC: ["깨진 방패 재생 시간(초)", G.combat, 1, 60, 0.5],
   SPLASH_FACTOR: ["범위 공격 피해 비율", G.combat, 0, 2, 0.05],
   CAV_DAMAGE_PER_SPEED: ["기병 속도당 돌격 추가 피해", G.combat, 0, 1, 0.005],
+  ENEMY_CAV_RAM_FRAC: ["충돌로 공격하는 적 기병 비율", G.enemy, 0, 1, 0.05],
   CAV_COUNTER_MULT: ["창병 카운터 피해 배율(기병이 되돌려받는 돌격 피해)", G.combat, 0, 10, 0.1],
   CAV_COLLIDE_MIN_MOM: ["기병 충돌 피해에 필요한 속도(최고 속도 대비)", G.combat, 0, 1, 0.05],
   CAV_COLLIDE_LOSS: ["기병이 부딪힐 때 잃는 속도 비율", G.combat, 0, 0.9, 0.05],

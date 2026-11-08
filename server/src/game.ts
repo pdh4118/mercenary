@@ -487,6 +487,9 @@ export interface Enemy extends Fighter {
   ghost?: Ghost; // 은신(투명화) 상태: 투명도가 절반 이하면 어그로가 풀린다
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
+  ram?: boolean; // 충돌형 기병: 창으로 찌르지 않고 몸으로 부딪혀 밀고 지나간다
+  ramT?: number; // 부딪힌 뒤 빠져나가 속도를 다시 붙이는 남은 시간
+  ramMin?: number; // 이번 돌진에서 대상에 가장 가까웠던 거리(이보다 멀어지면 지나친 것)
   rage?: number; // 보스군 격노 단계(이동 속도가 단계마다 조금씩 빨라진다)
   poisonT?: number; // 독이 남은 시간
   poisonDps?: number;
@@ -1546,6 +1549,8 @@ export class Game {
       const chance = Math.min(TUNE.VENOM_CHANCE_MAX, TUNE.VENOM_CHANCE_PER_STAGE * (this.stage - 1));
       e.venom = chance > 0 && this.rng() < chance;
     }
+    // 적 기병의 일부는 충돌형: 번호로 정해서(난수를 쓰지 않아 다른 장면의 난수 순서는 그대로) 약 ENEMY_CAV_RAM_FRAC가 된다
+    if (type === CAVALRY && !e.boss && !e.elite && e.ram === undefined) e.ram = ((id * 2654435761) >>> 0) % 1000 < TUNE.ENEMY_CAV_RAM_FRAC * 1000;
     this.enemies.set(id, e);
     return e;
   }
@@ -6452,7 +6457,7 @@ export class Game {
       }
       const attackRange = st.ranged ? st.reach : st.reach + target.r * 0.5;
       if (targetDist <= attackRange) {
-        if (e.cd <= 0 && !(e.type === CAVALRY && e.evadeT > 0)) {
+        if (e.cd <= 0 && !(e.type === CAVALRY && e.evadeT > 0) && !e.ram) {
           e.atkT = st.windup;
           e.atkAng = Math.atan2(target.y - e.y, target.x - e.x);
           e.face = e.atkAng;
@@ -6465,7 +6470,10 @@ export class Game {
           continue;
         }
       }
+      const ex0 = e.x;
+      const ey0 = e.y;
       this.enemyMove(e, st, dt, foes, archers, target, targetDist, speed);
+      if (e.ram && e.type === CAVALRY) this.enemyBump(e, friendlies, e.x - ex0, e.y - ey0);
     }
     for (const [e, hx, hy] of held) {
       e.x = hx; // 제자리 수비병은 이번 틱에 움직인 만큼을 되돌린다(공격은 그대로 한다)
@@ -6642,6 +6650,25 @@ export class Game {
       gx = target.x + Math.cos(phi) * radius;
       gy = target.y + Math.sin(phi) * radius;
     } else if (td <= 70) e.flankT = 0;
+    if (e.ram) {
+      // 충돌형: 찌르지 않고 대상을 뚫고 지나가는 지점으로 달린다. 지나치거나 부딪히면 잠시 빠져나가 속도를 다시 붙인 뒤 또 달려든다.
+      e.ramMin = Math.min(e.ramMin ?? Infinity, td);
+      if ((e.ramT ?? 0) > 0) {
+        e.ramT = Math.max(0, e.ramT! - dt);
+        const a = Math.atan2(e.y - target.y, e.x - target.x) + (e.id % 2 ? 0.7 : -0.7);
+        gx = target.x + Math.cos(a) * 320;
+        gy = target.y + Math.sin(a) * 320;
+        if (e.ramT === 0) e.ramMin = Infinity;
+      } else if (td > (e.ramMin ?? Infinity) + 130) {
+        e.ramT = TUNE.CAV_RUNUP_SEC * 0.55; // 지나쳤다: 돌아 나가며 다시 속도를 붙인다
+        e.ramMin = Infinity;
+      } else {
+        const ux = (target.x - e.x) / Math.max(1, td);
+        const uy = (target.y - e.y) / Math.max(1, td);
+        gx = target.x + target.vx * lead + ux * 240; // 대상 너머까지 달려 뚫고 지나간다
+        gy = target.y + target.vy * lead + uy * 240;
+      }
+    }
     const cavSpd = cavSpeed(speed, e.momentum);
     // 창병 가까이로는 들어가지 않고 비껴 돌아간다
     let dx = gx - e.x;
@@ -6671,6 +6698,34 @@ export class Game {
     e.x += ux * step;
     e.y += uy * step;
     this.updateMomentum(e, true, dt);
+  }
+
+  /** 충돌형 적 기병이 달리다 아군(용병·주인공)과 부딪힌다: 속도를 일부 잃고 잃은 속도만큼 피해를 준 뒤, 빠져나가 다시 달려든다. */
+  private enemyBump(e: Enemy, friendlies: Friendly[], dx: number, dy: number): void {
+    if (e.hp <= 0 || e.momentum < TUNE.CAV_COLLIDE_MIN_MOM || TUNE.CAV_COLLIDE_MULT <= 0) return;
+    const st = ENEMY_STATS[CAVALRY]!;
+    const dl = Math.hypot(dx, dy);
+    if (dl < 0.5) return;
+    const fx = dx / dl;
+    const fy = dy / dl;
+    const maxSpeed = this.enemySpeed(e);
+    for (const f of friendlies) {
+      const d = Math.hypot(f.x - e.x, f.y - e.y);
+      if (d > st.radius + f.radius + 8 || ((f.x - e.x) * fx + (f.y - e.y) * fy) / (d || 1) < 0.2) continue;
+      const key = `e${e.id}:${f.merc ? f.merc.id : -f.ownerId}`;
+      if ((this.rams.get(key) ?? 0) > this.tick) continue;
+      this.rams.set(key, this.tick + Math.ceil(TUNE.CAV_COLLIDE_CD * TICK_RATE));
+      const before = cavSpeed(maxSpeed, e.momentum);
+      e.momentum *= 1 - TUNE.CAV_COLLIDE_LOSS;
+      const lost = before - cavSpeed(maxSpeed, e.momentum);
+      const dmg = TUNE.CAV_DAMAGE_PER_SPEED * lost * TUNE.CAV_COLLIDE_MULT * e.dmgMult;
+      this.pushEvent(EVT_KNOCK, f.x, f.y, Math.atan2(f.y - e.y, f.x - e.x));
+      const back = f.hit({ damage: dmg, charge: 0, srcType: CAVALRY, fromAngle: Math.atan2(e.y - f.y, e.x - f.x), src: e });
+      if (back > 0) this.reflectToEnemy(e, back, f.ownerId, f.merc);
+      e.ramT = TUNE.CAV_RUNUP_SEC * 0.55; // 부딪혔으니 빠져나가 다시 속도를 붙인다
+      e.ramMin = Infinity;
+      if (e.hp <= 0 || e.momentum < TUNE.CAV_COLLIDE_MIN_MOM) break;
+    }
   }
 
   private resolveEnemyAttack(e: Enemy, st: UnitStats, friendlies: Friendly[]): void {

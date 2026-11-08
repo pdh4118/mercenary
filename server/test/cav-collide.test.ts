@@ -229,3 +229,34 @@ test("창 카운터: 쌓아 둔 돌격 피해 x 카운터 배율 x 공격력, �
   assert.ok(Math.abs(counter(1, 1) / base - 1.1) < 0.01, "창병 1단계 보너스 +10%");
   assert.ok(Math.abs(counter(2, 0) / base - 2) < 0.05, "공격력이 곱해진다");
 });
+
+test("적 기병: 약 20%는 충돌형이고, 충돌형은 창으로 찌르지 않고 몸으로 부딪혀 피해를 준다", () => {
+  const g = quiet();
+  g.addPlayer("a");
+  const total = 1000;
+  let rams = 0;
+  for (let i = 0; i < total; i++) if ((g as any).enemies.get(g.spawnEnemyAt(1000, 1000, CAVALRY)).ram) rams++;
+  assert.ok(rams > total * 0.15 && rams < total * 0.25, `충돌형 비율 ${(rams / total).toFixed(2)}`);
+
+  const g2 = quiet();
+  const a = g2.addPlayer("a")!;
+  const p = g2.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  const m = (g2 as any).mercs.get(g2.addMerc(a, 3, p.x + 900, p.y)); // 검방병 용병(제자리에서 맞는다)
+  const hp0 = m.hp + m.shield;
+  const e = (g2 as any).enemies.get(g2.spawnEnemyAt(m.x + 500, m.y, CAVALRY));
+  e.ram = true;
+  let stabbed = false;
+  let maxMom = 0;
+  for (let i = 0; i < 6 * TICK_RATE; i++) {
+    m.x = p.x + 900;
+    m.y = p.y;
+    g2.step();
+    p.hp = p.maxHp;
+    if (e.atkT > 0) stabbed = true;
+    maxMom = Math.max(maxMom, e.momentum);
+  }
+  assert.ok(!stabbed, "충돌형은 창으로 찌르지 않는다");
+  assert.ok(m.hp + m.shield < hp0, `몸으로 부딪혀 피해를 줬다(${(hp0 - m.hp - m.shield).toFixed(1)})`);
+  assert.ok(maxMom > 0.5, "속도를 붙여 달렸다");
+});
