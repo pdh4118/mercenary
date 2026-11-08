@@ -5249,6 +5249,7 @@ export class Game {
     return l < 0.001 ? [Math.cos(id), Math.sin(id)] : [ex / l, ey / l];
   }
 
+  private navDead = new Map<string, number>(); // 길이 없던 (출발 칸, 도착 칸) -> 이 시각까지 다시 찾지 않는다
   private navs = new WeakMap<object, { path: [number, number][]; tx: number; ty: number; age: number }>();
   private navBudget = 0;
 
@@ -5270,10 +5271,21 @@ export class Game {
     let st = this.navs.get(f);
     const stale = !st || st.age > 1 || Math.hypot(st.tx - tx, st.ty - ty) > 160;
     if (stale && this.navBudget > 0) {
-      this.navBudget--;
-      const path = t.findPath(f.x, f.y, tx, ty, 12);
-      st = { path: path ?? [], tx, ty, age: 0 };
-      this.navs.set(f, st);
+      // 갈 수 없는 곳(닫힌 성 안 등)으로 가는 길 찾기는 격자 전체를 뒤져서 가장 비싸다. 비슷한 출발·도착 칸이면 잠시 결과를 같이 쓴다.
+      const nk = `${Math.floor(f.x / 200)},${Math.floor(f.y / 200)},${Math.floor(tx / 200)},${Math.floor(ty / 200)}`;
+      if ((this.navDead.get(nk) ?? 0) > this.time) {
+        st = { path: [], tx, ty, age: -2 }; // 막힌 곳으로 간주하고 3초쯤 뒤에 다시 시도한다
+        this.navs.set(f, st);
+      } else {
+        this.navBudget--;
+        const path = t.findPath(f.x, f.y, tx, ty, 12);
+        if (path === null) {
+          this.navDead.set(nk, this.time + 4);
+          if (this.navDead.size > 400) for (const [k, until] of this.navDead) if (until <= this.time) this.navDead.delete(k);
+        }
+        st = { path: path ?? [], tx, ty, age: path === null ? -2 : 0 };
+        this.navs.set(f, st);
+      }
     }
     if (!st) return [tx, ty];
     st.age += 1 / TICK_RATE;
