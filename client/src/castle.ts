@@ -39,11 +39,14 @@ export function createCastle(layer: Container, high: Container): Castle {
   const front = new Container();
   front.zIndex = GATE_Y + 1;
   front.visible = false;
+  const gateC = new Container(); // 성문: 벽이 반투명해져도 이쪽은 늘 불투명하게 보인다
+  gateC.zIndex = GATE_Y + 2;
+  gateC.visible = false;
   const towers = new Container(); // 남쪽 탑: 성벽 위 수비병보다도 앞(수비병이 탑 기둥에 가려진다)
   towers.zIndex = 1e5;
   towers.visible = false;
-  layer.addChild(back, front, towers);
-  for (const c of [back, front, towers]) {
+  layer.addChild(back, front, gateC, towers);
+  for (const c of [back, front, gateC, towers]) {
     c.pivot.set(0, baseY);
     c.position.set(0, baseY);
   }
@@ -88,7 +91,7 @@ export function createCastle(layer: Container, high: Container): Castle {
       gateSp = new Sprite(tex.boss10_gate_0);
       gateSp.anchor.set(0.5, 1);
       gateSp.position.set(GATE_X, GATE_Y + 6);
-      front.addChild(gateSp);
+      gateC.addChild(gateSp);
     }
     ready = true;
   });
@@ -119,14 +122,14 @@ export function createCastle(layer: Container, high: Container): Castle {
       const wantHigh = !!behind && rise0(reveal) >= 0.98;
       if (wantHigh !== isHigh) {
         isHigh = wantHigh;
-        for (const c of [front, towers]) (wantHigh ? high : layer).addChild(c);
+        for (const c of [front, gateC, towers]) (wantHigh ? high : layer).addChild(c);
       }
       seeThru += ((wantHigh ? 0.5 : 1) - seeThru) * (wantHigh ? 0.7 : 0.12); // 가려질 때는 거의 바로, 돌아올 때만 서서히
       const rise = ease(clamp01(reveal));
-      back.visible = front.visible = towers.visible = rise > 0.02;
-      for (const c of [back, front, towers]) {
+      back.visible = front.visible = gateC.visible = towers.visible = rise > 0.02;
+      for (const c of [back, front, gateC, towers]) {
         c.scale.set(1, Math.max(0.01, rise));
-        c.alpha = Math.min(1, rise * 2.5) * (c === back ? 1 : seeThru);
+        c.alpha = Math.min(1, rise * 2.5) * (c === back || c === gateC ? 1 : seeThru);
       }
       drawGate(gate, open, rise >= 0.98, now, !!sortie);
     },
@@ -134,6 +137,7 @@ export function createCastle(layer: Container, high: Container): Castle {
       back.destroy({ children: true });
       front.destroy({ children: true });
       towers.destroy({ children: true });
+      gateC.destroy({ children: true });
       gateG.destroy();
       gateLabel.destroy();
     },

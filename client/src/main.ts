@@ -2460,7 +2460,11 @@ async function main() {
         let behindCastle = false;
         for (const v of players.views.values()) if (!behindCastle && inBehind(v.x, v.y)) behindCastle = true;
         if (!behindCastle) for (const v of mercs.views.values()) if (inBehind(v.x, v.y)) behindCastle = true;
-        if (!behindCastle) for (const [id, v] of enemies.views) if (inBehind(v.x, v.y) && (((latest?.enemies.find((q) => q[0] === id)?.[14] ?? 0) & EF_POST) === 0)) behindCastle = true;
+        if (!behindCastle) {
+          const flags = new Map<number, number>(); // 적 번호 -> 상태 비트(매번 배열을 훑지 않게)
+          for (const q of latest?.enemies ?? []) flags.set(q[0], q[14] ?? 0);
+          for (const [id, v] of enemies.views) if (inBehind(v.x, v.y) && ((flags.get(id) ?? 0) & EF_POST) === 0) behindCastle = true;
+        }
         castle.update(sg.reveal / 100, sg.gate, sg.open, performance.now(), sg.sortie, behindCastle);
         for (const tv of tviews) {
           if (!inCastleZone(tv.x, tv.footY)) continue;
