@@ -207,3 +207,25 @@ test("기병: 치명타가 뜨면 돌격 추가 피해와 충돌 피해도 함�
   const crit = dealt(true);
   assert.ok(crit > plain * 1.3, `치명타 충돌 ${plain.toFixed(1)} → ${crit.toFixed(1)}`);
 });
+
+test("창 카운터: 쌓아 둔 돌격 피해 x 카운터 배율 x 공격력, 찌른 창병의 단계 보너스가 붙는다", () => {
+  const counter = (atk: number, srcTier: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    const id = g.addMerc(a, CAVALRY, p.x + 300, p.y);
+    const m = (g as any).mercs.get(id);
+    if (atk > 1) (g as any).applyCard((g as any).slots.get(a), { k: "mercStat", stat: "dmg", v: atk - 1, type: CAVALRY });
+    (g as any).rollCrit = () => false;
+    m.momentum = 1;
+    const f = (g as any).collectFriendlies().find((x: any) => x.merc?.id === id);
+    const hp0 = m.hp;
+    f.hit({ damage: 0, charge: 0, srcType: SPEAR, srcTier, fromAngle: 0 });
+    assert.equal(m.momentum, 0, "속도를 모두 잃는다");
+    return hp0 - m.hp;
+  };
+  const base = counter(1, 0);
+  assert.ok(Math.abs(base - TUNE.CAV_DAMAGE_PER_SPEED * MERC_STATS[CAVALRY]!.speed * TUNE.CAV_COUNTER_MULT) < 0.01, `기본 카운터 ${base.toFixed(2)}`);
+  assert.ok(Math.abs(counter(1, 1) / base - 1.1) < 0.01, "창병 1단계 보너스 +10%");
+  assert.ok(Math.abs(counter(2, 0) / base - 2) < 0.05, "공격력이 곱해진다");
+});

@@ -25,6 +25,7 @@ export interface Hit {
   dot?: boolean; // 지속 피해(독): 방패·회피·배후 배율을 무시하고 몸에 들어간다
   poison?: number; // 독 총 피해(몸에 맞았을 때만 걸린다)
   crit?: boolean; // 치명타(이미 피해에 반영됨. 표시용)
+  srcTier?: number; // 공격자 용병의 강화 단계(창병의 카운터가 단계마다 세진다)
   src?: unknown; // 공격자(가시 갑옷이 되돌릴 대상)
 }
 

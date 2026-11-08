@@ -3830,8 +3830,10 @@ export class Game {
               );
           if (w.type === CAVALRY && h.srcType === SPEAR && !h.dot && !h.pierceGuard) {
             // 기마 주인공도 돌격하기 전에 창에 맞으면 속도를 잃고 돌격 피해를 되돌려받는다
-            const amount = TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s);
-            if (amount >= COUNTER_MIN && s.mom >= COUNTER_MOMENTUM) {
+            const raw = TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) * s.mods.heroDmg;
+            const crit = this.rollCrit(s.mods.heroCrit);
+            const amount = raw * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1) * TUNE.CAV_COUNTER_MULT * (1 + TIER_COUNTER[SPEAR]! * (h.srcTier ?? 0));
+            if (raw >= COUNTER_MIN && s.mom >= COUNTER_MOMENTUM) {
               s.mom = 0;
               this.hurtHeroReflect(s, amount);
               const d = Math.min(TUNE.KNOCK_MAX, counterKnock(amount));
@@ -3898,8 +3900,9 @@ export class Game {
           this.applyShield(m, r.shield, r.shieldBroke);
           if (m.type === CAVALRY && h.srcType === SPEAR && !h.dot && !h.pierceGuard) {
             // 돌격하기 전에 창에 맞으면 속도를 잃고 쌓아 둔 돌격 피해를 되돌려받는다
-            const amount = Math.max(m.chargeSnap, chargeBonus(MERC_STATS[CAVALRY]!.speed, m.momentum) * (1 + TIER_CHARGE[CAVALRY]! * m.tier));
-            if (amount >= COUNTER_MIN && (m.momentum >= COUNTER_MOMENTUM || m.chargeSnap > 0)) {
+            const raw = Math.max(m.chargeSnap, chargeBonus(MERC_STATS[CAVALRY]!.speed, m.momentum) * (1 + TIER_CHARGE[CAVALRY]! * m.tier));
+            const amount = raw < COUNTER_MIN ? raw : this.counterAmount(raw, this.cavAtkMult(m, this.mercStats(m)), m, mods ?? newMods(), h.srcTier);
+            if (raw >= COUNTER_MIN && (m.momentum >= COUNTER_MOMENTUM || m.chargeSnap > 0)) {
               m.momentum = 0;
               m.chargeSnap = 0;
               this.pushDamage(EVT_COUNTER, m.id, m.x, m.y, amount, m.owner);
@@ -5079,6 +5082,14 @@ export class Game {
     return st.damage / (MERC_STATS[CAVALRY]!.damage * TIER_DMG[m.tier]!);
   }
 
+  /** 창에 먼저 찔린 용병 기병이 되돌려받는 카운터 피해: 쌓아 둔 돌격 피해 x 공격력 x 치명타 x 카운터 배율 x 찌른 창병의 단계 보너스 */
+  private counterAmount(raw: number, atk: number, m: Merc, mods: Mods, srcTier = 0): number {
+    const critChance = this.pstat(m, mods, "crit");
+    const crit = this.rollCrit(critChance);
+    const critMult = critDamageMult(critChance, TUNE.CRIT_BASE_MULT + mstat(mods, CAVALRY, "critMult"));
+    return raw * atk * (crit ? critMult : 1) * TUNE.CAV_COUNTER_MULT * (1 + TIER_COUNTER[SPEAR]! * srcTier);
+  }
+
   private rams = new Map<string, number>(); // "기병:대상" -> 다시 부딪힐 수 있는 틱
   private cavBump(m: Merc, st: UnitStats, foes: Friendly[] | null, dx: number, dy: number): void {
     if (m.respawn > 0 || m.momentum < TUNE.CAV_COLLIDE_MIN_MOM || TUNE.CAV_COLLIDE_MULT <= 0) return;
@@ -5608,7 +5619,7 @@ export class Game {
         hitFoes.push(f);
       }
       let back = 0;
-      for (const f of hitFoes) back += f.hit({ damage: dmg, charge, srcType: m.type, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit });
+      for (const f of hitFoes) back += f.hit({ damage: dmg, charge, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit });
       if (st.splash > 0) {
         for (const f of foes) {
           if (hitFoes.includes(f) || !hitFoes.some((h) => Math.hypot(f.x - h.x, f.y - h.y) <= st.splash + f.radius)) continue;
@@ -5634,7 +5645,7 @@ export class Game {
     }
     let reflected = 0;
     for (const e of struck) {
-      reflected += this.damageEnemy(e, { damage: dmg, charge, srcType: m.type, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit }, m.owner, m);
+      reflected += this.damageEnemy(e, { damage: dmg, charge, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit }, m.owner, m);
     }
     if (st.splash > 0) this.splashEnemies(struck, st.splash, dmg * this.splashFactor(mods, m.type), m.type, m.x, m.y, m.owner, m);
     if (reflected > 0) {
@@ -5669,7 +5680,7 @@ export class Game {
     if (e.type === CAVALRY && hit.srcType === SPEAR && !hit.dot && !hit.pierceGuard) {
       // 돌격하기 전에 창에 맞으면 속도를 잃고 쌓아 둔 돌격 피해를 되돌려받는다
       // 창병 용병은 단계가 오를수록 카운터가 세다
-      const amount = Math.max(e.chargeSnap, chargeBonus(this.enemySpeed(e), e.momentum)) * (src?.type === SPEAR ? 1 + TIER_COUNTER[SPEAR]! * src.tier : 1);
+      const amount = Math.max(e.chargeSnap, chargeBonus(this.enemySpeed(e), e.momentum)) * (src?.type === SPEAR ? 1 + TIER_COUNTER[SPEAR]! * src.tier : 1) * TUNE.CAV_COUNTER_MULT;
       if (amount >= COUNTER_MIN && (e.momentum >= COUNTER_MOMENTUM || e.chargeSnap > 0)) {
         e.momentum = 0;
         e.chargeSnap = 0;
