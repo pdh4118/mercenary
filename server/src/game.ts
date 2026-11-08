@@ -3383,7 +3383,7 @@ export class Game {
     this.boss.strikeBarriers(p.x, p.y, reach, damage);
     const arc = meleeArc(w.type, w.arc, s.mods.heroArea);
     // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
-    const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) : 0;
+    const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) * s.mods.heroDmg : 0; // 공격력 카드가 돌격 추가 피해에도 곱해진다
     if (w.type === CAVALRY) {
       s.boostT = 0; // 공격하면 가속(최고 속도)을 잃는다
       p.bst = 0;
@@ -5074,6 +5074,11 @@ export class Game {
   }
 
   /** 기병이 달리다 몸으로 부딪힌다: 속도를 일부 잃고, 잃은 속도만큼 대상에게 피해를 준다(창병에게는 카운터를 맞는다) */
+  /** 기병의 공격력 배율(공격력 카드·군세·급여 미지급 등. 단계 배율은 돌격 배수가 따로 있어 뺀다). 돌격·충돌 추가 피해에도 곱한다. */
+  private cavAtkMult(m: Merc, st: UnitStats): number {
+    return st.damage / (MERC_STATS[CAVALRY]!.damage * TIER_DMG[m.tier]!);
+  }
+
   private rams = new Map<string, number>(); // "기병:대상" -> 다시 부딪힐 수 있는 틱
   private cavBump(m: Merc, st: UnitStats, foes: Friendly[] | null, dx: number, dy: number): void {
     if (m.respawn > 0 || m.momentum < TUNE.CAV_COLLIDE_MIN_MOM || TUNE.CAV_COLLIDE_MULT <= 0) return;
@@ -5101,7 +5106,7 @@ export class Game {
       m.momentum *= 1 - TUNE.CAV_COLLIDE_LOSS;
       const lost = before - cavSpeed(st.speed, m.momentum);
       const mods = this.slots.get(m.owner)?.mods ?? newMods();
-      const dmg = TUNE.CAV_DAMAGE_PER_SPEED * lost * TUNE.CAV_COLLIDE_MULT * (1 + TIER_CHARGE[CAVALRY]! * m.tier) * (hasLegend(mods, "chargeBoost", CAVALRY) ? LEGEND_CONST.chargeMult : 1);
+      const dmg = TUNE.CAV_DAMAGE_PER_SPEED * lost * TUNE.CAV_COLLIDE_MULT * this.cavAtkMult(m, st) * (1 + TIER_CHARGE[CAVALRY]! * m.tier) * (hasLegend(mods, "chargeBoost", CAVALRY) ? LEGEND_CONST.chargeMult : 1);
       const back = apply({ damage: dmg, charge: 0, srcType: CAVALRY, fromAngle: Math.atan2(m.y - vy, m.x - vx), crit: false });
       if (back > 0) {
         this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, back, m.owner);
@@ -5589,7 +5594,7 @@ export class Game {
       }
       return;
     }
-    const charge = m.type === CAVALRY ? m.chargeSnap * (hasLegend(mods, "chargeBoost", CAVALRY) ? LEGEND_CONST.chargeMult : 1) : 0;
+    const charge = m.type === CAVALRY ? m.chargeSnap * this.cavAtkMult(m, st) * (hasLegend(mods, "chargeBoost", CAVALRY) ? LEGEND_CONST.chargeMult : 1) : 0; // 돌격 추가 피해도 공격력(카드·군세 등)을 받는다
     if (m.type === CAVALRY) {
       m.evadeT = m.brawl ? 0 : TUNE.CAV_RUNUP_SEC; // 치고 빠지기(마무리 싸움 중에는 빠지지 않는다)
       m.momentum *= CAV_MOMENTUM_AFTER_HIT; // 부딪히면 속도를 잃는다

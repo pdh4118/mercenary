@@ -170,3 +170,22 @@ test("토너먼트(용병전): 기병 진형 파괴·후방 공격이 상대 용
     assert.ok(lost > 10, `${mode}: 상대 진형이 입은 피해 ${lost}`);
   }
 });
+
+test("기병: 공격력 카드가 돌격 추가 피해와 충돌 피해에도 곱해진다", () => {
+  const make = (atk: number) => {
+    const g = quiet();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    const id = g.addMerc(a, CAVALRY, p.x + 300, p.y);
+    (g as any).slots.get(a).mods.mercDmg = undefined;
+    const m = (g as any).mercs.get(id);
+    const e = dummy(g, m.x + 20, m.y, 0);
+    m.momentum = 1;
+    if (atk > 1) (g as any).applyCard((g as any).slots.get(a), { k: "mercStat", stat: "dmg", v: atk - 1, type: CAVALRY });
+    (g as any).cavBump(m, (g as any).mercStats(m), null, 10, 0);
+    return 5000 - e.hp;
+  };
+  const base = make(1);
+  const strong = make(2);
+  assert.ok(Math.abs(strong / base - 2) < 0.05, `공격력 x2 → 충돌 피해 ${base.toFixed(1)} → ${strong.toFixed(1)}`);
+});
