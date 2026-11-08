@@ -276,7 +276,7 @@ export const ENEMY_STATS: readonly UnitStats[] = [
   { hp: 30, speed: 70, reach: 30, damage: 4.5, windup: 0.5, cooldown: 1.4, arc: deg(65), ranged: false, radius: 14, leash: 0, shield: 50, splash: 0 },
   { hp: 36, speed: 60, reach: 38, damage: 8.55, windup: 0.9, cooldown: 1.8, arc: deg(90), ranged: false, radius: 14, leash: 0, shield: 0, splash: 40 },
   // 적 마법사: 드물게 나온다. 3.5초 주문 뒤 모여 있는 아군에게 운석을 떨어뜨린다(낙하 지점이 미리 보이니 피할 수 있다). 넉백이나 둔기병의 타격으로 밀려나면 주문이 끊긴다.
-  { hp: 22, speed: 55, reach: 260, damage: 50, windup: 3.5, cooldown: 4, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 100 },
+  { hp: 22, speed: 55, reach: 260, damage: 40, windup: 3.5, cooldown: 4, arc: 0, ranged: true, radius: 11, leash: 0, shield: 0, splash: 100 },
 ];
 
 /** 적 생성 비율(기병, 창병, 궁병, 검방병, 둔기병) */

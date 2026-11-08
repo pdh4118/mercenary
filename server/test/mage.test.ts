@@ -51,7 +51,7 @@ test("마법사: 병종 목록에 있고 느리고 약하지만 준비 3초·한
   assert.ok(m.splash > MERC_STATS[BLUNT]!.splash * 2, "범위가 굉장히 넓다");
   assert.equal(m.reach, MERC_STATS[ARCHER]!.reach, "사정거리는 궁수 정도");
   assert.equal(WEAPONS[4]!.type, MAGE);
-  assert.equal(WEAPONS[4]!.windup, 2.5);
+  assert.equal(WEAPONS[4]!.windup, 3);
   assert.ok(CAV_TARGET_WEIGHT[MAGE]! > CAV_TARGET_WEIGHT[ARCHER]!, "기병은 마법사를 궁병보다 먼저 노린다");
 });
 
@@ -95,7 +95,7 @@ test("용병 마법사가 주문 도중 쓰러지면 운석은 떨어지지 않�
   assert.equal(e.hp, 5000, "쓰러졌으니 폭발이 없다");
 });
 
-test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 2초 뒤에 폭발하며, 그동안 움직일 수 없다", () => {
+test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 3초 뒤에 폭발하며, 그동안 움직일 수 없다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
@@ -115,7 +115,7 @@ test("주인공 지팡이: 마우스 거리에 운석을 떨어뜨리고 2초 �
   run(g, 1.5);
   assert.equal(p.x, x0, "주문을 외우는 동안은 움직일 수 없다");
   assert.equal(near.hp, 5000, "아직 폭발 전");
-  run(g, 1.2);
+  run(g, 1.6);
   assert.ok(5000 - near.hp > WEAPONS[4]!.damage * 0.8);
   assert.equal(other.hp, 5000);
 });
