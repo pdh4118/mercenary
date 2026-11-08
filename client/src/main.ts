@@ -1983,6 +1983,11 @@ async function main() {
         } else send({ t: "mercCmd", ids: cmd.ids, kind: cmd.action, type: cmd.markType, x: wx, y: wy });
         return cmd.label + fz;
       }
+      if (cmd.kind === "cav") {
+        const tp0 = targetPoint();
+        send({ t: "cavOrder", mode: cmd.mode, x: tp0.x, y: tp0.y });
+        return cmd.label + fz;
+      }
       const tf = cmd.types === null ? typesField() : cmd.types === ALL_MASK ? undefined : cmd.types;
       const me = latest?.players.find((p) => p.id === myId);
       const who = cmd.types === null ? (selMask === ALL_MASK ? "전체" : "선택한 병종") : cmd.types === ALL_MASK ? "전체" : UNIT_TYPES.filter((t) => cmd.types! & (1 << t)).map((t) => UNIT_NAMES[t]).join("·");

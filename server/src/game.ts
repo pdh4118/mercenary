@@ -534,6 +534,7 @@ export interface Merc extends Fighter {
   slowT?: number; // 둔화 남은 시간
   slowMult?: number; // 둔화 중 이동 속도 배율
   runId?: number; // 기병이 마지막으로 친 대상(그 뒤로 돌아 들어간다)
+  cv?: { seq: number; pts: [number, number, boolean][]; i: number; t: number; done: boolean }; // 기병 전술 지시(진형 파괴·후방 공격)의 경로: [x, y, 달려 들어가는 구간인가]
   stormBurst?: boolean; // 폭풍 연사가 방금 터졌다(바로 다음 공격은 다시 터지지 않는다)
   lockId?: number; // 기병이 노리기로 정한 대상(잠시 유지한다)
   lockT?: number;
@@ -4349,6 +4350,7 @@ export class Game {
           m.y *= TOURNAMENT_ARENA_RADIUS / r;
         }
       }
+      if (m.type === CAVALRY) this.cavBump(m, st, duel ? this.duelFoes(m.owner, all) : null, m.x - px0, m.y - py0); // 달리다 부딪히면 속도를 잃고 피해를 준다
     }
   }
 
@@ -4916,6 +4918,207 @@ export class Game {
    * 기병: 진형 날개에서 대기하다가, 궁병·둔기병을 노려 옆·뒤로 돌아 들어간다(정면의 방패는 나중, 창병은 피한다).
    * 달릴수록 속도가 붙어 돌격 피해가 커지고, 공격한 뒤에는 속도를 잃고 잠깐 물러난다. 우클릭 돌격 지시 중에는 활동 범위를 넘어 지점으로 나간다.
    */
+  /**
+   * 기병 전술 지시: sweep(진형 파괴) = 적 진형의 옆구리를 길이 방향으로 쓸고 지나간다, rear(후방 공격) = 진형을 크게 돌아 뒤로 들어가 등 뒤를 가로지른다.
+   * 적 진형은 마우스가 가리킨 적 둘레의 무리(토너먼트에서는 상대 전체)다.
+   */
+  cavOrder(playerId: number, mode: unknown, x: unknown, y: unknown): void {
+    const s = this.slots.get(playerId);
+    if (!s || (mode !== "sweep" && mode !== "rear") || typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    let pts: { x: number; y: number }[];
+    if (this.phase === "tournament") {
+      const foes = this.duelFoes(playerId);
+      const mercs = foes.filter((f) => f.merc);
+      pts = (mercs.length > 0 ? mercs : foes).map((f) => ({ x: f.x, y: f.y }));
+    } else {
+      let best = Infinity;
+      let pick: Enemy | null = null;
+      for (const e of this.enemies.values()) {
+        const d = Math.hypot(e.x - x, e.y - y);
+        if (d <= 450 + radiusOf(e) && d < best) {
+          best = d;
+          pick = e;
+        }
+      }
+      if (!pick) return;
+      pts = [...this.enemies.values()].filter((e) => Math.hypot(e.x - pick!.x, e.y - pick!.y) <= TUNE.ORDER_GROUP_RADIUS * 1.5).map((e) => ({ x: e.x, y: e.y }));
+    }
+    if (pts.length === 0) return;
+    let ax = 0;
+    let ay = 0;
+    for (const p of pts) {
+      ax += p.x;
+      ay += p.y;
+    }
+    ax /= pts.length;
+    ay /= pts.length;
+    this.clearMercCmds(playerId, 1 << CAVALRY);
+    s.orders[CAVALRY] = { kind: mode === "sweep" ? 2 : 3, x: ax, y: ay, left: CHARGE_DURATION_SEC, targetId: 0, seq: ++this.orderSeq };
+    s.state.chargeX = ax;
+    s.state.chargeY = ay;
+    s.state.chargeKind = 0;
+    s.state.chargeLeft = CHARGE_DURATION_SEC;
+  }
+
+  /** 진형 파괴·후방 공격의 경로를 짠다(적 진형의 위치·방향을 보고 한 번만) */
+  private planCavRun(c: AiCtx, ord: { kind: number; x: number; y: number; seq: number }): NonNullable<Merc["cv"]> {
+    const { m } = c;
+    const empty = { seq: ord.seq, pts: [] as [number, number, boolean][], i: 0, t: 0, done: true };
+    const near = c.targets.filter((t) => Math.hypot(t.x - ord.x, t.y - ord.y) <= 650);
+    const body = near.filter((t) => !t.hero);
+    const foes = body.length > 0 ? body : near;
+    if (foes.length === 0) return empty;
+    let cx = 0;
+    let cy = 0;
+    for (const t of foes) {
+      cx += t.x;
+      cy += t.y;
+    }
+    cx /= foes.length;
+    cy /= foes.length;
+    const arena = this.phase === "tournament" ? TOURNAMENT_ARENA_RADIUS - 50 : 1e9;
+    const clampP = (px: number, py: number): [number, number] => {
+      const r = Math.hypot(px, py);
+      return r > arena ? [(px * arena) / r, (py * arena) / r] : [clampToWorld(px, 24), clampToWorld(py, 24)];
+    };
+    const pts: [number, number, boolean][] = [];
+    if (ord.kind === 2) {
+      // 진형 파괴: 진형의 긴 방향(공분산의 주축)을 따라, 내 쪽 가장자리를 끝에서 끝까지 달려 지나간다
+      let sxx = 0;
+      let syy = 0;
+      let sxy = 0;
+      for (const t of foes) {
+        sxx += (t.x - cx) ** 2;
+        syy += (t.y - cy) ** 2;
+        sxy += (t.x - cx) * (t.y - cy);
+      }
+      let ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+      const extent = (a: number) => {
+        let lo = Infinity;
+        let hi = -Infinity;
+        let hw = 0;
+        for (const t of foes) {
+          const u = (t.x - cx) * Math.cos(a) + (t.y - cy) * Math.sin(a);
+          const n = -(t.x - cx) * Math.sin(a) + (t.y - cy) * Math.cos(a);
+          lo = Math.min(lo, u);
+          hi = Math.max(hi, u);
+          hw = Math.max(hw, Math.abs(n));
+        }
+        return { lo, hi, hw };
+      };
+      let ex = extent(ang);
+      if (ex.hi - ex.lo < 90) {
+        // 거의 한 덩어리면 내가 오는 방향과 직각으로 지나간다
+        ang = Math.atan2(m.y - cy, m.x - cx) + Math.PI / 2;
+        ex = extent(ang);
+      }
+      const ux = Math.cos(ang);
+      const uy = Math.sin(ang);
+      const nx = -uy;
+      const ny = ux;
+      const pm = (m.x - cx) * ux + (m.y - cy) * uy;
+      const dir = pm >= 0 ? -1 : 1; // 내가 가까운 쪽 끝에서 먼 쪽 끝으로 달린다
+      const start = dir > 0 ? ex.lo : ex.hi;
+      const end = dir > 0 ? ex.hi : ex.lo;
+      const side = (m.x - cx) * nx + (m.y - cy) * ny >= 0 ? 1 : -1;
+      const lat = Math.min(70, ex.hw * 0.3);
+      const at = (t: number, o: number): [number, number] => clampP(cx + ux * t + nx * o, cy + uy * t + ny * o);
+      pts.push([...at(start - dir * 260, side * (ex.hw + 70)), false], [...at(start - dir * 130, side * lat), false], [...at(end + dir * 240, side * lat), true]);
+    } else {
+      // 후방 공격: 적이 바라보는 반대쪽(뒤)으로 진형 바깥을 크게 돌아 들어가, 뒤에서 앞으로 가로지른다
+      let fx = 0;
+      let fy = 0;
+      let rad = 80;
+      for (const t of foes) {
+        fx += Math.cos(t.face);
+        fy += Math.sin(t.face);
+        rad = Math.max(rad, Math.hypot(t.x - cx, t.y - cy));
+      }
+      const fa = Math.hypot(fx, fy) < 0.3 * foes.length ? Math.atan2(m.y - cy, m.x - cx) : Math.atan2(fy, fx); // 방향이 제각각이면 내 쪽을 앞으로 본다
+      const rear = fa + Math.PI;
+      const ra = rad + 170;
+      const a0 = Math.atan2(m.y - cy, m.x - cx);
+      const diff = angleDiff(rear, a0);
+      const steps = Math.min(4, Math.ceil(Math.abs(diff) / 0.8));
+      if (Math.abs(diff) > 0.35) for (let k = 1; k <= steps; k++) pts.push([...clampP(cx + Math.cos(a0 + (diff * k) / steps) * ra, cy + Math.sin(a0 + (diff * k) / steps) * ra), false]);
+      pts.push([...clampP(cx + Math.cos(rear) * (rad + 60), cy + Math.sin(rear) * (rad + 60)), false]);
+      pts.push([...clampP(cx - Math.cos(rear) * (rad + 120), cy - Math.sin(rear) * (rad + 120)), true]);
+    }
+    return { seq: ord.seq, pts, i: 0, t: 0, done: false };
+  }
+
+  /** 기병 전술 지시를 따라 경로의 다음 지점으로 달린다. 이 틱에 움직였으면 true(끝났거나 경로가 없으면 false: 평소 AI로) */
+  private cavSpecial(c: AiCtx, ord: { kind: number; x: number; y: number; seq: number }): boolean {
+    const { m, st, dt } = c;
+    let cv = m.cv;
+    if (!cv || cv.seq !== ord.seq) cv = m.cv = this.planCavRun(c, ord);
+    if (cv.done) return false;
+    cv.t += dt;
+    if (cv.t > 8 || cv.i >= cv.pts.length) {
+      cv.done = true;
+      return false;
+    }
+    const [gx, gy, run] = cv.pts[cv.i]!;
+    if (Math.hypot(gx - m.x, gy - m.y) <= (cv.i === cv.pts.length - 1 ? 50 : 45)) {
+      cv.i++;
+      if (cv.i >= cv.pts.length) {
+        cv.done = true;
+        return false;
+      }
+    }
+    const [tx, ty, trun] = cv.pts[cv.i]!;
+    void run;
+    const spears = trun ? [] : c.targets.filter((t) => t.type === SPEAR); // 달려 들어가는 구간은 창병도 피하지 않고 밀고 들어간다
+    this.updateMomentum(m, this.steer(m, tx, ty, cavSpeed(st.speed, m.momentum), dt, spears, null, 20), dt);
+    return true;
+  }
+
+  /** 기병이 달리다 몸으로 부딪힌다: 속도를 일부 잃고, 잃은 속도만큼 대상에게 피해를 준다(창병에게는 카운터를 맞는다) */
+  private rams = new Map<string, number>(); // "기병:대상" -> 다시 부딪힐 수 있는 틱
+  private cavBump(m: Merc, st: UnitStats, foes: Friendly[] | null, dx: number, dy: number): void {
+    if (m.respawn > 0 || m.momentum < TUNE.CAV_COLLIDE_MIN_MOM || TUNE.CAV_COLLIDE_MULT <= 0) return;
+    const dl = Math.hypot(dx, dy);
+    const fx = dl > 0.5 ? dx / dl : Math.cos(m.face);
+    const fy = dl > 0.5 ? dy / dl : Math.sin(m.face);
+    const try1 = (vx: number, vy: number, vr: number, key: string, vType: number, apply: (h: Hit) => number): void => {
+      const d = Math.hypot(vx - m.x, vy - m.y);
+      if (d > (st.radius + vr) * Math.max(1, TUNE.MERC_SPACING) + 6 || // 용병끼리는 서로 밀려나므로 간격이 벌어지는 만큼 여유를 둔다
+ ((vx - m.x) * fx + (vy - m.y) * fy) / (d || 1) < 0.2) return; // 앞에 있는 대상만
+      if ((this.rams.get(key) ?? 0) > this.tick || m.momentum < TUNE.CAV_COLLIDE_MIN_MOM) return;
+      this.rams.set(key, this.tick + Math.ceil(TUNE.CAV_COLLIDE_CD * TICK_RATE)); // 시간은 토너먼트에서 멈추므로 틱으로 센다
+      const before = cavSpeed(st.speed, m.momentum);
+      this.pushEvent(EVT_KNOCK, vx, vy, Math.atan2(vy - m.y, vx - m.x));
+      if (vType === SPEAR) {
+        // 창병에게 정면으로 부딪히면 돌격과 같이 카운터: 속도를 모두 잃고 속도만큼 되돌려받는다
+        const amount = TUNE.CAV_DAMAGE_PER_SPEED * before;
+        if (amount >= COUNTER_MIN) {
+          m.momentum = 0;
+          this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, amount, m.owner);
+          this.hurtMerc(m, amount);
+          return;
+        }
+      }
+      m.momentum *= 1 - TUNE.CAV_COLLIDE_LOSS;
+      const lost = before - cavSpeed(st.speed, m.momentum);
+      const mods = this.slots.get(m.owner)?.mods ?? newMods();
+      const dmg = TUNE.CAV_DAMAGE_PER_SPEED * lost * TUNE.CAV_COLLIDE_MULT * (1 + TIER_CHARGE[CAVALRY]! * m.tier) * (hasLegend(mods, "chargeBoost", CAVALRY) ? LEGEND_CONST.chargeMult : 1);
+      const back = apply({ damage: dmg, charge: 0, srcType: CAVALRY, fromAngle: Math.atan2(m.y - vy, m.x - vx), crit: false });
+      if (back > 0) {
+        this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, back, m.owner);
+        this.hurtMerc(m, back);
+      }
+    };
+    if (foes) {
+      for (const f of foes) try1(f.x, f.y, f.radius, `${m.id}:${f.merc ? f.merc.id : -f.ownerId}`, f.merc ? f.merc.type : -1, (h) => f.hit(h));
+    } else {
+      for (const e of this.enemies.values()) {
+        if (e.hp <= 0) continue;
+        try1(e.x, e.y, radiusOf(e), `${m.id}:${e.id}`, e.type, (h) => this.damageEnemy(e, h, m.owner, m));
+      }
+    }
+    if (this.rams.size > 600) for (const [k, until] of this.rams) if (until <= this.tick) this.rams.delete(k);
+  }
+
   private aiCavalry(c: AiCtx): void {
     const { m, st, dt } = c;
     const owner = c.owner;
@@ -4923,6 +5126,11 @@ export class Game {
     if (m.lockT) m.lockT = Math.max(0, m.lockT - dt);
     if (m.skipT) m.skipT = Math.max(0, m.skipT - dt);
     if (!c.ignoreOrders && owner?.orders[CAVALRY]?.kind === 1) m.evadeT = 0; // 이동 지시는 치고 빠지기보다 앞선다
+    const tac = c.ignoreOrders ? null : owner?.orders[CAVALRY] ?? null;
+    if (tac && tac.kind >= 2) {
+      m.evadeT = 0; // 진형 파괴·후방 공격은 치고 빠지기보다 앞선다
+      if (this.cavSpecial(c, tac)) return;
+    }
     if (m.evadeT > 0) {
       // 한 대 치고 빠진다: 대상에서 떨어져 후방으로 돌아 들어가며 속도를 다시 붙인다
       const prey = c.targets.find((t) => t.id === m.runId);

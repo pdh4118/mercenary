@@ -4,6 +4,7 @@ import { CAVALRY, SPEAR, ARCHER, SHIELD, BLUNT, MAGE } from "./rules.js";
 export type VoiceCmd =
   | { kind: "stance"; v: number; types: number | null; label: string }
   | { kind: "hold"; at: "hero" | "mouse"; types: number | null; label: string }
+  | { kind: "cav"; mode: "sweep" | "rear"; label: string } // 기병 전술: 진형 파괴(옆구리 휩쓸기) / 후방 공격
   | { kind: "order"; types: number | null; label: string } // 지정한 위치(없으면 마우스 위치)로: 적 근처면 공격, 빈 땅이면 이동
   | { kind: "merc"; ids: number[]; names: string[]; action: "mark" | "move" | "attack" | "clear" | "stay"; markType?: number; label: string }; // 번호·이름으로 고른 용병 개인에게
 
@@ -33,6 +34,8 @@ export const VOICE_GROUPS: readonly VoiceGroupDef[] = [
   { key: "type4", tab: "병종 이름", label: "둔기병", hint: "둔기병을 부르는 말", words: ["둔기병", "철퇴", "망치", "둔기", "둔기대", "해머", "곤봉", "철퇴병", "망치병"] },
   { key: "type5", tab: "병종 이름", label: "마법사", hint: "마법사를 부르는 말", words: ["마법사", "법사", "마법", "메이지", "마도사", "마술사", "위자드", "마법병"] },
   { key: "all", tab: "병종 이름", label: "전체", hint: "모든 병종에게 한 번에 지시하는 말", words: ["전체", "전원", "모두", "다들", "전부", "모든", "다같이", "너희", "여러분"] },
+  { key: "cav_sweep", tab: "기병 전술", label: "진형 파괴", hint: "기병이 적 진형의 옆구리를 쓸고 지나가며 충돌 피해를 주는 말(병종을 말하지 않아도 기병이 움직인다)", words: ["진형파괴", "진형깨", "진형무너", "진형부수", "진형부숴", "진형뚫", "대열파괴", "대열깨", "대열무너", "옆구리", "측면돌파", "휩쓸", "쓸어버", "쓸고지나", "스윕"] },
+  { key: "cav_rear", tab: "기병 전술", label: "후방 공격", hint: "기병이 적 진형을 돌아 뒤로 파고들어 등 뒤를 치는 말", words: ["후방공격", "후면공격", "배후공격", "후방돌파", "후방기습", "후방으로", "배후", "뒤를치", "뒤를쳐", "뒤를때려", "뒤를공격", "뒤를파고", "뒤로돌아가", "우회공격", "뒤쪽으로"] },
   { key: "charge", tab: "진형 명령", label: "돌격 진형", hint: "돌격 진형으로 바꾸는 말(수비·산개보다 먼저 확인)", words: ["돌격", "돌진", "돌파", "밀어", "쳐들어", "몰아붙", "들이쳐", "러시", "총공격"] },
   { key: "spread", tab: "진형 명령", label: "산개 진형", hint: "산개 진형으로 바꾸는 말", words: ["산개", "흩어", "분산", "퍼져", "퍼지", "벌려", "넓게"] },
   { key: "hold", tab: "진형 명령", label: "수비(지점 방어)", hint: "그 자리·지정한 지점을 지키는 말", words: ["수비", "지켜", "지키", "방어", "사수", "버텨", "막아", "고수", "홀드"] },
@@ -302,6 +305,8 @@ export function parseVoice(text: string, roster: readonly VoiceMerc[] = [], fuzz
   }
   const t = t0;
   const types = voiceTypes(t, fuzzy);
+  if (has(t, fuzzy, ...voiceWords("cav_sweep"))) return { kind: "cav", mode: "sweep", label: "기병 진형 파괴(옆구리 휩쓸기)" };
+  if (has(t, fuzzy, ...voiceWords("cav_rear"))) return { kind: "cav", mode: "rear", label: "기병 후방 공격(진형 뒤로 돌아 들어가기)" };
   const mouse = has(t, fuzzy, ...voiceWords("mouse"));
   if (has(t, fuzzy, ...voiceWords("charge"))) return { kind: "stance", v: 1, types, label: "돌격 진형" };
   if (has(t, fuzzy, ...voiceWords("spread"))) return { kind: "stance", v: 4, types, label: "산개 진형" };
@@ -346,7 +351,7 @@ export function parseVoiceMulti(alts: readonly string[], roster: readonly VoiceM
       const b = parseVoiceBest([seg], roster);
       if (!b) continue;
       const cmd = b.cmd;
-      if (cmd.kind !== "merc") {
+      if (cmd.kind === "stance" || cmd.kind === "hold" || cmd.kind === "order") {
         if (cmd.types === null && prevTypes !== null) cmd.types = prevTypes;
         if (cmd.types !== null) prevTypes = cmd.types;
       }

@@ -46,6 +46,10 @@ export const TUNE = {
   SHIELD_REGEN_SEC: 8, // 방패가 깨진 뒤 재생될 때까지
   SPLASH_FACTOR: 0.5,
   CAV_DAMAGE_PER_SPEED: 0.07, // 현재 속도(px/s) 1당 돌격 추가 피해
+  CAV_COLLIDE_MIN_MOM: 0.35, // 기병이 몸으로 부딪혀 피해를 주려면 필요한 속도(최고 속도 대비 0~1)
+  CAV_COLLIDE_LOSS: 0.25, // 몸으로 부딪힐 때마다 잃는 속도 비율(남은 속도 x (1 - 이 값))
+  CAV_COLLIDE_MULT: 7, // 충돌 피해 = 잃은 속도(px/s) x CAV_DAMAGE_PER_SPEED x 이 배율
+  CAV_COLLIDE_CD: 0.8, // 같은 대상에게 다시 부딪혀 피해를 주기까지(초)
   CAV_RAMP_SEC: 2, // 최대 속도까지 걸리는 시간
   KNOCK_MAX: 160, // 한 번에 밀려나는 최대 거리
   ARMY_BASE_UNITS: 10,

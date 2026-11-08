@@ -172,6 +172,9 @@ export class RoomManager {
       case "hold":
         room.game.setHold(id, msg.x, msg.y, msg.types);
         return;
+      case "cavOrder":
+        room.game.cavOrder(id, msg.mode, msg.x, msg.y);
+        return;
       case "order":
         room.game.order(id, msg.x, msg.y, msg.types, msg.kind);
         return;
