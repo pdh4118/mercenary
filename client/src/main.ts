@@ -1,4 +1,4 @@
-import { warmAssets } from "./assets.js";
+import { prefetch, warmAssets } from "./assets.js";
 import { createMurmur } from "./murmur.js";
 import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
@@ -6,7 +6,7 @@ import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
 import { createBossFx } from "./bossfx.js";
 import { createCastle, type Castle } from "./castle.js";
-import { createHall, HALL_OUTER, type Hall } from "./hall.js";
+import { createHall, HALL_OUTER, HALL_TEXTURES, type Hall } from "./hall.js";
 import { bindAudioUi, createAudio } from "./audio.js";
 import { createMercPanel, isReady } from "./mercpanel.js";
 import {
@@ -435,6 +435,7 @@ async function main() {
     loadingEl.classList.toggle("open", text !== null);
   };
   let castle: Castle | null = null; // 공성전의 성(스테이지 10)
+  let hallLoaded = false;
   let hallFlash = 0; // 성 안으로 돌입하는 순간 화면이 번쩍였다가 걷힌다(1→0)
   const hallFlashG = new Graphics();
   hallFlashG.eventMode = "none";
@@ -2567,12 +2568,16 @@ async function main() {
         }
         if (!hall) {
           terrainFlat.sortableChildren = true;
-          hall = createHall(terrainFlat, terrainLow);
+          hall = createHall(terrainFlat, terrainLow, terrainHigh);
           say("성 안으로 돌입했습니다! 옥좌의 군주를 쓰러뜨리세요", 5);
           siegeSeen = 4;
           hallFlash = 1;
         }
-        hall.update(performance.now());
+        const hu: { x: number; y: number }[] = [];
+        for (const v of players.views.values()) hu.push({ x: v.x, y: v.y });
+        for (const v of mercs.views.values()) hu.push({ x: v.x, y: v.y });
+        for (const v of enemies.views.values()) hu.push({ x: v.x, y: v.y });
+        hall.update(performance.now(), hu);
       } else if (hall) {
         hall.destroy();
         hall = null;
@@ -2581,6 +2586,10 @@ async function main() {
       if (hallFlash > 0) {
         hallFlashG.rect(0, 0, app.screen.width, app.screen.height).fill({ color: 0xfff2d0, alpha: Math.min(0.9, hallFlash) });
         hallFlash = Math.max(0, hallFlash - ticker.deltaMS / 700);
+      }
+      if (sg && !hallLoaded) {
+        hallLoaded = true;
+        void prefetch(HALL_TEXTURES); // 성내 전장 그림을 미리 받아 둔다
       }
       if (sg && !sg.hall && !castle) castle = createCastle(enemyLayer, terrainHigh);
       if (sg && castle) {

@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { Assets, Container, Graphics, Rectangle, Sprite, Texture, TilingSprite } from "pixi.js";
 import { HALL, HALL_ENTRY, HALL_PILLARS, HALL_WALL } from "@mercenary/shared";
 
 /**
@@ -6,7 +6,8 @@ import { HALL, HALL_ENTRY, HALL_PILLARS, HALL_WALL } from "@mercenary/shared";
  * 바닥은 모든 유닛 아래에, 기둥은 유닛과 같이 발 위치로 앞뒤를 가른다. 충돌은 서버(`hallSolids`)와 같은 모양이다.
  */
 export interface Hall {
-  update(now: number): void;
+  /** units: 유닛 발 위치(기둥 뒤에 서 있는 유닛이 보이게 기둥이 반투명해진다) */
+  update(now: number, units?: readonly { x: number; y: number }[]): void;
   destroy(): void;
 }
 
@@ -18,7 +19,10 @@ const TILE = 100;
 export const HALL_OUTER = 760; // 홀 바깥 암벽을 덮는 폭(클라이언트가 이 안의 지형 그림도 숨긴다)
 const OUTER = HALL_OUTER;
 
-export function createHall(floorLayer: Container, objLayer: Container): Hall {
+export const HALL_TEXTURES = ["boss10_hall_floor", "boss10_hall_wall", "boss10_hall_pillar", "boss10_hall_throne"].map((n) => `assets/fx/${n}.png`);
+
+/** floorLayer: 바닥·벽(유닛 아래), objLayer: 옥좌(유닛 아래, 발 위치로 앞뒤), topLayer: 기둥(유닛 위, 뒤에 선 유닛이 있으면 반투명) */
+export function createHall(floorLayer: Container, objLayer: Container, topLayer: Container = objLayer): Hall {
   const floor = new Graphics();
   floor.zIndex = -1e6;
   // 홀 바깥은 어두운 암벽(성 밖 풀밭이 비쳐 보이지 않게 넓게 덮는다)
@@ -88,8 +92,82 @@ export function createHall(floorLayer: Container, objLayer: Container): Hall {
     made.push(c);
   }
 
+  // --- 그림(boss10_hall_*)이 받아지면 코드로 그린 임시 그림 대신 그것을 쓴다 ---
+  let alive = true;
+  const extra: Container[] = [];
+  const texPillars: { sp: Sprite; x: number; y: number }[] = [];
+  void Promise.all(HALL_TEXTURES.map((u) => Assets.load<Texture>(u))).then(([floorT, wallT, pillarT, throneT]) => {
+    if (!alive || !floorT || !wallT || !pillarT || !throneT) return;
+    floor.visible = false;
+    for (const c of made) c.visible = false;
+    const Z = -1e6;
+    const base = new Graphics();
+    base.zIndex = Z;
+    base.rect(X0 - HALL_WALL - OUTER, Y0 - HALL_WALL - OUTER, W + (HALL_WALL + OUTER) * 2, H + (HALL_WALL + OUTER) * 2).fill(0x0f0d14);
+    const tile = new TilingSprite({ texture: floorT, width: W, height: H });
+    tile.position.set(X0, Y0);
+    tile.tileScale.set(0.78);
+    tile.zIndex = Z + 1;
+    const deco = new Graphics();
+    deco.zIndex = Z + 2;
+    for (let i = 0; i < 6; i++) {
+      const o = i * 14;
+      deco.rect(X0 + o, Y0 + o, W - o * 2, H - o * 2).stroke({ width: 14, color: 0x000000, alpha: 0.07 }); // 벽 가까이가 어둡다
+    }
+    const carpetTop = Y0 + 330;
+    deco.rect(HALL.cx - 105, carpetTop, 210, Y0 + H - carpetTop).fill(0x7a1f26);
+    deco.rect(HALL.cx - 105, carpetTop, 210, Y0 + H - carpetTop).stroke({ width: 5, color: 0xc9a24a });
+    deco.rect(HALL.cx - 88, carpetTop, 176, Y0 + H - carpetTop).stroke({ width: 2, color: 0xc9a24a, alpha: 0.7 });
+    deco.rect(HALL.cx - 130, Y0 + H - 6, 260, HALL_WALL * 0.7).fill(0x0c0a10).stroke({ width: 4, color: 0x4a3a28 }); // 입구
+    // 벽: 북쪽은 벽돌 면이 보이고, 나머지 세 쪽은 윗면(석재 갓돌)만 보인다
+    const ledge = new Texture({ source: wallT.source, frame: new Rectangle(wallT.frame.x, wallT.frame.y, wallT.frame.width, 52) });
+    const mk = (tex: Texture, x: number, y: number, w: number, h: number, rot = 0): Sprite => {
+      const sp = new Sprite(tex);
+      sp.width = w;
+      sp.height = h;
+      sp.position.set(x, y);
+      sp.rotation = rot;
+      sp.zIndex = Z + 3;
+      return sp;
+    };
+    const wl = [
+      mk(ledge, X0 - HALL_WALL, Y0 + H, W + HALL_WALL * 2, HALL_WALL), // 남
+      mk(ledge, X0, Y0 - HALL_WALL, H + HALL_WALL * 2, HALL_WALL, Math.PI / 2), // 동(회전: 왼쪽 위 기준이라 오른쪽 벽 바깥으로)
+      mk(ledge, X0, Y0 + H + HALL_WALL, H + HALL_WALL * 2, HALL_WALL, -Math.PI / 2), // 서
+      mk(wallT, X0 - HALL_WALL, Y0 - 150 + 6, W + HALL_WALL * 2, 150), // 북(벽돌 면)
+    ];
+    wl[1]!.position.set(X0 + W + HALL_WALL, Y0 - HALL_WALL);
+    wl[2]!.position.set(X0 - HALL_WALL, Y0 + H + HALL_WALL);
+    floorLayer.addChild(base, tile, deco, ...wl);
+    extra.push(base, tile, deco, ...wl);
+    glow.zIndex = Z + 4;
+    // 옥좌: 군주 뒤(북쪽). 군주보다 아래에 그린다
+    const th = new Sprite(throneT);
+    th.anchor.set(0.5, 1);
+    th.scale.set(0.8);
+    th.position.set(HALL.cx, Y0 + 330);
+    th.zIndex = Y0 + 100;
+    objLayer.addChild(th);
+    extra.push(th);
+    // 기둥: 유닛 위에 그린다(뒤에 선 유닛이 있으면 update가 반투명하게 한다)
+    for (const [px, py] of HALL_PILLARS) {
+      const sp = new Sprite(pillarT);
+      sp.anchor.set(0.5, 0.93);
+      sp.scale.set(0.26);
+      sp.position.set(px, py);
+      topLayer.addChild(sp);
+      extra.push(sp);
+      texPillars.push({ sp, x: px, y: py });
+    }
+  }).catch(() => {});
+
   return {
-    update(now) {
+    update(now, units) {
+      for (const pl of texPillars) {
+        let behind = false;
+        if (units) for (const u of units) if (Math.abs(u.x - pl.x) < 80 && u.y < pl.y + 6 && u.y > pl.y - 360) { behind = true; break; }
+        pl.sp.alpha += ((behind ? 0.45 : 1) - pl.sp.alpha) * 0.3;
+      }
       glow.clear();
       for (const [i, [x, y]] of torches.entries()) {
         const f = 0.8 + 0.2 * Math.sin(now / 130 + i * 1.7);
@@ -99,6 +177,8 @@ export function createHall(floorLayer: Container, objLayer: Container): Hall {
       }
     },
     destroy() {
+      alive = false;
+      for (const c of extra) c.destroy();
       floor.destroy();
       glow.destroy();
       for (const c of made) c.destroy({ children: true });
