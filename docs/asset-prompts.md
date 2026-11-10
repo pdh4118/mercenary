@@ -1073,3 +1073,34 @@ Six royal castle garrison soldiers in a row, black plate armor with purple cape 
 (5) "post_blunt_idle": a heavy mace soldier at ease, a huge spiked iron mace resting on the shoulder, bulkier armor with spiked pauldrons.
 (6) "post_blunt_atk": the same soldier swinging the huge mace overhead in a smashing blow.
 ```
+
+### 12-11. 군주의 진군령·포위령·집결령 - 깃발병과 깃발(대열 표시) - `assets/units/enemy_flag_*`, `assets/fx/cmd_*`
+
+군주의 명령을 받은 졸개 대열의 깃발병용 그림입니다. 지금은 코드로 그린 도형(깃대와 붉은 삼각 깃발)이 대신 쓰이고 있어, 그림이 들어오면 그것만 바꿉니다. 일반 적 졸개(`units/enemy_sword`, `units/enemy_spear`)와 같은 크기·화풍으로 만들어 주세요(졸개 그림 옆에 섞여 서므로 같은 카메라와 높이여야 합니다).
+
+**(A) 깃발병 두 명** - `units/enemy_flag_sword.png`(검방병형), `units/enemy_flag_spear.png`(창병형). 한 장에 가로로 나란히, 배경 투명.
+
+```
+Hand-painted cartoon strategy-game character sheet, thick dark outlines, slightly desaturated colors, transparent background, generous empty margin (at least 20px) around every figure, no grid lines, no captions.
+Exactly the same camera, scale and style as the attached enemy soldier sheet (the dark-armored enemy sword-and-shield soldier and enemy spearman with red trim): a straight-on front view slightly from above, each figure facing right, standing on flat feet with no ground and no shadow, about 90 px tall.
+Two enemy standard bearers in a row, dark iron armor with crimson trim like the ordinary enemy soldiers but clearly the leaders of their squad:
+(1) "enemy_flag_sword": the sword-and-shield soldier with a taller helmet crest and a short crimson cape, a tall war banner pole strapped upright on his back rising well above his head (the banner itself is NOT drawn here, only the pole with a small iron spearhead on top), sword in the right hand, round shield on the left arm.
+(2) "enemy_flag_spear": the spearman with a taller helmet crest and a short crimson cape, the same banner pole strapped upright on his back rising above his head (pole only, no cloth), long spear held forward at shoulder height.
+Both figures keep the exact pose, proportions and silhouette of the ordinary soldiers so they can replace them in the game; only the crest, cape and the back pole are new.
+```
+
+**(B) 깃발 천 3프레임**(바람에 흔들림, 깃대 위에 얹어 그림) - `fx/cmd_flag_0~2.png`, 각 약 48x64 px, 투명 배경, 한 줄에 3장.
+
+```
+Hand-painted cartoon strategy-game effect sprite sheet, thick dark outlines, slightly desaturated colors, transparent background, generous empty margin around every frame, no grid lines, no captions.
+A 3-frame animation of one war banner cloth flapping in the wind, three frames in a row, each about 48 x 64 px: a crimson swallow-tailed banner on a short dark wooden crossbar with a golden fringe at the bottom and a simple gold sword-and-crown emblem in the middle. Frame 1: the cloth hangs and ripples slightly to the right; frame 2: the cloth swells and waves strongly to the right; frame 3: the cloth ripples the other way slightly. Same banner, same size and position in every frame, only the cloth shape changes. The crossbar is at the top left of each frame (it will be attached to a pole by the game). No pole, no hands, no ground.
+```
+
+**(C) 명령 대열 발밑 고리**(선택) - `fx/cmd_ring_0~1.png`, 각 약 64x28 px, 투명 배경.
+
+```
+Hand-painted cartoon strategy-game effect sprite, transparent background, no captions.
+Two frames side by side, each about 64 x 28 px: a thin glowing crimson ellipse ring lying flat on the ground seen from slightly above, with a few tiny golden rune ticks along its rim, soft red glow inside the ring. Frame 1: the ring is slightly dimmer and thinner; frame 2: slightly brighter and wider. Nothing else in the picture, no unit, no ground texture, no shadow.
+```
+
+**넘겨 주실 때**: (A)는 두 명을 한 장으로, (B)는 3프레임을 한 장으로, (C)는 2프레임을 한 장으로 주시면 `tools/slice_sheet.py`로 자르겠습니다. 이 그림이 들어오면 깃발병만 해당 그림으로 바꿔 그리고, 깃발 천은 깃발병 머리 위 깃대에 얹어 흔들리게 하겠습니다.
