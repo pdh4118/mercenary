@@ -9,6 +9,8 @@ import { GATE_X, GATE_Y, SIEGE } from "@mercenary/shared";
  */
 export interface Castle {
   /** reveal 0..1, gate 0..100(성문 체력 %), open = 성문이 부서짐 */
+  /** 성문을 맞았다: 문이 잠깐 흔들리고 붉게 번쩍인다 */
+  hit(): void;
   update(reveal: number, gate: number, open: boolean, now: number, sortie?: boolean, behind?: boolean): void;
   destroy(): void;
 }
@@ -58,6 +60,8 @@ export function createCastle(layer: Container, high: Container): Castle {
   gateLabel.zIndex = 999999;
   layer.addChild(gateLabel);
   let gateSp: Sprite | null = null;
+  let hitLeft = 0; // 성문을 맞은 뒤 흔들림이 남은 시간(초)
+  let lastNow = 0;
   let ready = false;
   let isHigh = false;
   let seeThru = 1;
@@ -104,7 +108,11 @@ export function createCastle(layer: Container, high: Container): Castle {
     const t = tex[name] ?? tex.boss10_gate_0!;
     gateSp.texture = t;
     const gs = 150 / Math.max(1, t.width - 12);
-    gateSp.scale.set(gs);
+    // 맞은 직후 문이 흔들리고 붉게 번쩍이며 살짝 움츠러든다
+    const k = Math.max(0, hitLeft / 0.18);
+    gateSp.scale.set(gs * (1 - 0.025 * k));
+    gateSp.position.set(GATE_X + (Math.random() - 0.5) * 5 * k, GATE_Y + 6);
+    gateSp.tint = k > 0.45 ? 0xffb8a8 : 0xffffff;
     if (!show || open) return;
     const bw = SIEGE.gateHalf * 2 + 40;
     const by = GATE_Y - t.height * gs - 12;
@@ -117,7 +125,12 @@ export function createCastle(layer: Container, high: Container): Castle {
   };
 
   return {
+    hit() {
+      hitLeft = 0.18;
+    },
     update(reveal, gate, open, now, sortie, behind) {
+      if (lastNow > 0) hitLeft = Math.max(0, hitLeft - Math.min(0.1, (now - lastNow) / 1000));
+      lastNow = now;
       if (!ready) return;
       const wantHigh = !!behind && rise0(reveal) >= 0.98;
       if (wantHigh !== isHigh) {

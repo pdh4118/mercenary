@@ -373,3 +373,49 @@ test("간격 표: 용병과 적이 같은 병종 표를 쓰고, 진영 보정과
   assert.ok(Math.abs(spacingBetween(1, true, 3, true) - 1.2 * TUNE.SPACING_SIDE_MERC) < 1e-9);
   assert.ok(spacingBetween(0, false, 0, false) >= 1, "1보다 작아지지 않는다");
 });
+
+test("돌격 진형의 궁병 용병은 사거리 안에 적이 있어도 재사용 대기 중에 계속 다가간다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const id = g.addMerc(a, 2, p.x + 100, p.y);
+  g.setStance(a, 1, 1 << 2); // 궁병만 돌격 진형
+  const e = dummy(g, p.x + 400, p.y, 3);
+  e.speed = 0;
+  (g as any).enemies.forEach((x: any) => (x.cd = 1e9));
+  const m = (g as any).mercs.get(id);
+  m.cd = 5; // 쏠 수 없는 동안
+  const d0 = Math.hypot(e.x - m.x, e.y - m.y);
+  run(g, 1.5);
+  const d1 = Math.hypot(e.x - m.x, e.y - m.y);
+  assert.ok(d1 < d0 - 20, `다가갔다 ${d0.toFixed(0)} → ${d1.toFixed(0)}`);
+});
+
+test("궁병 용병 전통: 30발을 쏘면 장전(2.5초)하고, 장전 중에는 쏘지 못하며, 가득 차서 다시 쏜다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const id = g.addMerc(a, 2, p.x + 100, p.y);
+  const m = (g as any).mercs.get(id);
+  const e = dummy(g, p.x + 250, p.y, 3);
+  e.speed = 0;
+  (g as any).enemies.forEach((x: any) => (x.cd = 1e9));
+  assert.equal(m.ammo ?? TUNE.MERC_QUIVER_SIZE, TUNE.MERC_QUIVER_SIZE);
+  let minAmmo = 99;
+  let reloads = 0;
+  let wasReloading = false;
+  let shotWhileReloading = 0;
+  let lastAmmo = TUNE.MERC_QUIVER_SIZE;
+  for (let i = 0; i < 40 * TICK_RATE; i++) {
+    g.step();
+    const r = (m.reloadT ?? 0) > 0;
+    if (r && !wasReloading) reloads++;
+    wasReloading = r;
+    if (r && (m.ammo ?? 0) < lastAmmo - 0 && lastAmmo !== 0 && (m.ammo ?? 0) !== 0) shotWhileReloading++;
+    lastAmmo = m.ammo ?? TUNE.MERC_QUIVER_SIZE;
+    minAmmo = Math.min(minAmmo, lastAmmo);
+  }
+  assert.ok(minAmmo === 0, "전통을 다 비운다");
+  assert.ok(reloads >= 1, "장전한다");
+  assert.equal(shotWhileReloading, 0, "장전 중에는 쏘지 않는다");
+});

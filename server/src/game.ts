@@ -541,6 +541,8 @@ export interface Merc extends Fighter {
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   flankT: number; // 기병이 우회 접근에 쓴 시간
   intent?: number; // 이번 틱에 하려는 일(INTENT). 머리 위 표시용
+  ammo?: number; // 궁병 용병의 남은 화살(없으면 가득)
+  reloadT?: number; // 궁병 용병 장전이 끝나기까지 남은 시간
   intentArg?: number; // 의도의 대상 병종
   orderSeen?: number; // 마지막으로 판정한 지시 번호
   ignoring?: boolean; // 지금 받은 지시를 무시하는 중(성격)
@@ -1810,7 +1812,7 @@ export class Game {
     if (!s || !s.solid || s.open) return;
     this.boss.hazards = this.boss.hazards.filter((h) => h.kind !== HZ_GATE);
     const hp = SIEGE.gateHp * (1 + 0.4 * Math.max(0, this.slots.size - 1));
-    this.boss.addHazard({ kind: HZ_GATE, x: GATE_X, y: GATE_Y, ang: 0, a: SIEGE.gateHalf, b: 100, t: 9999, total: 9999, hp, hpMax: hp, solid: 0, d: { ht: 30, idle: 0 } });
+    this.boss.addHazard({ kind: HZ_GATE, x: GATE_X, y: GATE_Y, ang: 0, a: SIEGE.gateHalf, b: 100, t: 9999, total: 9999, hp, hpMax: hp, solid: 0, d: { ht: 14, idle: 0 } }); // ht: 성문 앞면까지의 거리(그림의 문 앞면에 가깝게. 때리는 쪽이 닿을 만큼 붙어야 맞는다)
   }
 
   /** 성문이 부서졌다(장군 시스템이 부른다) */
@@ -3692,7 +3694,7 @@ export class Game {
     }
     p.swing = SWING_VISUAL_SEC;
     this.meleeFx(p.x, p.y, p.aim, reach, w.type, MELEE_TEAM_ALLY);
-    this.boss.strikeBarriers(p.x, p.y, reach, damage);
+    this.boss.strikeBarriers(p.x, p.y, reach, damage, p.id);
     const arc = meleeArc(w.type, w.arc, s.mods.heroArea);
     // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
     const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1) : 0; // 공격력 카드가 돌격 추가 피해에도 곱해진다
@@ -4309,6 +4311,8 @@ export class Game {
     }
     this.boss.onDeath(m.x, m.y, m.type, m.owner, false); // 안개 속이면 시체가 남는다
     m.hp = 0;
+    m.ammo = TUNE.MERC_QUIVER_SIZE; // 쓰러졌다 돌아오면 전통이 가득 찬다
+    m.reloadT = 0;
     m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * respawnTimeMult(owner ? mstat(owner.mods, m.type, "respawn") : 0) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
     if (owner) {
       owner.stats.mercDeaths++;
@@ -4536,6 +4540,12 @@ export class Game {
         this.healPop(m.id, m.x, m.y, m.hp - hb, m.owner);
       }
       m.cd = Math.max(0, m.cd - dt);
+      if ((m.reloadT ?? 0) > 0) {
+        // 궁병 용병 장전 중: 쏘지 못하지만(재사용 대기를 남은 장전 시간만큼 묶는다) 움직일 수 있다
+        m.reloadT = Math.max(0, m.reloadT! - dt);
+        if (m.reloadT === 0) m.ammo = TUNE.MERC_QUIVER_SIZE;
+        else m.cd = Math.max(m.cd, m.reloadT);
+      }
 
       // 공포: 사기가 꺾인 동안 모든 용병이 싸우지 않고 적에게서 멀어지는 쪽으로 도망친다(주문·공격 준비도 끊긴다)
       if (!duel && ownerSlot && ownerSlot.state.shaken > 0 && !this.persona(m).fearImmune) {
@@ -4885,6 +4895,7 @@ export class Game {
       if (d <= st.reach) return this.aiMage(c);
     } else if (this.canStrike(c, target)) {
       if (m.cd <= 0) this.startAttack(m, st, m.face);
+      else if (m.type === ARCHER && d > st.reach * TUNE.ASSAULT_ARCHER_FRAC + 20) this.moveToward(m, target.x, target.y, st.speed, dt, Math.max(4, st.reach * TUNE.ASSAULT_ARCHER_FRAC)); // 재사용 대기 중에도 적에게 다가간다(돌격 진형의 궁병이 주인공 곁에 서서 쏘기만 하지 않는다)
       return;
     }
     const speed = d > 300 ? st.speed * Math.min(TUNE.CATCHUP_MAX, 1.3) : st.speed;
@@ -5887,6 +5898,11 @@ export class Game {
     }
     if (st.ranged) {
       const n = 1 + Math.round(mstat(mods, m.type, "multi"));
+      if (m.type === ARCHER) {
+        // 전통: 쏜 화살 수만큼 줄고, 다 쏘면 장전한다(장전 중에는 AI가 쏘지 못한다)
+        m.ammo = Math.max(0, (m.ammo ?? TUNE.MERC_QUIVER_SIZE) - n);
+        if (m.ammo <= 0) m.reloadT = TUNE.MERC_RELOAD_SEC;
+      }
       for (let i = 0; i < n; i++) {
         const ang = m.atkAng + fanOffset(i, n);
         this.bullets.push({
@@ -5917,7 +5933,7 @@ export class Game {
     }
     m.chargeSnap = 0;
     this.meleeFx(m.x, m.y, m.atkAng, st.reach, m.type, MELEE_TEAM_ALLY);
-    this.boss.strikeBarriers(m.x, m.y, st.reach, dmg); // 거대 방패·얼음벽을 때린다
+    this.boss.strikeBarriers(m.x, m.y, st.reach, dmg, m.owner); // 거대 방패·얼음벽·성문을 때린다
     if (this.phase === "tournament") {
       const foes = this.duelFoes(m.owner);
       const hitFoes: Friendly[] = [];

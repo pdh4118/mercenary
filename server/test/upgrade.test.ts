@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  scaledValue,
   UNIT_NAMES as UNIT_NAMES_T,
   ARCHER,
   BLUNT,
@@ -39,16 +40,16 @@ const quiet = () => {
 test("용병 공용 카드가 기본이고, 병종 전용 카드는 그 병종의 특화 능력치에만 남는다", () => {
   const globals = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.type === undefined);
   const types = CARDS.filter((c) => c.effect.k === "mercStat" && c.effect.type !== undefined);
-  assert.ok(globals.length >= 30 && types.length >= 20);
+  assert.ok(globals.length >= 30 && types.length >= 15);
   for (const c of globals) {
     if (c.effect.k !== "mercStat") continue;
     const base = MERC_STAT_BASE[c.effect.stat];
-    assert.ok(Math.abs(c.effect.v - base * RARITY[c.rarity as 0 | 1 | 2].mult * GLOBAL_CARD_FACTOR * (c.effect.stat === "lifesteal" ? 5 : 1)) < 2e-3, c.name);
+    assert.ok(Math.abs(c.effect.v - scaledValue(c.effect.stat, base, c.rarity as 0 | 1 | 2) * GLOBAL_CARD_FACTOR * (c.effect.stat === "lifesteal" ? 5 : 1)) < 2e-3, c.name);
   }
-  const special = new Set(["pierce", "multi", "poison", "armor", "thorns", "cast", "knock"]);
+  const special = new Set(["pierce", "multi", "poison", "cast", "knock"]); // 피해 감소·피해 반사는 공용 카드
   for (const c of types) assert.ok(c.effect.k === "mercStat" && special.has(c.effect.stat), `${c.name}은 특화 능력치가 아니다`);
   // 병종마다 특화 능력치마다 일반/희귀/영웅 세 등급(방어구는 두 등급)이 있고, 모두 그 병종을 가진 사람에게만 나온다
-  for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.filter((st) => special.has(st)).reduce((n, st) => n + (st === "armor" || st === "multi" ? 2 : 3), 0));
+  for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.filter((st) => special.has(st)).reduce((n, st) => n + (st === "multi" ? 2 : 3), 0));
 });
 
 test("카드를 고를 때마다 새로고침이 1회씩 쌓이고 상한이 있다", () => {

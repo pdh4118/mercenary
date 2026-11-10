@@ -390,6 +390,10 @@ async function main() {
     highLayer: terrainHigh,
     spawnFloat: (text, x, y, style, life, pop) => spawnFloat(text, x, y, style as TextStyleOptions, life, pop),
     sound: (name, x, y, vol) => audio.play(name as never, { x, y, vol }),
+    gateHit: (owner) => {
+      castle?.hit();
+      if (owner === myId) shake(2.6, 0.09);
+    },
     maceBoom: (x, y, r) => {
       if (!maceHitTex.every((t) => t !== null)) return false;
       const sp = new Sprite(maceHitTex[0]!);
@@ -1701,6 +1705,9 @@ async function main() {
       }),
   );
   let spectating = false; // 쓰러진 동안 동료를 따라가며 구경한다
+  let freeCamX = 0; // 용병전 자유 시야의 화면 중심
+  let freeCamY = 0;
+  let freeCamWas = false;
   let specIndex = 0;
   let specCount = 0; // 지금 구경할 수 있는 살아 있는 동료 수(관전 중에 매 프레임 갱신)
   window.addEventListener("keydown", (e) => {
@@ -3657,6 +3664,27 @@ async function main() {
         specName = t.name;
       }
     }
+    // 용병전(주인공은 구경): 자유 시야. WASD·방향키로 화면을 움직여 용병들의 싸움을 보고, Home이나 스페이스를 누르면 경기장 가운데로 돌아온다.
+    const freeCam = !!tourNow && tourNow.mode === TOUR_MERCS && !spectating;
+    if (freeCam) {
+      if (!freeCamWas) {
+        freeCamX = 0;
+        freeCamY = 0;
+        say("자유 시야: WASD·방향키로 화면을 움직입니다 (Home: 경기장 가운데)", 5);
+      }
+      const sp = (1100 * ticker.deltaMS) / 1000;
+      const fdx = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
+      const fdy = (keys.has("s") || keys.has("arrowdown") ? 1 : 0) - (keys.has("w") || keys.has("arrowup") ? 1 : 0);
+      if (keys.has("home") || keys.has(" ")) {
+        freeCamX = 0;
+        freeCamY = 0;
+      }
+      const lim = TOURNAMENT_ARENA_RADIUS + 250;
+      freeCamX = Math.max(-lim, Math.min(lim, freeCamX + fdx * sp));
+      freeCamY = Math.max(-lim, Math.min(lim, freeCamY + fdy * sp));
+      camTarget = { x: freeCamX, y: freeCamY } as typeof camTarget;
+    }
+    freeCamWas = freeCam;
     stepFlashes(ticker.deltaMS / 1000);
     if (camTarget) world.position.set(app.screen.width / 2 - camTarget.x, app.screen.height / 2 - camTarget.y);
     if (shakeT > 0) {

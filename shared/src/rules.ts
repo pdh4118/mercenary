@@ -15,24 +15,24 @@ export const TUNE = {
   XP_TEAM_SHARE: 0.5, // 팀 공유 비율. 나머지(0.5)는 처치한 사람 몫
   STAGE_GROW_SEC: 90, // 스테이지당 자유 성장 시간(1분 30초)
   STAGE_BREAK_SEC: 10, // 클리어 뒤 쉬는 시간(회복·부활·보상)
-  STAGE_ENEMY_HP_GROWTH: 0.3, // 스테이지가 오를 때마다 적 체력 +30%
+  STAGE_ENEMY_HP_GROWTH: 0.36, // 스테이지가 오를 때마다 적 체력 +36%
   VENOM_CHANCE_PER_STAGE: 0.08, // 스테이지마다 늘어나는 독 궁병 비율(2스테이지부터)
   VENOM_CHANCE_MAX: 0.4, // 독 궁병 비율 상한
   VENOM_POISON: 0.8, // 독 화살의 독 피해(화살 피해 대비, 4초에 걸쳐)
-  STAGE_ENEMY_DMG_GROWTH: 0.14, // 적 피해 +14%
+  STAGE_ENEMY_DMG_GROWTH: 0.18, // 적 피해 +18%
   STAGE_SPAWN_GROWTH: 0.18, // 일반 적 생성량 +18%
-  ENEMY_TIME_HP_GROWTH: 0.12, // 스테이지 시작 후 60초마다 적 체력 +12%
-  ENEMY_TIME_DMG_GROWTH: 0.05, // 60초마다 적 피해 +5%
-  ENEMY_LEVEL_HP_GROWTH: 0.035, // 접속자 평균 레벨이 1 오를 때마다 적 체력 +3.5%
-  ENEMY_LEVEL_DMG_GROWTH: 0.015, // 적 피해 +1.5%
+  ENEMY_TIME_HP_GROWTH: 0.16, // 스테이지 시작 후 60초마다 적 체력 +16%
+  ENEMY_TIME_DMG_GROWTH: 0.07, // 60초마다 적 피해 +7%
+  ENEMY_LEVEL_HP_GROWTH: 0.06, // 접속자 평균 레벨이 1 오를 때마다 적 체력 +6%
+  ENEMY_LEVEL_DMG_GROWTH: 0.03, // 적 피해 +3%
   STAGE_CLEAR_GOLD: 40, // 클리어 보상 금화 = 이 값 x 스테이지 (모든 플레이어에게)
   STAGE_CLEAR_XP: 30, // 클리어 보상 경험치 = 이 값 + 15 x 스테이지
   BOSS_HP_BASE: 10, // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
   BOSS_HP_PER_STAGE: 5,
   BOSS_DMG_MULT: 2,
   BOSS_LATE_FROM: 3, // 이 스테이지 다음부터 장군이 한 단계마다 더 세진다(주인공 체력이 레벨마다 늘어난 만큼 후반 장군도 조금씩 강해진다)
-  BOSS_LATE_HP_GROWTH: 0.05, // 후반 단계마다 장군 체력 +5%
-  BOSS_LATE_DMG_GROWTH: 0.06, // 후반 단계마다 장군 피해 +6%
+  BOSS_LATE_HP_GROWTH: 0.10, // 후반 단계마다 장군 체력 +10%
+  BOSS_LATE_DMG_GROWTH: 0.11, // 후반 단계마다 장군 피해 +11%
   BOSS_TIMEOUT_SEC: 90, // 보스군이 등장한 뒤 이 시간(1분 30초) 안에 장군을 못 잡으면 보스군이 격노해 점점 강해진다
   BOSS_HARD_TIMEOUT_SEC: 0, // 0이면 보스를 잡을 때까지 이어진다. 양수면 이 시간(초)이 지나 못 잡았을 때 보스군이 물러나고 다음 스테이지로 넘어간다(마지막 스테이지 제외)
   BOSS_RAGE_INTERVAL_SEC: 20, // 격노 단계가 올라가는 간격
@@ -74,6 +74,7 @@ export const TUNE = {
   ASSAULT_LEASH_MULT: 2.4, // 돌격 진형에서 용병이 진형 자리를 벗어날 수 있는 거리 배율
   GUARD_DIST: 46, // 검방병이 지키는 아군과 위협 사이에서 서는 거리(아군으로부터)
   SPEAR_COVER_DIST: 70, // 창병이 기병 위협을 막으려고 지키는 아군 앞에 서는 거리
+  ASSAULT_ARCHER_FRAC: 0.55, // 돌격 진형·공격 지시에서 궁병이 적에게 다가가 쏘는 거리(사거리의 이 비율. 평소 사격은 ARCHER_REACH_FRAC)
   ARCHER_REACH_FRAC: 0.88, // 궁병이 사거리의 이 비율 근처에서 쏘려 한다
   ARCHER_ROAM: 240, // 궁병이 진형 자리에서 벗어날 수 있는 거리
   ARCHER_KITE_MARGIN: 55,
@@ -129,6 +130,8 @@ export const TUNE = {
   UNPAID_MAX: 3,
   UNPAID_QUIT: 3, // 이 횟수 연속으로 못 주면 이후 못 줄 때마다 가장 높은 단계 용병이 한 명씩 떠난다
   ARROW_COST: 0.5, // 화살 한 발을 장전할 때 드는 금화(토너먼트도 같다)
+  MERC_QUIVER_SIZE: 30, // 궁병 용병의 전통(화살 수). 다 쏘면 MERC_RELOAD_SEC 동안 장전한다(금화는 들지 않는다)
+  MERC_RELOAD_SEC: 2.5, // 궁병 용병 장전 시간(초). 이 동안은 쏘지 못하지만 움직일 수 있다
   QUIVER_SIZE: 30, // 주인공 궁수의 전통 크기(화살 수). 쏠 때마다 줄고 멀티샷은 화살 수만큼 준다
   RELOAD_SEC: 2, // 전통을 채우는 시간(초). 움직일 수는 있지만 채우는 동안은 쏠 수 없다
   HERO_HP_PER_LEVEL: 10, // 주인공 레벨업 1회당 최대 체력 증가

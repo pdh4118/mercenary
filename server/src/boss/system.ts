@@ -1,5 +1,7 @@
 import {
   BFX_ICEBREAK,
+  BFX_GATEHIT,
+  EVT_DMG_ENEMY,
   BFX_HEAL,
   BFX_IMPACT,
   HZ_CORPSE,
@@ -615,19 +617,32 @@ export class BossSystem {
   }
 
   /** 아군 투사체가 거대 방패·얼음벽에 막힌다. 막혔으면 true. (적 투사체는 거대 방패를 지나간다) */
-  blockBullet(b: { hostile: boolean; damage: number; radius: number }, px: number, py: number): boolean {
+  blockBullet(b: { hostile: boolean; damage: number; radius: number; owner?: number }, px: number, py: number): boolean {
     for (const h of this.hazards) {
       if (h.delay > 0 || (h.kind !== HZ_SHIELD && h.kind !== HZ_ICE && h.kind !== HZ_GATE)) continue;
       if (b.hostile && (h.kind === HZ_SHIELD || h.kind === HZ_GATE)) continue;
       if (!this.inRect(h, px, py, b.radius)) continue;
-      if (!b.hostile) this.damageBarrier(h, h.kind === HZ_GATE ? b.damage * BOSS_LORD.gateBulletMult : b.damage);
+      if (!b.hostile) this.damageBarrier(h, h.kind === HZ_GATE ? b.damage * BOSS_LORD.gateBulletMult : b.damage, { x: px, owner: b.owner ?? 0 });
       return true;
     }
     return false;
   }
 
   /** 얼음벽은 공격 한 번이 1회, 거대 방패는 피해만큼 체력이 깎인다 */
-  private damageBarrier(h: Hazard, dmg: number): void {
+  private gateFxAt = -9;
+  /** 성문을 때린 자리에 충격 효과와 피해 숫자를 낸다(0.12초에 한 번만: 여럿이 때려도 시끄럽지 않게) */
+  private gateHitFx(h: Hazard, x: number, dmg: number, owner: number): void {
+    const now = (this.g as unknown as { time: number }).time;
+    if (now - this.gateFxAt < 0.12) return;
+    this.gateFxAt = now;
+    const px = h.x + Math.max(-h.a, Math.min(h.a, x - h.x));
+    const py = h.y + (h.d.ht ?? 14) + 4; // 문 앞면
+    this.g.pushEvent(EVT_BOSSFX, px, py, 0, BFX_GATEHIT, owner);
+    (this.g as any).pushDamage(EVT_DMG_ENEMY, -9000, px, py - 26, dmg, owner);
+  }
+
+  private damageBarrier(h: Hazard, dmg: number, fx?: { x: number; owner: number }): void {
+    if (h.kind === HZ_GATE && fx && dmg > 0) this.gateHitFx(h, fx.x, dmg, fx.owner);
     if (h.kind === HZ_ICE) h.hp -= 1;
     else h.hp -= dmg;
     if (h.kind === HZ_GATE) {
@@ -651,7 +666,7 @@ export class BossSystem {
   }
 
   /** 아군의 근접 공격이 사거리 안의 장애물을 때린다 */
-  strikeBarriers(x: number, y: number, reach: number, dmg: number): void {
+  strikeBarriers(x: number, y: number, reach: number, dmg: number, owner = 0): void {
     for (const h of this.hazards) {
       if (h.kind === HZ_CORPSE && h.t > 0) {
         // 시체는 근접 공격 3번이면 부서진다(소생할 수 없다)
@@ -665,7 +680,7 @@ export class BossSystem {
       const cx = h.x + Math.cos(h.ang) * u;
       const cy = h.y + Math.sin(h.ang) * u;
       if (Math.hypot(x - cx, y - cy) > reach + (h.d.ht ?? 12) + 10) continue;
-      this.damageBarrier(h, h.kind === HZ_GATE ? dmg * BOSS_LORD.gateMeleeMult : dmg);
+      this.damageBarrier(h, h.kind === HZ_GATE ? dmg * BOSS_LORD.gateMeleeMult : dmg, { x, owner });
     }
   }
 
@@ -679,7 +694,7 @@ export class BossSystem {
       }
       if (h.delay > 0 || (h.kind !== HZ_ICE && h.kind !== HZ_GATE)) continue;
       if (Math.hypot(h.x - x, h.y - y) > radius + h.a) continue;
-      this.damageBarrier(h, h.kind === HZ_GATE ? damage * BOSS_LORD.gateMeteorMult : 0);
+      this.damageBarrier(h, h.kind === HZ_GATE ? damage * BOSS_LORD.gateMeteorMult : 0, { x, owner: 0 });
     }
   }
 

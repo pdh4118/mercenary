@@ -11,7 +11,7 @@ const find = (pred: (c: (typeof CARDS)[number]) => boolean): number => {
 
 test("카드 표: 고른 카드를 영웅·병종·공용 열로 묶고 같은 능력치는 합친다", () => {
   const heroDmg = find((c) => c.effect.k === "heroDmg" && c.rarity === 0);
-  const spearHp = find((c) => c.effect.k === "mercStat" && c.effect.stat === "thorns" && c.effect.type === SPEAR); // 창병 전용(근접 반사)
+  const spearHp = find((c) => c.effect.k === "mercStat" && c.effect.stat === "knock" && c.effect.type === SPEAR); // 창병 전용(넉백)
   const allHp = find((c) => c.effect.k === "mercStat" && c.effect.stat === "hp" && c.effect.type === undefined && c.rarity === 0);
   const heroHp = find((c) => c.effect.k === "heroMaxHp" && c.rarity === 0);
   const lead = find((c) => c.effect.k === "leadership" && c.rarity === 0);
@@ -24,8 +24,8 @@ test("카드 표: 고른 카드를 영웅·병종·공용 열로 묶고 같은 �
   const hp = s.rows.find((r) => r.label === "체력")!;
   assert.ok(hp.cells[0]!.length > 0, "영웅 최대 체력(+n)");
   assert.ok(hp.cells[7]!.endsWith("%") && hp.cells[SPEAR + 1] === "", "체력은 공용 열(병종 카드는 없다)");
-  const th = s.rows.find((r) => r.label === "근접 반사")!;
-  assert.ok(th.cells[SPEAR + 1]!.length > 0 && th.cells[CAVALRY + 1] === "", "창병 전용 근접 반사");
+  const th = s.rows.find((r) => r.label === "넉백")!;
+  assert.ok(th.cells[SPEAR + 1]!.length > 0 && th.cells[CAVALRY + 1] === "", "창병 전용 넉백");
   assert.equal(s.legends[MAGE + 1]!.length, 1, "마법사 전설");
   assert.ok(s.extras.some((x) => x.label === "통솔력"));
   // 같은 카드 두 장은 합산된다

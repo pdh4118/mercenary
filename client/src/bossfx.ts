@@ -4,6 +4,7 @@ import {
   BFX_CRASH,
   BFX_ICEBREAK,
   BFX_IMPACT,
+  BFX_GATEHIT,
   BFX_SWING,
   BFX_FLURRYHIT,
   BFX_THRUST,
@@ -128,6 +129,8 @@ export interface BossFxDeps {
   sound: (name: string, x: number, y: number, vol?: number) => void;
   /** 던진 철퇴가 땅에 닿는 폭발 그림(갈라진 땅과 흙먼지). 그림이 없으면 false */
   maceBoom: (x: number, y: number, r: number) => boolean;
+  /** 성문을 때렸다(owner = 때린 플레이어): 성문이 흔들리고 내가 때렸으면 화면이 살짝 흔들린다 */
+  gateHit?: (owner: number) => void;
 }
 
 const BOSS_UNIT_TEX = [
@@ -313,7 +316,12 @@ export async function createBossFx(d: BossFxDeps) {
 
   /** 장군 효과 이벤트(EVT_BOSSFX) */
   const playFx = (val: number, x: number, y: number, ang: number, len = 0) => {
-    if (val === BFX_IMPACT || val === BFX_CRASH) {
+    if (val === BFX_GATEHIT) {
+      playSeq(T.impact, x, y - 14, 0.35, 0.5, 0); // 문 앞면의 충격 섬광
+      playSeq(T.flurryHit, x, y - 20, 0.3, 0.9, 0, 0.5, false, 0.8);
+      d.sound("skill_wall_hit", x, y, 0.65);
+      d.gateHit?.(len);
+    } else if (val === BFX_IMPACT || val === BFX_CRASH) {
       playSeq(T.impact, x, y, 0.55, val === BFX_CRASH ? 1 : 0.7, 0);
       d.sound("knockback", x, y);
       if (val === BFX_CRASH) d.spawnFloat("쿵! 기절", x, y - 40, { fill: 0xffd45d, fontSize: 26, fontWeight: "900", stroke: { color: 0x5a2000, width: 5 } }, 1.2, 0.5);
