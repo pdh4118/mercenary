@@ -171,26 +171,72 @@ test("공성전: 성문 개방 돌격은 정예 기병을 내보내고 성문을
   assert.ok(gate.hp > gate.hpMax * 0.5, "성문이 조금 회복한다");
 });
 
-test("공성전: 진군령은 멈춘 대상에게만 번개를 내린다", () => {
-  const run1 = (move: boolean): number => {
-    const { g, a } = setup(BSK_EDICT);
-    const p = g.getPlayer(a)!;
-    p.maxHp = p.hp = 1e9;
-    p.x = 0;
-    p.y = GATE_Y + 300;
-    let low = p.maxHp;
-    let seen = false;
-    for (let i = 0; i < TICK_RATE * (BOSS_LORD.edictGrace + 5); i++) {
-      g.step();
-      if (move) p.x += 5;
-      low = Math.min(low, p.hp);
-      if (((g as any).boss.hazards as any[]).some((h) => h.kind === HZ_EDICT)) seen = true;
-    }
-    assert.ok(seen, "칙령 장판(문구)이 있다");
-    return p.maxHp - low;
+test("공성전: 진군령은 필드 졸개를 대열로 묶어 전진시키고, 끝나면 푼다", () => {
+  const { g, a } = setup(BSK_EDICT);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  p.x = 0;
+  p.y = GATE_Y + 600;
+  g.spawnSiegeWave(24);
+  const before = new Map<number, number>();
+  for (const e of (g as any).enemies.values()) if (!e.boss) before.set(e.id, e.dmgMult);
+  let seen = false;
+  let cmdCount = 0;
+  let flags = 0;
+  let squads = 0;
+  for (let i = 0; i < TICK_RATE * (BOSS_LORD.edictGrace + 2); i++) {
+    g.step();
+    p.hp = p.maxHp;
+    if (((g as any).boss.hazards as any[]).some((h) => h.kind === HZ_EDICT)) seen = true;
+  }
+  const list = [...(g as any).enemies.values()].filter((e: any) => !e.boss);
+  cmdCount = list.filter((e: any) => e.cmd).length;
+  flags = list.filter((e: any) => e.flag).length;
+  squads = (g as any).commandSquadCount();
+  assert.ok(seen, "진군령 장판(문구)이 있다");
+  assert.ok(cmdCount >= 6, `명령을 받은 졸개 ${cmdCount}`);
+  assert.ok(squads >= 1 && flags === squads, `대열마다 깃발병 하나(대열 ${squads}, 깃발 ${flags})`);
+  const e0: any = list.find((e: any) => e.cmd);
+  assert.ok(Math.abs(e0.dmgMult - before.get(e0.id)! * (1 + BOSS_LORD.cmdAtk)) < 1e-9, "공격이 강해진다");
+  assert.equal(g.info().squads, 0, "진군령 대열은 적 소대 알림에 세지 않는다");
+  // 시간이 지나면 풀린다
+  for (let i = 0; i < TICK_RATE * (BOSS_LORD.edictSec + 1); i++) {
+    g.step();
+    p.hp = p.maxHp;
+  }
+  const after = [...(g as any).enemies.values()].filter((e: any) => !e.boss);
+  assert.equal(after.filter((e: any) => e.cmd || e.flag).length, 0, "대열이 풀렸다");
+  assert.equal((g as any).commandSquadCount(), 0);
+  const e1: any = after.find((e: any) => before.has(e.id));
+  assert.ok(Math.abs(e1.dmgMult - before.get(e1.id)!) < 1e-9, "강화가 원래대로 돌아온다");
+});
+
+test("공성전: 진군령 대열 안의 졸개는 피해를 덜 받고, 깃발병이 쓰러지면 그 대열이 무너진다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  p.x = 0;
+  p.y = GATE_Y + 600;
+  g.spawnSiegeWave(20);
+  const n = (g as any).commandTroops();
+  assert.ok(n >= 6, `명령을 받은 졸개 ${n}`);
+  const list = [...(g as any).enemies.values()].filter((e: any) => e.cmd);
+  const flag: any = list.find((e: any) => e.flag);
+  const other: any = list.find((e: any) => !e.flag && e.squad === flag.squad && e.type !== 3);
+  const plain: any = [...(g as any).enemies.values()].find((e: any) => !e.boss && !e.cmd && e.type === other.type) ?? null;
+  const hit = (e: any) => {
+    const hp0 = e.hp + e.shield;
+    (g as any).damageEnemy(e, { damage: 10, charge: 0, srcType: 0, fromAngle: 0, crit: false }, a);
+    return hp0 - (e.hp + e.shield);
   };
-  assert.ok(run1(false) > 0, "멈추면 맞는다");
-  assert.equal(run1(true), 0, "움직이면 맞지 않는다");
+  if (plain) assert.ok(Math.abs(hit(other) / hit(plain) - (1 - BOSS_LORD.cmdReduce)) < 0.05, "받는 피해가 25% 줄어든다");
+  const squadId = flag.squad;
+  const mates = list.filter((e: any) => e.squad === squadId && e !== flag);
+  flag.hp = 0;
+  (g as any).damageEnemy(flag, { damage: 1, charge: 0, srcType: 0, fromAngle: 0, crit: false }, a);
+  assert.ok(mates.every((e: any) => !e.cmd && !e.squad), "깃발병이 쓰러지면 대열이 풀린다");
+  assert.equal((g as any).squads.has(squadId), false);
+  (g as any).endCommand();
 });
 
 const openGate = (g: Game) => {

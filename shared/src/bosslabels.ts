@@ -2289,44 +2289,44 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
  "BOSS_LORD.edictGrace": {
   "boss": "군주",
   "skill": "칙령",
-  "label": "칙령: 규칙이 적용되기까지",
-  "hint": "칙령: 규칙이 적용되기까지(문구를 읽을 시간)"
+  "label": "진군령: 졸개에게 명이 닿기까지",
+  "hint": "진군령: 졸개에게 명이 닿기까지(함성·깃발 예고)"
  },
  "BOSS_LORD.edictSec": {
   "boss": "군주",
   "skill": "칙령",
   "label": "지속 시간(초)",
-  "hint": "규칙이 적용되는 시간"
+  "hint": "졸개가 대열을 갖춰 전진하는 시간"
  },
- "BOSS_LORD.edictCheck": {
+ "BOSS_LORD.cmdMin": {
   "boss": "군주",
-  "skill": "칙령",
-  "label": "위반을 검사하는 간격",
-  "hint": "위반을 검사하는 간격(초)"
+  "skill": "기본",
+  "label": "최소",
+  "hint": "진군령을 내리려면 필드에 졸개가 이만큼은 있어야 한다"
  },
- "BOSS_LORD.edictStill": {
+ "BOSS_LORD.cmdCluster": {
   "boss": "군주",
-  "skill": "칙령",
-  "label": "진군령: 이 거리",
-  "hint": "진군령: 이 거리(px)도 못 움직이면 멈춘 것"
+  "skill": "기본",
+  "label": "이 거리 안의 졸개끼리 하나의 대열이 된다",
+  "hint": "이 거리 안의 졸개끼리 하나의 대열이 된다"
  },
- "BOSS_LORD.edictSpread": {
+ "BOSS_LORD.cmdMarch": {
   "boss": "군주",
-  "skill": "칙령",
-  "label": "분산령: 이 거리 안에 다른 아군이 있으면 ",
-  "hint": "분산령: 이 거리 안에 다른 아군이 있으면 뭉친 것"
+  "skill": "기본",
+  "label": "대열이 전진하는 속도",
+  "hint": "대열이 전진하는 속도(px/s)"
  },
- "BOSS_LORD.edictDmg": {
+ "BOSS_LORD.cmdReduce": {
   "boss": "군주",
-  "skill": "칙령",
-  "label": "피해 배율",
-  "hint": "위반했을 때 번개 피해(배율)"
+  "skill": "기본",
+  "label": "대열 안에 있는 졸개가 받는 피해 감소 비율",
+  "hint": "대열 안에 있는 졸개가 받는 피해 감소 비율"
  },
- "BOSS_LORD.edictSpreadGate": {
+ "BOSS_LORD.cmdAtk": {
   "boss": "군주",
-  "skill": "칙령",
-  "label": "분산령은 성문 체력이 이 % 이하일 때부터",
-  "hint": "분산령은 성문 체력이 이 % 이하일 때부터"
+  "skill": "기본",
+  "label": "대열 안에 있는 졸개의 공격 강화 비율",
+  "hint": "대열 안에 있는 졸개의 공격 강화 비율"
  },
  "BOSS_LORD.edictCd": {
   "boss": "군주",

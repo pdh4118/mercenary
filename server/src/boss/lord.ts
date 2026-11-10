@@ -146,43 +146,37 @@ const sortie: SkillDef = {
   tele: ({ k }) => [[TELE_CIRCLE, r1(GATE_X), r1(GATE_Y + 20), 0, 170, 0, ...lt(k), BSK_SORTIE]],
 };
 
-/** 칙령: 문구를 읽고 규칙대로 움직여야 한다(어기면 번개). 진군령 = 멈추면 번개, 분산령 = 아군끼리 뭉치면 번개(성문이 많이 상한 뒤부터). */
+/**
+ * 진군령: 군주가 필드의 졸개에게 대열을 갖춰 전진하라고 명한다. 졸개는 가까운 것끼리 대열(깃발병 한 명 포함)을 이루고
+ * 정해진 시간 동안 함께 행군한다. 대열 안에서는 받는 피해가 줄고 공격이 강해진다. 대열의 깃발병을 쓰러뜨리면 그 대열이 무너진다.
+ */
 const edict: SkillDef = {
   id: BSK_EDICT,
   cd: C.edictCd,
   weight: 4,
-  can: ({ foes }) => foes.length > 0,
+  can: ({ sys }) => (sys.g as any).commandableCount() >= C.cmdMin,
   begin: (c) => {
-    const spread = gatePct(c) <= C.edictSpreadGate && Math.random() < 0.5;
-    c.k.d.rule = spread ? 2 : 1;
     c.k.t = c.k.total = C.edictGrace + C.edictSec;
-    c.k.d.chk = C.edictCheck;
-    c.k.list = [new Map<number, { x: number; y: number }>()];
-    c.sys.addHazard({ kind: HZ_EDICT, x: c.e.x, y: c.e.y, a: c.k.d.rule, delay: C.edictGrace, t: C.edictSec, total: C.edictSec, src: c.e.id });
+    c.k.d.issued = 0;
+    c.sys.addHazard({ kind: HZ_EDICT, x: c.e.x, y: c.e.y, a: 1, delay: C.edictGrace, t: C.edictSec, total: C.edictSec, src: c.e.id });
+    c.sys.fx(c.e.x, c.e.y, 0, BFX_RALLY);
   },
   run: (c) => {
-    const { e, k, foes, sys, dt } = c;
+    const { e, k, sys } = c;
+    const g = sys.g as any;
     const grace = k.total - k.t < C.edictGrace;
-    const pos: Map<number, { x: number; y: number }> = k.list[0];
-    if (!grace) {
-      k.d.chk! -= dt;
-      if (k.d.chk! <= 0) {
-        k.d.chk = C.edictCheck;
-        for (const f of foes) {
-          const key = sys.foeKey(f);
-          const prev = pos.get(key);
-          let bad = false;
-          if (k.d.rule === 1) bad = !!prev && Math.hypot(f.x - prev.x, f.y - prev.y) < C.edictStill;
-          else bad = foes.some((o) => o !== f && Math.hypot(o.x - f.x, o.y - f.y) < C.edictSpread);
-          pos.set(key, { x: f.x, y: f.y });
-          if (bad) {
-            sys.hitFoe(e, f, C.edictDmg, 0);
-            sys.fx(f.x, f.y, 0, BFX_IMPACT);
-          }
-        }
+    if (!grace && !k.d.issued) {
+      k.d.issued = 1;
+      const n = g.commandTroops();
+      if (n === 0) {
+        sys.hazards = sys.hazards.filter((h) => h.kind !== HZ_EDICT);
+        sys.end(c);
+        return;
       }
-    } else for (const f of foes) pos.set(sys.foeKey(f), { x: f.x, y: f.y });
-    if (k.t <= 0) {
+      sys.fx(e.x, e.y, 0, BFX_RALLY);
+    }
+    if (k.t <= 0 || (k.d.issued && g.commandSquadCount() === 0)) {
+      g.endCommand();
       sys.hazards = sys.hazards.filter((h) => h.kind !== HZ_EDICT);
       sys.end(c);
     }

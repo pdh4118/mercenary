@@ -39,7 +39,7 @@ export const BSK_CATAPULT = 40; // 군주: 성루 투석
 export const BSK_OIL = 41; // 군주: 끓는 기름
 export const BSK_ARROWSTORM = 42; // 군주: 화살 소나기
 export const BSK_SORTIE = 43; // 군주: 성문 개방 돌격
-export const BSK_EDICT = 44; // 군주: 칙령
+export const BSK_EDICT = 44; // 군주: 진군령(필드 졸개에게 대열을 갖춰 전진하라고 명한다)
 export const BSK_GUARDS = 45; // 군주: 근위대 소집
 export const BSK_SCEPTER = 46; // 군주: 홀 내려찍기
 export const BSK_RALLY = 47; // 군주: 호령
@@ -92,7 +92,7 @@ export const BOSS_SKILL_NAMES: Record<number, string> = {
   [BSK_OIL]: "끓는 기름",
   [BSK_ARROWSTORM]: "화살 소나기",
   [BSK_SORTIE]: "성문 개방 돌격",
-  [BSK_EDICT]: "칙령",
+  [BSK_EDICT]: "진군령",
   [BSK_GUARDS]: "근위대 소집",
   [BSK_SCEPTER]: "홀 내려찍기",
   [BSK_RALLY]: "호령",
@@ -110,6 +110,8 @@ export const EF_CORNERED = 16; // 궁지에 몰림
 export const EF_BUBBLE = 32; // 매직 쉴드
 export const EF_STUN = 64; // 기절·그로기
 export const EF_MAD = 128; // 광분(바퀴가 붉게 달아오름)
+export const EF_CMD = 16384; // (일반 적) 군주의 진군령을 받아 대열을 갖춰 전진 중(피해 감소·공격 강화)
+export const EF_FLAG = 32768; // (일반 적) 대열의 깃발병(쓰러지면 그 대열의 진군령이 풀린다)
 export const EF_SUPPLY = 2048; // (일반 적) 군량병: 공격 없이 도망만 치고, 쓰러지면 쌀을 떨군다
 export const EF_POST = 8192; // (일반 적) 성벽 위 수비병(궁병·마법사, 전용 그림. EF_ELITE와 함께 켜진다)
 export const EF_ELITE = 4096; // (일반 적) 군주의 근위대·정예(전용 그림)
@@ -133,7 +135,7 @@ export const HZ_CALTROP = 14; // 마름쇠: a = 반지름(예고 중에는 state
 export const HZ_GATE = 15; // 성문(공성전): 위치 = 성문 중심, a = 반길이, b = 남은 체력 %
 export const HZ_WARD = 18; // 결계(처형령에서 안전한 곳): a = 반지름
 export const HZ_EXECUTE = 19; // 처형령: 예고(state 0) 동안 화면이 어두워지고 끝나면 벼락. a = 0
-export const HZ_EDICT = 17; // 칙령(공성전): a = 규칙(1 진군령, 2 분산령), 예고(state 0) 뒤 규칙이 적용된다. 위치는 군주
+export const HZ_EDICT = 17; // 진군령(공성전): 걸려 있는 동안 화면에 문구를 보인다. 예고(state 0) 뒤 졸개가 대열을 갖춰 전진한다. 위치는 군주
 export const HZ_OIL = 16; // 끓는 기름 장판(공성전): a = 반지름(예고 중에는 state 0)
 export const HZ_RING = 8; // 퍼지는 불꽃 고리: a = 현재 반지름, b = 틈 반각(라디안), 방향 = 틈 중심
 export type HazardWire = [id: number, kind: number, x: number, y: number, ang: number, a: number, b: number, left: number, total: number, state: number];
@@ -651,13 +653,13 @@ export const BOSS_LORD = {
   sortieOpenSec: 3.5, // 성문이 열려 있는 시간(그림)
   sortieGateHeal: 6, // 닫힐 때 성문이 회복하는 체력(%)
   sortieCd: 24,
-  edictGrace: 1.5, // 칙령: 규칙이 적용되기까지(문구를 읽을 시간)
-  edictSec: 8, // 규칙이 적용되는 시간
-  edictCheck: 0.75, // 위반을 검사하는 간격(초)
-  edictStill: 28, // 진군령: 이 거리(px)도 못 움직이면 멈춘 것
-  edictSpread: 130, // 분산령: 이 거리 안에 다른 아군이 있으면 뭉친 것
-  edictDmg: 3, // 위반했을 때 번개 피해(배율)
-  edictSpreadGate: 60, // 분산령은 성문 체력이 이 % 이하일 때부터
+  edictGrace: 1.5, // 진군령: 졸개에게 명이 닿기까지(함성·깃발 예고)
+  edictSec: 8, // 졸개가 대열을 갖춰 전진하는 시간
+  cmdMin: 6, // 진군령을 내리려면 필드에 졸개가 이만큼은 있어야 한다
+  cmdCluster: 450, // 이 거리 안의 졸개끼리 하나의 대열이 된다
+  cmdMarch: 80, // 대열이 전진하는 속도(px/s)
+  cmdReduce: 0.25, // 대열 안에 있는 졸개가 받는 피해 감소 비율
+  cmdAtk: 0.2, // 대열 안에 있는 졸개의 공격 강화 비율
   edictCd: 26,
   guardsCd: 30, // 근위대 소집(성문이 부서진 뒤 안마당 단계)
   guardsReduce: 0.2, // 근위대 한 명이 살아 있을 때마다 군주가 받는 피해 감소 비율

@@ -51,6 +51,8 @@ import {
   EF_SKEL,
   EF_ELITE,
   EF_POST,
+  EF_CMD,
+  EF_FLAG,
   EF_SUPPLY,
   EVT_RICE,
   EVT_TENT,
@@ -343,6 +345,7 @@ async function main() {
   };
   const campLayer = new Container();
   const enemyLayer = new Container();
+  const cmdG = new Graphics(); // 군주의 진군령: 대열의 깃발과 명령받은 졸개 표시
   const fxLayer = new Graphics(); // 공격 예고 부채꼴
   const bulletLayer = new Container();
   const mercLayer = new Container();
@@ -366,7 +369,7 @@ async function main() {
   const dmgLayer = new Container(); // 피해 숫자는 모든 그림 위에
   const terrainHigh = new Container(); // 유닛이 뒤에 서 있는 바위·나무: 유닛을 가린다
   terrainHigh.sortableChildren = true;
-  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, ammoLabel, dbgG, dmgLayer);
+  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, cmdG, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, ammoLabel, dbgG, dmgLayer);
   // 장군 스킬 표현(예고·장판·상태 표시·효과 컷). 서 있는 물건은 적과 함께 깊이 정렬된다.
   const bossFx = await createBossFx({
     groundFx,
@@ -2361,6 +2364,7 @@ async function main() {
     }
     const k = 1 - Math.exp(-ticker.deltaMS / SMOOTH_MS);
 
+    cmdG.clear();
     enemies.update(latest.enemies, k, (v, w) => {
       let heatTint = 0;
       const size = w[11] === 1 ? BOSS_SIZE : 1;
@@ -2431,6 +2435,18 @@ async function main() {
         v.sprite.alpha *= mk.alpha;
         v.sprite.tint = heatTint || mk.tint;
       }
+      const cf = w[14] ?? 0;
+      if (cf & (EF_CMD | EF_FLAG)) {
+        // 진군령 대열: 발밑에 붉은 고리, 깃발병은 머리 위에 붉은 깃발
+        const t = performance.now() / 260;
+        cmdG.ellipse(v.x, v.y + 9, 13, 5).stroke({ width: 2, color: 0xff5a4a, alpha: 0.5 + 0.2 * Math.sin(t + w[0]) });
+        if (cf & EF_FLAG) {
+          const top = v.y - 70;
+          const wave = Math.sin(t * 2 + w[0]) * 2;
+          cmdG.moveTo(v.x, v.y - 24).lineTo(v.x, top).stroke({ width: 3, color: 0x3a2a1a, alpha: 0.95 });
+          cmdG.poly([v.x, top, v.x + 20, top + 6 + wave, v.x, top + 14]).fill({ color: 0xd9322a, alpha: 0.95 }).stroke({ width: 1.5, color: 0xffd36a, alpha: 0.9 });
+        }
+      }
       setPoison(v.sprite, w[12] === 1);
     });
     // 장군 스킬 예고·장판·효과 컷
@@ -2464,8 +2480,7 @@ async function main() {
       const ed = bossFx.edict();
       edictText.visible = !!ed;
       if (ed) {
-        const rule = ed.rule === 1 ? "진군령 — 멈추면 번개!" : "분산령 — 뭉치면 번개!";
-        edictText.text = `칙령  ${rule}\n${ed.grace ? "곧 시행됩니다" : `${Math.ceil(ed.left)}초`}`;
+        edictText.text = ed.grace ? "진군령!  군주가 졸개에게 진군을 명한다\n곧 졸개가 대열을 갖춥니다" : `졸개가 대열을 갖춰 전진 중  ${Math.ceil(ed.left)}초\n깃발병을 쓰러뜨리면 대열이 무너진다`;
         edictText.style.fill = ed.grace ? 0xffe08a : 0xff6a5a;
         edictText.scale.set(1 + (ed.grace ? 0.04 * Math.sin(performance.now() / 90) : 0));
         edictText.position.set(app.screen.width / 2, 120);

@@ -208,6 +208,8 @@ import {
   EF_SKEL,
   EF_ELITE,
   EF_POST,
+  EF_CMD,
+  EF_FLAG,
   ST_BIT_STUN,
   ST_BIT_ROOT,
   ST_BIT_SLOW,
@@ -289,7 +291,7 @@ import { resolveHit, type Hit, type HitResult } from "./combat.js";
 import { BossSystem } from "./boss/system.js";
 import type { BossKitState } from "./boss/types.js";
 import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, RAMP_DOWN_AT, RAMP_OUT, RAMP_TOP_AT, RAMP_Y0, RAMP_Y1, RING, SIEGE, WALL_STRIPS, castleSolids, clampToWallTop, wallPathAt, WALL_CORNER_S, WALL_PATH_LEN, inCastleZone, inCourtyard, rampSideAt, type SiegeInfo } from "@mercenary/shared";
-import { SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
+import { type ArmySlot, SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
 /** 한 번에 n발을 쏠 때 i번째 화살의 각도 오프셋: 0번은 정면, 나머지는 좌우로 번갈아 퍼진다 */
@@ -491,6 +493,8 @@ export interface Enemy extends Fighter {
   ghost?: Ghost; // 은신(투명화) 상태: 투명도가 절반 이하면 어그로가 풀린다
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
+  cmd?: boolean; // 군주의 진군령을 받아 대열을 갖춰 전진 중(피해 감소·공격 강화)
+  flag?: boolean; // 그 대열의 깃발병(쓰러지면 대열이 무너진다)
   ram?: boolean; // 충돌형 기병: 창으로 찌르지 않고 몸으로 부딪혀 밀고 지나간다
   ramT?: number; // 부딪힌 뒤 빠져나가 속도를 다시 붙이는 남은 시간
   ramKey?: number; // 마지막으로 공격 방식(충돌/찌르기)을 정한 대상
@@ -784,7 +788,7 @@ export class Game {
   private stageTime = 0; // 이번 스테이지에서 흐른 성장 시간(적 생성량 계산용)
   status: GameStatus = "playing";
   private armyTotal = 0;
-  private squads = new Map<number, { a: Army; left: number; size: number }>();
+  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean }>(); // cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
   private nextSquadId = 1;
   private squadTimer = SQUAD_FIRST;
 
@@ -1438,7 +1442,7 @@ export class Game {
       e.boss ? 1 : 0,
       e.poisonT && e.poisonT > 0 ? 1 : 0,
       e.bk?.show ?? 0,
-      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0) | (e.elite ? EF_ELITE : 0) | ((e.post || e.art) ? EF_ELITE | EF_POST : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
+      (e.boss ? this.boss.flagsOf(e) : ((e.invulnT ?? 0) > 0 ? 8 : 0) | (e.skel ? EF_SKEL : 0) | (e.supply ? EF_SUPPLY : 0) | (e.elite ? EF_ELITE : 0) | ((e.post || e.art) ? EF_ELITE | EF_POST : 0) | (e.cmd ? EF_CMD : 0) | (e.flag ? EF_FLAG : 0)) | (ghostHidesAggro(e.ghost) ? EF_STEALTH : 0),
       Math.round(ghostAlpha(e.ghost) * 100),
     ]);
   }
@@ -1578,7 +1582,7 @@ export class Game {
       armyLeft,
       armyTotal: this.armyTotal,
       rage: this.phase === "boss" ? this.rage : 0,
-      squads: this.squads.size,
+      squads: [...this.squads.values()].filter((q) => !q.cmd).length,
       tourIn: Math.ceil(this.tourCountdown),
       tour: this.phase === "tournament" ? this.tourInfo() : null,
       siege: this.siegeInfo(),
@@ -2205,7 +2209,7 @@ export class Game {
 
   /** 소대: 보스가 아닐 때도 가끔 진형을 갖춘 소규모 혼성 부대가 다가온다(성장 단계에서만) */
   private stepSquads(dt: number): void {
-    for (const sq of this.squads.values()) this.marchArmy(sq.a, dt, SQUAD_MARCH_MULT);
+    for (const sq of this.squads.values()) this.marchArmy(sq.a, dt, sq.cmd ? BOSS_LORD.cmdMarch / ARMY_MARCH_SPEED : SQUAD_MARCH_MULT);
     if (!this.autoSpawn || this.phase !== "grow") return;
     this.squadTimer -= dt;
     if (this.squadTimer > 0) return;
@@ -2242,12 +2246,127 @@ export class Game {
     return id;
   }
 
+  /** 군주의 진군령을 받을 수 있는 필드 졸개(성벽 위·성 안 수비대·군주군 진형·소대·정예·군량병·스켈레톤·마법사는 제외) */
+  private commandables(): Enemy[] {
+    const out: Enemy[] = [];
+    for (const e of this.enemies.values()) {
+      if (e.boss || e.guard || e.post || e.art || e.hold || e.army || e.squad || e.supply || e.skel || e.elite || e.type === MAGE || e.hp <= 0) continue;
+      out.push(e);
+    }
+    return out;
+  }
+
+  commandableCount(): number {
+    return this.commandables().length;
+  }
+
+  commandSquadCount(): number {
+    let n = 0;
+    for (const q of this.squads.values()) if (q.cmd) n++;
+    return n;
+  }
+
+  /**
+   * 진군령: 필드 졸개를 가까운 것끼리 묶어 대열(소대 진형)을 짜 준다. 각 대열에는 깃발병이 한 명 있고, 대열 안의 졸개는
+   * 받는 피해가 줄고 공격이 강해진다. 대열이 몇 개 만들어졌는지가 아니라 명령을 받은 졸개 수를 돌려준다.
+   */
+  commandTroops(): number {
+    const C = BOSS_LORD;
+    const list = this.commandables();
+    if (list.length < C.cmdMin) return 0;
+    const groups: { x: number; y: number; members: Enemy[] }[] = [];
+    for (const e of list) {
+      let best: (typeof groups)[number] | null = null;
+      let bd: number = C.cmdCluster;
+      for (const gp of groups) {
+        const d = Math.hypot(gp.x - e.x, gp.y - e.y);
+        if (d < bd) {
+          bd = d;
+          best = gp;
+        }
+      }
+      if (!best) groups.push({ x: e.x, y: e.y, members: [e] });
+      else {
+        const n = best.members.length;
+        best.x = (best.x * n + e.x) / (n + 1);
+        best.y = (best.y * n + e.y) / (n + 1);
+        best.members.push(e);
+      }
+    }
+    const present = this.presentPlayers();
+    let total = 0;
+    for (const gp of groups) {
+      if (gp.members.length < 3) continue; // 너무 작은 무리는 대열을 이루지 못한다
+      const comp = [0, 0, 0, 0, 0];
+      for (const e of gp.members) comp[e.type]!++;
+      const layout = squadLayout(comp);
+      let near: PlayerState | null = null;
+      let bd = Infinity;
+      for (const s of present) {
+        const d = Math.hypot(s.state.x - gp.x, s.state.y - gp.y);
+        if (d < bd) {
+          bd = d;
+          near = s.state;
+        }
+      }
+      const a: Army = { x: gp.x, y: gp.y, heading: near ? Math.atan2(near.y - gp.y, near.x - gp.x) : Math.PI / 2 };
+      const id = this.nextSquadId++;
+      this.squads.set(id, { a, left: gp.members.length, size: gp.members.length, cmd: true });
+      const byType = new Map<number, ArmySlot[]>();
+      for (const sl of layout) {
+        const q = byType.get(sl.type) ?? [];
+        q.push(sl);
+        byType.set(sl.type, q);
+      }
+      let flagged = false;
+      for (const type of [SHIELD, SPEAR, BLUNT, ARCHER, CAVALRY]) {
+        for (const e of gp.members.filter((m) => m.type === type)) {
+          const sl = byType.get(type)?.shift();
+          if (!sl) continue;
+          e.squad = id;
+          e.slotF = sl.forward;
+          e.slotL = sl.lateral;
+          e.cmd = true;
+          e.dmgMult *= 1 + C.cmdAtk;
+          if (!flagged && (type === SHIELD || type === SPEAR)) {
+            e.flag = true; // 앞줄의 검방병·창병 한 명이 깃발을 든다
+            flagged = true;
+          }
+          total++;
+        }
+      }
+      if (!flagged) {
+        const first = gp.members.find((m) => m.cmd);
+        if (first) first.flag = true;
+      }
+    }
+    return total;
+  }
+
+  /** 대열 하나를 푼다: 졸개는 다시 제각각 움직이고 강화가 사라진다 */
+  private releaseCommand(id: number): void {
+    for (const e of this.enemies.values()) {
+      if (e.squad !== id || !e.cmd) continue;
+      e.squad = 0;
+      e.cmd = false;
+      e.flag = false;
+      e.dmgMult /= 1 + BOSS_LORD.cmdAtk;
+    }
+    this.squads.delete(id);
+  }
+
+  /** 진군령이 끝났다: 남은 대열을 모두 푼다 */
+  endCommand(): void {
+    for (const [id, q] of [...this.squads]) if (q.cmd) this.releaseCommand(id);
+  }
+
   private onSquadMemberDown(id: number): void {
     const sq = this.squads.get(id);
     if (!sq) return;
     sq.left--;
     if (sq.left > 0) return;
     this.squads.delete(id);
+    if (sq.cmd) return; // 진군령 대열은 보상이 없다
     // 소대를 전멸시키면 모두에게 보상
     for (const sl of this.slots.values()) {
       const bonus = Math.round(SQUAD_CLEAR_GOLD * sq.size * sl.mods.bounty);
@@ -5682,6 +5801,7 @@ export class Game {
     const adj = this.boss.preHit(e, hit0, ownerId, src);
     if (!adj) return 0;
     let hit = adj;
+    if (e.cmd) hit = { ...hit, damage: hit.damage * (1 - BOSS_LORD.cmdReduce), charge: hit.charge * (1 - BOSS_LORD.cmdReduce) }; // 진군령 대열 안에서는 받는 피해가 줄어든다
     const owner = this.slots.get(ownerId);
     const scope: LegendScope = src ? src.type : "hero"; // 때린 쪽(주인공 또는 그 병종)에게만 전설이 적용된다
     const has = (id: LegendId) => !!owner && hasLegend(owner.mods, id, scope);
@@ -6069,6 +6189,10 @@ export class Game {
     const shared = (xp * TUNE.XP_TEAM_SHARE) / this.slots.size;
     for (const s of this.slots.values()) this.giveXp(s.state.id, shared);
     if (owner) this.giveXp(owner.state.id, xp * (1 - TUNE.XP_TEAM_SHARE));
+    if (e.flag && e.squad && this.squads.get(e.squad)?.cmd) {
+      this.pushEvent(EVT_BOSSFX, e.x, e.y, 0, BFX_IMPACT); // 깃발이 꺾이며 대열이 무너진다
+      this.releaseCommand(e.squad);
+    }
     if (e.squad) this.onSquadMemberDown(e.squad);
     if (e.boss) this.onBossDown(e);
   }

@@ -73,6 +73,7 @@ import {
   EF_CORNERED,
   EF_GUARD,
   EF_INVULN,
+  EF_CMD,
   EF_MAD,
   EF_STEALTH,
   EF_STUN,
@@ -1155,6 +1156,7 @@ export async function createBossFx(d: BossFxDeps) {
       tint = 0xffe9a0;
       if (boss) mark(id, "inv", pick(T.inv, 1 + (Math.floor(now / 140) % 2)), x, y + 6, 1.7, 0.6, true, 0.7);
     }
+    if (flags & EF_CMD && tint === 0xffffff) tint = 0xffc4b8; // 진군령을 받은 졸개는 붉게 물든다
     if (!boss) return { alpha, tint };
     if (flags & EF_WHIRL) whirls.push({ id, x, y });
     const top = y - 120 * Math.max(0.8, size);
