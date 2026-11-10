@@ -157,8 +157,8 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
     for (const dx of [-420, 420, -880, 880]) {
       const t = new Sprite(tframes[0]!);
       t.anchor.set(0.5, 1);
-      t.scale.set(0.17);
-      t.position.set(HALL.cx + dx, Y0 + 2);
+      t.scale.set(0.15);
+      t.position.set(HALL.cx + dx, Y0 - 18); // 벽 면 가운데쯤에 걸린다
       t.zIndex = Z + 4;
       wallDeco.push(t);
       torchSprites.push(t);
@@ -167,13 +167,13 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
     extra.push(base, tile, deco, ...wl, ...wallDeco);
     torchFrames = tframes;
     torches.length = 0; // 그림 횃불을 쓰면 임시 불빛은 그 네 자리에만 남긴다
-    for (const dx of [-420, 420, -880, 880]) torches.push([HALL.cx + dx, Y0 + 40]);
+    for (const dx of [-420, 420, -880, 880]) torches.push([HALL.cx + dx, Y0 - 75]);
     glow.zIndex = Z + 4;
     // 옥좌: 군주 뒤(북쪽). 군주보다 아래에 그린다
     const th = new Sprite(throneT);
     th.anchor.set(0.5, 1);
-    th.scale.set(0.8);
-    th.position.set(HALL.cx, Y0 + 330);
+    th.scale.set(0.48);
+    th.position.set(HALL.cx, Y0 + 370); // 정면 그림: 카펫이 단 가운데 계단으로 이어지고, 군주는 단 위 가운데에 선다
     th.zIndex = Y0 + 100;
     objLayer.addChild(th);
     extra.push(th);
