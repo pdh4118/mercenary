@@ -2362,7 +2362,19 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "boss": "군주",
   "skill": "기본",
   "label": "집결령: 방어선 중심이 성문에서 남쪽으로 떨",
-  "hint": "집결령: 방어선 중심이 성문에서 남쪽으로 떨어진 거리(px)"
+  "hint": "집결령: 방어선 중심이 성문에서 남쪽으로 떨어진 거리(px). 성문 바로 앞에 친다"
+ },
+ "BOSS_LORD.cmdRallyAssault": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "집결령: 성문에서 이 거리 안의 플레이어를 ",
+  "hint": "집결령: 성문에서 이 거리 안의 플레이어를 '성문을 공략 중'으로 보고, 그 뒤쪽(성 반대편)에 방어선을 쳐서 등 뒤를 잡는다"
+ },
+ "BOSS_LORD.cmdRallyBehind": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "집결령: 성문을 공략 중인 가장 먼 플레이어",
+  "hint": "집결령: 성문을 공략 중인 가장 먼 플레이어에서 이만큼 뒤(남쪽)에 선다"
  },
  "BOSS_LORD.cmdRallyRow": {
   "boss": "군주",

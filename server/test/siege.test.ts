@@ -277,6 +277,39 @@ test("공성전: 집결령은 졸개를 성문 앞 방어선으로 모으고(앞
   assert.equal((g as any).commandSquadCount(), 0);
 });
 
+test("공성전: 성문을 공략 중인 플레이어가 있으면 집결령은 그 뒤(성 반대편)에 북쪽을 보고 서서 따라가며 등을 잡는다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  p.x = 0;
+  p.y = GATE_Y + 300;
+  g.spawnSiegeWave(30);
+  const n = (g as any).commandTroops(3);
+  assert.ok(n >= 6);
+  const mem: any[] = [...(g as any).enemies.values()].filter((e) => e.cmd);
+  const sq = (g as any).squads.get(mem[0].squad);
+  assert.equal(sq.behind, true, "등 뒤 모드");
+  assert.ok(Math.abs(sq.a.heading + Math.PI / 2) < 1e-9, "북쪽(성문 쪽)을 본다");
+  assert.ok(Math.abs(sq.a.y - (p.y + BOSS_LORD.cmdRallyBehind)) < 1, "플레이어보다 뒤(남쪽)");
+  // 앞줄(검방병)이 플레이어에게 더 가깝고 궁병은 더 뒤
+  const worldY = (e: any) => sq.a.y - e.slotF; // 북쪽을 볼 때 앞(+)이 북쪽(-y)
+  const sh = mem.filter((e) => e.type === 3);
+  const ar = mem.filter((e) => e.type === 2);
+  if (sh.length && ar.length) assert.ok(sh.reduce((t, e) => t + worldY(e), 0) / sh.length < ar.reduce((t, e) => t + worldY(e), 0) / ar.length, "검방병이 플레이어 쪽 앞줄");
+  // 플레이어가 움직이면 따라간다
+  p.x = 200;
+  p.y = GATE_Y + 420;
+  for (let i = 0; i < TICK_RATE * 4; i++) {
+    g.step();
+    p.hp = p.maxHp;
+    p.x = 200;
+    p.y = GATE_Y + 420;
+  }
+  assert.ok(Math.abs(sq.a.y - (GATE_Y + 420 + BOSS_LORD.cmdRallyBehind)) < 40, `방어선이 플레이어를 따라 내려왔다 ${sq.a.y.toFixed(0)}`);
+  assert.ok(sq.a.x > 100, "옆으로도 따라간다");
+  (g as any).endCommand();
+});
+
 test("공성전: 포위령은 졸개를 플레이어 둘레의 호(깃발병 포함)로 나눠 세우고, 갖춰진 뒤 반지름을 좁힌다", () => {
   const { g, a } = setup(0);
   const p = g.getPlayer(a)!;

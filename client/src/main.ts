@@ -2533,8 +2533,8 @@ async function main() {
       edictText.visible = !!ed;
       if (ed) {
         const name = ed.rule === 2 ? "포위령" : ed.rule === 3 ? "집결령" : "진군령";
-        const what = ed.rule === 2 ? "졸개가 퇴로를 막고 조여 온다" : ed.rule === 3 ? "졸개가 성문 앞에 방어선을 친다" : "군주가 졸개에게 진군을 명한다";
-        const doing = ed.rule === 2 ? "졸개가 퇴로를 막고 조여 오는 중" : ed.rule === 3 ? "졸개가 성문 앞 방어선을 지키는 중" : "졸개가 대열을 갖춰 전진 중";
+        const what = ed.rule === 2 ? "졸개가 퇴로를 막고 조여 온다" : ed.rule === 3 ? "졸개가 성문 쪽으로 집결한다" : "군주가 졸개에게 진군을 명한다";
+        const doing = ed.rule === 2 ? "졸개가 퇴로를 막고 조여 오는 중" : ed.rule === 3 ? "졸개가 성문 쪽 방어선을 지키는 중" : "졸개가 대열을 갖춰 전진 중";
         edictText.text = ed.grace ? `${name}!  ${what}\n곧 졸개가 대열을 갖춥니다` : `${doing}  ${Math.ceil(ed.left)}초\n깃발병을 쓰러뜨리면 그 대열이 무너진다`;
         edictText.style.fill = ed.grace ? 0xffe08a : 0xff6a5a;
         edictText.scale.set(1 + (ed.grace ? 0.04 * Math.sin(performance.now() / 90) : 0));

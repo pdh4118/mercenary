@@ -793,7 +793,7 @@ export class Game {
   private stageTime = 0; // 이번 스테이지에서 흐른 성장 시간(적 생성량 계산용)
   status: GameStatus = "playing";
   private armyTotal = 0;
-  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean; kind?: number; age?: number; ringR0?: number; engageR?: number; engaged?: boolean }>(); // kind: 진군령 1·포위령 2·집결령 3, cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
+  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean; kind?: number; age?: number; ringR0?: number; engageR?: number; engaged?: boolean; behind?: boolean }>(); // kind: 진군령 1·포위령 2·집결령 3, cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
   private nextSquadId = 1;
   private squadTimer = SQUAD_FIRST;
 
@@ -2217,7 +2217,9 @@ export class Game {
     for (const sq of this.squads.values()) {
       if (!sq.cmd) this.marchArmy(sq.a, dt, SQUAD_MARCH_MULT);
       else if (sq.kind === 2) this.stepRing(sq, dt);
-      else if (sq.kind !== 3) this.marchArmy(sq.a, dt, BOSS_LORD.cmdMarch / ARMY_MARCH_SPEED); // 진군령은 행군, 집결령은 제자리를 지킨다
+      else if (sq.kind === 3) {
+        if (sq.behind) this.stepRallyFollow(sq, dt); // 성문을 공략 중인 플레이어의 뒤를 따라간다
+      } else this.marchArmy(sq.a, dt, BOSS_LORD.cmdMarch / ARMY_MARCH_SPEED); // 진군령은 행군, 집결령은 제자리를 지킨다
     }
     if (!this.autoSpawn || this.phase !== "grow") return;
     this.squadTimer -= dt;
@@ -2374,9 +2376,12 @@ export class Game {
   /** 집결령: 성문 앞 방어선. 앞에서부터 검방병 → 창병 → 둔기병 → 궁병 줄을 서고, 기병은 양 끝을 지킨다. 한 대열이고 깃발병은 맨 앞줄 가운데다. */
   private commandRally(list: Enemy[]): number {
     const C = BOSS_LORD;
-    const a: Army = { x: GATE_X, y: GATE_Y + C.cmdRallyY, heading: Math.PI / 2 }; // 남쪽(필드 쪽)을 바라본다
+    // 성문을 공략 중인 플레이어가 있으면 그 뒤(성 반대편)에 북쪽을 보고 서서 등 뒤를 잡고, 없으면 성문 바로 앞에 남쪽을 보고 방어선을 친다
+    const assault = this.presentPlayers().filter((s) => Math.hypot(s.state.x - GATE_X, s.state.y - GATE_Y) <= C.cmdRallyAssault);
+    const behind = assault.length > 0;
+    const a: Army = behind ? this.rallyBehindRef(assault.map((s) => s.state)) : { x: GATE_X, y: GATE_Y + C.cmdRallyY, heading: Math.PI / 2 };
     const id = this.nextSquadId++;
-    this.squads.set(id, { a, left: list.length, size: list.length, cmd: true, kind: 3, age: 0 });
+    this.squads.set(id, { a, left: list.length, size: list.length, cmd: true, kind: 3, age: 0, behind });
     const rows: [number, number][] = [[SHIELD, 60], [SPEAR, 22], [BLUNT, -16], [ARCHER, -56]]; // [병종, 앞뒤 위치(앞이 +)]
     let total = 0;
     let widest = 0;
@@ -2401,6 +2406,28 @@ export class Game {
     const front = list.filter((e) => e.type === SHIELD && e.cmd).sort((p, q) => Math.abs(p.slotL) - Math.abs(q.slotL))[0] ?? list.find((e) => e.cmd);
     if (front) front.flag = true;
     return total;
+  }
+
+  /** 집결령(등 뒤 모드)의 기준점: 성문을 공략 중인 플레이어들의 가운데에서 가장 먼 플레이어보다 cmdRallyBehind만큼 뒤(남쪽), 북쪽을 바라본다 */
+  private rallyBehindRef(ps: PlayerState[]): Army {
+    let cx = 0;
+    let maxY = -Infinity;
+    for (const p of ps) {
+      cx += p.x;
+      maxY = Math.max(maxY, p.y);
+    }
+    cx /= ps.length;
+    return { x: Math.max(GATE_X - 500, Math.min(GATE_X + 500, cx)), y: maxY + BOSS_LORD.cmdRallyBehind, heading: -Math.PI / 2 };
+  }
+
+  /** 집결령(등 뒤 모드): 성문을 공략하는 플레이어를 따라 방어선이 움직인다 */
+  private stepRallyFollow(sq: { a: Army }, dt: number): void {
+    const ps = this.presentPlayers().filter((s) => Math.hypot(s.state.x - GATE_X, s.state.y - GATE_Y) <= BOSS_LORD.cmdRallyAssault + 250).map((s) => s.state);
+    if (ps.length === 0) return;
+    const t = this.rallyBehindRef(ps);
+    const k = Math.min(1, dt * 1.2);
+    sq.a.x += (t.x - sq.a.x) * k;
+    sq.a.y += (t.y - sq.a.y) * k;
   }
 
   /**
