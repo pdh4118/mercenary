@@ -666,10 +666,13 @@ export const BOSS_LORD = {
   cmdRallyRow: 14, // 집결령: 방어선 한 줄에 서는 최대 인원
   cmdRallyReduce: 0.35, // 집결령 대열의 피해 감소(방어선이라 진군령보다 단단하다)
   cmdRallyAtk: 0.1,
-  cmdSiegeSec: 11, // 포위령: 둘러싸서 조여 오는 전체 시간
-  cmdSiegeForm: 5, // 포위령: 포위망이 갖춰지는 시간(그동안은 넓게 둘러싼다)
-  cmdRingR: 520, // 포위령: 처음 포위 반지름(px)
-  cmdRingMin: 190, // 포위령: 가장 좁게 조일 때의 반지름
+  cmdSiegeSec: 17, // 포위령: 둘러싸서 조여 오는 전체 시간(초)
+  cmdSiegeForm: 6, // 포위령: 포위망이 갖춰지는 시간(그동안은 멀리서 퇴로를 막으며 자리를 잡는다)
+  cmdRingR: 1300, // 포위령: 처음 포위 반지름의 상한(px). 실제로는 졸개들이 서 있는 거리(중앙값)에서 시작한다
+  cmdRingRMin: 600, // 포위령: 처음 포위 반지름의 하한
+  cmdRetreatShare: 0.65, // 포위령: 졸개 중 퇴로 쪽(성 반대편)을 막는 비율
+  cmdRetreatArc: 100, // 포위령: 퇴로 쪽으로 보는 각도(양쪽 몇 도까지)
+  cmdRingMin: 170, // 포위령: 가장 좁게 조일 때의 반지름
   cmdRingOut: 70, // 포위령: 궁병은 근접 졸개보다 이만큼 바깥에서 쏜다
   cmdSiegeReduce: 0, // 포위령 대열의 피해 감소(포위망은 얇아서 단단하지 않다)
   cmdSiegeAtk: 0.3, // 포위령 대열의 공격 강화

@@ -291,10 +291,17 @@ test("공성전: 포위령은 졸개를 플레이어 둘레의 호(깃발병 포
   assert.ok(ids.size >= 2 && ids.size <= 4, `호 ${ids.size}개`);
   for (const id of ids) assert.equal(mem.filter((e) => e.squad === id && e.flag).length, 1, "호마다 깃발병 하나");
   const radius = (e: any) => Math.hypot(e.slotF, e.slotL);
+  const sq0 = (g as any).squads.get([...ids][0]);
+  const r0 = sq0.ringR0 as number;
+  assert.ok(r0 >= BOSS_LORD.cmdRingRMin && r0 <= BOSS_LORD.cmdRingR, `처음 반지름 ${r0.toFixed(0)}(멀리서 시작)`);
   const melee = mem.find((e) => e.type !== 2)!;
-  assert.ok(Math.abs(radius(melee) - BOSS_LORD.cmdRingR) < 1, "처음에는 넓게 둘러싼다");
+  assert.ok(Math.abs(radius(melee) - r0) < 1, "처음에는 멀리 둘러싼다");
   const arch = mem.find((e) => e.type === 2);
-  if (arch) assert.ok(Math.abs(radius(arch) - (BOSS_LORD.cmdRingR + BOSS_LORD.cmdRingOut)) < 1, "궁병은 바깥에서");
+  if (arch) assert.ok(Math.abs(radius(arch) - (r0 + BOSS_LORD.cmdRingOut)) < 1, "궁병은 바깥에서");
+  // 퇴로 쪽(성 반대편 ±100도)에 졸개가 더 많이 선다
+  const away = Math.atan2(p.y - GATE_Y, p.x - GATE_X);
+  const inRetreat = mem.filter((e) => Math.abs(Math.atan2(Math.sin(e.ringAng - away), Math.cos(e.ringAng - away))) <= (BOSS_LORD.cmdRetreatArc * Math.PI) / 180 + 1e-6).length;
+  assert.ok(inRetreat >= mem.length * (BOSS_LORD.cmdRetreatShare - 0.1), `퇴로 쪽 졸개 ${inRetreat}/${mem.length}`);
   // 시간이 지나면 조여 든다
   for (let i = 0; i < TICK_RATE * (BOSS_LORD.cmdSiegeSec + 1); i++) {
     g.step();
@@ -303,7 +310,7 @@ test("공성전: 포위령은 졸개를 플레이어 둘레의 호(깃발병 포
   const still: any[] = [...(g as any).enemies.values()].filter((e) => e.cmd && e.ringAng !== undefined);
   if (still.length) {
     const m2 = still.find((e) => e.type !== 2);
-    if (m2) assert.ok(radius(m2) < BOSS_LORD.cmdRingR - 100, `반지름이 줄었다 ${radius(m2).toFixed(0)}`);
+    if (m2) assert.ok(radius(m2) < r0 - 100, `반지름이 줄었다 ${radius(m2).toFixed(0)}`);
   }
   (g as any).endCommand();
 });

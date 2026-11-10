@@ -792,7 +792,7 @@ export class Game {
   private stageTime = 0; // 이번 스테이지에서 흐른 성장 시간(적 생성량 계산용)
   status: GameStatus = "playing";
   private armyTotal = 0;
-  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean; kind?: number; age?: number }>(); // kind: 진군령 1·포위령 2·집결령 3, cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
+  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean; kind?: number; age?: number; ringR0?: number }>(); // kind: 진군령 1·포위령 2·집결령 3, cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
   private nextSquadId = 1;
   private squadTimer = SQUAD_FIRST;
 
@@ -2401,8 +2401,12 @@ export class Game {
     return total;
   }
 
-  /** 포위령: 졸개를 플레이어 둘레의 방향 순서대로 늘어세워 호(2~4개)로 나누고, 호마다 깃발병을 둔다. 자리는 매 틱 stepRing이 갱신한다. */
+  /**
+   * 포위령: 졸개가 멀리서부터 플레이어를 빙 둘러싸고(퇴로 쪽 = 성 반대편에 더 많이 서서 길을 막는다) 점점 조여 온다.
+   * 졸개를 방향 순서대로 늘어세워 호(2~4개)로 나누고 호마다 깃발병을 둔다. 자리는 매 틱 stepRing이 갱신한다.
+   */
   private commandSiege(list: Enemy[]): number {
+    const C = BOSS_LORD;
     const present = this.presentPlayers();
     if (present.length === 0) return 0;
     let cx = 0;
@@ -2413,24 +2417,38 @@ export class Game {
     }
     cx /= present.length;
     cy /= present.length;
-    const sorted = [...list].sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+    // 퇴로 방향: 성에서 플레이어 쪽으로 이어진 방향(성에서 멀어지는 쪽). 성 근처면 남쪽
+    const away = Math.hypot(cx - GATE_X, cy - GATE_Y) > 60 ? Math.atan2(cy - GATE_Y, cx - GATE_X) : Math.PI / 2;
+    // 퇴로 방향을 기준으로 한 방위(−π~π) 순서로 세운다
+    const rel = (e: Enemy) => angleDiff(Math.atan2(e.y - cy, e.x - cx), away);
+    const sorted = [...list].sort((p, q) => rel(p) - rel(q));
     const n = sorted.length;
+    // 처음 반지름: 졸개들이 서 있는 거리(중앙값)에서 시작해 멀리서 조여 온다
+    const dists = sorted.map((e) => Math.hypot(e.x - cx, e.y - cy)).sort((p, q) => p - q);
+    const r0 = Math.max(C.cmdRingRMin, Math.min(C.cmdRingR, dists[Math.floor(n / 2)] ?? C.cmdRingRMin));
     const arcs = Math.max(2, Math.min(4, Math.ceil(n / 10)));
     const ids: number[] = [];
     for (let k = 0; k < arcs; k++) {
       const id = this.nextSquadId++;
       ids.push(id);
-      this.squads.set(id, { a: { x: cx, y: cy, heading: 0 }, left: 0, size: 0, cmd: true, kind: 2, age: 0 });
+      this.squads.set(id, { a: { x: cx, y: cy, heading: 0 }, left: 0, size: 0, cmd: true, kind: 2, age: 0, ringR0: r0 });
     }
-    const start = Math.atan2(sorted[0]!.y - cy, sorted[0]!.x - cx);
+    // 각도 배분: 퇴로 쪽(±cmdRetreatArc°)에 cmdRetreatShare 비율의 졸개를 촘촘히, 나머지는 성 쪽에 듬성듬성
+    const half = (C.cmdRetreatArc * Math.PI) / 180;
+    const mid = Math.round(n * C.cmdRetreatShare);
+    const side = Math.floor((n - mid) / 2);
     sorted.forEach((e, i) => {
+      let ang: number;
+      if (i < side) ang = -Math.PI + (i / Math.max(1, side)) * (Math.PI - half);
+      else if (i < side + mid) ang = -half + ((i - side) / Math.max(1, mid)) * 2 * half;
+      else ang = half + ((i - side - mid) / Math.max(1, n - side - mid)) * (Math.PI - half);
       const arc = Math.min(arcs - 1, Math.floor((i / n) * arcs));
       const sq = this.squads.get(ids[arc]!)!;
       sq.left++;
       sq.size++;
       this.joinCommand(e, ids[arc]!, 2, 0, 0);
-      e.ringAng = start + (i / n) * Math.PI * 2;
-      e.ringOut = e.type === ARCHER ? BOSS_LORD.cmdRingOut : 0;
+      e.ringAng = away + ang;
+      e.ringOut = e.type === ARCHER ? C.cmdRingOut : 0;
     });
     // 호마다 가운데 근처의 근접 졸개 한 명이 깃발을 든다
     for (const id of ids) {
@@ -2442,8 +2460,8 @@ export class Game {
     return n;
   }
 
-  /** 포위령 한 호의 자리를 갱신한다: 포위 중심이 플레이어 무리를 따라가고, 갖춰진 뒤에는 반지름이 줄어든다. */
-  private stepRing(sq: { a: Army; age?: number }, dt: number): void {
+  /** 포위령 한 호의 자리를 갱신한다: 포위 중심이 플레이어 무리를 따라가고, 자리를 잡은 뒤에는 반지름이 줄어든다. */
+  private stepRing(sq: { a: Army; age?: number; ringR0?: number }, dt: number): void {
     const C = BOSS_LORD;
     sq.age = (sq.age ?? 0) + dt;
     const present = this.presentPlayers();
@@ -2461,7 +2479,8 @@ export class Game {
       sq.a.y += (cy - sq.a.y) * k;
     }
     const closing = Math.max(0, sq.age - C.cmdSiegeForm) / Math.max(0.1, C.cmdSiegeSec - C.cmdSiegeForm);
-    const r = C.cmdRingR + (C.cmdRingMin - C.cmdRingR) * Math.min(1, closing);
+    const r0 = sq.ringR0 ?? C.cmdRingR;
+    const r = r0 + (C.cmdRingMin - r0) * Math.min(1, closing);
     for (const e of this.enemies.values()) {
       if (!e.cmd || e.ringAng === undefined || !e.squad || this.squads.get(e.squad)?.a !== sq.a) continue;
       const rr = r + (e.ringOut ?? 0);

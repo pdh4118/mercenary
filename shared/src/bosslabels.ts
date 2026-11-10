@@ -2368,19 +2368,37 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "boss": "군주",
   "skill": "기본",
   "label": "지속 시간(초)",
-  "hint": "포위령: 둘러싸서 조여 오는 전체 시간"
+  "hint": "포위령: 둘러싸서 조여 오는 전체 시간(초)"
  },
  "BOSS_LORD.cmdSiegeForm": {
   "boss": "군주",
   "skill": "기본",
   "label": "포위령: 포위망이 갖춰지는 시간",
-  "hint": "포위령: 포위망이 갖춰지는 시간(그동안은 넓게 둘러싼다)"
+  "hint": "포위령: 포위망이 갖춰지는 시간(그동안은 멀리서 퇴로를 막으며 자리를 잡는다)"
  },
  "BOSS_LORD.cmdRingR": {
   "boss": "군주",
   "skill": "기본",
-  "label": "포위령: 처음 포위 반지름",
-  "hint": "포위령: 처음 포위 반지름(px)"
+  "label": "포위령: 처음 포위 반지름의 상한",
+  "hint": "포위령: 처음 포위 반지름의 상한(px). 실제로는 졸개들이 서 있는 거리(중앙값)에서 시작한다"
+ },
+ "BOSS_LORD.cmdRingRMin": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "최소",
+  "hint": "포위령: 처음 포위 반지름의 하한"
+ },
+ "BOSS_LORD.cmdRetreatShare": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "포위령: 졸개 중 퇴로 쪽",
+  "hint": "포위령: 졸개 중 퇴로 쪽(성 반대편)을 막는 비율"
+ },
+ "BOSS_LORD.cmdRetreatArc": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "포위령: 퇴로 쪽으로 보는 각도",
+  "hint": "포위령: 퇴로 쪽으로 보는 각도(양쪽 몇 도까지)"
  },
  "BOSS_LORD.cmdRingMin": {
   "boss": "군주",
