@@ -289,6 +289,13 @@ async function main() {
   // 여성 주인공 그림(없으면 기본 그림으로 대신한다)
   const heroTexF = await Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_f_${f}.png`).catch(() => null)));
   const tentTex = await Promise.all([0, 1].map((i) => Assets.load<Texture>(`assets/camp/tent_${i}.png`).catch(() => null)));
+  // 철퇴 충격파 자세: 힘 모으는 동안 철퇴를 머리 위로 쳐든 모습(raised), 찍는 순간(slam). 그림은 2배 해상도라 절반 크기로 그린다.
+  // 값은 그림을 기존 주인공과 같은 몸 크기로 맞출 때 계산한 기준점(ax, ay). 없으면 기존 그림을 그대로 쓴다.
+  const HERO_POSE_META = {"hero_f_mace_slam": {"ax": 0.4502, "ay": 0.58}, "hero_f_mace_raised": {"ax": 0.5514, "ay": 0.6329}, "hero_mace_slam": {"ax": 0.7171, "ay": 0.6236}, "hero_mace_raised": {"ax": 0.5482, "ay": 0.7037}} as const;
+  const heroPoseTex = Object.fromEntries(
+    await Promise.all(Object.keys(HERO_POSE_META).map(async (n) => [n, await Assets.load<Texture>(`assets/hero/${n}.png`).catch(() => null)] as const)),
+  ) as Record<keyof typeof HERO_POSE_META, Texture | null>;
+  const slamPoseUntil = new Map<number, number>(); // 충격파를 찍은 직후 찍는 자세를 보여 줄 때까지(ms)
   const [heroTex, campTex, groundTex, allyArrow, enemyArrow] = await Promise.all([
     Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_${f}.png`))),
     Assets.load<Texture>("assets/camp/camp.png"),
@@ -1530,6 +1537,7 @@ async function main() {
             // 철퇴 충격파: 갈라진 땅 자국(오래 남음) 위로 충격파 고리 6컷이 퍼진다
             audio.play("skill_mace_hit", { x, y });
             if (owner === myId) shake(5, 0.2);
+            slamPoseUntil.set(owner, performance.now() + 350);
             const crack = new Sprite(slamCrackTex);
             crack.anchor.set(0.5);
             crack.position.set(x, y);
@@ -2939,9 +2947,27 @@ async function main() {
       const ghostA = Math.max(p.id === myId ? 0.3 : 0.05, (p.alpha ?? 100) / 100);
       v.node.alpha = dead ? 0.4 : sitsOut(p.id, true) ? SPECTATOR_ALPHA : ghostA < 1 ? ghostA : p.invuln > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 90)) : 1;
       // 들고 있는 무기에 맞는 모습으로 바꾸고, 조준한 쪽을 바라보게 좌우 반전한다
-      const tex = (p.lk === 1 ? heroTexF[p.weapon] : null) ?? heroTex[p.weapon] ?? heroTex[0]!;
+      let tex = (p.lk === 1 ? heroTexF[p.weapon] : null) ?? heroTex[p.weapon] ?? heroTex[0]!;
+      let poseScale = 1;
+      let anchorX = 0.5;
+      let anchorY = SPRITE_ANCHOR_Y;
+      if (WEAPONS[p.weapon]?.type === BLUNT_TYPE && !dead) {
+        // 철퇴 충격파: 모으는 동안 머리 위로 쳐들고, 찍은 직후 잠깐 내려찍는 자세
+        const pose = (p.sm ?? 0) > 0 ? "raised" : (slamPoseUntil.get(p.id) ?? 0) > performance.now() ? "slam" : null;
+        if (pose) {
+          const key = `hero_${p.lk === 1 ? "f_" : ""}mace_${pose}` as keyof typeof HERO_POSE_META;
+          const pt = heroPoseTex[key];
+          if (pt) {
+            tex = pt;
+            poseScale = 0.5;
+            anchorX = HERO_POSE_META[key].ax;
+            anchorY = HERO_POSE_META[key].ay;
+          }
+        }
+      }
       if (v.sprite.texture !== tex) v.sprite.texture = tex;
-      v.sprite.scale.set(HERO_SCALE * (Math.cos(p.aim) >= 0 ? 1 : -1), HERO_SCALE);
+      v.sprite.anchor.set(anchorX, anchorY);
+      v.sprite.scale.set(HERO_SCALE * poseScale * (Math.cos(p.aim) >= 0 ? 1 : -1), HERO_SCALE * poseScale);
       setPoison(v.sprite, !!p.poisoned);
       drawBar(v.bar, p.hp, p.maxHp, 36, HERO_TOP - 6);
       if (dead) {
