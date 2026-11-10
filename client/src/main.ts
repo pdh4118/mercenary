@@ -301,6 +301,11 @@ async function main() {
   // 철퇴 투척: 날아가는 철퇴, 궤적 3컷, 적중 충격 4컷(없으면 도형·고리로 대신한다)
   const maceThrownTex = await Assets.load<Texture>("assets/fx/skill_mace_thrown.png").catch(() => null);
   const maceTrailTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_trail_${i}.png`).catch(() => null)));
+  // 철퇴 충격파: 힘 모으기 룬 원 6컷, 땅을 찍는 충격파 6컷, 갈라진 땅 자국, 급여 금화 아이콘. 없으면 도형으로 대신한다.
+  const slamChargeTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_slam_charge_${i}.png`).catch(() => null)));
+  const slamWaveTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_slam_wave_${i}.png`).catch(() => null)));
+  const slamCrackTex = await Assets.load<Texture>("assets/fx/skill_slam_crack.png").catch(() => null);
+  const coinTex = await Assets.load<Texture>("assets/fx/icon_gold_coin.png").catch(() => null);
   const maceHitTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_hit_${i}.png`).catch(() => null)));
   // 기마 가속 속도 이펙트(바람 궤적 6컷 반복). 없으면 이펙트 없이 달린다.
   const boostTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_boost_${i}.png`).catch(() => null)));
@@ -1289,6 +1294,9 @@ async function main() {
   };
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
+  const slamFx: { sp: Sprite; age: number; r: number; kind: 0 | 1 }[] = []; // 충격파(0)·갈라진 자국(1)
+  const slamChargeSeen = new Set<number>(); // 이번 프레임에 모으는 중이던 주인공
+  const slamCharges = new Map<number, Sprite>(); // 힘을 모으는 중인 주인공별 룬 원
   const maceHits: { sp: Sprite; age: number; r: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean; t0: number }[]>(); // 방벽 번호 -> 수정 조각들
   const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
@@ -1518,6 +1526,23 @@ async function main() {
           else if (kind === EVT_METEOR) {
             blasts.push({ x, y, r: val || 140, age: 0, boom: null, scorch: null, friendly: owner > 0, hero: owner > 0 && ang === 2, boss: owner === 0 && ang === 1 });
           }
+          else if (kind === EVT_SKILL && val >= 10 && slamWaveTex.every((t) => t !== null) && slamCrackTex) {
+            // 철퇴 충격파: 갈라진 땅 자국(오래 남음) 위로 충격파 고리 6컷이 퍼진다
+            audio.play("skill_mace_hit", { x, y });
+            if (owner === myId) shake(5, 0.2);
+            const crack = new Sprite(slamCrackTex);
+            crack.anchor.set(0.5);
+            crack.position.set(x, y);
+            crack.width = (val * 2) / 0.9;
+            crack.height = (crack.width * slamCrackTex.height) / slamCrackTex.width;
+            groundFx.addChild(crack);
+            slamFx.push({ sp: crack, age: 0, r: val, kind: 1 });
+            const wave = new Sprite(slamWaveTex[0]!);
+            wave.anchor.set(0.5);
+            wave.position.set(x, y);
+            groundFx.addChild(wave);
+            slamFx.push({ sp: wave, age: 0, r: val, kind: 0 });
+          }
           else if (kind === EVT_SKILL && val >= 10 && maceHitTex.every((t) => t !== null)) {
             // 던진 철퇴가 적에게 닿음: 갈라진 땅과 흙먼지 4컷(지름 약 반경 x 2.3)
             audio.play("skill_mace_hit", { x, y });
@@ -1601,7 +1626,14 @@ async function main() {
             const node = spawnFloat(label, x, y - 52, { fill: paid ? 0xffd45d : 0xff6a5a, fontSize: owner === myId ? 22 : 17, fontWeight: "900", stroke: { color: 0x3a2a00, width: 5 } }, 1.5, 0.3);
             if (node) {
               const r = owner === myId ? 11 : 9;
-              const coin = new Graphics().circle(0, 0, r).fill(0xffd45d).stroke({ width: 2, color: 0xa87400 }).circle(0, 0, r * 0.55).stroke({ width: 1.5, color: 0xe0a020 });
+              let coin: Container;
+              if (coinTex) {
+                const cs = new Sprite(coinTex);
+                cs.anchor.set(0.5);
+                cs.width = r * 2.2;
+                cs.height = (cs.width * coinTex.height) / coinTex.width;
+                coin = cs;
+              } else coin = new Graphics().circle(0, 0, r).fill(0xffd45d).stroke({ width: 2, color: 0xa87400 }).circle(0, 0, r * 0.55).stroke({ width: 1.5, color: 0xe0a020 });
               coin.position.set(-node.width / 2 - r - 3, -node.height / 2);
               node.addChild(coin);
             }
@@ -2953,6 +2985,13 @@ async function main() {
       }
     });
 
+    // 철퇴 충격파를 더 이상 모으지 않는 주인공의 룬 원을 치운다(지난 프레임에 보이지 않은 것)
+    for (const [pid, sp] of [...slamCharges]) {
+      if (slamChargeSeen.has(pid)) continue;
+      sp.destroy();
+      slamCharges.delete(pid);
+    }
+    slamChargeSeen.clear();
     // 공격 예고
     fxLayer.clear();
     // 토너먼트 경기장
@@ -3226,6 +3265,28 @@ async function main() {
       if (g.age >= DASH_GHOST_LIFE) {
         g.sp.destroy();
         dashGhosts.splice(i, 1);
+      }
+    }
+    // 철퇴 충격파: 고리 6컷(0.5초)과 갈라진 자국(1.6초 동안 서서히 사라짐)
+    for (let i = slamFx.length - 1; i >= 0; i--) {
+      const f = slamFx[i]!;
+      f.age += ticker.deltaMS / 1000;
+      if (f.kind === 0) {
+        const t = slamWaveTex[Math.min(5, Math.floor(f.age / 0.085))]!;
+        f.sp.texture = t;
+        f.sp.width = f.r * 2.5;
+        f.sp.height = (f.sp.width * t.height) / t.width;
+        f.sp.alpha = 1;
+        if (f.age >= 0.52) {
+          f.sp.destroy();
+          slamFx.splice(i, 1);
+        }
+      } else {
+        f.sp.alpha = f.age < 0.5 ? 1 : Math.max(0, 1 - (f.age - 0.5) / 1.1);
+        if (f.age >= 1.6) {
+          f.sp.destroy();
+          slamFx.splice(i, 1);
+        }
       }
     }
     // 던진 철퇴 충격: 4컷을 0.4초 동안 재생하고 마지막에 서서히 사라진다
@@ -3529,17 +3590,33 @@ async function main() {
       const reachNow = p.hs?.[2] || w.reach; // 사거리·범위 카드가 반영된 값(철퇴는 범위가 사거리로 간다)
       const arcNow = meleeArc(w.type, w.arc, p.hs?.[6] || 1);
       if (v && (p.sm ?? 0) > 0 && !p.down) {
-        // 철퇴 충격파 모으기: 찍을 범위가 점점 진하게 차오르고, 다 모이면 터진다
+        // 철퇴 충격파 모으기: 찍을 범위(바깥 고리)와 룬 원이 점점 밝아지고, 다 모이면 터진다
         const R = p.smR ?? 190;
         const prog = Math.max(0, Math.min(1, 1 - (p.sm ?? 0) / (p.smMax || 1)));
         const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 60);
-        fxLayer
-          .circle(v.x, v.y, R)
-          .stroke({ width: 3, color: 0xffc27a, alpha: 0.55 + 0.25 * pulse })
-          .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
-          .fill({ color: 0xff9a3c, alpha: 0.1 + 0.28 * prog })
-          .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
-          .stroke({ width: 2, color: 0xffe6b0, alpha: 0.7 });
+        fxLayer.circle(v.x, v.y, R).stroke({ width: 3, color: 0xffc27a, alpha: 0.5 + 0.25 * pulse });
+        if (slamChargeTex.every((t) => t !== null)) {
+          let sp = slamCharges.get(p.id);
+          if (!sp) {
+            sp = new Sprite(slamChargeTex[0]!);
+            sp.anchor.set(0.5);
+            groundFx.addChild(sp);
+            slamCharges.set(p.id, sp);
+          }
+          const t = slamChargeTex[Math.min(4, Math.floor(prog * 5))]!; // 점점 밝은 컷(마지막 컷은 사라지는 컷이라 쓰지 않는다)
+          sp.texture = t;
+          sp.position.set(v.x, v.y);
+          sp.width = R * 2.25;
+          sp.height = (sp.width * t.height) / t.width;
+          sp.alpha = 0.55 + 0.45 * prog;
+          slamChargeSeen.add(p.id);
+        } else {
+          fxLayer
+            .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
+            .fill({ color: 0xff9a3c, alpha: 0.1 + 0.28 * prog })
+            .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
+            .stroke({ width: 2, color: 0xffe6b0, alpha: 0.7 });
+        }
       }
       if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
         // 철퇴 준비 동작: 범위가 점점 진하게 차오른다(맞기 직전까지 피하라는 신호가 아니라 휘두르는 타이밍 표시)
