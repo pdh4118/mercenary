@@ -19,7 +19,7 @@ const TILE = 100;
 export const HALL_OUTER = 760; // 홀 바깥 암벽을 덮는 폭(클라이언트가 이 안의 지형 그림도 숨긴다)
 const OUTER = HALL_OUTER;
 
-export const HALL_TEXTURES = ["boss10_hall_floor", "boss10_hall_wall", "boss10_hall_pillar", "boss10_hall_throne", "boss10_hall_carpet", "boss10_hall_door", "boss10_hall_torch"].map((n) => `assets/fx/${n}.png`);
+export const HALL_TEXTURES = ["boss10_hall_floor", "boss10_hall_wall", "boss10_hall_pillar", "boss10_hall_throne", "boss10_hall_carpet", "boss10_hall_door", "boss10_hall_torch", "boss10_hall_corner"].map((n) => `assets/fx/${n}.png`);
 
 /** floorLayer: 바닥·벽(유닛 아래), objLayer: 옥좌(유닛 아래, 발 위치로 앞뒤), topLayer: 기둥(유닛 위, 뒤에 선 유닛이 있으면 반투명) */
 export function createHall(floorLayer: Container, objLayer: Container, topLayer: Container = objLayer): Hall {
@@ -98,8 +98,8 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
   const texPillars: { sp: Sprite; x: number; y: number }[] = [];
   const torchSprites: Sprite[] = [];
   let torchFrames: Texture[] = [];
-  void Promise.all(HALL_TEXTURES.map((u) => Assets.load<Texture>(u))).then(([floorT, wallT, pillarT, throneT, carpetT, doorT, torchT]) => {
-    if (!alive || !floorT || !wallT || !pillarT || !throneT || !carpetT || !doorT || !torchT) return;
+  void Promise.all(HALL_TEXTURES.map((u) => Assets.load<Texture>(u))).then(([floorT, wallT, pillarT, throneT, carpetT, doorT, torchT, cornerT]) => {
+    if (!alive || !floorT || !wallT || !pillarT || !throneT || !carpetT || !doorT || !torchT || !cornerT) return;
     floor.visible = false;
     for (const c of made) c.visible = false;
     const Z = -1e6;
@@ -140,6 +140,7 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
       mk(ledge, X0, Y0 + H + HALL_WALL, H + HALL_WALL * 2, HALL_WALL, -Math.PI / 2), // 서
       mk(wallT, X0 - HALL_WALL, Y0 - 150 + 6, W + HALL_WALL * 2, 150), // 북(벽돌 면)
     ];
+    for (const cx of [X0 - HALL_WALL, X0 + W]) wl.push(mk(cornerT, cx, Y0 + H, HALL_WALL, HALL_WALL)); // 남쪽 두 모서리: 석재 덮개
     wl[1]!.position.set(X0 + W + HALL_WALL, Y0 - HALL_WALL);
     wl[2]!.position.set(X0 - HALL_WALL, Y0 + H + HALL_WALL);
     // 북쪽 벽: 증원이 들어오는 문 두 개와 횃불 네 개
