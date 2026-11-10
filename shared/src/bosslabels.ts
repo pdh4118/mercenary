@@ -2328,6 +2328,90 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
   "label": "대열 안에 있는 졸개의 공격 강화 비율",
   "hint": "대열 안에 있는 졸개의 공격 강화 비율"
  },
+ "BOSS_LORD.cmdHurry": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "명령받은 졸개가 대열 자리로 서둘러 가는 속",
+  "hint": "명령받은 졸개가 대열 자리로 서둘러 가는 속도 배율(평소 진형 복귀는 1.2배)"
+ },
+ "BOSS_LORD.cmdRallySec": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "지속 시간(초)",
+  "hint": "집결령: 졸개가 성문 앞에서 방어선을 지키는 시간"
+ },
+ "BOSS_LORD.cmdRallyY": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "집결령: 방어선 중심이 성문에서 남쪽으로 떨",
+  "hint": "집결령: 방어선 중심이 성문에서 남쪽으로 떨어진 거리(px)"
+ },
+ "BOSS_LORD.cmdRallyRow": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "집결령: 방어선 한 줄에 서는 최대 인원",
+  "hint": "집결령: 방어선 한 줄에 서는 최대 인원"
+ },
+ "BOSS_LORD.cmdRallyReduce": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "집결령 대열의 피해 감소",
+  "hint": "집결령 대열의 피해 감소(방어선이라 진군령보다 단단하다)"
+ },
+ "BOSS_LORD.cmdRallyAtk": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "cmdRallyAtk",
+  "hint": ""
+ },
+ "BOSS_LORD.cmdSiegeSec": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "지속 시간(초)",
+  "hint": "포위령: 둘러싸서 조여 오는 전체 시간"
+ },
+ "BOSS_LORD.cmdSiegeForm": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "포위령: 포위망이 갖춰지는 시간",
+  "hint": "포위령: 포위망이 갖춰지는 시간(그동안은 넓게 둘러싼다)"
+ },
+ "BOSS_LORD.cmdRingR": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "포위령: 처음 포위 반지름",
+  "hint": "포위령: 처음 포위 반지름(px)"
+ },
+ "BOSS_LORD.cmdRingMin": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "최소",
+  "hint": "포위령: 가장 좁게 조일 때의 반지름"
+ },
+ "BOSS_LORD.cmdRingOut": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "포위령: 궁병은 근접 졸개보다 이만큼 바깥에",
+  "hint": "포위령: 궁병은 근접 졸개보다 이만큼 바깥에서 쏜다"
+ },
+ "BOSS_LORD.cmdSiegeReduce": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "포위령 대열의 피해 감소",
+  "hint": "포위령 대열의 피해 감소(포위망은 얇아서 단단하지 않다)"
+ },
+ "BOSS_LORD.cmdSiegeAtk": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "포위령 대열의 공격 강화",
+  "hint": "포위령 대열의 공격 강화"
+ },
+ "BOSS_LORD.cmdWeightRally": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "집결령이 뽑힐 가중치",
+  "hint": "집결령이 뽑힐 가중치(진군령·포위령은 각 1)"
+ },
  "BOSS_LORD.edictCd": {
   "boss": "군주",
   "skill": "칙령",

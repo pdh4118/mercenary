@@ -660,6 +660,20 @@ export const BOSS_LORD = {
   cmdMarch: 80, // 대열이 전진하는 속도(px/s)
   cmdReduce: 0.25, // 대열 안에 있는 졸개가 받는 피해 감소 비율
   cmdAtk: 0.2, // 대열 안에 있는 졸개의 공격 강화 비율
+  cmdHurry: 2.4, // 명령받은 졸개가 대열 자리로 서둘러 가는 속도 배율(평소 진형 복귀는 1.2배)
+  cmdRallySec: 12, // 집결령: 졸개가 성문 앞에서 방어선을 지키는 시간
+  cmdRallyY: 260, // 집결령: 방어선 중심이 성문에서 남쪽으로 떨어진 거리(px)
+  cmdRallyRow: 14, // 집결령: 방어선 한 줄에 서는 최대 인원
+  cmdRallyReduce: 0.35, // 집결령 대열의 피해 감소(방어선이라 진군령보다 단단하다)
+  cmdRallyAtk: 0.1,
+  cmdSiegeSec: 11, // 포위령: 둘러싸서 조여 오는 전체 시간
+  cmdSiegeForm: 5, // 포위령: 포위망이 갖춰지는 시간(그동안은 넓게 둘러싼다)
+  cmdRingR: 520, // 포위령: 처음 포위 반지름(px)
+  cmdRingMin: 190, // 포위령: 가장 좁게 조일 때의 반지름
+  cmdRingOut: 70, // 포위령: 궁병은 근접 졸개보다 이만큼 바깥에서 쏜다
+  cmdSiegeReduce: 0, // 포위령 대열의 피해 감소(포위망은 얇아서 단단하지 않다)
+  cmdSiegeAtk: 0.3, // 포위령 대열의 공격 강화
+  cmdWeightRally: 1, // 집결령이 뽑힐 가중치(진군령·포위령은 각 1)
   edictCd: 26,
   guardsCd: 30, // 근위대 소집(성문이 부서진 뒤 안마당 단계)
   guardsReduce: 0.2, // 근위대 한 명이 살아 있을 때마다 군주가 받는 피해 감소 비율

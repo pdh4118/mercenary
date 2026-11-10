@@ -147,18 +147,38 @@ const sortie: SkillDef = {
 };
 
 /**
- * 진군령: 군주가 필드의 졸개에게 대열을 갖춰 전진하라고 명한다. 졸개는 가까운 것끼리 대열(깃발병 한 명 포함)을 이루고
- * 정해진 시간 동안 함께 행군한다. 대열 안에서는 받는 피해가 줄고 공격이 강해진다. 대열의 깃발병을 쓰러뜨리면 그 대열이 무너진다.
+ * 칙령: 군주가 필드의 졸개에게 명령을 내린다. 명령을 받은 졸개는 군주의 깃발 아래 대열을 이루고, 대열 안에서는 받는 피해가 줄고 공격이 강해진다.
+ * 대열마다 깃발병이 있고, 깃발병을 쓰러뜨리면 그 대열이 무너진다.
+ *  - 진군령: 졸개가 가까운 것끼리 대열을 갖춰 플레이어를 향해 행군한다.
+ *  - 포위령: 졸개가 플레이어 둘레로 퍼져 포위한 뒤 한꺼번에 조여 온다.
+ *  - 집결령: 졸개가 성문 앞으로 물러나 방어선(방패벽)을 치고 성문을 지킨다(성문이 있을 때만).
  */
+const edictSecOf = (kind: number): number => (kind === 2 ? C.cmdSiegeSec : kind === 3 ? C.cmdRallySec : C.edictSec);
 const edict: SkillDef = {
   id: BSK_EDICT,
   cd: C.edictCd,
   weight: 4,
   can: ({ sys }) => (sys.g as any).commandableCount() >= C.cmdMin,
   begin: (c) => {
-    c.k.t = c.k.total = C.edictGrace + C.edictSec;
+    // 명령 고르기: 성문이 아직 있으면 집결령도 후보다(성문을 노리는 플레이어가 가까울수록 자주)
+    const opts: [number, number][] = [[1, 1], [2, 1]];
+    if (gateAlive(c)) {
+      const near = c.foes.some((f) => Math.hypot(f.x - GATE_X, f.y - GATE_Y) <= 900);
+      opts.push([3, C.cmdWeightRally * (near ? 2 : 1)]);
+    }
+    let r = Math.random() * opts.reduce((t, o) => t + o[1], 0);
+    let kind = 1;
+    for (const [k, w] of opts) {
+      if ((r -= w) <= 0) {
+        kind = k;
+        break;
+      }
+    }
+    const sec = edictSecOf(kind);
+    c.k.d.kind = kind;
+    c.k.t = c.k.total = C.edictGrace + sec;
     c.k.d.issued = 0;
-    c.sys.addHazard({ kind: HZ_EDICT, x: c.e.x, y: c.e.y, a: 1, delay: C.edictGrace, t: C.edictSec, total: C.edictSec, src: c.e.id });
+    c.sys.addHazard({ kind: HZ_EDICT, x: c.e.x, y: c.e.y, a: kind, delay: C.edictGrace, t: sec, total: sec, src: c.e.id });
     c.sys.fx(c.e.x, c.e.y, 0, BFX_RALLY);
   },
   run: (c) => {
@@ -167,7 +187,7 @@ const edict: SkillDef = {
     const grace = k.total - k.t < C.edictGrace;
     if (!grace && !k.d.issued) {
       k.d.issued = 1;
-      const n = g.commandTroops();
+      const n = g.commandTroops(k.d.kind);
       if (n === 0) {
         sys.hazards = sys.hazards.filter((h) => h.kind !== HZ_EDICT);
         sys.end(c);

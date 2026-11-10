@@ -493,6 +493,10 @@ export interface Enemy extends Fighter {
   ghost?: Ghost; // 은신(투명화) 상태: 투명도가 절반 이하면 어그로가 풀린다
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
+  cmdAtk?: number; // 진군령 계열 명령으로 곱해 둔 공격 강화(풀 때 이만큼 나눈다)
+  cmdRed?: number; // 같은 명령의 받는 피해 감소 비율
+  ringAng?: number; // 포위령: 포위망에서 서는 각도
+  ringOut?: number; // 포위령: 이 졸개가 서는 바깥쪽 추가 거리(궁병)
   cmd?: boolean; // 군주의 진군령을 받아 대열을 갖춰 전진 중(피해 감소·공격 강화)
   flag?: boolean; // 그 대열의 깃발병(쓰러지면 대열이 무너진다)
   ram?: boolean; // 충돌형 기병: 창으로 찌르지 않고 몸으로 부딪혀 밀고 지나간다
@@ -788,7 +792,7 @@ export class Game {
   private stageTime = 0; // 이번 스테이지에서 흐른 성장 시간(적 생성량 계산용)
   status: GameStatus = "playing";
   private armyTotal = 0;
-  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean }>(); // cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
+  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean; kind?: number; age?: number }>(); // kind: 진군령 1·포위령 2·집결령 3, cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
   private nextSquadId = 1;
   private squadTimer = SQUAD_FIRST;
 
@@ -2209,7 +2213,11 @@ export class Game {
 
   /** 소대: 보스가 아닐 때도 가끔 진형을 갖춘 소규모 혼성 부대가 다가온다(성장 단계에서만) */
   private stepSquads(dt: number): void {
-    for (const sq of this.squads.values()) this.marchArmy(sq.a, dt, sq.cmd ? BOSS_LORD.cmdMarch / ARMY_MARCH_SPEED : SQUAD_MARCH_MULT);
+    for (const sq of this.squads.values()) {
+      if (!sq.cmd) this.marchArmy(sq.a, dt, SQUAD_MARCH_MULT);
+      else if (sq.kind === 2) this.stepRing(sq, dt);
+      else if (sq.kind !== 3) this.marchArmy(sq.a, dt, BOSS_LORD.cmdMarch / ARMY_MARCH_SPEED); // 진군령은 행군, 집결령은 제자리를 지킨다
+    }
     if (!this.autoSpawn || this.phase !== "grow") return;
     this.squadTimer -= dt;
     if (this.squadTimer > 0) return;
@@ -2266,14 +2274,36 @@ export class Game {
     return n;
   }
 
+  /** 명령 종류별 대열 보너스: 진군령은 균형, 집결령은 단단하게, 포위령은 공격적으로 */
+  private cmdBonus(kind: number): { red: number; atk: number } {
+    const C = BOSS_LORD;
+    return kind === 3 ? { red: C.cmdRallyReduce, atk: C.cmdRallyAtk } : kind === 2 ? { red: C.cmdSiegeReduce, atk: C.cmdSiegeAtk } : { red: C.cmdReduce, atk: C.cmdAtk };
+  }
+
+  /** 졸개 한 명을 명령에 편입한다(대열 번호·자리·보너스) */
+  private joinCommand(e: Enemy, id: number, kind: number, f: number, l: number): void {
+    const b = this.cmdBonus(kind);
+    e.squad = id;
+    e.slotF = f;
+    e.slotL = l;
+    e.cmd = true;
+    e.cmdRed = b.red;
+    e.cmdAtk = 1 + b.atk;
+    e.dmgMult *= e.cmdAtk;
+  }
+
   /**
-   * 진군령: 필드 졸개를 가까운 것끼리 묶어 대열(소대 진형)을 짜 준다. 각 대열에는 깃발병이 한 명 있고, 대열 안의 졸개는
-   * 받는 피해가 줄고 공격이 강해진다. 대열이 몇 개 만들어졌는지가 아니라 명령을 받은 졸개 수를 돌려준다.
+   * 군주의 명령을 필드 졸개에게 내린다. 명령을 받은 졸개 수를 돌려준다(0이면 아무 일도 일어나지 않은 것).
+   * kind 1 진군령: 가까운 졸개끼리 대열을 짜 플레이어를 향해 행군한다.
+   * kind 2 포위령: 졸개가 플레이어 둘레에 둥글게 퍼져 포위한 뒤 한꺼번에 조여 온다(호 단위 대열, 호마다 깃발병).
+   * kind 3 집결령: 졸개가 성문 앞으로 물러나 가로로 긴 방어선(방패벽)을 치고 제자리를 지킨다.
    */
-  commandTroops(): number {
+  commandTroops(kind = 1): number {
     const C = BOSS_LORD;
     const list = this.commandables();
     if (list.length < C.cmdMin) return 0;
+    if (kind === 2) return this.commandSiege(list);
+    if (kind === 3) return this.commandRally(list);
     const groups: { x: number; y: number; members: Enemy[] }[] = [];
     for (const e of list) {
       let best: (typeof groups)[number] | null = null;
@@ -2311,7 +2341,7 @@ export class Game {
       }
       const a: Army = { x: gp.x, y: gp.y, heading: near ? Math.atan2(near.y - gp.y, near.x - gp.x) : Math.PI / 2 };
       const id = this.nextSquadId++;
-      this.squads.set(id, { a, left: gp.members.length, size: gp.members.length, cmd: true });
+      this.squads.set(id, { a, left: gp.members.length, size: gp.members.length, cmd: true, kind: 1, age: 0 });
       const byType = new Map<number, ArmySlot[]>();
       for (const sl of layout) {
         const q = byType.get(sl.type) ?? [];
@@ -2323,11 +2353,7 @@ export class Game {
         for (const e of gp.members.filter((m) => m.type === type)) {
           const sl = byType.get(type)?.shift();
           if (!sl) continue;
-          e.squad = id;
-          e.slotF = sl.forward;
-          e.slotL = sl.lateral;
-          e.cmd = true;
-          e.dmgMult *= 1 + C.cmdAtk;
+          this.joinCommand(e, id, 1, sl.forward, sl.lateral);
           if (!flagged && (type === SHIELD || type === SPEAR)) {
             e.flag = true; // 앞줄의 검방병·창병 한 명이 깃발을 든다
             flagged = true;
@@ -2343,6 +2369,107 @@ export class Game {
     return total;
   }
 
+  /** 집결령: 성문 앞 방어선. 앞에서부터 검방병 → 창병 → 둔기병 → 궁병 줄을 서고, 기병은 양 끝을 지킨다. 한 대열이고 깃발병은 맨 앞줄 가운데다. */
+  private commandRally(list: Enemy[]): number {
+    const C = BOSS_LORD;
+    const a: Army = { x: GATE_X, y: GATE_Y + C.cmdRallyY, heading: Math.PI / 2 }; // 남쪽(필드 쪽)을 바라본다
+    const id = this.nextSquadId++;
+    this.squads.set(id, { a, left: list.length, size: list.length, cmd: true, kind: 3, age: 0 });
+    const rows: [number, number][] = [[SHIELD, 60], [SPEAR, 22], [BLUNT, -16], [ARCHER, -56]]; // [병종, 앞뒤 위치(앞이 +)]
+    let total = 0;
+    let widest = 0;
+    for (const [type, f0] of rows) {
+      const mem = list.filter((e) => e.type === type);
+      for (let i = 0; i < mem.length; i++) {
+        const row = Math.floor(i / C.cmdRallyRow);
+        const inRow = Math.min(C.cmdRallyRow, mem.length - row * C.cmdRallyRow);
+        const col = i % C.cmdRallyRow;
+        const l = (col - (inRow - 1) / 2) * 40;
+        widest = Math.max(widest, Math.abs(l));
+        this.joinCommand(mem[i]!, id, 3, f0 - row * 34, l);
+        total++;
+      }
+    }
+    const cav = list.filter((e) => e.type === CAVALRY);
+    cav.forEach((e, i) => {
+      const side = i % 2 === 0 ? 1 : -1;
+      this.joinCommand(e, id, 3, 22 - Math.floor(i / 2) * 36, side * (widest + 60));
+      total++;
+    });
+    const front = list.filter((e) => e.type === SHIELD && e.cmd).sort((p, q) => Math.abs(p.slotL) - Math.abs(q.slotL))[0] ?? list.find((e) => e.cmd);
+    if (front) front.flag = true;
+    return total;
+  }
+
+  /** 포위령: 졸개를 플레이어 둘레의 방향 순서대로 늘어세워 호(2~4개)로 나누고, 호마다 깃발병을 둔다. 자리는 매 틱 stepRing이 갱신한다. */
+  private commandSiege(list: Enemy[]): number {
+    const present = this.presentPlayers();
+    if (present.length === 0) return 0;
+    let cx = 0;
+    let cy = 0;
+    for (const s of present) {
+      cx += s.state.x;
+      cy += s.state.y;
+    }
+    cx /= present.length;
+    cy /= present.length;
+    const sorted = [...list].sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+    const n = sorted.length;
+    const arcs = Math.max(2, Math.min(4, Math.ceil(n / 10)));
+    const ids: number[] = [];
+    for (let k = 0; k < arcs; k++) {
+      const id = this.nextSquadId++;
+      ids.push(id);
+      this.squads.set(id, { a: { x: cx, y: cy, heading: 0 }, left: 0, size: 0, cmd: true, kind: 2, age: 0 });
+    }
+    const start = Math.atan2(sorted[0]!.y - cy, sorted[0]!.x - cx);
+    sorted.forEach((e, i) => {
+      const arc = Math.min(arcs - 1, Math.floor((i / n) * arcs));
+      const sq = this.squads.get(ids[arc]!)!;
+      sq.left++;
+      sq.size++;
+      this.joinCommand(e, ids[arc]!, 2, 0, 0);
+      e.ringAng = start + (i / n) * Math.PI * 2;
+      e.ringOut = e.type === ARCHER ? BOSS_LORD.cmdRingOut : 0;
+    });
+    // 호마다 가운데 근처의 근접 졸개 한 명이 깃발을 든다
+    for (const id of ids) {
+      const mem = sorted.filter((e) => e.squad === id);
+      const flag = mem.find((e, i) => i >= mem.length / 2 && e.type !== ARCHER) ?? mem[Math.floor(mem.length / 2)];
+      if (flag) flag.flag = true;
+    }
+    for (const id of ids) this.stepRing(this.squads.get(id)!, 0); // 첫 자리를 바로 정한다
+    return n;
+  }
+
+  /** 포위령 한 호의 자리를 갱신한다: 포위 중심이 플레이어 무리를 따라가고, 갖춰진 뒤에는 반지름이 줄어든다. */
+  private stepRing(sq: { a: Army; age?: number }, dt: number): void {
+    const C = BOSS_LORD;
+    sq.age = (sq.age ?? 0) + dt;
+    const present = this.presentPlayers();
+    if (present.length > 0) {
+      let cx = 0;
+      let cy = 0;
+      for (const s of present) {
+        cx += s.state.x;
+        cy += s.state.y;
+      }
+      cx /= present.length;
+      cy /= present.length;
+      const k = dt === 0 ? 1 : Math.min(1, dt * 3);
+      sq.a.x += (cx - sq.a.x) * k;
+      sq.a.y += (cy - sq.a.y) * k;
+    }
+    const closing = Math.max(0, sq.age - C.cmdSiegeForm) / Math.max(0.1, C.cmdSiegeSec - C.cmdSiegeForm);
+    const r = C.cmdRingR + (C.cmdRingMin - C.cmdRingR) * Math.min(1, closing);
+    for (const e of this.enemies.values()) {
+      if (!e.cmd || e.ringAng === undefined || !e.squad || this.squads.get(e.squad)?.a !== sq.a) continue;
+      const rr = r + (e.ringOut ?? 0);
+      e.slotF = Math.cos(e.ringAng) * rr; // heading 0: 자리의 앞뒤가 곧 동서, 좌우가 곧 남북
+      e.slotL = Math.sin(e.ringAng) * rr;
+    }
+  }
+
   /** 대열 하나를 푼다: 졸개는 다시 제각각 움직이고 강화가 사라진다 */
   private releaseCommand(id: number): void {
     for (const e of this.enemies.values()) {
@@ -2350,12 +2477,16 @@ export class Game {
       e.squad = 0;
       e.cmd = false;
       e.flag = false;
-      e.dmgMult /= 1 + BOSS_LORD.cmdAtk;
+      e.dmgMult /= e.cmdAtk ?? 1;
+      e.cmdAtk = undefined;
+      e.cmdRed = undefined;
+      e.ringAng = undefined;
+      e.ringOut = undefined;
     }
     this.squads.delete(id);
   }
 
-  /** 진군령이 끝났다: 남은 대열을 모두 푼다 */
+  /** 명령이 끝났다: 남은 대열을 모두 푼다 */
   endCommand(): void {
     for (const [id, q] of [...this.squads]) if (q.cmd) this.releaseCommand(id);
   }
@@ -5801,7 +5932,7 @@ export class Game {
     const adj = this.boss.preHit(e, hit0, ownerId, src);
     if (!adj) return 0;
     let hit = adj;
-    if (e.cmd) hit = { ...hit, damage: hit.damage * (1 - BOSS_LORD.cmdReduce), charge: hit.charge * (1 - BOSS_LORD.cmdReduce) }; // 진군령 대열 안에서는 받는 피해가 줄어든다
+    if (e.cmd && e.cmdRed) hit = { ...hit, damage: hit.damage * (1 - e.cmdRed), charge: hit.charge * (1 - e.cmdRed) }; // 군주의 명령으로 대열을 이룬 졸개는 받는 피해가 줄어든다
     const owner = this.slots.get(ownerId);
     const scope: LegendScope = src ? src.type : "hero"; // 때린 쪽(주인공 또는 그 병종)에게만 전설이 적용된다
     const has = (id: LegendId) => !!owner && hasLegend(owner.mods, id, scope);
@@ -6571,7 +6702,7 @@ export class Game {
       if (!target) {
         // 진형 소속은 자리를 지키며 대열과 함께 움직인다
         if (home) {
-          this.moveToward(e, home[0], home[1], st.speed * 1.2, dt, 4);
+          this.moveToward(e, home[0], home[1], st.speed * (e.cmd ? BOSS_LORD.cmdHurry : 1.2), dt, 4);
           e.face = group!.heading;
         }
         continue;

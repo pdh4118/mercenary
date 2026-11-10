@@ -172,6 +172,16 @@ test("공성전: 성문 개방 돌격은 정예 기병을 내보내고 성문을
 });
 
 test("공성전: 진군령은 필드 졸개를 대열로 묶어 전진시키고, 끝나면 푼다", () => {
+  const rnd = Math.random;
+  Math.random = () => 0.001; // 칙령이 진군령(첫 후보)을 고르게 한다
+  try {
+    edictAdvanceCase();
+  } finally {
+    Math.random = rnd;
+  }
+});
+
+function edictAdvanceCase(): void {
   const { g, a } = setup(BSK_EDICT);
   const p = g.getPlayer(a)!;
   p.maxHp = p.hp = 1e9;
@@ -209,7 +219,7 @@ test("공성전: 진군령은 필드 졸개를 대열로 묶어 전진시키고,
   assert.equal((g as any).commandSquadCount(), 0);
   const e1: any = after.find((e: any) => before.has(e.id));
   assert.ok(Math.abs(e1.dmgMult - before.get(e1.id)!) < 1e-9, "강화가 원래대로 돌아온다");
-});
+}
 
 test("공성전: 진군령 대열 안의 졸개는 피해를 덜 받고, 깃발병이 쓰러지면 그 대열이 무너진다", () => {
   const { g, a } = setup(0);
@@ -237,6 +247,89 @@ test("공성전: 진군령 대열 안의 졸개는 피해를 덜 받고, 깃발�
   assert.ok(mates.every((e: any) => !e.cmd && !e.squad), "깃발병이 쓰러지면 대열이 풀린다");
   assert.equal((g as any).squads.has(squadId), false);
   (g as any).endCommand();
+});
+
+test("공성전: 집결령은 졸개를 성문 앞 방어선으로 모으고(앞줄 검방병, 뒤 궁병, 양 끝 기병), 깃발병은 하나다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  p.x = 0;
+  p.y = GATE_Y + 900;
+  g.spawnSiegeWave(30);
+  const n = (g as any).commandTroops(3);
+  assert.ok(n >= 6, `명령을 받은 졸개 ${n}`);
+  const mem: any[] = [...(g as any).enemies.values()].filter((e) => e.cmd);
+  const sq = (g as any).squads.get(mem[0].squad);
+  assert.equal(sq.kind, 3);
+  assert.ok(Math.abs(sq.a.x - GATE_X) < 1 && Math.abs(sq.a.y - (GATE_Y + BOSS_LORD.cmdRallyY)) < 1 && Math.abs(sq.a.heading - Math.PI / 2) < 1e-9, "방어선은 성문 앞 남쪽을 본다");
+  assert.equal(mem.filter((e) => e.flag).length, 1, "깃발병은 하나");
+  const avgF = (t: number) => {
+    const l = mem.filter((e) => e.type === t);
+    return l.length ? l.reduce((x, e) => x + e.slotF, 0) / l.length : null;
+  };
+  const sh = avgF(3);
+  const ar = avgF(2);
+  if (sh !== null && ar !== null) assert.ok(sh > ar, "검방병이 앞줄, 궁병이 뒷줄");
+  const cavs = mem.filter((e) => e.type === 0);
+  const inner = Math.max(...mem.filter((e) => e.type !== 0).map((e) => Math.abs(e.slotL)));
+  if (cavs.length) assert.ok(cavs.every((e) => Math.abs(e.slotL) > inner), "기병은 양 끝");
+  (g as any).endCommand();
+  assert.equal((g as any).commandSquadCount(), 0);
+});
+
+test("공성전: 포위령은 졸개를 플레이어 둘레의 호(깃발병 포함)로 나눠 세우고, 갖춰진 뒤 반지름을 좁힌다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  p.x = 0;
+  p.y = GATE_Y + 900;
+  g.spawnSiegeWave(40);
+  const n = (g as any).commandTroops(2);
+  assert.ok(n >= 6, `명령을 받은 졸개 ${n}`);
+  const mem: any[] = [...(g as any).enemies.values()].filter((e) => e.cmd);
+  const ids = new Set(mem.map((e) => e.squad));
+  assert.ok(ids.size >= 2 && ids.size <= 4, `호 ${ids.size}개`);
+  for (const id of ids) assert.equal(mem.filter((e) => e.squad === id && e.flag).length, 1, "호마다 깃발병 하나");
+  const radius = (e: any) => Math.hypot(e.slotF, e.slotL);
+  const melee = mem.find((e) => e.type !== 2)!;
+  assert.ok(Math.abs(radius(melee) - BOSS_LORD.cmdRingR) < 1, "처음에는 넓게 둘러싼다");
+  const arch = mem.find((e) => e.type === 2);
+  if (arch) assert.ok(Math.abs(radius(arch) - (BOSS_LORD.cmdRingR + BOSS_LORD.cmdRingOut)) < 1, "궁병은 바깥에서");
+  // 시간이 지나면 조여 든다
+  for (let i = 0; i < TICK_RATE * (BOSS_LORD.cmdSiegeSec + 1); i++) {
+    g.step();
+    p.hp = p.maxHp;
+  }
+  const still: any[] = [...(g as any).enemies.values()].filter((e) => e.cmd && e.ringAng !== undefined);
+  if (still.length) {
+    const m2 = still.find((e) => e.type !== 2);
+    if (m2) assert.ok(radius(m2) < BOSS_LORD.cmdRingR - 100, `반지름이 줄었다 ${radius(m2).toFixed(0)}`);
+  }
+  (g as any).endCommand();
+});
+
+test("공성전: 칙령은 진군령·포위령·집결령 중 하나를 골라 문구(장판)를 걸고, 졸개가 부족하면 쓰이지 않는다", () => {
+  const { g, a } = setup(BSK_EDICT);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  p.x = 0;
+  p.y = GATE_Y + 600;
+  const kinds = new Set<number>();
+  for (let round = 0; round < 12; round++) {
+    const { g: g2, a: a2 } = setup(BSK_EDICT);
+    const p2 = g2.getPlayer(a2)!;
+    p2.maxHp = p2.hp = 1e9;
+    p2.x = 0;
+    p2.y = GATE_Y + 500;
+    g2.spawnSiegeWave(20);
+    for (let i = 0; i < TICK_RATE * 2; i++) {
+      g2.step();
+      p2.hp = p2.maxHp;
+      for (const h of (g2 as any).boss.hazards as any[]) if (h.kind === HZ_EDICT) kinds.add(h.a);
+    }
+  }
+  assert.ok([...kinds].every((k) => k === 1 || k === 2 || k === 3), `종류 ${[...kinds]}`);
+  assert.ok(kinds.size >= 2, "여러 종류가 나온다");
 });
 
 const openGate = (g: Game) => {
