@@ -1,6 +1,6 @@
 // 수치 조정 도구가 다루는 숫자 목록. 서버는 실행 중에도 값을 바꿀 수 있고, 바뀐 값은 접속한 클라이언트에도 전달된다.
 // 값을 바꿔도 이 파일의 기본값(def)은 처음 읽을 때 기억해 두므로 언제든 "기본값으로"를 누를 수 있다.
-import { TUNE, MERC_STATS, ENEMY_STATS, MERC_BASE_PRICE, MERC_RESPAWN_SEC, ENEMY_XP, ENEMY_GOLD, SHIELD_DAMAGE_FACTOR, UNIT_COST, ENEMY_SPAWN_WEIGHTS, WARD_WEIGHT, CAV_TARGET_WEIGHT, UNIT_NAMES } from "./rules.js";
+import { TUNE, SPACING_BY_TYPE, MERC_STATS, ENEMY_STATS, MERC_BASE_PRICE, MERC_RESPAWN_SEC, ENEMY_XP, ENEMY_GOLD, SHIELD_DAMAGE_FACTOR, UNIT_COST, ENEMY_SPAWN_WEIGHTS, WARD_WEIGHT, CAV_TARGET_WEIGHT, UNIT_NAMES } from "./rules.js";
 import { MERC_XP_NEED, TIER_HP, TIER_DMG } from "./tiers.js";
 import { WEAPONS, DIFFICULTY_REDUCTION, DIFFICULTY_NAMES } from "./index.js";
 import { CARD_TUNE, HERO_STATS, LEGEND_CONST, MERC_STAT_BASE, MERC_STAT_LABEL, RARITY, RARITY_NAMES, SCALE_CARD, rebuildCards, type MercStat } from "./cards.js";
@@ -129,10 +129,10 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   PLATEAU_TOP_SPEED: ["고지대 윗면 이동 속도 배율", G.terrain, 0.2, 1.2, 0.05],
   RAMP_SPEED: ["고지대 올라가는 길(계단·다리) 이동 속도 배율", G.terrain, 0.1, 1.2, 0.05],
   SLOPE_SPEED: ["고지대 비탈(오르는 길) 이동 속도 배율", G.terrain, 0.1, 1.2, 0.05],
-  MERC_SPACING: ["용병끼리 유지하는 거리 배율(반지름 합 x 이 값)", G.ai, 1, 4, 0.1],
+  SPACING_SIDE_MERC: ["용병 진영 간격 보정 배율(병종 표 값에 곱함)", G.ai, 0.5, 4, 0.05],
   CROSS_SEPARATION_SPEED: ["아군·적·주인공이 겹쳤을 때 밀려나는 속도(px/초)", G.ai, 0, 600, 10],
   CROSS_CHARGE_MOMENTUM: ["이 속도 이상의 기병은 돌격 중이라 통과한다(0~1)", G.ai, 0, 1, 0.05],
-  ENEMY_SPACING: ["적끼리 유지하는 거리 배율(반지름 합 x 이 값)", G.ai, 1, 4, 0.05],
+  SPACING_SIDE_ENEMY: ["적 진영 간격 보정 배율(병종 표 값에 곱함)", G.ai, 0.5, 4, 0.05],
   ENEMY_SEPARATION_SPEED: ["겹친 적이 서로 밀려나는 최대 속도(px/초)", G.ai, 0, 1000, 10],
   MERC_SEPARATION_SPEED: ["겹친 용병이 밀려나는 속도(px/초)", G.ai, 0, 600, 10],
   GUARD_HERO_RADIUS: ["주인공 호위: 주인공 둘레 이 거리 안의 적은 막으러 나선다(px)", G.ai, 0, 800, 10],
@@ -271,6 +271,7 @@ function build(): Map<string, Entry> {
   });
   table("MERC_BASE_PRICE", MERC_BASE_PRICE, "고용 기본 가격", G.hire, UNIT_NAMES, 1, 1000, 1);
   table("UNIT_COST", UNIT_COST, "통솔력 비용", G.hire, UNIT_NAMES, 1, 20, 1);
+  table("SPACING_BY_TYPE", SPACING_BY_TYPE, "간격 유지 배율(반지름 합 x, 용병·적 공통)", G.ai, UNIT_NAMES, 1, 4, 0.05);
   table("MERC_RESPAWN_SEC", MERC_RESPAWN_SEC, "용병 부활 시간(초)", G.hire, UNIT_NAMES, 1, 300, 1);
   table("ENEMY_XP", ENEMY_XP, "적 처치 경험치", G.xp, UNIT_NAMES, 0, 100, 0.5);
   table("ENEMY_GOLD", ENEMY_GOLD, "적 처치 금화", G.xp, UNIT_NAMES, 0, 200, 1);

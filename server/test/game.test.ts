@@ -757,8 +757,8 @@ test("카드 효과: 용병 부활 시간 단축", () => {
   const p = me(g, a);
   const m = g.addMerc(a, BLUNT, p.x + 300, p.y); // (창병·검방병은 주인공 곁을 지키러 물러나므로 제자리에서 싸우는 병종으로)
   forceCard(g, a, "mercStat", (e) => e.stat === "respawn" && e.type === undefined);
-  for (let i = 0; i < 400 && g.getMerc(m)!.respawn === 0; i++) {
-    if (i % 4 === 0) g.spawnEnemyAt(g.getMerc(m)!.x, g.getMerc(m)!.y, BLUNT);
+  for (let i = 0; i < 800 && g.getMerc(m)!.respawn === 0; i++) {
+    if (i % 2 === 0) g.spawnEnemyAt(g.getMerc(m)!.x, g.getMerc(m)!.y, BLUNT); // 적도 서로 간격을 두므로 더 자주 몰아넣는다
     g.step();
   }
   assert.ok(g.getMerc(m)!.respawn > 0);
@@ -964,7 +964,7 @@ test("기병은 달릴수록 속도가 붙고, 공격하면 속도를 잃으며,
   assert.ok(wire[13] > 0, "속도가 클라이언트에 전달된다");
   // 목표에 닿아 공격하면 속도가 크게 준다
   let before = 0;
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 600; i++) {
     before = Math.max(before, g.getMerc(c)!.momentum);
     g.step();
     if (g.enemyCount === 0) break;

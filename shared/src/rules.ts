@@ -92,8 +92,8 @@ export const TUNE = {
   RAMP_SPEED: 0.75, // 계단·다리 같은 올라가는 길 위에서의 이동 속도 배율 // 고지대를 오르는 비탈에서의 이동 속도 배율
   CROSS_SEPARATION_SPEED: 120, // 아군과 적·주인공이 겹쳤을 때 밀려나는 최대 속도(px/초). 달리는 기병은 제외
   CROSS_CHARGE_MOMENTUM: 0.3, // 기병이 이 속도(0..1) 이상이면 돌격 중이라 다른 유닛을 통과한다
-  MERC_SPACING: 1.9, // 용병끼리 유지하려는 거리 = 두 용병 반지름 합 x 이 값(뭉치지 않게)
-  ENEMY_SPACING: 1.3, // 적끼리 유지하려는 거리 = 두 적 반지름 합 x 이 값(너무 뭉치지 않게. 1이면 몸이 닿는 거리까지)
+  SPACING_SIDE_MERC: 1.3, // 용병 진영의 간격 보정 배율(병종 표 값에 곱한다. 1이면 표 그대로)
+  SPACING_SIDE_ENEMY: 1, // 적 진영의 간격 보정 배율
   ENEMY_SEPARATION_SPEED: 160, // 겹친 적이 서로 밀려나는 최대 속도(px/초)
   MERC_SEPARATION_SPEED: 160, // 겹친 용병이 서로 밀려나는 최대 속도(px/초)
   GUARD_HERO_RADIUS: 260, // 주인공 호위에서 주인공 둘레 이 거리 안의 적은 진형 자리에서 멀어도 막으러 나선다
@@ -514,4 +514,16 @@ export function bossBasicStats(type: number): UnitStats {
   const base = ENEMY_STATS[type]!;
   const B = BOSS_BASIC;
   return { ...base, windup: type === MAGE ? B.mageWindup : base.windup, reach: base.reach * (base.ranged ? B.rangedReach : B.meleeReach), arc: Math.min(Math.PI, base.arc * B.arc), splash: base.splash * B.splash, damage: base.damage * B.damage, cooldown: base.cooldown * B.cooldown };
+}
+
+/**
+ * 유닛끼리 유지하려는 거리 배율(두 유닛의 반지름 합 x 배율). 병종 순서는 UNIT_TYPES와 같다(기병·창병·궁병·검방병·둔기병·마법사).
+ * 앞줄 병종(기병·창병·검방병)은 촘촘하게, 범위 공격을 맞기 쉬운 후열(궁병·마법사)과 휘두를 공간이 필요한 둔기병은 넓게.
+ * 용병과 적이 같은 표를 쓰고, 진영마다 SPACING_SIDE_MERC / SPACING_SIDE_ENEMY가 곱해진다.
+ */
+export const SPACING_BY_TYPE: number[] = [1.0, 1.2, 1.5, 1.2, 1.6, 2.0];
+/** 두 유닛이 서로 유지하는 간격 배율: 각 유닛의 (병종 표 x 진영 보정)의 평균. 1보다 작아지지 않는다(몸이 겹치지는 않는다). */
+export function spacingBetween(typeA: number, mercA: boolean, typeB: number, mercB: boolean): number {
+  const one = (t: number, merc: boolean) => (SPACING_BY_TYPE[t] ?? 1.2) * (merc ? TUNE.SPACING_SIDE_MERC : TUNE.SPACING_SIDE_ENEMY);
+  return Math.max(1, (one(typeA, mercA) + one(typeB, mercB)) / 2);
 }

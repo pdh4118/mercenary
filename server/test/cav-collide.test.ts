@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CAVALRY, MERC_STATS, TICK_RATE, TUNE, parseVoice, parseVoiceMulti } from "@mercenary/shared";
+import { CAVALRY, MERC_STATS, SPACING_BY_TYPE, TICK_RATE, TUNE, parseVoice, parseVoiceMulti, spacingBetween } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -342,7 +342,7 @@ test("기마 가속 중 충돌: 속도를 절반만 잃고 곧 다시 붙으며,
   assert.ok(Math.abs(boosted.dmg / plain.dmg - TUNE.SKILL_BOOST_MULT) < 1e-6, "피해는 가속으로 빨라진 속도에 비례해 오히려 커진다(손실을 줄여도 줄지 않는다)");
 });
 
-test("적끼리 간격: 반지름 합의 1.3배까지 벌어지고, 서로 밀려나는 속도는 제한된다", () => {
+test("적끼리 간격: 병종 표(검방병 1.2)만큼 벌어지고, 서로 밀려나는 속도는 제한된다", () => {
   const g = quiet();
   g.addPlayer("a");
   const mk = (x: number, y: number) => (g as any).enemies.get(g.spawnEnemyAt(x, y, 3)); // 검방병
@@ -360,7 +360,16 @@ test("적끼리 간격: 반지름 합의 1.3배까지 벌어지고, 서로 밀�
   g.step();
   assert.ok(Math.abs(a.x - x0) <= TUNE.ENEMY_SEPARATION_SPEED / TICK_RATE + 1e-6, "한 틱에 밀리는 거리가 제한된다");
   run(g, 3);
-  const need = (a.type === 3 ? 14 : 14) * 2 * TUNE.ENEMY_SPACING;
+  const need = 14 * 2 * spacingBetween(3, false, 3, false);
   assert.ok(dist(a, b) >= need * 0.95 && dist(b, c) >= need * 0.95 && dist(a, c) >= need * 0.95, `간격 ${dist(a, b).toFixed(1)}, ${dist(b, c).toFixed(1)}, ${dist(a, c).toFixed(1)} (목표 ${need.toFixed(1)})`);
   void r;
+});
+
+test("간격 표: 용병과 적이 같은 병종 표를 쓰고, 진영 보정과 평균 규칙이 적용된다", () => {
+  assert.deepEqual([...SPACING_BY_TYPE], [1.0, 1.2, 1.5, 1.2, 1.6, 2.0]);
+  assert.ok(Math.abs(spacingBetween(5, false, 5, false) - 2.0) < 1e-9, "적 마법사끼리 2.0");
+  assert.ok(Math.abs(spacingBetween(1, false, 5, false) - 1.6) < 1e-9, "창병(1.2)과 마법사(2.0)는 평균 1.6");
+  assert.ok(Math.abs(spacingBetween(0, true, 0, true) - 1.0 * TUNE.SPACING_SIDE_MERC) < 1e-9, "용병은 진영 보정이 곱해진다");
+  assert.ok(Math.abs(spacingBetween(1, true, 3, true) - 1.2 * TUNE.SPACING_SIDE_MERC) < 1e-9);
+  assert.ok(spacingBetween(0, false, 0, false) >= 1, "1보다 작아지지 않는다");
 });

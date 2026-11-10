@@ -25,6 +25,8 @@ import {
   ENEMY_XP,
   ARMY_AGGRO,
   ARMY_LATERAL_SPACING,
+  SPACING_BY_TYPE,
+  spacingBetween,
   ARMY_RANK_SPACING,
   ARMY_ENGAGE_DISTANCE,
   ARMY_LEASH,
@@ -5106,9 +5108,9 @@ export class Game {
     const dl = Math.hypot(dx, dy);
     const fx = dl > 0.5 ? dx / dl : Math.cos(m.face);
     const fy = dl > 0.5 ? dy / dl : Math.sin(m.face);
-    const try1 = (vx: number, vy: number, vr: number, key: string, apply: (h: Hit) => number): void => {
+    const try1 = (vx: number, vy: number, vr: number, key: string, sp: number, apply: (h: Hit) => number): void => {
       const d = Math.hypot(vx - m.x, vy - m.y);
-      if (d > (st.radius + vr) * Math.max(1, TUNE.MERC_SPACING) + 6 || // 용병끼리는 서로 밀려나므로 간격이 벌어지는 만큼 여유를 둔다
+      if (d > (st.radius + vr) * sp + 6 || // 용병끼리는 서로 밀려나므로 간격이 벌어지는 만큼 여유를 둔다
  ((vx - m.x) * fx + (vy - m.y) * fy) / (d || 1) < 0.2) return; // 앞에 있는 대상만
       if ((this.rams.get(key) ?? 0) > this.tick || m.momentum < TUNE.CAV_COLLIDE_MIN_MOM) return;
       this.rams.set(key, this.tick + Math.ceil(TUNE.CAV_COLLIDE_CD * TICK_RATE)); // 시간은 토너먼트에서 멈추므로 틱으로 센다
@@ -5128,11 +5130,11 @@ export class Game {
       }
     };
     if (foes) {
-      for (const f of foes) try1(f.x, f.y, f.radius, `${m.id}:${f.merc ? f.merc.id : -f.ownerId}`, (h) => f.hit(h));
+      for (const f of foes) try1(f.x, f.y, f.radius, `${m.id}:${f.merc ? f.merc.id : -f.ownerId}`, f.merc ? spacingBetween(CAVALRY, true, f.merc.type, true) : 1, (h) => f.hit(h));
     } else {
       for (const e of this.enemies.values()) {
         if (e.hp <= 0) continue;
-        try1(e.x, e.y, radiusOf(e), `${m.id}:${e.id}`, (h) => this.damageEnemy(e, h, m.owner, m));
+        try1(e.x, e.y, radiusOf(e), `${m.id}:${e.id}`, spacingBetween(CAVALRY, true, e.type, true), (h) => this.damageEnemy(e, h, m.owner, m));
       }
     }
     if (this.rams.size > 600) for (const [k, until] of this.rams) if (until <= this.tick) this.rams.delete(k);
@@ -6879,7 +6881,7 @@ export class Game {
         for (let oy = -1; oy <= 1; oy++) {
           for (const o of grid.get(key(cx + ox, cy + oy)) ?? []) {
             if (o.id <= m.id) continue;
-            const min = (rm + MERC_STATS[o.type]!.radius) * TUNE.MERC_SPACING;
+            const min = (rm + MERC_STATS[o.type]!.radius) * spacingBetween(m.type, true, o.type, true);
             const ex = o.x - m.x;
             const ey = o.y - m.y;
             const d = Math.hypot(ex, ey);
@@ -6996,7 +6998,7 @@ export class Game {
     const fixed = (e: Enemy) => !!(e.post || e.hold); // 성벽 위·제자리를 지키는 수비병은 밀려나지 않는다(다른 쪽이 비켜 준다)
     let maxR = 12;
     for (const e of list) if (!e.boss) maxR = Math.max(maxR, radiusOf(e));
-    const reach = Math.max(1, Math.ceil((2 * maxR * Math.max(1, TUNE.ENEMY_SPACING)) / SEPARATION_CELL)); // 간격을 두는 거리까지 이웃 칸을 본다(장군은 제외: 아주 크다)
+    const reach = Math.max(1, Math.ceil((2 * maxR * Math.max(1, Math.max(...SPACING_BY_TYPE) * TUNE.SPACING_SIDE_ENEMY)) / SEPARATION_CELL)); // 간격을 두는 거리까지 이웃 칸을 본다(장군은 제외: 아주 크다)
     for (const e of list) {
       const cx = Math.floor(e.x / SEPARATION_CELL);
       const cy = Math.floor(e.y / SEPARATION_CELL);
@@ -7006,8 +7008,10 @@ export class Game {
           for (const o of grid.get(key(cx + ox, cy + oy)) ?? []) {
             if (o.id <= e.id) continue; // 쌍마다 한 번만
             // 돌진하는 기병은 간격을 두지 않고 몸이 닿는 거리까지만 비킨다
-            const spacing = charging(e) || charging(o) ? 1 : Math.max(1, TUNE.ENEMY_SPACING);
-            const min = (er + radiusOf(o)) * spacing;
+            const orr = radiusOf(o);
+            let spacing = charging(e) || charging(o) ? 1 : spacingBetween(e.type, false, o.type, false);
+            if ((e.army || e.squad > 0) && (o.army || o.squad > 0)) spacing = Math.min(spacing, Math.max(1, ARMY_LATERAL_SPACING / (er + orr))); // 진형 칸 간격을 넘으면 칸을 지키려는 힘과 부딪혀 떨리므로 넘지 않게
+            const min = (er + orr) * spacing;
             const dx = o.x - e.x;
             const dy = o.y - e.y;
             const d = Math.hypot(dx, dy);
