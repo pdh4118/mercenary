@@ -295,6 +295,7 @@ async function main() {
   const heroPoseTex = Object.fromEntries(
     await Promise.all(Object.keys(HERO_POSE_META).map(async (n) => [n, await Assets.load<Texture>(`assets/hero/${n}.png`).catch(() => null)] as const)),
   ) as Record<keyof typeof HERO_POSE_META, Texture | null>;
+  const slamFace = new Map<number, number>(); // 충격파를 모으던 마지막 방향(1 오른쪽 / -1 왼쪽). 찍는 자세는 이 방향을 그대로 이어 간다
   const slamPoseUntil = new Map<number, number>(); // 충격파를 찍은 직후 찍는 자세를 보여 줄 때까지(ms)
   const [heroTex, campTex, groundTex, allyArrow, enemyArrow] = await Promise.all([
     Promise.all(HERO_FILES.map((f) => Assets.load<Texture>(`assets/hero/hero_${f}.png`))),
@@ -2948,11 +2949,15 @@ async function main() {
       let poseScale = 1;
       let anchorX = 0.5;
       let anchorY = SPRITE_ANCHOR_Y;
+      let faceSign = Math.cos(p.aim) >= 0 ? 1 : -1;
       if (WEAPONS[p.weapon]?.type === BLUNT_TYPE && !dead) {
         // 철퇴 충격파: 모으는 동안 머리 위로 쳐들고, 찍은 직후 잠깐 내려찍는 자세
         const pose = (p.sm ?? 0) > 0 ? "raised" : (slamPoseUntil.get(p.id) ?? 0) > performance.now() ? "slam" : null;
+        if (pose === "raised") slamFace.set(p.id, faceSign); // 쳐든 동안의 방향을 기억해 둔다
+        else if (pose === "slam") faceSign = slamFace.get(p.id) ?? faceSign; // 찍을 때 마우스가 반대로 넘어가 있어도 모으던 방향으로 찍는다
         if (pose) {
           const key = `hero_${p.lk === 1 ? "f_" : ""}mace_${pose}` as keyof typeof HERO_POSE_META;
+          if (key === "hero_mace_slam") faceSign = -faceSign; // 이 그림만 원래 왼쪽을 보고 찍는다(나머지는 오른쪽)
           const pt = heroPoseTex[key];
           if (pt) {
             tex = pt;
@@ -2964,7 +2969,7 @@ async function main() {
       }
       if (v.sprite.texture !== tex) v.sprite.texture = tex;
       v.sprite.anchor.set(anchorX, anchorY);
-      v.sprite.scale.set(HERO_SCALE * poseScale * (Math.cos(p.aim) >= 0 ? 1 : -1), HERO_SCALE * poseScale);
+      v.sprite.scale.set(HERO_SCALE * poseScale * faceSign, HERO_SCALE * poseScale);
       setPoison(v.sprite, !!p.poisoned);
       drawBar(v.bar, p.hp, p.maxHp, 36, HERO_TOP - 6);
       if (dead) {
