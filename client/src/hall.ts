@@ -19,7 +19,7 @@ const TILE = 100;
 export const HALL_OUTER = 760; // 홀 바깥 암벽을 덮는 폭(클라이언트가 이 안의 지형 그림도 숨긴다)
 const OUTER = HALL_OUTER;
 
-export const HALL_TEXTURES = ["boss10_hall_floor", "boss10_hall_wall", "boss10_hall_pillar", "boss10_hall_throne"].map((n) => `assets/fx/${n}.png`);
+export const HALL_TEXTURES = ["boss10_hall_floor", "boss10_hall_wall", "boss10_hall_pillar", "boss10_hall_throne", "boss10_hall_carpet", "boss10_hall_door", "boss10_hall_torch"].map((n) => `assets/fx/${n}.png`);
 
 /** floorLayer: 바닥·벽(유닛 아래), objLayer: 옥좌(유닛 아래, 발 위치로 앞뒤), topLayer: 기둥(유닛 위, 뒤에 선 유닛이 있으면 반투명) */
 export function createHall(floorLayer: Container, objLayer: Container, topLayer: Container = objLayer): Hall {
@@ -96,8 +96,10 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
   let alive = true;
   const extra: Container[] = [];
   const texPillars: { sp: Sprite; x: number; y: number }[] = [];
-  void Promise.all(HALL_TEXTURES.map((u) => Assets.load<Texture>(u))).then(([floorT, wallT, pillarT, throneT]) => {
-    if (!alive || !floorT || !wallT || !pillarT || !throneT) return;
+  const torchSprites: Sprite[] = [];
+  let torchFrames: Texture[] = [];
+  void Promise.all(HALL_TEXTURES.map((u) => Assets.load<Texture>(u))).then(([floorT, wallT, pillarT, throneT, carpetT, doorT, torchT]) => {
+    if (!alive || !floorT || !wallT || !pillarT || !throneT || !carpetT || !doorT || !torchT) return;
     floor.visible = false;
     for (const c of made) c.visible = false;
     const Z = -1e6;
@@ -114,11 +116,13 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
       const o = i * 14;
       deco.rect(X0 + o, Y0 + o, W - o * 2, H - o * 2).stroke({ width: 14, color: 0x000000, alpha: 0.07 }); // 벽 가까이가 어둡다
     }
-    const carpetTop = Y0 + 330;
-    deco.rect(HALL.cx - 105, carpetTop, 210, Y0 + H - carpetTop).fill(0x7a1f26);
-    deco.rect(HALL.cx - 105, carpetTop, 210, Y0 + H - carpetTop).stroke({ width: 5, color: 0xc9a24a });
-    deco.rect(HALL.cx - 88, carpetTop, 176, Y0 + H - carpetTop).stroke({ width: 2, color: 0xc9a24a, alpha: 0.7 });
-    deco.rect(HALL.cx - 130, Y0 + H - 6, 260, HALL_WALL * 0.7).fill(0x0c0a10).stroke({ width: 4, color: 0x4a3a28 }); // 입구
+    const carpetTop = Y0 + 300;
+    const carpet = new TilingSprite({ texture: carpetT, width: 230, height: Y0 + H - carpetTop }); // 폭 600을 230으로: 위아래를 거울로 이은 타일이라 이음매가 없다
+    carpet.tileScale.set(230 / 600);
+    carpet.position.set(HALL.cx - 115, carpetTop);
+    carpet.zIndex = Z + 2;
+    floorLayer.addChild(carpet);
+    extra.push(carpet);
     // 벽: 북쪽은 벽돌 면이 보이고, 나머지 세 쪽은 윗면(석재 갓돌)만 보인다
     const ledge = new Texture({ source: wallT.source, frame: new Rectangle(wallT.frame.x, wallT.frame.y, wallT.frame.width, 52) });
     const mk = (tex: Texture, x: number, y: number, w: number, h: number, rot = 0): Sprite => {
@@ -138,8 +142,32 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
     ];
     wl[1]!.position.set(X0 + W + HALL_WALL, Y0 - HALL_WALL);
     wl[2]!.position.set(X0 - HALL_WALL, Y0 + H + HALL_WALL);
-    floorLayer.addChild(base, tile, deco, ...wl);
-    extra.push(base, tile, deco, ...wl);
+    // 북쪽 벽: 증원이 들어오는 문 두 개와 횃불 네 개
+    const wallDeco: Sprite[] = [];
+    for (const dx of [-640, 640]) {
+      const d = new Sprite(doorT);
+      d.anchor.set(0.5, 1);
+      d.scale.set(0.2);
+      d.position.set(HALL.cx + dx, Y0 + 6);
+      d.zIndex = Z + 4;
+      wallDeco.push(d);
+    }
+    const fw = torchT.frame.width / 4;
+    const tframes = [0, 1, 2, 3].map((i) => new Texture({ source: torchT.source, frame: new Rectangle(torchT.frame.x + i * fw, torchT.frame.y, fw, torchT.frame.height) }));
+    for (const dx of [-420, 420, -880, 880]) {
+      const t = new Sprite(tframes[0]!);
+      t.anchor.set(0.5, 1);
+      t.scale.set(0.17);
+      t.position.set(HALL.cx + dx, Y0 + 2);
+      t.zIndex = Z + 4;
+      wallDeco.push(t);
+      torchSprites.push(t);
+    }
+    floorLayer.addChild(base, tile, deco, ...wl, ...wallDeco);
+    extra.push(base, tile, deco, ...wl, ...wallDeco);
+    torchFrames = tframes;
+    torches.length = 0; // 그림 횃불을 쓰면 임시 불빛은 그 네 자리에만 남긴다
+    for (const dx of [-420, 420, -880, 880]) torches.push([HALL.cx + dx, Y0 + 40]);
     glow.zIndex = Z + 4;
     // 옥좌: 군주 뒤(북쪽). 군주보다 아래에 그린다
     const th = new Sprite(throneT);
@@ -163,6 +191,7 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
 
   return {
     update(now, units) {
+      if (torchFrames.length > 0) torchSprites.forEach((t, i) => (t.texture = torchFrames[(Math.floor(now / 140) + i) % 4]!));
       for (const pl of texPillars) {
         let behind = false;
         if (units) for (const u of units) if (Math.abs(u.x - pl.x) < 80 && u.y < pl.y + 6 && u.y > pl.y - 360) { behind = true; break; }
@@ -173,7 +202,7 @@ export function createHall(floorLayer: Container, objLayer: Container, topLayer:
         const f = 0.8 + 0.2 * Math.sin(now / 130 + i * 1.7);
         glow.circle(x, y, 120 * f).fill({ color: 0xff9a3c, alpha: 0.06 });
         glow.circle(x, y, 46 * f).fill({ color: 0xffc46a, alpha: 0.16 });
-        glow.circle(x, y, 9).fill({ color: 0xfff0b0, alpha: 0.9 });
+        if (texPillars.length === 0) glow.circle(x, y, 9).fill({ color: 0xfff0b0, alpha: 0.9 });
       }
     },
     destroy() {

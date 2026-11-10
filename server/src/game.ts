@@ -2052,7 +2052,7 @@ export class Game {
     let y = half;
     if (this.siege?.hall) {
       // 성내 전장: 홀 양옆·북쪽 문에서 증원이 들어온다(플레이어에게서 먼 곳)
-      const doors: [number, number][] = [[HALL.cx - HALL.hw + 110, HALL.cy - 120], [HALL.cx + HALL.hw - 110, HALL.cy - 120], [HALL.cx - HALL.hw + 110, HALL.cy + 260], [HALL.cx + HALL.hw - 110, HALL.cy + 260], [HALL.cx - 300, HALL.cy - HALL.hh + 120], [HALL.cx + 300, HALL.cy - HALL.hh + 120]];
+      const doors: [number, number][] = [[HALL.cx - HALL.hw + 110, HALL.cy - 120], [HALL.cx + HALL.hw - 110, HALL.cy - 120], [HALL.cx - HALL.hw + 110, HALL.cy + 260], [HALL.cx + HALL.hw - 110, HALL.cy + 260], [HALL.cx - 640, HALL.cy - HALL.hh + 130], [HALL.cx + 640, HALL.cy - HALL.hh + 130]];
       doors.sort((a, b) => Math.hypot(b[0] - tgt.x, b[1] - tgt.y) - Math.hypot(a[0] - tgt.x, a[1] - tgt.y));
       const d = doors[Math.floor(this.rng() * Math.min(3, doors.length))]!;
       x = d[0];
