@@ -21,7 +21,7 @@ const HERO_ROW: Partial<Record<CardEffect["k"], MercStat>> = {
   heroArmor: "armor", heroCrit: "crit", heroCritMult: "critMult", heroArea: "area", heroKnock: "knock", heroThorns: "thorns", heroDefense: "defense", heroDodge: "dodge",
   heroRegen: "regen", heroLifesteal: "lifesteal", heroCast: "cast",
 };
-const ROW_ORDER: MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "crit", "critMult", "defense", "dodge", "regen", "lifesteal", "armor", "thorns", "pierce", "multi", "poison", "knock", "cast", "xp", "respawn"];
+const ROW_ORDER: MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "crit", "critMult", "defense", "dodge", "regen", "lifesteal", "armor", "thorns", "pierce", "multi", "poison", "knock", "quiver", "cast", "xp", "respawn"];
 
 const pct = (v: number) => {
   const p = Math.abs(v) * 100;

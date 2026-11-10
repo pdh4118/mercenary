@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RAMP_OUT, RAMP_Y0, RAMP_Y1, RING, WALL_STRIPS, BOSS_CAV, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_WARD, BOSS_LORD, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, HZ_EDICT, GATE_X, GATE_Y, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TICK_RATE, castleSolids, inCastleZone } from "@mercenary/shared";
+import { RAMP_OUT, RAMP_Y0, RAMP_Y1, RING, WALL_STRIPS, BOSS_CAV, BSK_EXECUTE, BSK_GUARDS, BSK_RALLY, BSK_SCEPTER, HZ_WARD, BOSS_LORD, BSK_ARROWSTORM, BSK_CATAPULT, BSK_EDICT, BSK_OIL, BSK_SORTIE, HZ_EDICT, GATE_X, GATE_Y, HZ_GATE, HZ_OIL, HZ_RAIN, SIEGE, TICK_RATE, castleSolids, inCastleZone, HALL, HALL_LORD, inHall } from "@mercenary/shared";
 import { ENEMY_STATS, ARCHER, BLUNT, MAGE, SHIELD, SPEAR } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
@@ -375,6 +375,7 @@ test("공성전: 칙령은 진군령·포위령·집결령 중 하나를 골라 
 
 const openGate = (g: Game) => {
   (g as any).boss.strikeBarriers(GATE_X, GATE_Y + 40, 80, 1e9);
+  (g as any).siege.enterT = 0; // 성내 전장으로 옮겨 가지 않고 안뜰 전투를 시험한다(옮겨 가는 것은 아래 성내 전장 시험)
   for (let i = 0; i < TICK_RATE; i++) g.step(); // 군주의 무적이 풀릴 때까지
 };
 
@@ -627,4 +628,37 @@ test("공성전 수비: 성벽 위 수비병은 성문 양옆으로 걸어가 �
   for (let i = 0; i < TICK_RATE * 6; i++) stand();
   const filled = posts().some((e) => Math.abs(e.x - gapX) < 20 && e.x < 0);
   assert.ok(filled, "빈자리를 다른 수비병이 메운다");
+});
+
+test("성내 전장: 성문이 부서지면 잠시 뒤 졸개·성벽 수비병이 사라지고 군주·수비대·아군이 넓은 홀로 옮겨 간다", () => {
+  const { g, a } = setup(BSK_GUARDS);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  g.spawnEnemyAt(0, 0, 1); // 필드 졸개
+  (g as any).boss.strikeBarriers(GATE_X, GATE_Y + 40, 80, 1e9);
+  const info0 = (g as any).siegeInfo();
+  assert.ok(info0.open && !info0.hall && info0.enter > 0, "성문이 부서진 직후에는 돌입 대기");
+  for (let i = 0; i < TICK_RATE * (BOSS_LORD.hallEnterSec + 1); i++) g.step();
+  const info = (g as any).siegeInfo();
+  assert.ok(info.hall, "성내 전장으로 옮겨 갔다");
+  assert.ok(inHall(p.x, p.y), `주인공이 홀 안에 있다(${p.x},${p.y})`);
+  assert.ok(p.y > HALL.cy, "입구(남쪽)에 선다");
+  const lord = [...(g as any).enemies.values()].find((e: any) => e.boss);
+  assert.ok(lord && Math.hypot(lord.x - HALL_LORD[0], lord.y - HALL_LORD[1]) < 5, "군주는 옥좌 앞");
+  for (const e of (g as any).enemies.values()) assert.ok(inHall(e.x, e.y), `적이 홀 안에 있다(${e.x},${e.y})`);
+  assert.ok([...(g as any).enemies.values()].every((e: any) => e.boss || e.guard || e.art || e.hp > 0));
+});
+
+test("성내 전장: 홀 밖으로는 나가지 못하고, 졸개 증원은 홀 안에서 나온다", () => {
+  const { g, a } = setup(BSK_GUARDS);
+  const p = g.getPlayer(a)!;
+  p.maxHp = p.hp = 1e9;
+  (g as any).boss.strikeBarriers(GATE_X, GATE_Y + 40, 80, 1e9);
+  for (let i = 0; i < TICK_RATE * (BOSS_LORD.hallEnterSec + 1); i++) g.step();
+  g.setInput(a, { dx: -1, dy: 0, aim: 0, fire: false } as any);
+  for (let i = 0; i < TICK_RATE * 6; i++) g.step();
+  assert.ok(p.x >= HALL.cx - HALL.hw && p.x <= HALL.cx + HALL.hw, `홀 안(${p.x})`);
+  const n = (g as any).spawnSiegeWave(8);
+  assert.ok(n > 0);
+  for (const e of (g as any).enemies.values()) assert.ok(inHall(e.x, e.y), `증원도 홀 안(${e.x},${e.y})`);
 });

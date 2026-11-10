@@ -120,8 +120,43 @@ export function clampToWallTop(x: number, y: number): [number, number] {
   return best;
 }
 
+/**
+ * 성내 전장(옥좌의 방): 성문이 부서지면 전투가 성 밖 마당이 아니라 이 넓은 홀로 옮겨 간다(성 안쪽은 성 그림에 갇혀 좁아서 따로 만든 공간).
+ * 월드의 빈 구역(성보다 남쪽)에 서고, 서버는 지형을 치우고 벽·기둥을 세운다. 군주는 북쪽 옥좌 앞에, 아군은 남쪽 입구에서 들어온다.
+ */
+export const HALL = { cx: 0, cy: 380, hw: 1000, hh: 760 } as const; // 바닥 절반 너비·높이
+export const HALL_WALL = 120; // 바닥 바깥 벽 두께(그림)
+export const HALL_LORD: readonly [number, number] = [HALL.cx, HALL.cy - HALL.hh + 190]; // 군주가 서 있는 옥좌 앞
+export const HALL_ENTRY: readonly [number, number] = [HALL.cx, HALL.cy + HALL.hh - 170]; // 아군이 들어오는 입구
+/** 홀 안의 기둥(충돌하고 화살을 막는다) */
+export const HALL_PILLARS: readonly (readonly [number, number])[] = [
+  [-560, HALL.cy - 330], [560, HALL.cy - 330], [-560, HALL.cy + 20], [560, HALL.cy + 20], [-560, HALL.cy + 370], [560, HALL.cy + 370], [-230, HALL.cy - 120], [230, HALL.cy - 120],
+];
+export const HALL_PILLAR_R = 38;
+/** 홀 안(바닥 위)인가. extra만큼 넉넉하게 */
+export const inHall = (x: number, y: number, extra = 0): boolean => Math.abs(x - HALL.cx) <= HALL.hw + extra && Math.abs(y - HALL.cy) <= HALL.hh + extra;
+/** 홀 안으로 몸 반지름 r만큼 들여 넣은 위치 */
+export const clampToHall = (v: number, axis: "x" | "y", r: number): number => (axis === "x" ? Math.max(HALL.cx - HALL.hw + r, Math.min(HALL.cx + HALL.hw - r, v)) : Math.max(HALL.cy - HALL.hh + r, Math.min(HALL.cy + HALL.hh - r, v)));
+/** 홀 벽(바닥 바깥 둘레)과 기둥의 충돌 원 */
+export function hallSolids(): { walls: CastleSolid[]; pillars: CastleSolid[] } {
+  const walls: CastleSolid[] = [];
+  const r = 60;
+  const ex = HALL.hw + r - 10;
+  const ey = HALL.hh + r - 10;
+  for (let x = -ex; x <= ex + 1; x += 52) {
+    walls.push({ x: HALL.cx + x, y: HALL.cy - ey, r, tower: false }, { x: HALL.cx + x, y: HALL.cy + ey, r, tower: false });
+  }
+  for (let y = -ey + 52; y < ey - 1; y += 52) {
+    walls.push({ x: HALL.cx - ex, y: HALL.cy + y, r, tower: false }, { x: HALL.cx + ex, y: HALL.cy + y, r, tower: false });
+  }
+  const pillars = HALL_PILLARS.map(([x, y]) => ({ x, y, r: HALL_PILLAR_R, tower: false }));
+  return { walls, pillars };
+}
+
 /** 공성전 진행 정보(스테이지 10에서만 있다) */
 export interface SiegeInfo {
+  hall?: boolean; // 전투가 성내 전장(옥좌의 방)으로 옮겨 갔다
+  enter?: number; // 성문이 부서진 뒤 성 안으로 돌입하기까지 남은 시간(초, 0이면 없음)
   reveal: number; // 성이 드러난 정도 0..100
   gate: number; // 성문 체력 비율 0..100(0이면 부서졌다)
   open: boolean; // 성문이 부서져 군주를 칠 수 있다

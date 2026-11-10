@@ -619,6 +619,9 @@ export const SUPPLY = {
 
 /** 군주(스테이지 10, 공성전) 수치. 제안값이라 플레이하며 조정한다. */
 export const BOSS_LORD = {
+  hallEnterSec: 3.5, // 성문이 부서진 뒤 성내 전장(옥좌의 방)으로 돌입하기까지(함성·준비)
+  hallWaveGap: 11, // 성내 전장에서 졸개 증원이 들어오는 간격(초)
+  hallWaveBase: 7, // 증원 졸개 수(기본)
   firstDelay: 4,
   idleMin: 1.6,
   idleMax: 3,

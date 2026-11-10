@@ -290,7 +290,7 @@ import {
 import { resolveHit, type Hit, type HitResult } from "./combat.js";
 import { BossSystem } from "./boss/system.js";
 import type { BossKitState } from "./boss/types.js";
-import { BOSS_LORD, GATE_X, GATE_Y, HZ_GATE, RAMP_DOWN_AT, RAMP_OUT, RAMP_TOP_AT, RAMP_Y0, RAMP_Y1, RING, SIEGE, WALL_STRIPS, castleSolids, clampToWallTop, wallPathAt, WALL_CORNER_S, WALL_PATH_LEN, inCastleZone, inCourtyard, rampSideAt, type SiegeInfo } from "@mercenary/shared";
+import { BOSS_LORD, HALL, HALL_ENTRY, HALL_LORD, clampToHall, hallSolids, inHall, GATE_X, GATE_Y, HZ_GATE, RAMP_DOWN_AT, RAMP_OUT, RAMP_TOP_AT, RAMP_Y0, RAMP_Y1, RING, SIEGE, WALL_STRIPS, castleSolids, clampToWallTop, wallPathAt, WALL_CORNER_S, WALL_PATH_LEN, inCastleZone, inCourtyard, rampSideAt, type SiegeInfo } from "@mercenary/shared";
 import { type ArmySlot, SQUAD_KINDS, armyComposition, armyLayout, armySize, bossTypeOf, squadComposition, squadLayout, squadSize } from "./stage.js";
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
@@ -317,7 +317,7 @@ type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "xp"];
 const newMercMods = (): MercMods => ({
   hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 0, cast: 0,
-  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, thorns: 0, xp: 1,
+  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, thorns: 0, xp: 1, quiver: 0,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
 const NO_PERSONALITY: Personality = { name: "", short: "", mods: {}, ignore: 0 };
@@ -837,7 +837,7 @@ export class Game {
   /** 이번 판의 지형(없으면 평지). 방이 게임을 시작할 때 generateTerrain()으로 만든다. */
   terrain: TerrainMap | null = null;
   /** 공성전(스테이지 10): 성이 드러나는 중이거나 드러난 상태. 아니면 null */
-  siege: { t: number; solid: boolean; open: boolean; waveT: number; clock: number; sortieT: number; postT?: number } | null = null;
+  siege: { t: number; solid: boolean; open: boolean; waveT: number; clock: number; sortieT: number; postT?: number; enterT?: number; hall?: boolean } | null = null;
   private terrainTrack: { o: { x: number; y: number }; px: number; py: number; r: number; en?: boolean }[] = [];
 
   /** 이번 판의 지형을 새로 만든다(시작 지점 둘레는 비워 둔다) */
@@ -1819,6 +1819,7 @@ export class Game {
   siegeGateBroken(): void {
     if (!this.siege || this.siege.open) return;
     this.siege.open = true;
+    this.siege.enterT = BOSS_LORD.hallEnterSec; // 잠시 뒤 전투가 성내 전장으로 옮겨 간다
     for (const e of this.enemies.values()) if (e.hold && !e.post) e.hold = false; // 성 안 수비대가 움직이기 시작한다
     // 성벽 윗면 통로는 높은 곳이다(아래에서 올려다보며 쏘면 약하고, 위에서 쏘면 강하다)
     for (const r of WALL_STRIPS) this.terrain?.addHighRect(r[0], r[1], r[2], r[3]);
@@ -1827,7 +1828,7 @@ export class Game {
   /** 성문이 부서진 뒤 안뜰의 아군 궁병 용병은 가까운 계단으로 성벽에 올라 통로에 흩어져 선다 */
   private stepWallArchers(): void {
     const s = this.siege;
-    if (!s?.open || this.phase === "tournament") return;
+    if (!s?.open || s.hall || this.phase === "tournament") return;
     for (const m of this.mercs.values()) {
       const wo = m as unknown as { wall?: boolean; climb?: boolean };
       if (m.type !== ARCHER || m.respawn > 0) continue;
@@ -1854,7 +1855,69 @@ export class Game {
     const s = this.siege;
     if (!s) return null;
     const gate = this.boss.hazards.find((h) => h.kind === HZ_GATE && h.t > 0);
-    return { reveal: Math.round(Math.min(1, s.t / SIEGE.revealSec) * 100), gate: s.open ? 0 : gate ? Math.max(1, Math.ceil((100 * gate.hp) / gate.hpMax)) : 100, open: s.open, sortie: s.sortieT > 0, guards: this.guardCount() };
+    return { reveal: Math.round(Math.min(1, s.t / SIEGE.revealSec) * 100), gate: s.open ? 0 : gate ? Math.max(1, Math.ceil((100 * gate.hp) / gate.hpMax)) : 100, open: s.open, sortie: s.sortieT > 0, guards: this.guardCount(), ...(s.hall ? { hall: true } : {}), ...((s.enterT ?? 0) > 0 ? { enter: Math.ceil(s.enterT!) } : {}) };
+  }
+
+  /** 군주가 서 있는 자리(성내 전장에서는 옥좌 앞) */
+  lordHome(): readonly [number, number] {
+    return this.siege?.hall ? HALL_LORD : [SIEGE.lordX, SIEGE.lordY];
+  }
+
+  /**
+   * 성문이 부서진 뒤 전투를 성내 전장(옥좌의 방)으로 옮긴다: 필드의 졸개·성벽 수비병·장판을 치우고, 홀의 지형을 비워 벽과 기둥을 세운 뒤,
+   * 군주·수비대는 북쪽 옥좌 앞에, 주인공·용병은 남쪽 입구에 선다. 그 뒤 졸개 증원은 홀 양옆·북쪽 문에서 들어온다.
+   */
+  private enterHall(): void {
+    const s = this.siege;
+    if (!s || s.hall) return;
+    s.hall = true;
+    this.endCommand();
+    this.squads.clear();
+    this.army = null;
+    this.boss.hazards = [];
+    this.terrain?.clearWhere((it) => inHall(it[1], it[2], 360));
+    if (this.terrain) {
+      const hs = hallSolids();
+      this.terrain.addSolids(hs.walls, this.terrain.items.length + 8, false);
+      this.terrain.addSolids(hs.pillars, this.terrain.items.length + 9, true);
+    }
+    for (const [id, c] of [...this.camps]) if (inHall(c.x, c.y, 360)) this.camps.delete(id);
+    for (const [id, t] of [...this.tents]) if (inHall(t.x, t.y, 360)) this.tents.delete(id);
+    // 졸개·성벽 수비병은 치우고, 군주·수비대·근위대만 홀로 옮긴다
+    let garrison = 0;
+    for (const [id, e] of [...this.enemies]) {
+      if (e.boss) {
+        e.x = HALL_LORD[0];
+        e.y = HALL_LORD[1];
+      } else if (e.guard) {
+        e.x = HALL_LORD[0] + (e.x - SIEGE.lordX);
+        e.y = HALL_LORD[1] + (e.y - SIEGE.lordY);
+      } else if (e.art && !e.post) {
+        const row = e.type === SHIELD ? 0 : e.type === SPEAR ? 1 : 2;
+        const n = Math.max(1, [...this.enemies.values()].filter((o) => o.art && !o.post && o.type === e.type).length);
+        const idx = garrison++ % Math.max(1, n);
+        e.x = HALL_LORD[0] + (idx - (n - 1) / 2) * 52;
+        e.y = HALL_LORD[1] + 250 + row * 46;
+        e.hold = false;
+      } else this.enemies.delete(id);
+    }
+    // 아군: 주인공은 입구에 나란히, 용병은 그 둘레에
+    const alive = [...this.slots.values()];
+    alive.forEach((sl, i) => {
+      const x = HALL_ENTRY[0] + (i - (alive.length - 1) / 2) * 110;
+      sl.state.x = x;
+      sl.state.y = HALL_ENTRY[1];
+      let k = 0;
+      const mine = [...this.mercs.values()].filter((m) => m.owner === sl.state.id);
+      for (const m of mine) {
+        const a = (k++ / Math.max(1, mine.length)) * Math.PI * 2;
+        m.x = clampToHall(x + Math.cos(a) * 70, "x", 20);
+        m.y = clampToHall(HALL_ENTRY[1] + Math.sin(a) * 70, "y", 20);
+        (m as unknown as { wall?: boolean }).wall = false;
+        m.cmd = undefined;
+      }
+    });
+    s.waveT = BOSS_LORD.hallWaveGap * 0.6;
   }
 
   private stepSiege(dt: number): void {
@@ -1863,6 +1926,10 @@ export class Game {
     if (!s) return;
     s.t += dt;
     s.sortieT = Math.max(0, s.sortieT - dt);
+    if (s.open && !s.hall && (s.enterT ?? 0) > 0) {
+      s.enterT = Math.max(0, s.enterT! - dt);
+      if (s.enterT <= 0) this.enterHall();
+    }
     if (!s.solid && s.t >= SIEGE.revealSec * SIEGE.solidAt) this.siegeSolidify();
     if (s.open || this.phase === "boss") this.leashGuards();
     this.stepWallArchers();
@@ -1876,14 +1943,15 @@ export class Game {
   /** 근위대는 군주에게서 일정 범위 안에서만 쫓아온다(범위 밖으로 나가려 하면 경계에서 멈춘다) */
   private leashGuards(): void {
     const R = BOSS_LORD.guardsLeash;
+    const [hx, hy] = this.lordHome();
     for (const e of this.enemies.values()) {
       if (!e.guard) continue;
-      const dx = e.x - SIEGE.lordX;
-      const dy = e.y - SIEGE.lordY;
+      const dx = e.x - hx;
+      const dy = e.y - hy;
       const d = Math.hypot(dx, dy);
       if (d > R) {
-        e.x = SIEGE.lordX + (dx / d) * R;
-        e.y = SIEGE.lordY + (dy / d) * R;
+        e.x = hx + (dx / d) * R;
+        e.y = hy + (dy / d) * R;
       }
     }
   }
@@ -1967,7 +2035,7 @@ export class Game {
     s.waveT -= dt;
     if (s.waveT > 0) return;
     const C = BOSS_LORD;
-    s.waveT = Math.max(C.waveGapMin, C.waveGapStart - C.waveGapDrop * s.clock);
+    s.waveT = s.hall ? C.hallWaveGap : Math.max(C.waveGapMin, C.waveGapStart - C.waveGapDrop * s.clock);
     let field = 0;
     for (const e of this.enemies.values()) if (!e.boss) field++;
     const want = Math.min(C.waveMax, Math.round((C.waveBase + C.waveGrow * s.clock) * (1 + 0.25 * (this.slots.size - 1))), C.fieldCap - field);
@@ -1982,6 +2050,14 @@ export class Game {
     const half = WORLD_SIZE / 2 - 80;
     let x = 0;
     let y = half;
+    if (this.siege?.hall) {
+      // 성내 전장: 홀 양옆·북쪽 문에서 증원이 들어온다(플레이어에게서 먼 곳)
+      const doors: [number, number][] = [[HALL.cx - HALL.hw + 110, HALL.cy - 120], [HALL.cx + HALL.hw - 110, HALL.cy - 120], [HALL.cx - HALL.hw + 110, HALL.cy + 260], [HALL.cx + HALL.hw - 110, HALL.cy + 260], [HALL.cx - 300, HALL.cy - HALL.hh + 120], [HALL.cx + 300, HALL.cy - HALL.hh + 120]];
+      doors.sort((a, b) => Math.hypot(b[0] - tgt.x, b[1] - tgt.y) - Math.hypot(a[0] - tgt.x, a[1] - tgt.y));
+      const d = doors[Math.floor(this.rng() * Math.min(3, doors.length))]!;
+      x = d[0];
+      y = d[1];
+    } else
     for (let k = 0; k < 10; k++) {
       const ang = this.rng() * Math.PI * 2;
       const r = 900 + this.rng() * 300;
@@ -2003,6 +2079,10 @@ export class Game {
     let made = 0;
     for (const type of types.slice(0, n)) {
       const e = this.makeEnemy(clampToWorld(x + (this.rng() - 0.5) * 220, 14), clampToWorld(y + (this.rng() - 0.5) * 220, 14), type, {});
+      if (this.siege?.hall) {
+        e.x = clampToHall(e.x, "x", 40);
+        e.y = clampToHall(e.y, "y", 40);
+      }
       e.maxHp *= hpM;
       e.hp *= hpM;
       e.shield *= hpM;
@@ -2046,7 +2126,8 @@ export class Game {
     const types = [SHIELD, SPEAR, ARCHER, MAGE];
     const spots: [number, number][] = [[-150, 60], [-60, 100], [60, 100], [150, 60]];
     types.forEach((type, i) => {
-      const e = this.makeEnemy(SIEGE.lordX + spots[i]![0], SIEGE.lordY + spots[i]![1], type, { guard: true, elite: true, face: Math.PI / 2 });
+      const [hx, hy] = this.lordHome();
+      const e = this.makeEnemy(hx + spots[i]![0], hy + spots[i]![1], type, { guard: true, elite: true, face: Math.PI / 2 });
       e.maxHp *= BOSS_LORD.guardsHp;
       e.hp *= BOSS_LORD.guardsHp;
       e.shield *= BOSS_LORD.guardsHp;
@@ -3168,7 +3249,7 @@ export class Game {
     if (!this.autoSpawn) return;
     this.tentTimer -= dt;
     const alive = this.alivePlayers();
-    if (this.tentTimer > 0 || alive.length === 0) return;
+    if (this.tentTimer > 0 || alive.length === 0 || this.siege?.hall) return;
     this.tentTimer = TENT.intervalSec;
     if (this.tents.size >= Math.min(TENT.max, Math.ceil(alive.length / 2))) return;
     for (let attempt = 0; attempt < 6; attempt++) {
@@ -3948,7 +4029,7 @@ export class Game {
     if (!this.autoSpawn) return;
     this.campTimer -= dt;
     const alive = this.alivePlayers();
-    if (this.campTimer > 0 || alive.length === 0) return;
+    if (this.campTimer > 0 || alive.length === 0 || this.siege?.hall) return;
     this.campTimer = TUNE.CAMP_SPAWN_INTERVAL_SEC;
     if (this.camps.size >= Math.min(CAMP_MAX, Math.ceil(alive.length / 2) + 1)) return;
     for (let attempt = 0; attempt < 6; attempt++) {
@@ -4311,7 +4392,7 @@ export class Game {
     }
     this.boss.onDeath(m.x, m.y, m.type, m.owner, false); // 안개 속이면 시체가 남는다
     m.hp = 0;
-    m.ammo = TUNE.MERC_QUIVER_SIZE; // 쓰러졌다 돌아오면 전통이 가득 찬다
+    m.ammo = this.mercQuiver(m); // 쓰러졌다 돌아오면 전통이 가득 찬다
     m.reloadT = 0;
     m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * respawnTimeMult(owner ? mstat(owner.mods, m.type, "respawn") : 0) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
     if (owner) {
@@ -4543,7 +4624,7 @@ export class Game {
       if ((m.reloadT ?? 0) > 0) {
         // 궁병 용병 장전 중: 쏘지 못하지만(재사용 대기를 남은 장전 시간만큼 묶는다) 움직일 수 있다
         m.reloadT = Math.max(0, m.reloadT! - dt);
-        if (m.reloadT === 0) m.ammo = TUNE.MERC_QUIVER_SIZE;
+        if (m.reloadT === 0) m.ammo = this.mercQuiver(m);
         else m.cd = Math.max(m.cd, m.reloadT);
       }
 
@@ -5900,7 +5981,7 @@ export class Game {
       const n = 1 + Math.round(mstat(mods, m.type, "multi"));
       if (m.type === ARCHER) {
         // 전통: 쏜 화살 수만큼 줄고, 다 쏘면 장전한다(장전 중에는 AI가 쏘지 못한다)
-        m.ammo = Math.max(0, (m.ammo ?? TUNE.MERC_QUIVER_SIZE) - n);
+        m.ammo = Math.max(0, (m.ammo ?? this.mercQuiver(m)) - n);
         if (m.ammo <= 0) m.reloadT = TUNE.MERC_RELOAD_SEC;
       }
       for (let i = 0; i < n; i++) {
@@ -6075,6 +6156,21 @@ export class Game {
     for (const s of this.slots.values()) {
       s.state.x = clampToWorld(s.state.x, PLAYER_RADIUS);
       s.state.y = clampToWorld(s.state.y, PLAYER_RADIUS);
+    }
+    if (this.siege?.hall) {
+      // 성내 전장: 홀 안에서만 움직인다
+      for (const m of this.mercs.values()) {
+        m.x = clampToHall(m.x, "x", 14);
+        m.y = clampToHall(m.y, "y", 14);
+      }
+      for (const e of this.enemies.values()) {
+        e.x = clampToHall(e.x, "x", 14);
+        e.y = clampToHall(e.y, "y", 14);
+      }
+      for (const s of this.slots.values()) {
+        s.state.x = clampToHall(s.state.x, "x", PLAYER_RADIUS);
+        s.state.y = clampToHall(s.state.y, "y", PLAYER_RADIUS);
+      }
     }
   }
 
@@ -6515,6 +6611,7 @@ export class Game {
       case "mercStat": {
         const target = e.type === undefined ? m.all : m.type[e.type]!;
         target[e.stat] += e.v;
+        if (e.stat === "quiver") for (const merc of this.mercs.values()) if (merc.owner === p.id && merc.type === ARCHER && merc.ammo !== undefined && (e.type === undefined || e.type === merc.type)) merc.ammo += Math.round(e.v); // 늘어난 만큼 지금 전통에도 채워 준다
         break;
       }
       case "legend":
@@ -6585,6 +6682,12 @@ export class Game {
     const d = this.persona(m).mods[stat];
     if (!d) return base;
     return MULT_STATS.includes(stat) ? base * (1 + d) : base + d;
+  }
+
+  /** 궁병 용병의 전통 크기(기본 + 화살 수 카드) */
+  mercQuiver(m: Merc): number {
+    const mods = this.slots.get(m.owner)?.mods;
+    return TUNE.MERC_QUIVER_SIZE + (mods ? Math.round(mstat(mods, m.type, "quiver")) : 0);
   }
 
   /** 레벨업 카드와 강화 단계가 반영된 용병 능력치 */

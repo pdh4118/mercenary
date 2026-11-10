@@ -64,7 +64,7 @@ for (const [id, d] of Object.entries(legendDescs())) LEGENDS[id as LegendId].des
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
 /** 용병 능력치 종류. 배율 계열(hp~area, xp)은 곱해지고, 나머지는 더해진다. 방어력·회피율·부활 속도·시전 속도는 더한 값 x를 x/(1+x) 꼴로 환산한다(상한 없음). */
-export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "lifesteal" | "pierce" | "multi" | "poison" | "armor" | "respawn" | "knock" | "thorns" | "xp" | "cast";
+export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "lifesteal" | "pierce" | "multi" | "poison" | "armor" | "respawn" | "knock" | "thorns" | "xp" | "cast" | "quiver";
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
@@ -137,10 +137,11 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
   thorns: "근접 반사",
   xp: "경험치 획득",
   cast: "시전 속도",
+  quiver: "화살 수",
 };
 /** 병종 전용 일반 카드 한 장의 효과량(이전의 1.5배: 후반에는 용병술이 더 중요하도록). 관통·발사 수는 개수라 그대로다. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.375, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.04,
+  hp: 0.375, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.04, quiver: 6,
 };
 /** 수치 조정 도구로 바꿀 수 있는 카드 설정 */
 export const CARD_TUNE = { globalFactor: 0.35, globalLifesteal: 5, globalWeight: 6, legendWeight: 0.6, bloodthirstWeight: 1.6, legendMinLevel: 6 };
@@ -169,7 +170,7 @@ export const GLOBAL_CARD_FACTOR = 0.35; // 기본값(수치 조정 도구가 바
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
   ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "area", "xp"], // 기병
   ["hp", "dmg", "range", "defense", "armor", "thorns", "lifesteal", "atkSpeed", "area", "knock", "xp"], // 창병
-  ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "armor", "knock", "xp"], // 궁병(화살이라 범위는 없다. 거리를 유지하는 병종이라 넉백을 쓴다)
+  ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "quiver", "armor", "knock", "xp"], // 궁병(화살이라 범위는 없다. 거리를 유지하는 병종이라 넉백을 쓴다)
   ["hp", "defense", "armor", "thorns", "regen", "lifesteal", "dmg", "respawn", "atkSpeed", "area", "xp"], // 검방병
   ["dmg", "area", "hp", "armor", "thorns", "lifesteal", "critMult", "atkSpeed", "xp"], // 둔기병
   ["dmg", "area", "range", "atkSpeed", "cast", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
@@ -178,11 +179,12 @@ export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
 /** 등급을 반영한 효과량. 관통은 정수로 1/2/3, 나머지는 등급 배율. */
 export const scaledValue = (stat: MercStat | "heroPierce" | "heroMulti" | "heroArmor" | "heroThorns", base: number, rarity: number): number =>
-  stat === "armor" || stat === "heroArmor" ? base * rarity : stat === "thorns" || stat === "heroThorns" ? round3(base * (rarity + 1)) : stat === "multi" || stat === "heroMulti" ? base * rarity : stat === "pierce" || stat === "heroPierce" ? base * (rarity + 1) : round3(base * RARITY[rarity]!.mult);
+  stat === "armor" || stat === "heroArmor" ? base * rarity : stat === "thorns" || stat === "heroThorns" ? round3(base * (rarity + 1)) : stat === "multi" || stat === "heroMulti" ? base * rarity : stat === "quiver" ? base * (rarity + 1) : stat === "pierce" || stat === "heroPierce" ? base * (rarity + 1) : round3(base * RARITY[rarity]!.mult);
 
 /** 능력치 변화량을 사람이 읽는 문구로 */
 export function describeStat(stat: MercStat, v: number): string {
   if (stat === "pierce" || stat === "multi") return `+${v}`;
+  if (stat === "quiver") return `+${Math.round(v)}발`;
   if (stat === "armor") return `-${v}`;
   if (stat === "thorns") return `${v}`;
   if (stat === "poison") return `화살 피해의 ${Math.round(v * 100)}%`;
@@ -218,14 +220,14 @@ export const ARCHER_KNOCK_FACTOR = 0.5;
 const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 };
 
 /** 병종 전용 카드로만 나오는 능력치(그 병종의 특화): 관통·발사 수·독은 궁병, 방어구·가시는 몸으로 싸우는 병종, 시전 시간은 마법사, 넉백은 창병·궁병 */
-const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "cast", "knock"]); // 피해 감소·피해 반사는 용병 공용 카드로 나온다
+const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "cast", "knock", "quiver"]); // 피해 감소·피해 반사는 용병 공용 카드로 나온다
 
 const statCards = (): CardDef[] => {
   const out: CardDef[] = [];
   for (const t of UNIT_TYPES) {
     for (const stat of MERC_TYPE_FOCUS[t]!) {
       if (!TYPE_ONLY_STATS.has(stat)) continue; // 그 병종만의 특화 능력이 아니면 용병 공용 카드로만 나온다
-      const special = stat === "pierce" || stat === "multi" || stat === "poison" || stat === "critMult" || stat === "thorns";
+      const special = stat === "pierce" || stat === "multi" || stat === "poison" || stat === "critMult" || stat === "thorns" || stat === "quiver";
       for (let r = stat === "armor" || stat === "multi" ? 1 : 0; r < 3; r++) { // 방어구·발사 수는 희귀부터
         const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * (stat === "knock" && t === ARCHER ? ARCHER_KNOCK_FACTOR : 1));
         out.push({
@@ -243,7 +245,7 @@ const statCards = (): CardDef[] => {
     }
   }
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
-    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "cast" || stat === "knock") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
+    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "cast" || stat === "knock" || stat === "quiver") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
     for (let r = stat === "armor" ? 1 : 0; r < 3; r++) { // 피해 감소는 희귀부터(일반은 0이다)
       const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * CARD_TUNE.globalFactor * (stat === "lifesteal" ? CARD_TUNE.globalLifesteal : 1));
       out.push({
