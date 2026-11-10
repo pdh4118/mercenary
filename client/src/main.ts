@@ -308,8 +308,7 @@ async function main() {
   // 철퇴 투척: 날아가는 철퇴, 궤적 3컷, 적중 충격 4컷(없으면 도형·고리로 대신한다)
   const maceThrownTex = await Assets.load<Texture>("assets/fx/skill_mace_thrown.png").catch(() => null);
   const maceTrailTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_trail_${i}.png`).catch(() => null)));
-  // 철퇴 충격파: 힘 모으기 룬 원 6컷, 땅을 찍는 충격파 6컷, 갈라진 땅 자국, 급여 금화 아이콘. 없으면 도형으로 대신한다.
-  const slamChargeTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_slam_charge_${i}.png`).catch(() => null)));
+  // 철퇴 충격파: 땅을 찍는 충격파 6컷, 갈라진 땅 자국, 급여 금화 아이콘. 없으면 도형으로 대신한다.
   const slamWaveTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_slam_wave_${i}.png`).catch(() => null)));
   const slamCrackTex = await Assets.load<Texture>("assets/fx/skill_slam_crack.png").catch(() => null);
   const coinTex = await Assets.load<Texture>("assets/fx/icon_gold_coin.png").catch(() => null);
@@ -1302,8 +1301,6 @@ async function main() {
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
   const slamFx: { sp: Sprite; age: number; r: number; kind: 0 | 1 }[] = []; // 충격파(0)·갈라진 자국(1)
-  const slamChargeSeen = new Set<number>(); // 이번 프레임에 모으는 중이던 주인공
-  const slamCharges = new Map<number, Sprite>(); // 힘을 모으는 중인 주인공별 룬 원
   const maceHits: { sp: Sprite; age: number; r: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean; t0: number }[]>(); // 방벽 번호 -> 수정 조각들
   const WALL_PIECE_W = 96; // 조각 하나의 화면 너비(px)
@@ -3011,13 +3008,6 @@ async function main() {
       }
     });
 
-    // 철퇴 충격파를 더 이상 모으지 않는 주인공의 룬 원을 치운다(지난 프레임에 보이지 않은 것)
-    for (const [pid, sp] of [...slamCharges]) {
-      if (slamChargeSeen.has(pid)) continue;
-      sp.destroy();
-      slamCharges.delete(pid);
-    }
-    slamChargeSeen.clear();
     // 공격 예고
     fxLayer.clear();
     // 토너먼트 경기장
@@ -3621,28 +3611,11 @@ async function main() {
         const prog = Math.max(0, Math.min(1, 1 - (p.sm ?? 0) / (p.smMax || 1)));
         const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 60);
         fxLayer.circle(v.x, v.y, R).stroke({ width: 3, color: 0xffc27a, alpha: 0.5 + 0.25 * pulse });
-        if (slamChargeTex.every((t) => t !== null)) {
-          let sp = slamCharges.get(p.id);
-          if (!sp) {
-            sp = new Sprite(slamChargeTex[0]!);
-            sp.anchor.set(0.5);
-            groundFx.addChild(sp);
-            slamCharges.set(p.id, sp);
-          }
-          const t = slamChargeTex[Math.min(4, Math.floor(prog * 5))]!; // 점점 밝은 컷(마지막 컷은 사라지는 컷이라 쓰지 않는다)
-          sp.texture = t;
-          sp.position.set(v.x, v.y);
-          sp.width = R * 2.25;
-          sp.height = (sp.width * t.height) / t.width;
-          sp.alpha = 0.55 + 0.45 * prog;
-          slamChargeSeen.add(p.id);
-        } else {
-          fxLayer
-            .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
-            .fill({ color: 0xff9a3c, alpha: 0.1 + 0.28 * prog })
-            .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
-            .stroke({ width: 2, color: 0xffe6b0, alpha: 0.7 });
-        }
+        fxLayer
+          .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
+          .fill({ color: 0xff9a3c, alpha: 0.1 + 0.28 * prog })
+          .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
+          .stroke({ width: 2, color: 0xffe6b0, alpha: 0.7 });
       }
       if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
         // 철퇴 준비 동작: 범위가 점점 진하게 차오른다(맞기 직전까지 피하라는 신호가 아니라 휘두르는 타이밍 표시)
