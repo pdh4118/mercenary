@@ -148,8 +148,8 @@ export const TUNE = {
   SKILL_DASH_DIST: 240, // 창 돌진 거리(px)
   SKILL_DASH_SEC: 0.18, // 돌진에 걸리는 시간
   SKILL_INVULN_SEC: 1.5, // 검 무적 지속(초)
-  SKILL_SLAM_CHARGE_SEC: 0.9, // 철퇴 스킬(충격파): 힘을 모으는 시간(초). 이 동안 느리게만 움직이고 공격하지 못하며, 끝나면 제자리를 찍는다
-  SKILL_SLAM_RADIUS: 190, // 충격파 반경(px). 스킬 효과 카드로 늘어난다
+  SKILL_SLAM_CHARGE_SEC: 1.2, // 철퇴 스킬(충격파): 힘을 모으는 시간(초). 이 동안 느리게만 움직이고 공격하지 못하며, 끝나면 제자리를 찍는다
+  SKILL_SLAM_RADIUS: 150, // 충격파 반경(px). 스킬 효과 카드로 늘어난다
   SKILL_SLAM_DAMAGE: 2.5, // 충격파 피해(철퇴 피해 대비). 범위 안의 모든 적에게 들어가고 스킬 효과 카드로는 늘지 않는다(범위만 늘어난다)
   SKILL_SLAM_MOVE: 0.3, // 힘을 모으는 동안 이동 속도 배율
   SKILL_SLAM_KNOCK: 150, // 충격파 넉백 거리(px)
