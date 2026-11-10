@@ -307,6 +307,7 @@ test("공성전: 포위령은 졸개를 플레이어 둘레의 호(깃발병 포
     g.step();
     p.hp = p.maxHp;
   }
+  assert.ok([...(g as any).squads.values()].some((q: any) => q.cmd && q.engaged), "포위가 좁혀지면 자리를 풀고 달려든다(자리 다툼으로 떨지 않는다)");
   const still: any[] = [...(g as any).enemies.values()].filter((e) => e.cmd && e.ringAng !== undefined);
   if (still.length) {
     const m2 = still.find((e) => e.type !== 2);

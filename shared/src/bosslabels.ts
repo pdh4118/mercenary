@@ -2331,14 +2331,32 @@ export const BOSS_LABELS: Record<string, { boss: string; skill: string; label: s
  "BOSS_LORD.cmdHurry": {
   "boss": "군주",
   "skill": "기본",
-  "label": "명령받은 졸개가 대열 자리로 서둘러 가는 속",
-  "hint": "명령받은 졸개가 대열 자리로 서둘러 가는 속도 배율(평소 진형 복귀는 1.2배)"
+  "label": "포위령: 명령받은 졸개가 멀리 포위 자리로 ",
+  "hint": "포위령: 명령받은 졸개가 멀리 포위 자리로 가는 속도 배율(평소 진형 복귀는 1.2배)"
+ },
+ "BOSS_LORD.cmdHurryMarch": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "진군령: 대열 자리로 가는 속도 배율",
+  "hint": "진군령: 대열 자리로 가는 속도 배율(이미 가까이 있다)"
+ },
+ "BOSS_LORD.cmdHurryRally": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "집결령: 성문 앞 방어선으로 가는 속도 배율",
+  "hint": "집결령: 성문 앞 방어선으로 가는 속도 배율(걸어서 모이는 느낌)"
+ },
+ "BOSS_LORD.cmdRingEngage": {
+  "boss": "군주",
+  "skill": "기본",
+  "label": "포위령: 포위 반지름이 이만큼 줄면",
+  "hint": "포위령: 포위 반지름이 이만큼 줄면(졸개가 많으면 더 크게) 자리를 풀고 한꺼번에 달려든다"
  },
  "BOSS_LORD.cmdRallySec": {
   "boss": "군주",
   "skill": "기본",
   "label": "지속 시간(초)",
-  "hint": "집결령: 졸개가 성문 앞에서 방어선을 지키는 시간"
+  "hint": "집결령: 졸개가 성문 앞에서 방어선을 지키는 시간(모이는 시간 포함)"
  },
  "BOSS_LORD.cmdRallyY": {
   "boss": "군주",

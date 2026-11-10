@@ -495,6 +495,7 @@ export interface Enemy extends Fighter {
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
   cmdAtk?: number; // 진군령 계열 명령으로 곱해 둔 공격 강화(풀 때 이만큼 나눈다)
   cmdRed?: number; // 같은 명령의 받는 피해 감소 비율
+  cmdKind?: number; // 받은 명령 종류(1 진군령·2 포위령·3 집결령)
   ringAng?: number; // 포위령: 포위망에서 서는 각도
   ringOut?: number; // 포위령: 이 졸개가 서는 바깥쪽 추가 거리(궁병)
   cmd?: boolean; // 군주의 진군령을 받아 대열을 갖춰 전진 중(피해 감소·공격 강화)
@@ -792,7 +793,7 @@ export class Game {
   private stageTime = 0; // 이번 스테이지에서 흐른 성장 시간(적 생성량 계산용)
   status: GameStatus = "playing";
   private armyTotal = 0;
-  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean; kind?: number; age?: number; ringR0?: number }>(); // kind: 진군령 1·포위령 2·집결령 3, cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
+  private squads = new Map<number, { a: Army; left: number; size: number; cmd?: boolean; kind?: number; age?: number; ringR0?: number; engageR?: number; engaged?: boolean }>(); // kind: 진군령 1·포위령 2·집결령 3, cmd: 군주의 진군령으로 임시로 짠 대열(전멸해도 보상이 없고, 명이 끝나면 풀린다)
   private nextSquadId = 1;
   private squadTimer = SQUAD_FIRST;
 
@@ -2289,6 +2290,7 @@ export class Game {
     e.cmd = true;
     e.cmdRed = b.red;
     e.cmdAtk = 1 + b.atk;
+    e.cmdKind = kind;
     e.dmgMult *= e.cmdAtk;
   }
 
@@ -2431,7 +2433,7 @@ export class Game {
     for (let k = 0; k < arcs; k++) {
       const id = this.nextSquadId++;
       ids.push(id);
-      this.squads.set(id, { a: { x: cx, y: cy, heading: 0 }, left: 0, size: 0, cmd: true, kind: 2, age: 0, ringR0: r0 });
+      this.squads.set(id, { a: { x: cx, y: cy, heading: 0 }, left: 0, size: 0, cmd: true, kind: 2, age: 0, ringR0: r0, engageR: Math.min(r0 * 0.8, Math.max(C.cmdRingEngage, (n * 42) / (2 * Math.PI))) });
     }
     // 각도 배분: 퇴로 쪽(±cmdRetreatArc°)에 cmdRetreatShare 비율의 졸개를 촘촘히, 나머지는 성 쪽에 듬성듬성
     const half = (C.cmdRetreatArc * Math.PI) / 180;
@@ -2461,7 +2463,7 @@ export class Game {
   }
 
   /** 포위령 한 호의 자리를 갱신한다: 포위 중심이 플레이어 무리를 따라가고, 자리를 잡은 뒤에는 반지름이 줄어든다. */
-  private stepRing(sq: { a: Army; age?: number; ringR0?: number }, dt: number): void {
+  private stepRing(sq: { a: Army; age?: number; ringR0?: number; engageR?: number; engaged?: boolean }, dt: number): void {
     const C = BOSS_LORD;
     sq.age = (sq.age ?? 0) + dt;
     const present = this.presentPlayers();
@@ -2481,6 +2483,7 @@ export class Game {
     const closing = Math.max(0, sq.age - C.cmdSiegeForm) / Math.max(0.1, C.cmdSiegeSec - C.cmdSiegeForm);
     const r0 = sq.ringR0 ?? C.cmdRingR;
     const r = r0 + (C.cmdRingMin - r0) * Math.min(1, closing);
+    if (!sq.engaged && r <= (sq.engageR ?? C.cmdRingEngage)) sq.engaged = true; // 포위가 충분히 좁혀졌다: 졸개가 자리를 풀고 한꺼번에 달려든다
     for (const e of this.enemies.values()) {
       if (!e.cmd || e.ringAng === undefined || !e.squad || this.squads.get(e.squad)?.a !== sq.a) continue;
       const rr = r + (e.ringOut ?? 0);
@@ -2499,6 +2502,7 @@ export class Game {
       e.dmgMult /= e.cmdAtk ?? 1;
       e.cmdAtk = undefined;
       e.cmdRed = undefined;
+      e.cmdKind = undefined;
       e.ringAng = undefined;
       e.ringOut = undefined;
     }
@@ -6679,7 +6683,8 @@ export class Game {
       if (e.boss && this.boss.step(e, dt, foes)) continue; // 스킬을 쓰는 동안은 스킬이 움직임을 정한다
 
       const group = e.army ? this.army : e.squad ? (this.squads.get(e.squad)?.a ?? null) : null;
-      const home = group ? this.armySlotPos(e.slotF, e.slotL, group) : null;
+      const engaged = e.cmdKind === 2 && !!e.squad && !!this.squads.get(e.squad)?.engaged; // 포위가 충분히 좁혀졌다: 자리를 풀고 달려든다
+      const home = group && !engaged ? this.armySlotPos(e.slotF, e.slotL, group) : null;
       const leashed = home !== null && Math.hypot(home[0] - e.x, home[1] - e.y) > ARMY_LEASH;
       const aggro = Math.max(ARMY_AGGRO, st.reach + 20);
       // 대상: 병종별 성향(기병은 궁병·둔기병, 둔기병은 방패 든 검방병, 창병은 기병, 궁병은 방패 정면이 아닌 쪽)을 거리에 반영해 고른다
@@ -6721,7 +6726,7 @@ export class Game {
       if (!target) {
         // 진형 소속은 자리를 지키며 대열과 함께 움직인다
         if (home) {
-          this.moveToward(e, home[0], home[1], st.speed * (e.cmd ? BOSS_LORD.cmdHurry : 1.2), dt, 4);
+          this.moveToward(e, home[0], home[1], st.speed * (e.cmd ? (e.cmdKind === 3 ? BOSS_LORD.cmdHurryRally : e.cmdKind === 2 ? BOSS_LORD.cmdHurry : BOSS_LORD.cmdHurryMarch) : 1.2), dt, 4);
           e.face = group!.heading;
         }
         continue;
