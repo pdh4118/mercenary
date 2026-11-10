@@ -254,6 +254,7 @@ export const EVT_DMG_POISON = 16; // 독이 적에게 준 피해(보라색 숫�
 export const EVT_DMG_POISON_ALLY = 17; // 독이 아군(주인공·용병)에게 준 피해(보라색 숫자)
 export const EVT_COUNTER = 15; // 달려오던 기병이 창에 먼저 맞아 속도를 잃고 카운터를 입음(val = 카운터 피해)
 export const EVT_METEOR = 13; // 운석이 떨어져 폭발함(val = 반경, owner = 쏜 플레이어(0이면 적), ang = 1이면 보스의 마법, 2이면 주인공이 직접 쏜 마법)
+export const EVT_PAY = 26; // 용병 급여가 빠져나감(val = 금액, ang 0 = 지급, 1 = 금화가 모자라 못 줌, owner = 주인. 주인공 머리 위에 금화 아이콘과 -금액을 띄운다)
 export const EVT_QUIT = 25; // 급여를 못 받은 용병이 떠남(val = 병종, ang = 단계, owner = 주인)
 export const EVT_TENT = 24; // 텐트에 들어가거나 나옴(val 0 = 들어감, 1 = 나옴)
 export const EVT_RICE = 23; // 군량병(val 0 = 쓰러져 쌀 자루가 터짐 / 1 = 쌀을 먹어 회복함, owner = 먹은 쪽 주인공)

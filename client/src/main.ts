@@ -37,6 +37,7 @@ import {
   EVT_DODGE,
   EVT_INVULN,
   EVT_QUIT,
+  EVT_PAY,
   EVT_WALL_HIT,
   EVT_HEAL,
   EVT_BACKSTAB,
@@ -872,6 +873,8 @@ async function main() {
   hudHp.position.set(HUD_W / 2, 62);
   const hudGold = hudTxt(19, 0xffd45d, true);
   hudGold.position.set(14, 86);
+  const hudPay = hudTxt(17, 0xff7a6a, true); // 금화 옆: 다음에 빠져나갈 급여 (-금액)
+  hudPay.position.set(110, 88);
   const hudKills = hudTxt(19, 0xe6e9f0, true);
   hudKills.anchor.set(1, 0);
   hudKills.position.set(HUD_W - 14, 86);
@@ -882,7 +885,7 @@ async function main() {
   hudMercs.position.set(HUD_W - 14, 114);
   const hudExtra = hudTxt(16, 0xffb4a8, true);
   hudExtra.position.set(14, 144);
-  hudPanel.addChild(hudBg, hudBars, hudLv, hudTime, hudHp, hudGold, hudKills, hudLead, hudMercs, hudExtra);
+  hudPanel.addChild(hudBg, hudBars, hudLv, hudTime, hudHp, hudGold, hudPay, hudKills, hudLead, hudMercs, hudExtra);
   let hudH = 0;
   const drawHudBg = (h: number) => {
     if (h === hudH) return;
@@ -1315,6 +1318,7 @@ async function main() {
     node.anchor.set(0.5, 1);
     dmgLayer.addChild(node);
     floats.push({ node, x: x + (Math.random() - 0.5) * 16, y: y - 18, vx: (Math.random() - 0.5) * 18, age: 0, life, pop });
+    return node;
   };
   const numFmt = (v: number) => (v >= 10 ? String(Math.round(v)) : String(Math.max(0.1, Math.round(v * 10) / 10)));
   const bursts: { kind: number; x: number; y: number; ang: number; age: number }[] = [];
@@ -1590,6 +1594,18 @@ async function main() {
           else if (duelNow && owner !== myId && kind === EVT_DMG_POISON_ALLY) spawnFloat(numFmt(val), x, y, { fill: 0xc77dff, fontSize: 14, fontWeight: "700", stroke: { color: 0x2a0a40, width: 3 } }, 0.8, 0);
           else if (owner === myId && kind === EVT_DMG_ALLY) spawnFloat(`-${numFmt(val)}`, x, y, { fill: 0xff5a5a, fontSize: 17, fontWeight: "700", stroke: { color: 0x2a0000, width: 4 } }, 0.9, 0.15);
           else if (owner === myId && kind === EVT_DODGE) spawnFloat("회피!", x, y, { fill: 0xd8e0ee, fontSize: 18, fontWeight: "800", fontStyle: "italic", stroke: { color: 0x000000, width: 4 } }, 0.9, 0.15);
+          else if (kind === EVT_PAY) {
+            // 급여가 빠져나감: 주인공 머리 위에 금화 아이콘과 -금액(못 줬으면 붉은 글자로 '급여 부족')
+            const paid = ang === 0;
+            const label = paid ? `-${val}` : `-${val} 부족!`;
+            const node = spawnFloat(label, x, y - 52, { fill: paid ? 0xffd45d : 0xff6a5a, fontSize: owner === myId ? 22 : 17, fontWeight: "900", stroke: { color: 0x3a2a00, width: 5 } }, 1.5, 0.3);
+            if (node) {
+              const r = owner === myId ? 11 : 9;
+              const coin = new Graphics().circle(0, 0, r).fill(0xffd45d).stroke({ width: 2, color: 0xa87400 }).circle(0, 0, r * 0.55).stroke({ width: 1.5, color: 0xe0a020 });
+              coin.position.set(-node.width / 2 - r - 3, -node.height / 2);
+              node.addChild(coin);
+            }
+          }
           else if (kind === EVT_QUIT) {
             const nm = UNIT_NAMES[val] ?? "용병";
             spawnFloat(`${nm} 이탈!`, x, y - 20, { fill: 0xff8f6a, fontSize: 20, fontWeight: "900", stroke: { color: 0x3a1000, width: 5 } }, 1.8, 0.4);
@@ -3766,6 +3782,14 @@ async function main() {
       hudHp.text = `HP ${Math.ceil(meState.hp)} / ${meState.maxHp}`;
       hudHp.text += (WEAPONS[meState.weapon]?.type ?? -1) === SHIELD && meState.shieldMax > 0 ? `  ·  방패 ${Math.ceil(meState.shield)}` : "";
       hudGold.text = `금화 ${meState.gold}`;
+      if (meState.salary > 0 && meState.payT > 0) {
+        // 다음 급여: 금화 옆에 (-금액). 금화가 모자라면 더 진한 빨강으로 깜빡인다
+        const short = meState.gold < meState.salary;
+        hudPay.text = `(-${meState.salary})`;
+        hudPay.style.fill = short ? 0xff3a3a : 0xff9a8a;
+        hudPay.alpha = short ? 0.65 + 0.35 * Math.abs(Math.sin(performance.now() / 260)) : 1;
+        hudPay.position.set(hudGold.x + hudGold.width + 8, hudGold.y + 2);
+      } else hudPay.text = "";
       hudKills.text = `처치 ${meState.kills}`;
       hudLead.text = `통솔력 ${used}/${meState.leadership}`;
       hudMercs.text = `용병 ${mine.length}명`;

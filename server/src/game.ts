@@ -46,6 +46,7 @@ import {
   EVT_HEAL,
   EVT_RICE,
   EVT_TENT,
+  EVT_PAY,
   ST_BIT_REST,
   TENT,
   type TentWire,
@@ -4513,8 +4514,10 @@ export class Game {
       if (st.gold >= salary) {
         st.gold -= salary;
         st.unpaid = 0;
+        this.pushEvent(EVT_PAY, st.x, st.y, 0, salary, st.id);
         continue;
       }
+      this.pushEvent(EVT_PAY, st.x, st.y, 1, salary, st.id);
       st.unpaid++;
       if (st.unpaid > TUNE.UNPAID_QUIT) this.quitOneMerc(st.id);
     }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ghostHidesAggro, EVT_HEAL, EVT_INVULN, EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
+import { ghostHidesAggro, EVT_HEAL, EVT_INVULN, EVT_PAY, EVT_SKILL, SHIELD, TICK_RATE, TUNE, WEAPONS, WEAPON_SWITCH_DELAY_SEC } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -454,13 +454,20 @@ test("용병 급여: 주기마다 낸다, 못 내면 공격력이 줄고 계속 
   step(1);
   assert.ok(p.salary > 0 && p.payT > 0, "급여 정보가 보인다");
   const salary = p.salary;
+  g.takeEvents();
   step(TUNE.PAY_INTERVAL + 1);
   assert.equal(p.unpaid, 0);
   assert.ok(p.gold <= 100 - salary + 5, "급여를 냈다"); // 사이에 번 금화 여유
+  const paidEv = g.takeEvents().filter((ev) => ev[0] === EVT_PAY);
+  assert.equal(paidEv.length, 1, "급여가 빠져나간 이벤트");
+  assert.equal(paidEv[0]![3], 0);
+  assert.equal(paidEv[0]![4], salary);
+  assert.equal(paidEv[0]![5], a);
   // 못 내는 경우
   p.gold = 0;
   step(TUNE.PAY_INTERVAL);
   assert.equal(p.unpaid, 1);
+  assert.ok(g.takeEvents().some((ev) => ev[0] === EVT_PAY && ev[3] === 1), "못 낸 이벤트(ang 1)");
   assert.equal(g.countMercs(a), 3);
   step(TUNE.PAY_INTERVAL * 2);
   assert.equal(p.unpaid, 3);
