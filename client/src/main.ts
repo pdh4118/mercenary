@@ -257,6 +257,17 @@ async function main() {
   // 병종 스프라이트(기병, 창병, 궁병, 검방병, 둔기병 순). 적은 수백 마리가 되므로 텍스처 하나를 모두가 공유한다.
   const loadUnits = (side: "ally" | "enemy") => Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/units/${side}_${f}.png`)));
   const [allyTex, enemyTex] = await Promise.all([loadUnits("ally"), loadUnits("enemy")]);
+  // 군주의 명령(진군령·포위령·집결령): 깃발병 그림(검방병형·창병형), 깃발 천 3프레임, 대열 발밑 고리 2프레임
+  const orNull = (p: string) => Assets.load<Texture>(p).catch(() => null);
+  const flagTex: Record<number, Texture | null> = { 3: await orNull("assets/units/enemy_flag_sword.png"), 1: await orNull("assets/units/enemy_flag_spear.png") };
+  const clothTex = await Promise.all([0, 1, 2].map((i) => orNull(`assets/fx/cmd_flag_${i}.png`)));
+  const ringTex = await Promise.all([0, 1].map((i) => orNull(`assets/fx/cmd_ring_${i}.png`)));
+  /** 깃발병 그림의 기준점: ax·ay는 앵커(발이 일반 졸개와 같은 높이가 되게), bx·by는 가로대 가운데(깃발 천을 거는 자리). 모두 그림 픽셀 */
+  const FLAG_GEO: Record<number, { w: number; h: number; bodyX: number; feetY: number; barX: number; barY: number }> = {
+    3: { w: 103, h: 109, bodyX: 40.3, feetY: 107.8, barX: 80.1, barY: 15.7 },
+    1: { w: 114, h: 110, bodyX: 56.9, feetY: 109.3, barX: 80.4, barY: 16.0 },
+  };
+  const CLOTH_BAR = { x: 38.7, y: 6.3 }; // 깃발 천 그림에서 가로대 가운데
   // 기병은 8방위(0=북,1=북동,2=동,…) 기본 자세·찌르기 자세 그림을 쓴다. 아군은 주인 색, 적은 어두운 붉은색으로 칠한다.
   const cavRaw = await Promise.all((["idle", "thrust"] as const).map((pose) => Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((d) => Assets.load<Texture>(`assets/units/cav_${pose}_${d}.png`)))));
   // 달리기 4프레임(방향 × 프레임). 기본 자세를 변형해서 만든 그림이다.
@@ -345,7 +356,7 @@ async function main() {
   };
   const campLayer = new Container();
   const enemyLayer = new Container();
-  const cmdG = new Graphics(); // 군주의 진군령: 대열의 깃발과 명령받은 졸개 표시
+  const cmdSprites = new Map<number, { ring: Sprite; cloth: Sprite | null }>(); // 군주의 명령: 명령받은 졸개의 발밑 고리와 깃발병의 깃발 천
   const fxLayer = new Graphics(); // 공격 예고 부채꼴
   const bulletLayer = new Container();
   const mercLayer = new Container();
@@ -369,7 +380,7 @@ async function main() {
   const dmgLayer = new Container(); // 피해 숫자는 모든 그림 위에
   const terrainHigh = new Container(); // 유닛이 뒤에 서 있는 바위·나무: 유닛을 가린다
   terrainHigh.sortableChildren = true;
-  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, cmdG, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, ammoLabel, dbgG, dmgLayer);
+  world.addChild(campLayer, groundFx, enemyLayer, fxLayer, bulletLayer, mercLayer, playerLayer, terrainHigh, skyLayer, chargeMark, chargeLabel, recoverLabel, ammoLabel, dbgG, dmgLayer);
   // 장군 스킬 표현(예고·장판·상태 표시·효과 컷). 서 있는 물건은 적과 함께 깊이 정렬된다.
   const bossFx = await createBossFx({
     groundFx,
@@ -2364,7 +2375,7 @@ async function main() {
     }
     const k = 1 - Math.exp(-ticker.deltaMS / SMOOTH_MS);
 
-    cmdG.clear();
+    const cmdSeen = new Set<number>();
     enemies.update(latest.enemies, k, (v, w) => {
       let heatTint = 0;
       const size = w[11] === 1 ? BOSS_SIZE : 1;
@@ -2425,6 +2436,15 @@ async function main() {
         v.lastY = v.y;
       } else {
         faceFrom(v, v.x, w[5] > 0 ? w[6] : null);
+        // 진군령 대열의 깃발병은 전용 그림(깃대를 멘 모습)으로 바꿔 그린다. 깃발병이 아니게 되면 원래 그림으로 돌린다.
+        const ft = ((w[14] ?? 0) & EF_FLAG) !== 0 ? flagTex[w[4]] ?? null : null;
+        const want = ft ?? enemyTex[w[4]]!;
+        if (v.sprite.texture !== want) {
+          v.sprite.texture = want;
+          const g = FLAG_GEO[w[4]];
+          if (ft && g) v.sprite.anchor.set(g.bodyX / g.w, (g.feetY - 0.35 * 90) / g.h); // 발이 일반 졸개와 같은 높이에 오게(일반 그림은 높이 90에 앵커 0.65)
+          else v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
+        }
         v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
       }
       v.sprite.zIndex = v.y;
@@ -2437,18 +2457,50 @@ async function main() {
       }
       const cf = w[14] ?? 0;
       if (cf & (EF_CMD | EF_FLAG)) {
-        // 진군령 대열: 발밑에 붉은 고리, 깃발병은 머리 위에 붉은 깃발
-        const t = performance.now() / 260;
-        cmdG.ellipse(v.x, v.y + 9, 13, 5).stroke({ width: 2, color: 0xff5a4a, alpha: 0.5 + 0.2 * Math.sin(t + w[0]) });
-        if (cf & EF_FLAG) {
-          const top = v.y - 70;
-          const wave = Math.sin(t * 2 + w[0]) * 2;
-          cmdG.moveTo(v.x, v.y - 24).lineTo(v.x, top).stroke({ width: 3, color: 0x3a2a1a, alpha: 0.95 });
-          cmdG.poly([v.x, top, v.x + 20, top + 6 + wave, v.x, top + 14]).fill({ color: 0xd9322a, alpha: 0.95 }).stroke({ width: 1.5, color: 0xffd36a, alpha: 0.9 });
+        // 군주의 명령을 받은 졸개: 발밑에 붉은 고리, 깃발병은 가로대에 깃발 천이 걸려 펄럭인다
+        const now = performance.now();
+        let cs = cmdSprites.get(w[0]);
+        if (!cs) {
+          cs = { ring: new Sprite(ringTex[0] ?? undefined), cloth: null };
+          cs.ring.anchor.set(0.5, 0.5);
+          cs.ring.scale.set(0.55);
+          enemyLayer.addChild(cs.ring);
+          cmdSprites.set(w[0], cs);
+        }
+        cmdSeen.add(w[0]);
+        const rt = ringTex[Math.floor(now / 380 + w[0]) % 2];
+        if (rt && cs.ring.texture !== rt) cs.ring.texture = rt;
+        cs.ring.visible = !!rt;
+        cs.ring.position.set(v.x, v.y + 14);
+        cs.ring.zIndex = v.y - 1;
+        const flagged = (cf & EF_FLAG) !== 0 && !!flagTex[w[4]] && !!clothTex[0];
+        if (flagged && !cs.cloth) {
+          cs.cloth = new Sprite(clothTex[0]!);
+          cs.cloth.anchor.set(CLOTH_BAR.x / clothTex[0]!.width, CLOTH_BAR.y / clothTex[0]!.height);
+          enemyLayer.addChild(cs.cloth);
+        } else if (!flagged && cs.cloth) {
+          cs.cloth.destroy();
+          cs.cloth = null;
+        }
+        if (cs.cloth) {
+          const g = FLAG_GEO[w[4]]!;
+          const ay = (g.feetY - 0.35 * 90) / g.h;
+          const k2 = SPRITE_SCALE * size;
+          const ct = clothTex[[0, 1, 2, 1][Math.floor(now / 170 + w[0] * 0.37) % 4]!];
+          if (ct && cs.cloth.texture !== ct) cs.cloth.texture = ct;
+          cs.cloth.scale.set(k2);
+          cs.cloth.position.set(v.x + (g.barX - (g.bodyX)) * k2 * v.face, v.y + (g.barY - ay * g.h) * k2);
+          cs.cloth.zIndex = v.y + 1;
         }
       }
       setPoison(v.sprite, w[12] === 1);
     });
+    for (const [id, cs] of cmdSprites) {
+      if (cmdSeen.has(id)) continue;
+      cs.ring.destroy();
+      cs.cloth?.destroy();
+      cmdSprites.delete(id);
+    }
     // 장군 스킬 예고·장판·효과 컷
     {
       const up: { x: number; y: number }[] = [];

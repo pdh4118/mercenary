@@ -1074,7 +1074,7 @@ Six royal castle garrison soldiers in a row, black plate armor with purple cape 
 (6) "post_blunt_atk": the same soldier swinging the huge mace overhead in a smashing blow.
 ```
 
-### 12-11. 군주의 진군령·포위령·집결령 - 깃발병과 깃발(대열 표시) - `assets/units/enemy_flag_*`, `assets/fx/cmd_*`
+### 12-11. 군주의 진군령·포위령·집결령 - 깃발병과 깃발(대열 표시) - `assets/units/enemy_flag_*`, `assets/fx/cmd_*` (적용됨: 가로대만 달린 깃대를 멘 깃발병 2종 + 깃발 천 3프레임 + 발밑 고리 2프레임. 고리는 받은 그림의 배경이 체크무늬라 같은 모양으로 코드로 다시 그려 넣었다)
 
 군주의 명령을 받은 졸개 대열의 깃발병용 그림입니다. 지금은 코드로 그린 도형(깃대와 붉은 삼각 깃발)이 대신 쓰이고 있어, 그림이 들어오면 그것만 바꿉니다. 일반 적 졸개(`units/enemy_sword`, `units/enemy_spear`)와 같은 크기·화풍으로 만들어 주세요(졸개 그림 옆에 섞여 서므로 같은 카메라와 높이여야 합니다).
 
