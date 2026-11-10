@@ -140,7 +140,7 @@ export const TUNE = {
   SKILL_CD_BOW: 10, // 스페이스 스킬 쿨타임(초, 모두 10초로 통일): 활(후퇴)
   SKILL_CD_SPEAR: 10, // 창(돌진)
   SKILL_CD_SWORD: 10, // 검(무적)
-  SKILL_CD_MACE: 10, // 철퇴(투척)
+  SKILL_CD_MACE: 10, // 철퇴(충격파)
   SKILL_CD_STAFF: 10, // 지팡이(방벽)
   SKILL_CD_MOUNT: 10, // 기마(가속)
   SKILL_BOOST_SEC: 2, // 기마 가속 지속(초)
@@ -148,10 +148,11 @@ export const TUNE = {
   SKILL_DASH_DIST: 240, // 창 돌진 거리(px)
   SKILL_DASH_SEC: 0.18, // 돌진에 걸리는 시간
   SKILL_INVULN_SEC: 1.5, // 검 무적 지속(초)
-  SKILL_MACE_RANGE: 420, // 철퇴 투척 비행 거리(px). 커서 방향으로 이만큼 날아가고, 적에게 닿으면 그 자리에 광역 피해(못 맞히면 그냥 사라진다)
-  SKILL_MACE_SPEED: 560, // 던진 철퇴의 속도(px/s)
-  SKILL_MACE_DAMAGE: 1.5, // 던진 철퇴의 피해(철퇴 피해 대비)
-  SKILL_MACE_SPLASH: 80, // 던진 철퇴가 적에게 닿은 자리의 광역 피해 반경(px)
+  SKILL_SLAM_CHARGE_SEC: 0.9, // 철퇴 스킬(충격파): 힘을 모으는 시간(초). 이 동안 느리게만 움직이고 공격하지 못하며, 끝나면 제자리를 찍는다
+  SKILL_SLAM_RADIUS: 190, // 충격파 반경(px). 스킬 효과 카드로 늘어난다
+  SKILL_SLAM_DAMAGE: 2.5, // 충격파 피해(철퇴 피해 대비). 범위 안의 모든 적에게 들어가고 스킬 효과 카드로는 늘지 않는다(범위만 늘어난다)
+  SKILL_SLAM_MOVE: 0.3, // 힘을 모으는 동안 이동 속도 배율
+  SKILL_SLAM_KNOCK: 150, // 충격파 넉백 거리(px)
   SKILL_WALL_LEN: 170, // 방벽 전체 길이(px)
   SKILL_WALL_THICK: 22, // 방벽 두께(px)
   SKILL_WALL_SEC: 5, // 방벽이 남아 있는 시간(초). 쿨타임 10초의 절반이라 계속 세워 둘 수는 없다

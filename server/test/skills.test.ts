@@ -133,44 +133,64 @@ test("창 스킬: 돌진하는 동안 무적이고 끝나면 다시 맞는다(�
   assert.ok(g.getPlayer(a)!.hp < hp0, "돌진이 끝나면 다시 맞는다");
 });
 
-test("철퇴 스킬: 날아가다 적에게 닿으면 그 자리의 주변 적이 함께 광역 피해를 입는다", () => {
+test("철퇴 스킬(충격파): 힘을 모으는 동안은 맞지 않고, 다 모으면 제자리를 찍어 범위 안 모든 적이 공격력에 비례한 피해를 입는다", () => {
   const { g, a, p } = start(3);
-  const near = dummy(g, p.x + 300, p.y);
-  const near2 = dummy(g, p.x + 300, p.y + 50);
-  const far = dummy(g, p.x + 300, p.y + 300);
+  const near = dummy(g, p.x + 120, p.y);
+  const near2 = dummy(g, p.x - 100, p.y + 80);
+  const far = dummy(g, p.x + 600, p.y);
+  for (const id of [near, near2, far]) (g.getEnemy(id) as { stunT: number }).stunT = 9; // 가만히 서 있게
   g.setInput(a, { ...idle, aim: 0, dist: 300 });
-  g.useSkill(a);
-  assert.equal(g.getEnemy(near)!.hp, 5000, "던진 직후에는 맞지 않았다");
-  run(g, 1.2);
-  const dealt = 5000 - g.getEnemy(near)!.hp;
-  assert.ok(dealt >= WEAPONS[3]!.damage * TUNE.SKILL_MACE_DAMAGE * 0.9, `피해 ${dealt}`);
-  assert.ok(g.getEnemy(near2)!.hp < 5000, "폭발 반경 안의 적도 맞는다");
-  assert.equal(g.getEnemy(far)!.hp, 5000, "먼 적은 맞지 않는다");
-  assert.ok(g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] >= 10), "적에게 닿은 이벤트");
-});
-
-test("철퇴 스킬: 커서까지의 거리와 상관없이 정해진 거리를 날아간다", () => {
-  const { g, a, p } = start(3);
-  const e = dummy(g, p.x + TUNE.SKILL_MACE_RANGE - 60, p.y);
-  (g.getEnemy(e) as { stunT: number }).stunT = 5; // 가만히 서 있게(접근하며 옆으로 비켜 가지 않게)
-  g.setInput(a, { ...idle, aim: 0, dist: 100 }); // 커서는 가까워도
-  g.useSkill(a);
-  run(g, 1.2);
-  assert.ok(g.getEnemy(e)!.hp < 5000, "정해진 거리 안의 적에게 닿는다");
-});
-
-test("철퇴 스킬: 아무것도 못 맞히면 폭발 없이 사라진다", () => {
-  const { g, a, p } = start(3);
-  const far = dummy(g, p.x + TUNE.SKILL_MACE_RANGE + 200, p.y); // 날아가는 거리 밖
-  g.setInput(a, { ...idle, aim: 0, dist: 200 });
-  g.useSkill(a);
+  assert.ok(g.useSkill(a));
   g.takeEvents();
-  assert.equal(g.snapshotBullets().length, 1);
-  assert.equal(g.snapshotBullets()[0]![4], 1, "던진 철퇴로 구분된다");
-  run(g, 1.5);
-  assert.equal(g.snapshotBullets().length, 0, "다 날아가면 사라진다");
-  assert.equal(g.getEnemy(far)!.hp, 5000, "아무 피해도 없다");
-  assert.ok(!g.takeEvents().some((ev) => ev[0] === EVT_SKILL && ev[4] >= 10), "폭발 이벤트가 없다");
+  run(g, 0.1);
+  assert.ok((g.getPlayer(a)!.sm ?? 0) > 0, "모으는 중 표시");
+  run(g, TUNE.SKILL_SLAM_CHARGE_SEC * 0.4);
+  assert.equal(g.getEnemy(near)!.hp, 5000, "모으는 동안은 맞지 않는다");
+  run(g, TUNE.SKILL_SLAM_CHARGE_SEC * 0.5 + 0.2);
+  const dealt = 5000 - g.getEnemy(near)!.hp;
+  assert.ok(dealt >= WEAPONS[3]!.damage * TUNE.SKILL_SLAM_DAMAGE * 0.9, `피해 ${dealt}`);
+  assert.ok(g.getEnemy(near2)!.hp < 5000, "반경 안의 적도 맞는다(방향 무관)");
+  assert.equal(g.getEnemy(far)!.hp, 5000, "먼 적은 맞지 않는다");
+  assert.equal(g.getPlayer(a)!.sm, undefined, "끝나면 표시가 사라진다");
+  const evs = g.takeEvents();
+  assert.ok(evs.some((ev) => ev[0] === EVT_SKILL && ev[4] >= 10), "충격파 이벤트");
+});
+
+test("철퇴 스킬(충격파): 스킬 효과 카드는 범위만 넓히고 피해는 그대로다", () => {
+  const dmgAt = (pow: number, dist: number) => {
+    const { g, a, p } = start(3);
+    (g as any).slots.get(a).mods.heroSkillPow = pow;
+    const e = dummy(g, p.x + dist, p.y);
+    (g.getEnemy(e) as { stunT: number }).stunT = 9;
+    g.useSkill(a);
+    run(g, TUNE.SKILL_SLAM_CHARGE_SEC + 0.2);
+    return 5000 - g.getEnemy(e)!.hp;
+  };
+  const edge = TUNE.SKILL_SLAM_RADIUS + 80; // 기본 범위 밖
+  assert.equal(dmgAt(0, edge), 0, "기본 범위 밖이면 맞지 않는다");
+  assert.ok(dmgAt(0.5, edge) > 0, "스킬 효과 카드로 범위가 늘면 맞는다");
+  assert.ok(Math.abs(dmgAt(0, 100) - dmgAt(1, 100)) < 1e-6, "피해는 늘지 않는다");
+});
+
+test("철퇴 스킬(충격파): 모으는 동안은 느리게 움직이고 평타를 쓰지 못하며, 무기를 바꾸면 취소된다", () => {
+  const { g, a, p } = start(3);
+  const x0 = p.x;
+  g.setInput(a, { ...idle, dx: 1 });
+  run(g, 0.5);
+  const free = g.getPlayer(a)!.x - x0;
+  const { g: g2, a: a2, p: p2 } = start(3);
+  const x1 = p2.x;
+  g2.useSkill(a2);
+  g2.setInput(a2, { ...idle, dx: 1 });
+  run(g2, 0.5);
+  const slow = g2.getPlayer(a2)!.x - x1;
+  assert.ok(slow < free * (TUNE.SKILL_SLAM_MOVE + 0.15), `느리게 움직인다(${slow} / ${free})`);
+  const e = dummy(g2, g2.getPlayer(a2)!.x + 60, g2.getPlayer(a2)!.y);
+  (g2.getEnemy(e) as { stunT: number }).stunT = 9;
+  g2.setWeapon(a2, 0);
+  run(g2, TUNE.SKILL_SLAM_CHARGE_SEC + 0.3);
+  assert.equal(g2.getPlayer(a2)!.sm, undefined);
+  assert.equal(g2.getEnemy(e)!.hp, 5000, "무기를 바꾸면 충격파가 취소된다");
 });
 
 test("기마 스킬: 2초간 최고 속도로 달리고, 공격하면 그 속도를 잃는다", () => {

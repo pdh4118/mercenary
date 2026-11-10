@@ -1517,6 +1517,7 @@ async function main() {
           else if (kind === EVT_SKILL && val >= 10 && maceHitTex.every((t) => t !== null)) {
             // 던진 철퇴가 적에게 닿음: 갈라진 땅과 흙먼지 4컷(지름 약 반경 x 2.3)
             audio.play("skill_mace_hit", { x, y });
+            if (owner === myId) shake(5, 0.2); // 내 충격파: 화면이 크게 흔들린다
             const sp = new Sprite(maceHitTex[0]!);
             sp.anchor.set(0.5);
             sp.position.set(x, y);
@@ -3511,6 +3512,19 @@ async function main() {
       if (!guardReady && v && p.invuln > 0 && !p.down) fxLayer.circle(v.x, v.y, 27 + 2 * Math.sin(performance.now() / 90)).stroke({ width: 3, color: 0x9be8ff, alpha: 0.85 }).circle(v.x, v.y, 24).fill({ color: 0x9be8ff, alpha: 0.12 }); // 무적
       const reachNow = p.hs?.[2] || w.reach; // 사거리·범위 카드가 반영된 값(철퇴는 범위가 사거리로 간다)
       const arcNow = meleeArc(w.type, w.arc, p.hs?.[6] || 1);
+      if (v && (p.sm ?? 0) > 0 && !p.down) {
+        // 철퇴 충격파 모으기: 찍을 범위가 점점 진하게 차오르고, 다 모이면 터진다
+        const R = p.smR ?? 190;
+        const prog = Math.max(0, Math.min(1, 1 - (p.sm ?? 0) / (p.smMax || 1)));
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 60);
+        fxLayer
+          .circle(v.x, v.y, R)
+          .stroke({ width: 3, color: 0xffc27a, alpha: 0.55 + 0.25 * pulse })
+          .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
+          .fill({ color: 0xff9a3c, alpha: 0.1 + 0.28 * prog })
+          .circle(v.x, v.y, R * (0.25 + 0.75 * prog))
+          .stroke({ width: 2, color: 0xffe6b0, alpha: 0.7 });
+      }
       if (v && p.wind > 0 && !w.ranged && w.type !== MAGE_TYPE) {
         // 철퇴 준비 동작: 범위가 점점 진하게 차오른다(맞기 직전까지 피하라는 신호가 아니라 휘두르는 타이밍 표시)
         const prog = Math.max(0, Math.min(1, 1 - p.wind / w.windup));

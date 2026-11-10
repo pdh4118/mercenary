@@ -410,6 +410,9 @@ export interface Slot {
   slowMult?: number; // 둔화 중 이동 속도 배율
   windT: number; // 주문(지팡이)을 외우는 남은 시간. 0이면 외우는 중이 아니다
   skillCd: number; // 스페이스 스킬 쿨타임이 남은 시간(무기를 바꿔도 공유)
+  slamT: number; // 철퇴 충격파를 모으는 남은 시간(0이면 모으는 중이 아니다)
+  slamMax: number;
+  slamCrit: boolean;
   skillMax: number; // 마지막으로 쓴 스킬의 전체 쿨타임
   boostT: number; // 기마 가속이 남은 시간
   dashT: number; // 돌진·후퇴가 남은 시간
@@ -1048,6 +1051,9 @@ export class Game {
       windT: 0,
       skillCd: 0,
       skillMax: 0,
+      slamT: 0,
+      slamMax: 0,
+      slamCrit: false,
       boostT: 0,
       dashT: 0,
       dashVx: 0,
@@ -3506,7 +3512,7 @@ export class Game {
       p.bst = Math.round(s.boostT * 10) / 10;
       s.mom = mounted && s.boostT > 0 ? Math.min(1, s.mom + (dt / TUNE.CAV_RAMP_SEC) * TUNE.CAV_BOOST_REGAIN) : mounted && moving ? Math.min(1, s.mom + dt / TUNE.CAV_RAMP_SEC) : Math.max(0, s.mom - dt / CAV_DECAY_SEC);
       const bowFiring = WEAPONS[p.weapon]!.ranged && WEAPONS[p.weapon]!.type === ARCHER && s.input.fire && !frozen; // 활을 쏘는 동안은 느려진다
-      const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1) * slowK;
+      const speed = this.heroSpeedNow(s) * (bowFiring ? 1 - TUNE.BOW_FIRE_SLOW : 1) * (s.slamT > 0 ? TUNE.SKILL_SLAM_MOVE : 1) * slowK;
       const hx0 = p.x;
       const hy0 = p.y;
       if (frozen) s.dashT = 0;
@@ -3538,6 +3544,24 @@ export class Game {
       s.facing += Math.max(-turn, Math.min(turn, angleDiff(p.aim, s.facing)));
       s.switchCd = Math.max(0, s.switchCd - dt);
       p.swing = Math.max(0, p.swing - dt);
+      if (s.slamT > 0) {
+        // 철퇴 충격파: 기절하거나 쓰러지면 끊기고, 다 모으면 제자리를 내려찍는다
+        if (stunned || p.down || WEAPONS[p.weapon]!.type !== BLUNT) {
+          s.slamT = 0;
+          p.sm = undefined;
+        } else {
+          s.slamT -= dt;
+          if (s.slamT <= 0) {
+            s.slamT = 0;
+            p.sm = undefined;
+            this.slamLand(s);
+          } else {
+            p.sm = Math.round(s.slamT * 100) / 100;
+            p.smMax = s.slamMax;
+            p.smR = Math.round(TUNE.SKILL_SLAM_RADIUS * (1 + Math.max(0, s.mods.heroSkillPow)));
+          }
+        }
+      }
       if (s.windT > 0) {
         const wc = this.casts.get(-p.id);
         if (wc && s.windT > TUNE.MAGE_LOCK_SEC) {
@@ -3560,7 +3584,7 @@ export class Game {
           this.strikeHero(s);
         }
       } else if (WEAPONS[p.weapon]!.type === BLUNT) {
-        this.stepMaceCharge(s, dt, !stunned && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight" && tmode !== TOUR_MERCS)));
+        this.stepMaceCharge(s, dt, !stunned && s.slamT <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight" && tmode !== TOUR_MERCS)));
       } else if (!stunned && s.input.fire && s.fireCd <= 0 && s.switchCd <= 0 && (!duel || (fighter && this.tour?.step === "fight" && tmode !== TOUR_MERCS))) this.useWeapon(s);
     }
     if (this.phase !== "tournament") this.stepRevive(dt);
@@ -3889,26 +3913,12 @@ export class Game {
         p.invuln = Math.max(p.invuln, TUNE.SKILL_INVULN_SEC * pow);
         break;
       case BLUNT: {
-        const crit = this.rollCrit(s.mods.heroCrit);
-        const d = TUNE.SKILL_MACE_RANGE; // 커서 방향으로 정해진 거리만큼 날아간다(커서까지의 거리와 무관)
-        const ang = s.input.aim;
-        this.bullets.push({
-          id: this.nextEntityId++,
-          x: p.x,
-          y: p.y,
-          vx: Math.cos(ang) * TUNE.SKILL_MACE_SPEED,
-          vy: Math.sin(ang) * TUNE.SKILL_MACE_SPEED,
-          left: d,
-          hostile: false,
-          damage: w.damage * TUNE.SKILL_MACE_DAMAGE * pow * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1),
-          srcType: BLUNT,
-          owner: playerId,
-          radius: 16,
-          pierce: 0,
-          crit,
-          hitIds: new Set(),
-          kind: 1,
-        });
+        // 충격파: 힘을 모으는 동안 느리게만 움직이고 공격하지 못하며, 다 모으면 제자리를 내려찍는다(stepPlayers가 처리)
+        if (s.slamT > 0) return false;
+        s.slamT = s.slamMax = TUNE.SKILL_SLAM_CHARGE_SEC;
+        s.slamCrit = this.rollCrit(s.mods.heroCrit);
+        s.chargeT = 0;
+        p.wind = 0;
         break;
       }
       case MAGE: {
@@ -3980,21 +3990,27 @@ export class Game {
     this.walls = this.walls.filter((w) => w.t > 0);
   }
 
-  /** 던진 철퇴가 적에게 닿았다: 그 자리 주변의 적(토너먼트에서는 상대 쪽)이 광역 피해를 입는다 */
-  private maceLand(b: Bullet): void {
-    const r = TUNE.SKILL_MACE_SPLASH * (1 + Math.max(0, this.slots.get(b.owner)?.mods.heroSkillPow ?? 0)); // 스킬 효과 카드
-    this.pushEvent(EVT_SKILL, b.x, b.y, 3, Math.round(r), b.owner); // val = 폭발 반경(10 이상이면 철퇴가 닿은 것)
+  /** 철퇴 충격파: 주인공 자리를 내려찍는다. 범위 안의 모든 적(토너먼트에서는 상대 쪽)이 공격력에 비례한 피해를 입고 밀려난다. 스킬 효과 카드는 범위만 넓힌다. */
+  private slamLand(s: Slot): void {
+    const p = s.state;
+    const w = WEAPONS[p.weapon]!;
+    const r = TUNE.SKILL_SLAM_RADIUS * (1 + Math.max(0, s.mods.heroSkillPow));
+    const crit = s.slamCrit;
+    const damage = w.damage * TUNE.SKILL_SLAM_DAMAGE * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1);
+    this.pushEvent(EVT_SKILL, p.x, p.y, 3, Math.round(r), p.id); // val = 충격파 반경(10 이상)
     if (this.phase === "tournament") {
-      const opp = this.opponentOf(b.owner);
+      const opp = this.opponentOf(p.id);
       for (const f of this.collectFriendlies()) {
-        if (f.ownerId !== opp || Math.hypot(f.x - b.x, f.y - b.y) > r + f.radius) continue;
-        f.hit({ damage: b.damage, charge: 0, srcType: BLUNT, fromAngle: Math.atan2(b.y - f.y, b.x - f.x), crit: b.crit });
+        if (f.ownerId !== opp || Math.hypot(f.x - p.x, f.y - p.y) > r + f.radius) continue;
+        f.hit({ damage, charge: 0, srcType: BLUNT, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit });
       }
       return;
     }
     for (const e of [...this.enemies.values()]) {
-      if (Math.hypot(e.x - b.x, e.y - b.y) > r + radiusOf(e)) continue;
-      this.damageEnemy(e, { damage: b.damage, charge: 0, srcType: BLUNT, fromAngle: Math.atan2(b.y - e.y, b.x - e.x), crit: b.crit }, b.owner);
+      if (Math.hypot(e.x - p.x, e.y - p.y) > r + radiusOf(e)) continue;
+      const ang = Math.atan2(p.y - e.y, p.x - e.x);
+      this.damageEnemy(e, { damage, charge: 0, srcType: BLUNT, fromAngle: ang, crit }, p.id);
+      if (this.enemies.has(e.id)) this.knockBack(e, ang, TUNE.SKILL_SLAM_KNOCK);
     }
   }
 
@@ -4016,6 +4032,8 @@ export class Game {
     s.switchCd = WEAPON_SWITCH_DELAY_SEC;
     s.windT = 0;
     s.chargeT = 0;
+    s.slamT = 0; // 충격파를 모으던 중이면 취소(쿨타임은 그대로)
+    s.state.sm = undefined;
     s.state.wind = 0;
     s.fireCd = Math.min(s.fireCd, WEAPON_SWITCH_DELAY_SEC);
     return true;
@@ -7574,17 +7592,6 @@ export class Game {
             break;
           }
         }
-      }
-      if (b.kind === 1) {
-        // 던진 철퇴: 적에게 닿으면 그 자리에 광역 피해를 주고, 바위·벽에 막히거나 다 날아가도록 못 맞히면 그냥 사라진다
-        if (contact) this.maceLand(b);
-        else if (!hit) {
-          b.x += mx;
-          b.y += my;
-          b.left -= Math.hypot(mx, my);
-          if (b.left > 0) remaining.push(b);
-        }
-        continue;
       }
       b.x += mx;
       b.y += my;
