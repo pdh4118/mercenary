@@ -341,3 +341,26 @@ test("기마 가속 중 충돌: 속도를 절반만 잃고 곧 다시 붙으며,
   assert.ok(boosted.later > boosted.right, "가속 중에는 속도가 빨리 다시 붙는다");
   assert.ok(Math.abs(boosted.dmg / plain.dmg - TUNE.SKILL_BOOST_MULT) < 1e-6, "피해는 가속으로 빨라진 속도에 비례해 오히려 커진다(손실을 줄여도 줄지 않는다)");
 });
+
+test("적끼리 간격: 반지름 합의 1.3배까지 벌어지고, 서로 밀려나는 속도는 제한된다", () => {
+  const g = quiet();
+  g.addPlayer("a");
+  const mk = (x: number, y: number) => (g as any).enemies.get(g.spawnEnemyAt(x, y, 3)); // 검방병
+  const a = mk(1500, 1500);
+  const b = mk(1510, 1500);
+  const c = mk(1505, 1512);
+  for (const e of [a, b, c]) {
+    e.hold = true; // 제자리에서 버티는 수비병은 안 밀리므로 쓰지 않고, 이동만 막는다
+    e.hold = false;
+    e.stunT = 1e9; // 움직이지 못하게 해 간격만 본다
+  }
+  const dist = (p: any, q: any) => Math.hypot(p.x - q.x, p.y - q.y);
+  const r = 14 * 2;
+  const x0 = a.x;
+  g.step();
+  assert.ok(Math.abs(a.x - x0) <= TUNE.ENEMY_SEPARATION_SPEED / TICK_RATE + 1e-6, "한 틱에 밀리는 거리가 제한된다");
+  run(g, 3);
+  const need = (a.type === 3 ? 14 : 14) * 2 * TUNE.ENEMY_SPACING;
+  assert.ok(dist(a, b) >= need * 0.95 && dist(b, c) >= need * 0.95 && dist(a, c) >= need * 0.95, `간격 ${dist(a, b).toFixed(1)}, ${dist(b, c).toFixed(1)}, ${dist(a, c).toFixed(1)} (목표 ${need.toFixed(1)})`);
+  void r;
+});

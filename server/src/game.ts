@@ -1368,7 +1368,7 @@ export class Game {
     if (!duel) {
       this.stepEnemies(dt, friendlies);
       this.boss.stepGlobal(dt, friendlies);
-      this.separateEnemies();
+      this.separateEnemies(dt);
       this.separateCross(dt);
     }
     this.terrainEnd();
@@ -6974,39 +6974,64 @@ export class Game {
     }
   }
 
-  private separateEnemies(): void {
+  private separateEnemies(dt: number): void {
     const grid = new Map<number, Enemy[]>();
     const key = (cx: number, cy: number) => cx * 100003 + cy;
+    const list: Enemy[] = [];
     for (const e of this.enemies.values()) {
+      list.push(e);
       const k = key(Math.floor(e.x / SEPARATION_CELL), Math.floor(e.y / SEPARATION_CELL));
       const cell = grid.get(k);
       if (cell) cell.push(e);
       else grid.set(k, [e]);
     }
-    for (const e of this.enemies.values()) {
+    const mx = new Map<Enemy, number>();
+    const my = new Map<Enemy, number>();
+    const add = (e: Enemy, x: number, y: number) => {
+      mx.set(e, (mx.get(e) ?? 0) + x);
+      my.set(e, (my.get(e) ?? 0) + y);
+    };
+    const maxStep = TUNE.ENEMY_SEPARATION_SPEED * dt;
+    const charging = (e: Enemy) => e.type === CAVALRY && e.momentum >= TUNE.CROSS_CHARGE_MOMENTUM;
+    const fixed = (e: Enemy) => !!(e.post || e.hold); // 성벽 위·제자리를 지키는 수비병은 밀려나지 않는다(다른 쪽이 비켜 준다)
+    let maxR = 12;
+    for (const e of list) if (!e.boss) maxR = Math.max(maxR, radiusOf(e));
+    const reach = Math.max(1, Math.ceil((2 * maxR * Math.max(1, TUNE.ENEMY_SPACING)) / SEPARATION_CELL)); // 간격을 두는 거리까지 이웃 칸을 본다(장군은 제외: 아주 크다)
+    for (const e of list) {
       const cx = Math.floor(e.x / SEPARATION_CELL);
       const cy = Math.floor(e.y / SEPARATION_CELL);
       const er = radiusOf(e);
-      for (let ox = -1; ox <= 1; ox++) {
-        for (let oy = -1; oy <= 1; oy++) {
+      for (let ox = -reach; ox <= reach; ox++) {
+        for (let oy = -reach; oy <= reach; oy++) {
           for (const o of grid.get(key(cx + ox, cy + oy)) ?? []) {
             if (o.id <= e.id) continue; // 쌍마다 한 번만
-            const min = er + radiusOf(o);
+            // 돌진하는 기병은 간격을 두지 않고 몸이 닿는 거리까지만 비킨다
+            const spacing = charging(e) || charging(o) ? 1 : Math.max(1, TUNE.ENEMY_SPACING);
+            const min = (er + radiusOf(o)) * spacing;
             const dx = o.x - e.x;
             const dy = o.y - e.y;
             const d = Math.hypot(dx, dy);
             if (d >= min) continue;
-            const push = (min - d) / 2;
+            const push = Math.min(maxStep, (min - d) / 2);
             // 완전히 겹친 경우에도 갈라지도록 id로 방향을 정한다
             const nx = d > 0.001 ? dx / d : Math.cos(e.id);
             const ny = d > 0.001 ? dy / d : Math.sin(e.id);
-            e.x -= nx * push;
-            e.y -= ny * push;
-            o.x += nx * push;
-            o.y += ny * push;
+            const we = fixed(e) ? 0 : fixed(o) ? 2 : 1;
+            const wo = fixed(o) ? 0 : fixed(e) ? 2 : 1;
+            add(e, -nx * push * we, -ny * push * we);
+            add(o, nx * push * wo, ny * push * wo);
           }
         }
       }
+    }
+    for (const e of list) {
+      const x = mx.get(e);
+      if (x === undefined) continue;
+      const y = my.get(e)!;
+      const l = Math.hypot(x, y);
+      const k = l > maxStep ? maxStep / l : 1; // 여럿에게 둘러싸여도 한 틱에 maxStep 이상은 밀리지 않는다
+      e.x += x * k;
+      e.y += y * k;
     }
   }
 
