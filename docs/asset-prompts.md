@@ -945,6 +945,8 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 | `skill_guard` | 검 무적 시작 | `bright protective ward activating, short shimmer and a soft metallic ring` | 0.5초, 1종 |
 | `skill_mace_throw` | 철퇴 던질 때 | `heavy mace thrown, deep spinning whoosh that fades away` | 0.5초, 2종 |
 | `skill_mace_hit` | 던진 철퇴가 적에게 닿을 때 | `heavy mace crashing into armor, big dull impact with a short rumbling shockwave` | 0.6초, 2종 |
+| `skill_slam_charge` | 철퇴 충격파: 힘을 모으는 동안(스킬을 쓴 순간부터) | `Charging up a heavy mace overhead: rising low rumble with creaking metal strain and gathering wind, a tense building swell that ends abruptly with a held breath` (적용됨, 일레븐랩스) | 1.2초 |
+| `skill_slam_hit` | 철퇴 충격파: 땅을 찍는 순간 | `Heavy mace ground slam impact sound effect: a deep low thud with a sharp crack of splitting earth, rock debris scattering, a short rumbling shockwave tail` (적용됨, 일레븐랩스) | 1.2초 |
 | `skill_wall_up` | 방벽이 설 때 | `crystal barrier rising from the ground, glassy chime and a low stone rumble` | 0.6초, 1종 |
 | `skill_wall_hit` | 방벽이 공격을 맞을 때(방벽이 이제 부서지지 않으므로 `skill_wall_break`는 "시간이 되어 사라질 때"로 쓴다) | `dull hit on a crystal wall, short thud with a tiny glassy crack` | 0.15초, 3종 |
 | `skill_wall_break` | 방벽이 부서질 때 | `crystal wall shattering into pieces, short bright shatter and falling shards` | 0.7초, 1종 |

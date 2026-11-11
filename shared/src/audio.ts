@@ -72,6 +72,8 @@ export const SOUNDS = {
   skill_guard_end: d(1, 0.45, 300, 2, 0.03),
   skill_mace_throw: d(2, 0.6, 200, 3),
   skill_mace_hit: d(2, 0.75, 150, 3),
+  skill_slam_charge: d(1, 0.7, 300, 2), // 철퇴 충격파: 힘을 모으는 소리(1.2초)
+  skill_slam_hit: d(1, 0.9, 150, 3), // 철퇴 충격파: 땅을 찍는 소리
   skill_wall_up: d(1, 0.6, 300, 2),
   skill_wall_break: d(1, 0.45, 300, 2),
   skill_wall_hit: d(3, 0.5, 80, 4),

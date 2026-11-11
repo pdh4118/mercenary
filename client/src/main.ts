@@ -1529,7 +1529,7 @@ async function main() {
             const wt = WEAPONS[Math.round(ang)]?.type;
             if (wt === ARCHER_TYPE) audio.play("skill_backstep", { x, y });
             else if (wt === SPEAR_TYPE) audio.play("skill_dash", { x, y });
-            else if (wt === BLUNT_TYPE) audio.play("skill_mace_throw", { x, y });
+            else if (wt === BLUNT_TYPE) audio.play("skill_slam_charge", { x, y }); // 철퇴 충격파를 모으기 시작
             else if (wt === 0) audio.play("skill_boost", { x, y });
           }
           if (kind === EVT_ARROW_HIT) audio.play("arrow_hit", { x, y });
@@ -1545,7 +1545,7 @@ async function main() {
           }
           else if (kind === EVT_SKILL && val >= 10 && slamWaveTex.every((t) => t !== null) && slamCrackTex) {
             // 철퇴 충격파: 갈라진 땅 자국(오래 남음) 위로 충격파 고리 6컷이 퍼진다
-            audio.play("skill_mace_hit", { x, y });
+            audio.play("skill_slam_hit", { x, y });
             if (owner === myId) shake(5, 0.2);
             slamPoseUntil.set(owner, performance.now() + 350);
             const crack = new Sprite(slamCrackTex);
