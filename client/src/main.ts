@@ -1668,7 +1668,7 @@ async function main() {
           else if (owner === myId && kind === EVT_INVULN) spawnFloat("무적!", x, y, { fill: 0x9be8ff, fontSize: 18, fontWeight: "800", stroke: { color: 0x0a2a3a, width: 4 } }, 0.9, 0.15);
           if (kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) {
             const hit = nearestSprite(enemies.views, x, y, 60);
-            if (hit) flashSprite(hit.sprite, kind === EVT_DMG_ENEMY_CRIT ? 0.13 : 0.08);
+            if (hit) flashSprite(hit.sprite, kind === EVT_DMG_ENEMY_CRIT ? 0.18 : 0.12);
             if (!arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14) && sparks.length < 90) {
               const big = kind === EVT_DMG_ENEMY_CRIT || val >= 40;
               const texs = big ? sparkCritTex : sparkTex;
