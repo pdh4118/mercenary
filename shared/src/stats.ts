@@ -246,9 +246,11 @@ export interface MercCareer {
   charge: number; // 기병: 돌격 추가 피해 합
   alive: number; // 살아서 싸운 시간(초)
   deaths: number; // 쓰러진 횟수
+  sitUp: number; // 성격의 이로운 상황 효과가 켜져 있던 시간(초)
+  sitDown: number; // 불리한 상황 효과가 켜져 있던 시간(초)
   score: number; // 기여도(체력 단위): 준 피해 + 막은 피해 + 되받아친 피해 + 경직 + 처치 보너스
 }
-export const newCareer = (): MercCareer => ({ dealt: 0, taken: 0, blocked: 0, kills: 0, assists: 0, counter: 0, stagger: 0, aoe: 0, crits: 0, charge: 0, alive: 0, deaths: 0, score: 0 });
+export const newCareer = (): MercCareer => ({ dealt: 0, taken: 0, blocked: 0, kills: 0, assists: 0, counter: 0, stagger: 0, aoe: 0, crits: 0, charge: 0, alive: 0, deaths: 0, sitUp: 0, sitDown: 0, score: 0 });
 
 /** 결과 화면의 용병 한 줄 */
 export interface ResultMerc extends MercCareer {

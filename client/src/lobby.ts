@@ -365,8 +365,9 @@ export function createLobby(opts: Options): Lobby {
         m.assists,
         m.deaths,
         special(m),
+        m.sitUp + m.sitDown > 0 ? `+${Math.round(m.sitUp)}초 / -${Math.round(m.sitDown)}초` : "-",
       ]);
-      const tab = mk(["용병", "병종·단계", "생존 시간", "기여도", "준 피해", "초당 피해(DPS)", "받은 피해", "분당 받은 피해", "처치", "어시스트", "쓰러짐", "병종 특기"], rows, "merc");
+      const tab = mk(["용병", "병종·단계", "생존 시간", "기여도", "준 피해", "초당 피해(DPS)", "받은 피해", "분당 받은 피해", "처치", "어시스트", "쓰러짐", "병종 특기", "성격 효과 켜짐(+이로움 / -불리)"], rows, "merc");
       // 기여도 막대: 1등 대비 비율을 기여도 칸 배경에 깐다
       tab.querySelectorAll("tr").forEach((tr, i) => {
         if (i === 0) return;

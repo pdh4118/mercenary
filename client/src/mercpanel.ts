@@ -51,7 +51,9 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
     nm.textContent = `${w[22] ?? 0}번 ${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}`;
     const sub = document.createElement("div");
     sub.className = "stat";
-    sub.textContent = respawn > 0 ? `쓰러짐 · 부활 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 기여 ${w[23] ?? 0}`;
+    const sitRule = (w[24] ?? 0) !== 0 ? personalityOf(nameId).sit?.[Math.abs(w[24]!) - 1] : undefined;
+    sub.textContent = respawn > 0 ? `쓰러짐 · 부활 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 기여 ${w[23] ?? 0}${sitRule ? ` · ${sitRule.label}` : ""}`;
+    if (sitRule && respawn <= 0) sub.style.color = (w[24] ?? 0) > 0 ? "#8ff0a4" : "#ff9a8a";
     name.append(nm, sub);
     const need = mercXpNeed(tier);
     if (Number.isFinite(need)) {
@@ -116,7 +118,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       const bigOpen = panel.classList.contains("open");
       if (!bigOpen && !docked) return;
       mine.sort((a, b) => Number(isReady(b)) - Number(isReady(a)) || a[4] - b[4] || b[15] - a[15] || a[0] - b[0]);
-      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${Math.ceil(w[8])}:${w[17]}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}:${Math.round((w[23] ?? 0) / 10)}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}${bigOpen ? 1 : 0}${docked ? 1 : 0}`;
+      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${Math.ceil(w[8])}:${w[17]}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}:${Math.round((w[23] ?? 0) / 10)}:${w[24] ?? 0}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}${bigOpen ? 1 : 0}${docked ? 1 : 0}`;
       if (confirm >= 0 && performance.now() - confirmT > 2500) confirm = -1;
       if (next === sig) return;
       sig = next;

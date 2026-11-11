@@ -2853,6 +2853,23 @@ async function main() {
       const baseY = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y;
       const lift = isReady(w) ? 10 : 0; // 강화 가능 화살표가 있으면 그 위로(강화 점·방패 막대·화살표와 겹치지 않게 막대에서 충분히 띄운다)
       v.label.y = baseY - 22 - lift; // 이름이 막대 바로 위, 그 위에 병종 + 의도
+      // 성격 상황 효과가 켜졌을 때 머리 위에 짧게 보여 준다(내 용병과 토너먼트 선수의 용병만): 이로우면 초록, 불리하면 붉은 글자
+      {
+        const sv = v as unknown as { sitText?: Text };
+        const code = w[24] ?? 0;
+        const rule = code !== 0 && w[8] <= 0 && (w[5] === myId || (tourView && (w[5] === tourView.a || w[5] === tourView.b))) ? personalityOf(w[16]).sit?.[Math.abs(code) - 1] : undefined;
+        if (rule) {
+          if (!sv.sitText) {
+            sv.sitText = new Text({ text: "", style: { fill: 0xffffff, fontSize: 12, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+            sv.sitText.anchor.set(0.5, 1);
+            v.node.addChild(sv.sitText);
+          }
+          sv.sitText.visible = true;
+          sv.sitText.text = rule.label;
+          sv.sitText.style.fill = code > 0 ? 0x8ff0a4 : 0xff9a8a;
+          sv.sitText.y = baseY - (tourView ? 20 : 6);
+        } else if (sv.sitText) sv.sitText.visible = false;
+      }
       // 토너먼트: 용병 머리 위에 이번 판 기여도(체력 단위: 준 피해 + 막은 피해 + 처치 보너스...)를 보여 준다. 가장 많이 한 용병에는 별
       {
         const mv = v as unknown as { merit?: Text };

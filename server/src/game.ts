@@ -21,6 +21,11 @@ import {
   PERSONALITY_IGNORE_MAX,
   RETREAT_SEC,
   KILL_HASTE_SEC,
+  SIT_COND,
+  SIT_RADIUS,
+  SIT_STEP,
+  type SitMods,
+  type SitCtx,
   AURA_RADIUS,
   RETREAT_COOLDOWN,
   sameEpithetName,
@@ -556,6 +561,9 @@ export interface Merc extends Fighter {
   career: MercCareer; // 전적(공헌 점수의 재료)
   retreatT?: number; // 체력이 낮아 진형으로 물러나는 남은 시간(성격 "수줍은"·"늙은")
   retreatCd?: number; // 다시 물러날 수 있을 때까지
+  sit?: SitMods; // 지금 켜진 성격 상황 효과(합친 값)
+  sitCode?: number; // 첫 번째 켜진 규칙(+n 이로움 / -n 불리함, 0 없음)
+  homeDist?: number; // 진형 자리에서 떨어진 거리(AI가 갱신)
   hasteT?: number; // 성격 "날쌘": 처치 뒤 빨라진 남은 시간
   auraDmg?: number; // 성격 "늙은" 곁에 있어서 받는 공격력 보너스
   matchBase?: number; // 토너먼트 경기를 시작할 때의 공헌 점수(이번 경기의 기여도 = score - matchBase)
@@ -1520,6 +1528,7 @@ export class Game {
       m.respawn > 0 ? -1 : m.intentArg ?? -1,
       m.num,
       Math.round(m.career.score - (this.phase === "tournament" ? m.matchBase ?? 0 : 0)),
+      m.respawn > 0 ? 0 : m.sitCode ?? 0,
     ]);
   }
 
@@ -4422,7 +4431,7 @@ export class Game {
             }
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
-          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner);
+          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner) * (1 + (m.sit?.taken ?? 0)); // 성격 상황 효과(받는 피해)
           fm.lastBody = taken;
           if (h.by && this.phase === "tournament") this.creditMercHit(h.by, taken);
           this.hurtMerc(m, taken, h.by);
@@ -4655,6 +4664,56 @@ export class Game {
     this.pushEvent(EVT_QUIT, pick.x, pick.y, pick.tier, pick.type, owner);
   }
 
+  private sitT = 0;
+  /** 성격의 상황 효과: 0.4초마다 용병마다 주변을 읽고, 켜진 규칙의 수치를 합쳐 둔다(능력치·받는 피해 계산이 가져다 쓴다) */
+  private stepSituations(dt: number): void {
+    this.sitT -= dt;
+    if (this.sitT > 0) return;
+    this.sitT = SIT_STEP;
+    const duel = this.phase === "tournament";
+    const foes = duel ? null : [...this.enemies.values()];
+    for (const m of this.mercs.values()) {
+      const pers = this.persona(m);
+      if (!pers.sit || m.respawn > 0) {
+        m.sit = undefined;
+        m.sitCode = 0;
+        continue;
+      }
+      let ne = 0;
+      let elite = false;
+      let shield = false;
+      if (foes) {
+        for (const e of foes) {
+          const d = Math.hypot(e.x - m.x, e.y - m.y);
+          if (d <= SIT_RADIUS.enemy + radiusOf(e)) ne++;
+          if ((e.elite || e.boss) && d <= SIT_RADIUS.elite) elite = true;
+          if (e.shield > 0 && d <= SIT_RADIUS.shield) shield = true;
+        }
+      } else {
+        for (const f of this.duelFoes(m.owner)) if (Math.hypot(f.x - m.x, f.y - m.y) <= SIT_RADIUS.enemy + f.radius) ne++;
+      }
+      let na = 0;
+      for (const o of this.mercs.values()) if (o !== m && o.owner === m.owner && o.respawn <= 0 && Math.hypot(o.x - m.x, o.y - m.y) <= SIT_RADIUS.ally) na++;
+      const ctx: SitCtx = { enemies: ne, allies: na, hpFrac: Math.min(1, m.hp / Math.max(1, this.mercStats(m).hp)), elite, shield, homeDist: m.homeDist ?? 0 };
+      let merged: SitMods | undefined;
+      let code = 0;
+      let up = false;
+      let down = false;
+      pers.sit.forEach((rule, i) => {
+        if (!SIT_COND[rule.when].test(ctx)) return;
+        merged ??= {};
+        for (const k of Object.keys(rule.mods) as (keyof SitMods)[]) merged[k] = (merged[k] ?? 0) + rule.mods[k]!;
+        if (!code) code = rule.good ? i + 1 : -(i + 1);
+        if (rule.good) up = true;
+        else down = true;
+      });
+      m.sit = merged;
+      m.sitCode = code;
+      if (up) m.career.sitUp += SIT_STEP;
+      if (down) m.career.sitDown += SIT_STEP;
+    }
+  }
+
   private auraT = 0;
   private stepMercs(dt: number): void {
     const alive = new Map<number, number>();
@@ -4664,6 +4723,7 @@ export class Game {
       alive.set(m.owner, (alive.get(m.owner) ?? 0) + 1);
       m.career.alive += dt;
     }
+    this.stepSituations(dt);
     this.auraT -= dt;
     if (this.auraT <= 0) {
       // 성격 "늙은": 곁(AURA_RADIUS 안)의 같은 주인 용병들이 공격력 보너스를 받는다(0.4초마다 갱신)
@@ -4872,6 +4932,7 @@ export class Game {
         fort,
         widthMult: boxWidthMult(m.type, st.arc),
       };
+      m.homeDist = c.homeDist;
       const ordNow = ignoring || m.type === CAVALRY ? null : ownerSlot?.orders[m.type] ?? null;
       c.ignoreOrders = ignoring;
       const px0 = m.x;
@@ -6906,7 +6967,7 @@ export class Game {
   /** 카드 능력치에 성격 보정을 더한 값: 배율 능력은 (1 + 값)배, 나머지는 더한다 */
   private pstat(m: Merc, mods: Mods, stat: MercStat): number {
     const base = mstat(mods, m.type, stat);
-    const d = this.persona(m).mods[stat];
+    const d = (this.persona(m).mods[stat] ?? 0) + (m.sit?.[stat] ?? 0); // 성격 + 지금 켜진 상황 효과
     if (!d) return base;
     return MULT_STATS.includes(stat) ? base * (1 + d) : base + d;
   }
@@ -6930,13 +6991,12 @@ export class Game {
     const area = this.pstat(m, mods, "area");
     const pers = this.persona(m);
     const maxHp = Math.round(base.hp * hpMult);
-    const rage = pers.berserkHp && m.hp > 0 && m.hp < maxHp * pers.berserkHp ? 1 + (pers.berserkDmg ?? 0) : 1; // 용감한: 체력이 절반 아래면 사생결단
     const quick = (m.hasteT ?? 0) > 0 ? 1 + (pers.killHaste ?? 0) : 1; // 날쌘: 처치 뒤 잠깐 빨라진다
     return {
       ...base,
       hp: maxHp,
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
-      damage: base.damage * this.pstat(m, mods, "dmg") * TIER_DMG[tier]! * power * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)) * rage * (1 + (m.auraDmg ?? 0)),
+      damage: base.damage * this.pstat(m, mods, "dmg") * TIER_DMG[tier]! * power * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)) * (1 + (m.auraDmg ?? 0)),
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier),
       cooldown: base.cooldown / quick / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick,
