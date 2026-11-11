@@ -1,4 +1,4 @@
-import { DIFFICULTY_NAMES, DIFFICULTY_REDUCTION, STAGE_COUNT, type ClientMsg, type ResultPlayer, type RoomInfo, type RoomMember, type RoomPhase, type ServerMsg } from "@mercenary/shared";
+import { DIFFICULTY_NAMES, DIFFICULTY_REDUCTION, STAGE_COUNT, UNIT_NAMES, WEAPONS, mercName, tierName, type ResultMerc, type ResultWeapon, type ClientMsg, type ResultPlayer, type RoomInfo, type RoomMember, type RoomPhase, type ServerMsg } from "@mercenary/shared";
 
 type ResultMsg = Extract<ServerMsg, { t: "result" }>;
 
@@ -292,6 +292,93 @@ export function createLobby(opts: Options): Lobby {
     return item;
   }
 
+  /** 결과 화면의 자세한 기록: 주인공 무기별, 용병별 표(기여도 순) */
+  function detailTables(p: ResultPlayer, total: number): HTMLElement {
+    const box = document.createElement("div");
+    box.className = "rdet";
+    const n1 = (v: number) => (Math.round(v * 10) / 10).toLocaleString();
+    const n0 = (v: number) => Math.round(v).toLocaleString();
+    const mk = (heads: string[], rows: (string | number)[][], cls = ""): HTMLElement => {
+      const wrap = document.createElement("div");
+      wrap.className = `rtab ${cls}`;
+      const t = document.createElement("table");
+      const th = document.createElement("tr");
+      for (const h of heads) {
+        const c = document.createElement("th");
+        c.textContent = h;
+        th.append(c);
+      }
+      t.append(th);
+      for (const r of rows) {
+        const tr = document.createElement("tr");
+        r.forEach((v, i) => {
+          const td = document.createElement("td");
+          td.textContent = String(v);
+          if (i > 0) td.className = "num";
+          tr.append(td);
+        });
+        t.append(tr);
+      }
+      wrap.append(t);
+      return wrap;
+    };
+    const weapons: ResultWeapon[] = p.weapons ?? [];
+    if (weapons.length > 0) {
+      const secTot = weapons.reduce((a, w) => a + w.sec, 0) || 1;
+      const h = document.createElement("h3");
+      h.textContent = "주인공 무기별";
+      const rows = weapons.map((w) => {
+        const wp = WEAPONS.find((x) => x.type === w.type);
+        return [`${wp?.name ?? UNIT_NAMES[w.type]}`, `${mmss(w.sec)} (${Math.round((100 * w.sec) / secTot)}%)`, n0(w.dealt), n1(w.sec > 0 ? w.dealt / w.sec : 0), w.kills, n0(w.taken), n1(w.sec > 0 ? (w.taken / w.sec) * 60 : 0)];
+      });
+      box.append(h, mk(["무기", "사용 시간", "준 피해", "초당 피해(DPS)", "처치", "받은 피해", "분당 받은 피해"], rows));
+    }
+    const mercs: ResultMerc[] = p.mercList ?? [];
+    if (mercs.length > 0) {
+      // 병종별 합계: 어느 병종이 얼마나 기여했는지 한눈에
+      const sh = document.createElement("h3");
+      sh.textContent = "병종별 합계";
+      const trows: (string | number)[][] = [];
+      for (let t = 0; t < 6; t++) {
+        const g = mercs.filter((m) => m.type === t);
+        if (g.length === 0) continue;
+        const sum = (f: (m: ResultMerc) => number) => g.reduce((a, m) => a + f(m), 0);
+        const alive = sum((m) => m.alive);
+        trows.push([UNIT_NAMES[t]!, `${g.length}명`, n0(sum((m) => m.score)), n0(sum((m) => m.score) / g.length), n0(sum((m) => m.dealt)), n1(alive > 0 ? sum((m) => m.dealt) / alive : 0), n0(sum((m) => m.taken)), n1(alive > 0 ? (sum((m) => m.taken) / alive) * 60 : 0), sum((m) => m.kills), sum((m) => m.assists), sum((m) => m.deaths)]);
+      }
+      box.append(sh, mk(["병종", "인원", "기여도 합", "1명당 기여도", "준 피해", "초당 피해(1명 평균)", "받은 피해", "분당 받은 피해(1명 평균)", "처치", "어시스트", "쓰러짐"], trows));
+      const h = document.createElement("h3");
+      h.textContent = `용병별 (기여도 순 · 용병 ${mercs.length}명)`;
+      const best = Math.max(1, ...mercs.map((m) => m.score));
+      const special = (m: ResultMerc): string =>
+        m.type === 1 ? `되받아친 ${n0(m.counter)}` : m.type === 3 ? `막은 ${n0(m.blocked)}` : m.type === 4 ? `경직 ${m.stagger}회` : m.type === 5 ? `광역 추가 ${m.aoe}명` : m.type === 2 ? `치명타 ${m.crits}발` : `돌격 ${n0(m.charge)}`;
+      const rows = mercs.map((m, i) => [
+        `${i === 0 ? "★ " : ""}${m.num}번 ${mercName(m.nameId)}`,
+        `${tierName(m.type, m.tier)}${m.tier > 0 ? " " + "★".repeat(m.tier) : ""}${m.active ? "" : " (떠남)"}`,
+        mmss(Math.round(m.alive)),
+        `${n0(m.score)}`,
+        n0(m.dealt),
+        n1(m.alive > 0 ? m.dealt / m.alive : 0),
+        n0(m.taken),
+        n1(m.alive > 0 ? (m.taken / m.alive) * 60 : 0),
+        m.kills,
+        m.assists,
+        m.deaths,
+        special(m),
+      ]);
+      const tab = mk(["용병", "병종·단계", "생존 시간", "기여도", "준 피해", "초당 피해(DPS)", "받은 피해", "분당 받은 피해", "처치", "어시스트", "쓰러짐", "병종 특기"], rows, "merc");
+      // 기여도 막대: 1등 대비 비율을 기여도 칸 배경에 깐다
+      tab.querySelectorAll("tr").forEach((tr, i) => {
+        if (i === 0) return;
+        const td = tr.children[3] as HTMLElement;
+        td.style.background = `linear-gradient(90deg, rgba(224,192,93,.35) ${Math.round((100 * mercs[i - 1]!.score) / best)}%, transparent 0)`;
+      });
+      box.append(h, tab);
+    }
+    void total;
+    return box;
+  }
+
   /** 결과 화면. 끝난 게임이면 방장만 다시 시작할 수 있고, 진행 중 기록이면 계속하거나 나갈 수 있고, 저장된 기록은 보기만 한다. */
   function renderResult(r: ResultMsg | null = lastResult, mode: ResultMode = resultMode, quit = false, me = nameInput.value.trim()): void {
     if (!r) return;
@@ -303,7 +390,10 @@ export function createLobby(opts: Options): Lobby {
     $("resultSub").textContent = `${r.partial || quit ? `스테이지 ${r.stage}/${STAGE_COUNT} 진행 중` : statusText(r, false)} · ${mmss(r.time)}`;
     const list = $("resultList");
     list.replaceChildren();
-    for (const p of r.players) list.append(playerRow(p, p.name === me));
+    for (const p of r.players) {
+      list.append(playerRow(p, p.name === me));
+      list.append(detailTables(p, r.time));
+    }
     const iAmHost = hostId === myId;
     $("resultClose").style.display = mode === "final" ? "none" : "";
     $("resultClose").textContent = mode === "view" ? "닫기" : "계속하기";

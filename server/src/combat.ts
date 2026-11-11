@@ -6,6 +6,7 @@ import {
   shieldFactor,
   TUNE,
 } from "@mercenary/shared";
+import type { Merc } from "./game.js";
 
 /** 공격을 받는 쪽의 방어 상태 */
 export interface Guard {
@@ -27,6 +28,7 @@ export interface Hit {
   crit?: boolean; // 치명타(이미 피해에 반영됨. 표시용)
   srcTier?: number; // 공격자 용병의 강화 단계(창병의 카운터가 단계마다 세진다)
   src?: unknown; // 공격자(가시 갑옷이 되돌릴 대상)
+  by?: Merc; // 토너먼트: 때린 용병(공헌 점수·킬을 준다)
 }
 
 export interface HitResult {

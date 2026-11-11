@@ -231,3 +231,38 @@ export function aggregateStats(records: readonly MatchRecord[], opt: StatsOption
     sizes: [...sizeMap.entries()].sort((a, b) => a[0] - b[0]).map(([players, count]) => ({ players, count })),
   };
 }
+
+/** 용병 한 명의 전적. 서버가 쌓고, 게임이 끝나면 결과 화면에 보낸다. score는 기여도(체력 단위)이고 경험치는 이 값에서 나온다. */
+export interface MercCareer {
+  dealt: number; // 적에게 준 피해(토너먼트에서는 상대에게 준 피해도 포함)
+  taken: number; // 받은 피해
+  blocked: number; // 검방병: 방패가 막은 피해
+  kills: number; // 막타
+  assists: number; // 어시스트(최근 몇 초 안에 피해를 줬다)
+  counter: number; // 창병: 카운터로 되받아친 피해
+  stagger: number; // 둔기병: 경직시킨 횟수
+  aoe: number; // 마법사: 한 번에 둘째 이후로 맞힌 적 수 합
+  crits: number; // 치명타 횟수
+  charge: number; // 기병: 돌격 추가 피해 합
+  alive: number; // 살아서 싸운 시간(초)
+  deaths: number; // 쓰러진 횟수
+  score: number; // 기여도(체력 단위): 준 피해 + 막은 피해 + 되받아친 피해 + 경직 + 처치 보너스
+}
+export const newCareer = (): MercCareer => ({ dealt: 0, taken: 0, blocked: 0, kills: 0, assists: 0, counter: 0, stagger: 0, aoe: 0, crits: 0, charge: 0, alive: 0, deaths: 0, score: 0 });
+
+/** 결과 화면의 용병 한 줄 */
+export interface ResultMerc extends MercCareer {
+  num: number; // 용병 번호
+  nameId: number;
+  type: number;
+  tier: number;
+  active: boolean; // 끝났을 때 아직 거느리고 있었다(해고·이탈하면 false)
+}
+/** 결과 화면의 주인공 무기 한 줄 */
+export interface ResultWeapon {
+  type: number; // 병종 속성 번호(무기와 일대일)
+  sec: number; // 든 시간
+  dealt: number;
+  kills: number;
+  taken: number; // 이 무기를 들고 있을 때 받은 피해
+}

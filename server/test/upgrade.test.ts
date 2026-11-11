@@ -180,7 +180,6 @@ import {
   LEGEND_CONST,
   KNOCK_BOSS_FACTOR,
   MERC_NAME_COUNT,
-  MERC_XP_KILL,
   MERC_XP_NEED,
   mercName,
   type LegendId,
@@ -212,13 +211,14 @@ test("용병 경험치: 피해를 주거나 받으면 조금, 막타를 치면 �
   (g.getEnemy(e) as { maxHp: number }).maxHp = 10_000;
   run(g, 4);
   const xp = mercWire(g, m)[17];
-  assert.ok(xp > 0 && xp < MERC_XP_KILL, `준·받은 피해 경험치만으로는 막타보다 적다 (${xp})`);
+  assert.ok(xp > 0, `피해를 주고받으면 경험치가 오른다 (${xp})`);
   // 막타
   const e2 = g.spawnEnemyAt(p.x + 80, p.y, 0);
   (g.getEnemy(e2) as { hp: number }).hp = 1;
   const before = g.getMerc(m)!.xp;
   run(g, 3);
-  assert.ok(g.getMerc(m)!.xp - before >= MERC_XP_KILL * 0.9, "막타 경험치");
+  assert.ok(g.getMerc(m)!.xp - before > 0, "막타를 치면 경험치가 오른다");
+  assert.ok(g.getMerc(m)!.career.kills >= 1 && g.getMerc(m)!.career.score > 0, "처치와 기여도가 기록된다");
 });
 
 test("용병 강화는 경험치를 모아야 가능하고, 강화하면 경험치가 소모된다", () => {

@@ -1201,7 +1201,7 @@ async function main() {
       v.bg
         .clear()
         .roundRect(0, 0, CARD_W, CARD_H, 10)
-        .fill({ color: 0x1b1f2a, alpha: 0.94 })
+        .fill({ color: 0x1b1f2a, alpha: 0.86 })
         .stroke({ width: 3, color: 0x050608 })
         .roundRect(2.5, 2.5, CARD_W - 5, CARD_H - 5, 8)
         .stroke({ width: card.rarity > 0 ? 2.5 : 1.5, color: card.rarity > 0 ? RARITY_COLORS[card.rarity]! : 0x59627a })
@@ -2287,7 +2287,11 @@ async function main() {
     } else if (tour.step === "fight" && tour.t >= TUNE.TOURNAMENT_MATCH_SEC - 1.5) {
       big = `<div class="b">시작!</div>`;
     } else if (tour.step === "outro") {
-      big = `<div class="a">${esc(tour.title)} · ${esc(modeName)}</div><div class="b">승자: ${esc(tour.winner)}</div>${multi ? `<div class="c">점수 ${tour.pts[0]} : ${tour.pts[1]}${tour.game + 1 < tour.games ? " · 다음 판 준비" : ""}</div>` : ""}`;
+      const mv = tour.mvp;
+      const mvLine = mv
+        ? `<div class="c" style="color:#ffd45d">★ MVP: <span style="color:${TEAM_CSS[mv.owner === tour.a ? sa : sb]}">${esc(mv.owner === tour.a ? tour.an : tour.bn)}</span>의 ${mv.num}번 ${esc(mercName(mv.nameId))} (${esc(tierName(mv.type, mv.tier))}) · 기여 ${mv.score}</div><div class="c" style="font-size:15px;color:#e6e9f0">준 피해 ${mv.dealt}${mv.blocked > 0 ? ` · 막은 피해 ${mv.blocked}` : ""}${mv.special > 0 ? ` · 특기 ${mv.special}` : ""} · 처치 ${mv.kills}${mv.assists > 0 ? ` · 어시스트 ${mv.assists}` : ""}</div>`
+        : "";
+      big = `<div class="a">${esc(tour.title)} · ${esc(modeName)}</div><div class="b">승자: ${esc(tour.winner)}</div>${mvLine}${multi ? `<div class="c">점수 ${tour.pts[0]} : ${tour.pts[1]}${tour.game + 1 < tour.games ? " · 다음 판 준비" : ""}</div>` : ""}`;
     } else if (tour.step === "end") {
       big = `<div class="a">토너먼트 우승</div><div class="b">${esc(tour.champion)}</div><div class="c">상금과 경험치를 받았습니다</div>`;
     }
@@ -2816,6 +2820,7 @@ async function main() {
     const tourView = latest.g?.phase === "tournament" ? latest.g.tour : null;
     const SPECTATOR_ALPHA = 0.35;
     const sitsOut = (owner: number, hero: boolean): boolean => !!tourView && (owner === tourView.a || owner === tourView.b) && (hero ? tourView.mode === TOUR_MERCS : tourView.mode === TOUR_DUEL);
+    const topMerit = tourView ? Math.max(0, ...latest.mercs.filter((q) => q[5] === tourView.a || q[5] === tourView.b).map((q) => q[23] ?? 0)) : 0; // 이번 판에서 가장 많이 기여한 용병(별 표시)
     mercs.update(latest.mercs, k, (v, w) => {
       v.node.alpha = sitsOut(w[5], false) ? SPECTATOR_ALPHA : 1;
       v.node.visible = w[8] <= 0 && ((w[19] ?? 0) & ST_BIT_REST) === 0; // 쓰러진 용병은 부활할 때까지, 텐트에서 쉬는 용병은 나올 때까지 숨긴다
@@ -2848,6 +2853,23 @@ async function main() {
       const baseY = -allyTex[w[4]]!.height * SPRITE_SCALE * SPRITE_ANCHOR_Y;
       const lift = isReady(w) ? 10 : 0; // 강화 가능 화살표가 있으면 그 위로(강화 점·방패 막대·화살표와 겹치지 않게 막대에서 충분히 띄운다)
       v.label.y = baseY - 22 - lift; // 이름이 막대 바로 위, 그 위에 병종 + 의도
+      // 토너먼트: 용병 머리 위에 이번 판 기여도(체력 단위: 준 피해 + 막은 피해 + 처치 보너스...)를 보여 준다. 가장 많이 한 용병에는 별
+      {
+        const mv = v as unknown as { merit?: Text };
+        if (tourView && (w[5] === tourView.a || w[5] === tourView.b)) {
+          if (!mv.merit) {
+            mv.merit = new Text({ text: "", style: { fill: 0xdfe6f2, fontSize: 12, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+            mv.merit.anchor.set(0.5, 1);
+            v.node.addChild(mv.merit);
+          }
+          const val = w[23] ?? 0;
+          const top = val > 0 && val === topMerit;
+          mv.merit.visible = w[8] <= 0;
+          mv.merit.y = baseY - 2;
+          mv.merit.text = `${top ? "★ " : ""}기여 ${val}`;
+          mv.merit.style.fill = top ? 0xffd45d : 0xdfe6f2;
+        } else if (mv.merit) mv.merit.visible = false;
+      }
       // 말풍선: 내 용병이 지금 하려는 일(병종 + 행동 → 대상)을 항상 담고, 혼잣말이 나오면 그 위 줄에 함께 보여 준다(토너먼트에서도)
       {
         type Bub = { box: Container; bg: Graphics; tIntent: Text; tTalk: Text; sig: string; h: number };
@@ -4162,6 +4184,14 @@ async function main() {
     }
     statsPanel.position.set(10, app.screen.height - 112 - STATS_H);
     statsPanel.visible = !!meState;
+    {
+      // 왼쪽 미니맵 아래 ~ 주인공 능력치 상자 위의 빈 공간에 용병 목록을 항상 띄운다(자리가 모자라면 접어 둔다: U로 여는 큰 창을 쓴다)
+      const oy = 30 + hudH + 8;
+      const S = Math.min(MINI_W, app.screen.height - oy - 8 - STATS_H - 112);
+      const top = oy + (miniOn && S >= 110 ? S + 8 : 0);
+      const bottom = app.screen.height - 112 - STATS_H - 8;
+      mercPanel.setDock(meState && bottom - top >= 120 ? { top, height: bottom - top } : null);
+    }
     drawMinimap(ticker.deltaMS / 1000);
     renderTournament(gi, myId);
     snd.near = nearCampId;
@@ -4176,7 +4206,7 @@ async function main() {
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 120);
     campPanel.position.set(app.screen.width - CAMP_W - 12, 52); // 오른쪽 위(소리 버튼 아래)
-    toast.position.set(app.screen.width / 2, 74);
+    toast.position.set(app.screen.width / 2, tourNow ? 142 : 74); // 토너먼트 배너 아래로
     legend.position.set(0, app.screen.height - LEGEND_H);
   });
 }

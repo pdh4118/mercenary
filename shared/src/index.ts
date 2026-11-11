@@ -202,6 +202,7 @@ export type MercWire = [
   intent: number, // 지금 무엇을 하려는지(INTENT_NAMES 번호). 머리 위에 표시한다
   intentArg: number, // 의도의 대상 병종(추격·공격·마크 중인 적의 병종, 없으면 -1)
   num: number, // 내 용병 번호(1부터. 해고하면 비는 번호를 다음 용병이 쓴다). 음성으로 "3번"이라고 부른다
+  merit: number, // 기여도(체력 단위). 토너먼트에서는 이번 경기에서 쌓은 만큼
 ];
 /** 용병이 지금 하려는 일(머리 위 표시). 0은 표시 없음 */
 export const INTENT_NAMES = ["", "대기", "복귀", "추격", "공격", "돌격", "이동 지시", "공격 지시", "물러남", "위험 회피", "사선 확보", "고지대", "공포", "치고 빠짐", "수비", "마크", "고집"] as const;
@@ -315,8 +316,25 @@ export interface TourInfo {
   game: number; // 한 경기 안에서 지금 몇 번째 판인가(0부터)
   games: number; // 한 경기의 판 수(1 또는 3)
   pts: [a: number, b: number]; // 세 판 경기의 현재 점수(한 판 경기는 0)
+  mvp?: TourMvp; // 방금 끝난 판의 MVP(결과 표시 단계)
 }
 
+/** 토너먼트 한 판에서 가장 많이 기여한 용병과 그 근거(왜 MVP인지 보이도록 수치를 함께 보낸다) */
+export interface TourMvp {
+  owner: number;
+  num: number;
+  nameId: number;
+  type: number;
+  tier: number;
+  score: number; // 이번 판 기여도
+  dealt: number; // 준 피해
+  blocked: number; // 막은 피해
+  kills: number; // 쓰러뜨린 용병 수
+  assists: number;
+  special: number; // 병종 특기(되받아친 피해 + 경직 횟수 기여)
+}
+
+import type { ResultMerc, ResultWeapon } from "./stats.js";
 export interface ResultPlayer {
   name: string;
   level: number;
@@ -330,6 +348,8 @@ export interface ResultPlayer {
   gold: number; // 번 금화 합(보상 포함)
   wins: number; // 토너먼트 경기 승리 수
   champion: number; // 토너먼트 우승 횟수
+  mercList?: ResultMerc[]; // 용병별 전적(공헌 점수 순)
+  weapons?: ResultWeapon[]; // 무기별 전적(든 시간이 있는 것만)
 }
 
 export type BulletWire = [id: number, x: number, y: number, team: 0 | 1, kind: number, ang: number]; // team 1 = 적 투사체, kind 0 = 화살, 1 = 던진 철퇴, 2 이상 = 장군 투사체(BUL_*), ang = 날아가는 방향

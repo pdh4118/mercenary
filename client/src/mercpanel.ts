@@ -6,6 +6,8 @@ export interface MercPanel {
   toggle(): void;
   isOpen(): boolean;
   show(visible: boolean): void;
+  /** 왼쪽 미니맵 아래 빈 공간에 항상 떠 있는 간단 목록. 자리가 없으면 null(U로 여는 큰 창만 쓴다) */
+  setDock(rect: { top: number; height: number } | null): void;
   /** 매 프레임 호출해도 된다. 내용이 바뀌었을 때만 다시 그린다. */
   update(mercs: readonly MercWire[], myId: number, gold: number, freeLeadership: number, nearCamp: boolean): void;
   /** 목록에서 가리키고 있는 용병(월드에서 강조 표시) */
@@ -20,6 +22,10 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
   const panel = $("mercPanel");
   const list = $("mercList");
   const title = $("mercTitle");
+  const dock = $("mercDock");
+  const dockList = $("dockList");
+  const dockTitle = $("dockTitle");
+  let docked = false;
   let sig = "";
   let hover = -1;
   let visible = false;
@@ -28,12 +34,60 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
   let confirm = -1; // 해고 확인 중인 용병(한 번 더 누르면 해고)
   let confirmT = 0;
   const hex = (c: number) => "#" + c.toString(16).padStart(6, "0");
+  /** 왼쪽에 항상 떠 있는 간단한 줄: 이름·단계, 체력·기여도, 경험치 막대, 강화 버튼 */
+  const compactRow = (w: MercWire, gold: number, freeLeadership: number): HTMLElement => {
+    const [id, , , hp, type, , , , respawn, maxHp, , , , , , tier, nameId, xp] = w;
+    const row = document.createElement("div");
+    row.className = "mrow compact";
+    row.onmouseenter = () => (hover = id);
+    row.onmouseleave = () => (hover = hover === id ? -1 : hover);
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.background = hex(opts.colors[type]!);
+    const name = document.createElement("div");
+    name.className = "grow";
+    const nm = document.createElement("div");
+    nm.className = "nm";
+    nm.textContent = `${w[22] ?? 0}번 ${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}`;
+    const sub = document.createElement("div");
+    sub.className = "stat";
+    sub.textContent = respawn > 0 ? `쓰러짐 · 부활 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 기여 ${w[23] ?? 0}`;
+    name.append(nm, sub);
+    const need = mercXpNeed(tier);
+    if (Number.isFinite(need)) {
+      const bar = document.createElement("div");
+      bar.className = "xpbar";
+      const fill = document.createElement("div");
+      fill.style.width = `${Math.min(100, (100 * xp) / need)}%`;
+      if (xp >= need) fill.className = "full";
+      bar.append(fill);
+      name.append(bar);
+    }
+    row.append(dot, name);
+    const cost = upgradeCost(type, tier);
+    if (cost !== null && xp >= need) {
+      const btn = document.createElement("button");
+      btn.textContent = `강화 ${cost}G`;
+      btn.className = "primary";
+      btn.disabled = gold < cost || respawn > 0 || freeLeadership < 1;
+      btn.title = freeLeadership < 1 ? "통솔력이 부족합니다 (강화하면 통솔력 +1)" : `${tierName(type, tier + 1)}로 강화`;
+      btn.onclick = () => opts.send({ t: "upgrade", merc: id });
+      row.append(btn);
+    } else {
+      const t = document.createElement("span");
+      t.className = "stat";
+      t.textContent = cost === null ? "최고" : `${xp}/${need}`;
+      row.append(t);
+    }
+    return row;
+  };
 
   return {
     toggle: () => panel.classList.toggle("open"),
     isOpen: () => panel.classList.contains("open"),
     show(v) {
       visible = v;
+      dock.classList.toggle("open", v && docked);
       if (!v) {
         panel.classList.remove("open");
         first = true;
@@ -41,6 +95,16 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       }
     },
     hovered: () => hover,
+    setDock(rect) {
+      const on = rect !== null;
+      if (rect) {
+        dock.style.top = `${Math.round(rect.top)}px`;
+        dock.style.height = `${Math.round(rect.height)}px`;
+      }
+      if (on !== docked) sig = "";
+      docked = on;
+      dock.classList.toggle("open", on && visible);
+    },
     update(mercs, myId, gold, freeLeadership, nearCamp) {
       if (!visible) return;
       const mine = mercs.filter((w) => w[5] === myId);
@@ -49,15 +113,28 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       if (!first) for (const w of mine) if (nowReady.has(w[0]) && !ready.has(w[0])) opts.notify(`${mercName(w[16])} 강화 가능! (U)`);
       ready = nowReady;
       first = false;
-      if (!panel.classList.contains("open")) return;
+      const bigOpen = panel.classList.contains("open");
+      if (!bigOpen && !docked) return;
       mine.sort((a, b) => Number(isReady(b)) - Number(isReady(a)) || a[4] - b[4] || b[15] - a[15] || a[0] - b[0]);
-      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${Math.ceil(w[8])}:${w[17]}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}`;
+      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${Math.ceil(w[8])}:${w[17]}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}:${Math.round((w[23] ?? 0) / 10)}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}${bigOpen ? 1 : 0}${docked ? 1 : 0}`;
       if (confirm >= 0 && performance.now() - confirmT > 2500) confirm = -1;
       if (next === sig) return;
       sig = next;
       title.textContent = `내 용병 ${mine.length}명 · 금화 ${gold}G · 강화 가능 ${nowReady.size}`;
-      list.replaceChildren();
+      dockTitle.textContent = `내 용병 ${mine.length}명 · 강화 가능 ${nowReady.size}`;
       hover = -1;
+      if (docked) {
+        dockList.replaceChildren();
+        for (const w of mine) dockList.append(compactRow(w, gold, freeLeadership));
+        if (mine.length === 0) {
+          const e = document.createElement("div");
+          e.className = "empty";
+          e.textContent = "용병이 없습니다";
+          dockList.append(e);
+        }
+      }
+      if (!bigOpen) return;
+      list.replaceChildren();
       for (const w of mine) {
         const [id, , , hp, type, , , , respawn, maxHp, , , , , , tier, nameId, xp] = w;
         const row = document.createElement("div");

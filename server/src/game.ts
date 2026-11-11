@@ -265,11 +265,14 @@ import {
   LEGEND_CONST,
   POISON_SEC,
   MERC_NAME_COUNT,
-  MERC_XP_KILL,
   MERC_XP_OVERFLOW,
-  MERC_XP_PER_DAMAGE,
-  MERC_XP_PER_HURT,
+  newCareer,
+  type MercCareer,
+  type ResultMerc,
+  type ResultWeapon,
+  type TourMvp,
   mercXpNeed,
+  MERC_XP_TYPE_MULT,
   MAX_TIER,
   luckWeight,
   REROLL_MAX,
@@ -443,6 +446,7 @@ export interface Slot {
   zones: number[]; // 진형: 병종별 구역
   spacing: number; // 진형 간격 배율
   revives: number; // 동료를 일으켜 세운 횟수
+  mercLog: ResultMerc[]; // 해고·이탈로 떠난 용병의 전적(결과 화면용)
   stats: { dealt: number; taken: number; downs: number; mercDeaths: number; gold: number; wins: number; champion: number }; // 기록용 누적
   detail: SlotDetail; // 밸런스 통계용 세부 기록(병종별 고용·피해·쓰러짐, 무기별 사용 시간, 고른 카드, 스테이지별 합계)
   facing: number; // 진형이 바라보는 방향. 조준 방향을 천천히 따라간다
@@ -460,10 +464,12 @@ export interface SlotDetail {
   takenMerc: number[]; // 병종별 용병이 받은 피해
   takenHero: number; // 주인공이 받은 피해
   heroSec: number[]; // 무기(병종 속성)별로 든 시간(초)
+  heroKills: number[]; // 무기별 처치
+  heroTaken: number[]; // 무기를 든 동안 받은 피해
   cards: Record<string, number>; // 고른 카드 이름별 횟수
   stage: Record<number, [dealt: number, taken: number, heroDowns: number, mercDeaths: number]>; // 스테이지별 합계
 }
-const newDetail = (): SlotDetail => ({ hired: [0, 0, 0, 0, 0, 0], mercDeaths: [0, 0, 0, 0, 0, 0], dealtMerc: [0, 0, 0, 0, 0, 0], dealtHero: [0, 0, 0, 0, 0, 0], takenMerc: [0, 0, 0, 0, 0, 0], takenHero: 0, heroSec: [0, 0, 0, 0, 0, 0], cards: {}, stage: {} });
+const newDetail = (): SlotDetail => ({ hired: [0, 0, 0, 0, 0, 0], mercDeaths: [0, 0, 0, 0, 0, 0], dealtMerc: [0, 0, 0, 0, 0, 0], dealtHero: [0, 0, 0, 0, 0, 0], takenMerc: [0, 0, 0, 0, 0, 0], takenHero: 0, heroSec: [0, 0, 0, 0, 0, 0], heroKills: [0, 0, 0, 0, 0, 0], heroTaken: [0, 0, 0, 0, 0, 0], cards: {}, stage: {} });
 
 interface Fighter {
   id: number;
@@ -496,6 +502,8 @@ export interface Foe {
 }
 
 export interface Enemy extends Fighter {
+  contrib?: Map<number, { d: number; t: number }>; // 이 적에게 피해를 준 용병별 피해량과 마지막 시각(어시스트 판정)
+  staggerXpT?: number; // 경직 경험치를 마지막으로 준 시각
   ghost?: Ghost; // 은신(투명화) 상태: 투명도가 절반 이하면 어그로가 풀린다
   flankT: number; // 기병이 우회 접근에 쓴 시간
   evadeT: number; // 기병이 공격 뒤 물러나는 남은 시간
@@ -541,6 +549,8 @@ export interface Enemy extends Fighter {
   slotL: number;
 }
 export interface Merc extends Fighter {
+  career: MercCareer; // 전적(공헌 점수의 재료)
+  matchBase?: number; // 토너먼트 경기를 시작할 때의 공헌 점수(이번 경기의 기여도 = score - matchBase)
   owner: number;
   respawn: number;
   paid: number; // 고용에 쓴 금화(해고 환급 기준)
@@ -701,6 +711,7 @@ interface Tournament {
   pts: [number, number]; // 세 판 경기의 점수(a, b)
   t: number; // 이 단계에서 남은 초
   winner: string;
+  mvp?: TourMvp; // 방금 끝난 판의 MVP
   champion: string;
   /** 이번 경기에서 두 선수의 남은 전력(0..1)을 시간으로 쌓은 값과 지난 시간: 시간 초과 판정은 마지막 순간이 아니라 경기 내내의 평균 전력으로 한다 */
   sa: number;
@@ -830,7 +841,9 @@ export class Game {
   /** 테스트용: 용병에게 경험치를 바로 준다 */
   grantMercXpForTest(mercId: number, amount: number): void {
     const m = this.mercs.get(mercId);
-    if (m) this.gainMercXp(m, amount);
+    if (!m) return;
+    const mods = this.slots.get(m.owner)?.mods;
+    m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + amount * (mods ? this.pstat(m, mods, "xp") : 1)); // 카드 보너스만 반영(병종·단계 보정 없이)
   }
 
   /** 테스트용: 카드가 반영된 용병 능력치 */
@@ -1082,6 +1095,7 @@ export class Game {
       zones: [...DEFAULT_PRESETS[0]!.zones],
       spacing: DEFAULT_PRESETS[0]!.spacing,
       revives: 0,
+      mercLog: [],
       stats: { dealt: 0, taken: 0, downs: 0, mercDeaths: 0, gold: 0, wins: 0, champion: 0 },
       detail: newDetail(),
       facing: 0,
@@ -1153,7 +1167,7 @@ export class Game {
       if (!pick || rank(m) < rank(pick)) pick = m;
     }
     if (!pick) return { ok: false, reason: "해당 병종 용병이 없습니다" };
-    this.mercs.delete(pick.id);
+    this.retireMerc(pick);
     s.state.gold += Math.floor(pick.paid * TUNE.DISMISS_REFUND);
     return { ok: true };
   }
@@ -1497,6 +1511,7 @@ export class Game {
       m.respawn > 0 ? 0 : m.intent ?? 0,
       m.respawn > 0 ? -1 : m.intentArg ?? -1,
       m.num,
+      Math.round(m.career.score - (this.phase === "tournament" ? m.matchBase ?? 0 : 0)),
     ]);
   }
 
@@ -1623,8 +1638,30 @@ export class Game {
         gold: Math.round(s.stats.gold),
         wins: s.stats.wins,
         champion: s.stats.champion,
+        mercList: this.mercResults(s),
+        weapons: this.weaponResults(s),
       })),
     };
+  }
+
+  /** 용병별 전적(떠난 용병 포함, 공헌 점수 순) */
+  private mercResults(s: Slot): ResultMerc[] {
+    const r1 = (v: number) => Math.round(v * 10) / 10;
+    const rows: ResultMerc[] = [...s.mercLog];
+    for (const m of this.mercs.values()) if (m.owner === s.state.id) rows.push(this.logMerc(m, true));
+    for (const r of rows) for (const k of Object.keys(r) as (keyof ResultMerc)[]) if (typeof r[k] === "number" && !["num", "nameId", "type", "tier"].includes(k)) (r as unknown as Record<string, number>)[k] = r1(r[k] as number);
+    return rows.sort((a, b) => b.score - a.score);
+  }
+
+  /** 주인공 무기별 전적(든 시간이 있는 무기만) */
+  private weaponResults(s: Slot): ResultWeapon[] {
+    const out: ResultWeapon[] = [];
+    for (let t = 0; t < 6; t++) {
+      const sec = s.detail.heroSec[t] ?? 0;
+      if (sec <= 0) continue;
+      out.push({ type: t, sec: Math.round(sec), dealt: Math.round(s.detail.dealtHero[t] ?? 0), kills: s.detail.heroKills[t] ?? 0, taken: Math.round(s.detail.heroTaken[t] ?? 0) });
+    }
+    return out;
   }
 
   /** 순간 효과를 가져가고 비운다 */
@@ -2867,7 +2904,9 @@ export class Game {
         t.step = "fight";
         t.t = TUNE.TOURNAMENT_MATCH_SEC;
         t.sa = t.sb = t.se = 0;
+        t.mvp = undefined;
         const fm = t.rounds[t.r]!.matches[t.m]!;
+        for (const m of this.mercs.values()) if (m.owner === fm.a || m.owner === fm.b) m.matchBase = m.career.score; // 이번 판의 기여도는 여기서부터 센다
         t.side = [fm.a, fm.b].map((id): TourSideTally => {
           const mercs = z6();
           for (const m of this.mercs.values()) if (m.owner === id && m.respawn <= 0) mercs[m.type] = (mercs[m.type] ?? 0) + 1;
@@ -2943,6 +2982,24 @@ export class Game {
     void mt;
   }
 
+  /** 이번 판에서 가장 많이 기여한 용병(두 선수의 용병 중). 근거 수치를 함께 남기고, 경험치 보너스를 준다 */
+  private tourPickMvp(a: number, b: number): TourMvp | undefined {
+    let best: Merc | null = null;
+    let bestScore = 0;
+    for (const m of this.mercs.values()) {
+      if (m.owner !== a && m.owner !== b) continue;
+      const sc = m.career.score - (m.matchBase ?? 0);
+      if (sc > bestScore) {
+        best = m;
+        bestScore = sc;
+      }
+    }
+    if (!best) return undefined;
+    if (best.tier < MAX_TIER) best.xp = Math.min(mercXpNeed(best.tier) * MERC_XP_OVERFLOW, best.xp + TUNE.MXP_MVP);
+    const c = best.career;
+    return { owner: best.owner, num: best.num, nameId: best.nameId, type: best.type, tier: best.tier, score: Math.round(bestScore), dealt: Math.round(c.dealt), blocked: Math.round(c.blocked), kills: c.kills, assists: c.assists, special: Math.round(c.counter + c.stagger * TUNE.MXP_STAGGER) };
+  }
+
   /** 한 판이 끝났다. 한 판짜리 경기는 곧 경기가 끝나고, 세 판 경기는 점수(3:3:4)를 더해 마지막 판에서 점수가 높은 쪽이 이긴다. */
   private tourMatchDone(winner: 1 | 2, reason: "down" | "time" | "both" = "time"): void {
     this.tourLogMatch(winner, reason);
@@ -2952,6 +3009,7 @@ export class Game {
     const mode = this.tourMode() ?? TOUR_ALL;
     const gameWinner = winner === 1 ? mt.a : mt.b;
     t.winner = this.tourName(gameWinner);
+    t.mvp = this.tourPickMvp(mt.a, mt.b);
     t.step = "outro";
     t.t = TOURNAMENT_OUTRO_SEC;
     this.bullets = [];
@@ -3061,6 +3119,7 @@ export class Game {
       sa: t.se > 0 ? Math.round((t.sa / t.se) * 100) : Math.round(this.tourPower(a) * 100),
       sb: t.se > 0 ? Math.round((t.sb / t.se) * 100) : Math.round(this.tourPower(b) * 100),
       winner: t.winner,
+      ...(t.mvp ? { mvp: t.mvp } : {}),
       champion: t.champion,
       rounds: t.rounds.map((r) => ({ title: r.title, matches: r.matches.map((m): TourMatchInfo => ({ a: m.an, b: m.bn, w: m.w })) })),
       now: [t.r, t.m],
@@ -3187,7 +3246,7 @@ export class Game {
     }
     let num = 1;
     while (used.has(num)) num++;
-    const merc: Merc = { num, id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier, nameId: nameId === undefined ? this.pickName(owner) : sameEpithetName(nameId, usedNames), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0 };
+    const merc: Merc = { num, id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier, nameId: nameId === undefined ? this.pickName(owner) : sameEpithetName(nameId, usedNames), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0, career: newCareer() };
     this.mercs.set(id, merc);
     merc.hp = this.mercStats(merc).hp; // 이미 받은 강화가 반영된 체력으로 시작한다
     merc.shield = this.mercStats(merc).shield;
@@ -3310,11 +3369,24 @@ export class Game {
     return id;
   }
 
-  private gainMercXp(m: Merc, amount: number): void {
-    if (amount <= 0 || m.tier >= MAX_TIER) return;
+  /** 용병이 공헌했다(체력 단위). 기여도가 쌓이고, 그만큼 경험치도 오른다. */
+  private meritMerc(m: Merc, merit: number): void {
+    if (merit <= 0) return;
+    m.career.score += merit;
+    this.xpMerc(m, merit * TUNE.MXP_RATE);
+  }
+
+  /** 용병이 경험치를 얻는다(카드·단계 보너스·토너먼트 비율 반영). 기여도에는 들어가지 않는다 */
+  private xpMerc(m: Merc, raw: number): void {
+    if (raw <= 0 || m.tier >= MAX_TIER) return;
     const mods = this.slots.get(m.owner)?.mods;
-    const gain = amount * (mods ? this.pstat(m, mods, "xp") : 1); // 경험치 획득 능력
+    const gain = raw * (mods ? this.pstat(m, mods, "xp") : 1) * (MERC_XP_TYPE_MULT[m.type] ?? 1) * (1 + TUNE.MXP_TIER_BONUS * m.tier) * (this.phase === "tournament" ? TUNE.MXP_TOURNAMENT : 1);
     m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + gain);
+  }
+
+  /** 처치 보너스의 크기: 그 적(또는 쓰러뜨린 상대 용병) 체력의 일부 */
+  private killMerit(maxHp: number, boss = false): number {
+    return Math.min(maxHp, TUNE.MXP_KILL_CAP) * TUNE.MXP_KILL_FRAC * (boss ? 2 : 1);
   }
 
   getMerc(id: number): Readonly<Merc> | undefined {
@@ -4280,10 +4352,12 @@ export class Game {
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(-p.id, h.poison); // 토너먼트: 몸에 맞은 독 화살
           const taken = this.armorCut(r.body, s.mods.heroArmor) * defenseTakenMult(s.mods.heroDefense) * this.damageTakenMult(p.id); // 고정 감소가 먼저, 방어력(%)은 그다음
           fr.lastBody = taken;
+          if (h.by && this.phase === "tournament") this.creditMercHit(h.by, taken);
           p.hp -= taken;
           s.stats.taken += taken;
           if (this.phase !== "tournament") {
             s.detail.takenHero += taken;
+            s.detail.heroTaken[WEAPONS[p.weapon]!.type] = (s.detail.heroTaken[WEAPONS[p.weapon]!.type] ?? 0) + taken;
             this.stageStat(s)[1] += taken;
           } else {
             const tt = this.tourTally(p.id);
@@ -4323,6 +4397,10 @@ export class Game {
           if (!h.dot && !h.pierceGuard && this.dodged(mods ? this.pstat(m, mods, "dodge") : 0, m.x, m.y, m.owner)) return 0;
           const r = h.dot || h.pierceGuard ? DOT_RESULT(h.damage) : resolveHit({ type: m.type, shield: m.shield, face: m.face }, h);
           this.applyShield(m, r.shield, r.shieldBroke);
+          if (r.shield > 0) {
+            m.career.blocked += r.shield;
+            this.meritMerc(m, r.shield * TUNE.MXP_BLOCK); // 방패로 막아 낸 만큼이 기여도다
+          }
           if (m.type === CAVALRY && h.srcType === SPEAR && !h.dot && !h.pierceGuard) {
             // 돌격하기 전에 창에 맞으면 속도를 잃고 쌓아 둔 돌격 피해를 되돌려받는다
             const raw = Math.max(m.chargeSnap, chargeBonus(MERC_STATS[CAVALRY]!.speed, m.momentum) * (1 + TIER_CHARGE[CAVALRY]! * m.tier));
@@ -4338,7 +4416,8 @@ export class Game {
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
           const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner);
           fm.lastBody = taken;
-          this.hurtMerc(m, taken);
+          if (h.by && this.phase === "tournament") this.creditMercHit(h.by, taken);
+          this.hurtMerc(m, taken, h.by);
           if (mods) {
             const os = this.slots.get(m.owner)!;
             os.stats.taken += taken;
@@ -4408,9 +4487,10 @@ export class Game {
     }
   }
 
-  private hurtMerc(m: Merc, amount: number): void {
+  private hurtMerc(m: Merc, amount: number, by?: Merc): void {
     if (amount <= 0) return;
-    this.gainMercXp(m, amount * MERC_XP_PER_HURT); // 맞을 때도 조금씩
+    m.career.taken += amount;
+    this.xpMerc(m, amount * TUNE.MXP_HURT); // 버틴 만큼 경험치(기여도는 아님)
     m.hp -= amount;
     if (m.hp > 0) return;
     const owner = this.slots.get(m.owner);
@@ -4422,6 +4502,11 @@ export class Game {
     }
     this.boss.onDeath(m.x, m.y, m.type, m.owner, false); // 안개 속이면 시체가 남는다
     m.hp = 0;
+    m.career.deaths++;
+    if (by && this.phase === "tournament") {
+      by.career.kills++; // 토너먼트: 상대 용병을 쓰러뜨렸다
+      this.meritMerc(by, this.killMerit(this.mercStats(m).hp));
+    }
     m.ammo = this.mercQuiver(m); // 쓰러졌다 돌아오면 전통이 가득 찬다
     m.reloadT = 0;
     m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * respawnTimeMult(owner ? mstat(owner.mods, m.type, "respawn") : 0) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
@@ -4535,6 +4620,21 @@ export class Game {
   }
 
   /** 급여를 못 받은 용병 한 명이 용병단을 떠난다(가장 높은 단계 먼저, 환급 없음). */
+  /** 토너먼트에서 용병이 상대에게 준 피해를 전적에 넣고 공헌 점수를 준다 */
+  private creditMercHit(by: Merc, dealt: number): void {
+    by.career.dealt += dealt;
+    this.meritMerc(by, dealt);
+  }
+
+  /** 용병이 떠나기 전에 전적을 남긴다(결과 화면용) */
+  private logMerc(m: Merc, active: boolean): ResultMerc {
+    return { ...m.career, num: m.num, nameId: m.nameId, type: m.type, tier: m.tier, active };
+  }
+  private retireMerc(m: Merc): void {
+    this.slots.get(m.owner)?.mercLog.push(this.logMerc(m, false));
+    this.mercs.delete(m.id);
+  }
+
   private quitOneMerc(owner: number): void {
     let pick: Merc | null = null;
     for (const m of this.mercs.values()) {
@@ -4542,13 +4642,17 @@ export class Game {
       if (!pick || m.tier > pick.tier || (m.tier === pick.tier && m.paid > pick.paid)) pick = m;
     }
     if (!pick) return;
-    this.mercs.delete(pick.id);
+    this.retireMerc(pick);
     this.pushEvent(EVT_QUIT, pick.x, pick.y, pick.tier, pick.type, owner);
   }
 
   private stepMercs(dt: number): void {
     const alive = new Map<number, number>();
-    for (const m of this.mercs.values()) if (m.respawn <= 0) alive.set(m.owner, (alive.get(m.owner) ?? 0) + 1);
+    for (const m of this.mercs.values()) {
+      if (m.respawn > 0) continue;
+      alive.set(m.owner, (alive.get(m.owner) ?? 0) + 1);
+      m.career.alive += dt;
+    }
     for (const sl of this.slots.values()) {
       sl.state.swarm = Math.min(SWARM_MAX, (alive.get(sl.state.id) ?? 0) * SWARM_PER_MERC);
       if (sl.state.shaken > 0) {
@@ -6062,11 +6166,11 @@ export class Game {
         hitFoes.push(f);
       }
       let back = 0;
-      for (const f of hitFoes) back += f.hit({ damage: dmg, charge, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit });
+      for (const f of hitFoes) back += f.hit({ damage: dmg, charge, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit, by: m });
       if (st.splash > 0) {
         for (const f of foes) {
           if (hitFoes.includes(f) || !hitFoes.some((h) => Math.hypot(f.x - h.x, f.y - h.y) <= st.splash + f.radius)) continue;
-          f.hit({ damage: dmg * this.splashFactor(mods, m.type), charge: 0, srcType: m.type, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit });
+          f.hit({ damage: dmg * this.splashFactor(mods, m.type), charge: 0, srcType: m.type, fromAngle: Math.atan2(m.y - f.y, m.x - f.x), crit, by: m });
         }
       }
       if (back > 0) {
@@ -6129,6 +6233,10 @@ export class Game {
         e.momentum = 0;
         e.chargeSnap = 0;
         e.hp -= amount;
+        if (src?.type === SPEAR) {
+          src.career.counter += amount;
+          this.meritMerc(src, amount * TUNE.MXP_COUNTER); // 창병: 돌격을 되받아친 피해도 기여도다
+        }
         this.pushDamage(EVT_COUNTER, e.id, e.x, e.y, amount, ownerId);
         this.knockBack(e, hit.fromAngle, counterKnock(amount)); // 부딪히기 전에 창에 막혀 뒤로 튕겨 난다
       }
@@ -6136,7 +6244,17 @@ export class Game {
     const dealt = Math.min(r.body, Math.max(0, e.hp));
     e.hp -= r.body;
     if (owner) this.addDealt(owner, src, hit.srcType, dealt + r.shield);
-    if (src) this.gainMercXp(src, (dealt + r.shield) * MERC_XP_PER_DAMAGE); // 피해를 줄 때마다 조금씩
+    if (src) {
+      const amt = dealt + r.shield;
+      src.career.dealt += amt;
+      if (hit.crit) src.career.crits++;
+      if (hit.charge > 0 && src.type === CAVALRY) src.career.charge += hit.charge;
+      this.meritMerc(src, amt); // 준 피해가 기여도의 바탕이다
+      if (amt > 0) {
+        const c = (e.contrib ??= new Map()).get(src.id);
+        e.contrib.set(src.id, { d: (c?.d ?? 0) + amt, t: this.time });
+      }
+    }
     if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
     // 흡혈: 카드로 쌓은 비율 + 전설 피의 갈증(치명타는 2배). 때린 쪽(주인공 또는 그 병종)만 회복한다.
     const steal = (owner ? (src ? this.pstat(src, owner.mods, "lifesteal") : owner.mods.heroLifesteal) : 0) + (has("bloodthirst") ? LEGEND_CONST.bloodthirstFrac : 0);
@@ -6150,6 +6268,11 @@ export class Game {
       const sec = (TUNE.BLUNT_STAGGER_SEC + TUNE.BLUNT_STAGGER_PER_TIER * src.tier) * (e.boss ? TUNE.BLUNT_STAGGER_BOSS_FRAC : 1);
       if (sec > (e.stunT ?? 0)) e.stunT = sec;
       e.atkT = 0;
+      if (this.time - (e.staggerXpT ?? -9) >= 0.6) {
+        e.staggerXpT = this.time;
+        src.career.stagger++;
+        this.meritMerc(src, TUNE.MXP_STAGGER); // 둔기병: 적을 묶어 두는 것도 기여다
+      }
     }
     if (e.boss) this.boss.onHit(e, hit, ownerId, src);
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
@@ -6308,15 +6431,18 @@ export class Game {
       for (const f of this.duelFoes(ownerId)) {
         const d = Math.hypot(f.x - x, f.y - y);
         if (d > radius + f.radius) continue;
-        f.hit({ damage: damage * scale(d), charge: 0, srcType: MAGE, fromAngle: Math.atan2(y - f.y, x - f.x), crit, pierceGuard: true });
+        f.hit({ damage: damage * scale(d), charge: 0, srcType: MAGE, fromAngle: Math.atan2(y - f.y, x - f.x), crit, pierceGuard: true, by: src });
       }
       return;
     }
+    let struck = 0;
     for (const e of [...this.enemies.values()]) {
       const d = Math.hypot(e.x - x, e.y - y);
       if (d > radius + radiusOf(e)) continue;
+      struck++;
       this.damageEnemy(e, { damage: damage * scale(d), charge: 0, srcType: MAGE, fromAngle: Math.atan2(y - e.y, x - e.x), crit, pierceGuard: true }, ownerId, src);
     }
+    if (src && struck > 1) src.career.aoe += struck - 1; // 한 번에 여럿 맞힌 횟수(기록만. 피해는 각 적에게 준 만큼 이미 기여도에 들어간다)
   }
 
   /** 마법사: 궁병처럼 근접한 적에게서 거리를 벌리고, 사거리 안에서 적이 가장 많이 모인 곳에 운석을 떨어뜨린다. 주문을 외우는(3초) 동안은 움직이지 못한다. */
@@ -6408,7 +6534,7 @@ export class Game {
     e.hp -= dmg;
     e.poisonAcc = (e.poisonAcc ?? 0) + dmg;
     if (owner) this.addDealt(owner, e.poisonSrc, ARCHER, dealt);
-    if (e.poisonSrc) this.gainMercXp(e.poisonSrc, dealt * MERC_XP_PER_DAMAGE);
+    if (e.poisonSrc) { e.poisonSrc.career.dealt += dealt; this.meritMerc(e.poisonSrc, dealt); }
     if (e.poisonAcc >= 1 || (e.poisonT <= 0 && e.poisonAcc > 0.05)) {
       this.pushDamage(EVT_DMG_POISON, e.id, e.x, e.y, e.poisonAcc, e.poisonOwner ?? 0);
       e.poisonAcc = 0;
@@ -6474,7 +6600,7 @@ export class Game {
       if (steal > 0 && dealt > 0) this.lifesteal(owner, src, dealt * steal);
       this.addDealt(owner, src, src ? src.type : SPEAR, dealt);
     }
-    if (src) this.gainMercXp(src, amount * MERC_XP_PER_DAMAGE);
+    if (src) { src.career.dealt += amount; this.meritMerc(src, amount); }
     e.hp -= amount;
     if (e.hp <= 0) this.killEnemy(e, ownerId, src);
   }
@@ -6499,7 +6625,27 @@ export class Game {
     }
     if (!e.boss) this.boss.onDeath(e.x, e.y, e.type, 0, !!e.skel); // 안개 속이면 시체가 남는다
     const owner = this.slots.get(ownerId);
-    if (src) this.gainMercXp(src, MERC_XP_KILL * (e.boss ? 4 : 1)); // 막타는 경험치를 크게 준다
+    const killBonus = this.killMerit(e.maxHp, !!e.boss);
+    if (src) {
+      src.career.kills++;
+      this.meritMerc(src, killBonus); // 막타: 그 적 체력의 일부를 더 인정한다
+    }
+    if (e.contrib && e.contrib.size > 0) {
+      // 어시스트: 최근 몇 초 안에 피해를 준 다른 용병들이 처치 보너스의 일부를, 준 피해의 제곱 비율로 나눈다(많이 준 쪽이 더 가져간다)
+      const mates: { m: Merc; w: number }[] = [];
+      let total = 0;
+      for (const [mid, c] of e.contrib) {
+        const mm = this.mercs.get(mid);
+        if (!mm || mm === src || this.time - c.t > TUNE.MXP_ASSIST_SEC) continue;
+        const w = c.d * c.d;
+        mates.push({ m: mm, w });
+        total += w;
+      }
+      for (const a of mates) {
+        a.m.career.assists++;
+        this.meritMerc(a.m, killBonus * TUNE.MXP_ASSIST_POOL * (a.w / total));
+      }
+    }
     const wscope = String(src ? src.type : "hero");
     if (owner && hasLegend(owner.mods, "warcry", src ? src.type : "hero")) {
       owner.haste[wscope] = Math.min(LEGEND_CONST.warcryMax, (owner.haste[wscope] ?? 0) + 1);
@@ -6507,6 +6653,7 @@ export class Game {
     }
     if (owner) {
       owner.state.kills++;
+      if (!src && this.phase !== "tournament") { const wt = WEAPONS[owner.state.weapon]!.type; owner.detail.heroKills[wt] = (owner.detail.heroKills[wt] ?? 0) + 1; }
       const loot = Math.round((ENEMY_GOLD[e.type] ?? 0) * owner.mods.goldMult * (e.boss ? 5 : 1));
       owner.state.gold += loot;
       owner.stats.gold += loot;
