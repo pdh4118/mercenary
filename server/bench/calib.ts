@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-process.env.MERC_NO_PERSONALITY = "1";
+if (process.env.PERS !== "1") process.env.MERC_NO_PERSONALITY = "1"; // PERS=1이면 성격을 켠다
 import { TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MERC_XP_TYPE_MULT } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 TUNE.ENEMY_CAV_RAM_FRAC = 0;

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-process.env.MERC_NO_PERSONALITY = "1";
+if (process.env.PERS !== "1") process.env.MERC_NO_PERSONALITY = "1"; // PERS=1이면 성격을 켠다
 import { TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, mercXpNeed } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 TUNE.ENEMY_CAV_RAM_FRAC = 0;
@@ -33,16 +33,18 @@ for (let sd = 1; sd <= seeds; sd++) {
   const a = g.addPlayer("snow")!;
   const p = g.getPlayer(a)!;
   const slot = (g as any).slots.get(a);
+  if (process.env.GOLD === 'real') p.gold = Number(process.env.START_GOLD ?? 200);
   for (const t of UNIT_TYPES) for (let i = 0; i < per; i++) g.addMerc(a, t, p.x + 40 * (t - 2) + i * 15, p.y + 40 + 20 * i, 0, 0);
   const firstAt = UNIT_TYPES.map(() => -1);
   for (let i = 0; i < secs * TICK_RATE; i++) {
     g.step();
     p.hp = p.maxHp = 1e9;
     p.invuln = 1e9;
-    p.gold = Number(process.env.GOLD ?? 1e9);
+    if (process.env.GOLD === 'real' && process.env.AUTOPLAY !== '0') g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false } as any);
+    if (process.env.GOLD !== 'real') p.gold = Number(process.env.GOLD ?? 1e9);
     p.leadership = 1e9;
     if (i % TICK_RATE === 0) {
-      for (const m of [...(g as any).mercs.values()]) {
+      for (const m of [...(g as any).mercs.values()].sort((x: any, y: any) => y.xp - x.xp)) {
         if (m.respawn <= 0 && m.tier < MAX_TIER && m.xp >= mercXpNeed(m.tier)) {
           g.upgrade(a, m.id);
           if (firstAt[m.type]! < 0) firstAt[m.type] = i / TICK_RATE;

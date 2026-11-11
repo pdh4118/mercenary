@@ -12,9 +12,14 @@ export interface Personality {
   mods: Partial<Record<MercStat, number>>;
   ignore: number; // 우클릭 지시·개인 명령을 무시할 확률(0~PERSONALITY_IGNORE_MAX)
   fearImmune?: boolean; // 사기가 꺾여도 도망치지 않는다
-  leash?: number; // 진형에서 벗어나 쫓는 거리 변화(0.5 = 50% 더)
+  leash?: number; // 진형에서 벗어나 쫓는 거리 변화(0.5 = 50% 더, -0.3 = 30% 덜 쫓고 진형을 지킨다)
+  retreatHp?: number; // 체력이 이 비율 아래로 떨어지면 잠시(RETREAT_SEC초) 진형으로 물러난다(너무 자주는 아니고 RETREAT_COOLDOWN초에 한 번)
   price?: number; // 고용 가격 변화(-0.2 = 20% 할인)
 }
+
+/** 체력이 낮아 물러나는 시간(초)과 다시 물러나기까지의 간격(초) */
+export const RETREAT_SEC = 4;
+export const RETREAT_COOLDOWN = 14;
 
 /** 명령을 무시하는 확률의 상한(30%) */
 export const PERSONALITY_IGNORE_MAX = 0.3;
@@ -22,11 +27,11 @@ export const PERSONALITY_IGNORE_MAX = 0.3;
 export const PERSONALITIES: readonly Personality[] = [
   { name: "고집쎈", short: "공격력 +15% · 지시 25% 무시", mods: { dmg: 0.15 }, ignore: 0.25 },
   { name: "말없는", short: "공포에 안 흔들림 · 경험치 -15%", mods: { xp: -0.15 }, ignore: 0, fearImmune: true },
-  { name: "수줍은", short: "회피 +12% · 공격력 -10%", mods: { dodge: 0.12, dmg: -0.1 }, ignore: 0 },
-  { name: "용감한", short: "체력 +12% · 공격 템포 -8%", mods: { hp: 0.12, atkSpeed: -0.08 }, ignore: 0 },
-  { name: "날쌘", short: "이동 속도 +12% · 체력 -12%", mods: { speed: 0.12, hp: -0.12 }, ignore: 0 },
-  { name: "철벽", short: "체력 +15% · 이동 속도 -10%", mods: { hp: 0.15, speed: -0.1 }, ignore: 0 },
-  { name: "늙은", short: "경험치 +30% · 이동 속도 -10%", mods: { xp: 0.3, speed: -0.1 }, ignore: 0 },
+  { name: "수줍은", short: "회피 +12% · 공격력 -10% · 체력 35% 아래면 잠시 물러남", mods: { dodge: 0.12, dmg: -0.1 }, ignore: 0, retreatHp: 0.35 },
+  { name: "용감한", short: "체력 +12% · 공격 템포 -8% · 더 멀리 쫓음", mods: { hp: 0.12, atkSpeed: -0.08 }, ignore: 0, leash: 0.25 },
+  { name: "날쌘", short: "이동 속도 +12% · 체력 -12% · 더 멀리 쫓음", mods: { speed: 0.12, hp: -0.12 }, ignore: 0, leash: 0.3 },
+  { name: "철벽", short: "체력 +15% · 이동 속도 -10% · 진형을 지킴(덜 쫓음)", mods: { hp: 0.15, speed: -0.1 }, ignore: 0, leash: -0.3 },
+  { name: "늙은", short: "경험치 +30% · 이동 속도 -10% · 체력 30% 아래면 잠시 물러남", mods: { xp: 0.3, speed: -0.1 }, ignore: 0, retreatHp: 0.3 },
   { name: "행운의", short: "치명타 +8%p · 체력 -10%", mods: { crit: 0.08, hp: -0.1 }, ignore: 0 },
   { name: "떠돌이", short: "고용비 -20% · 멀리 쫓음 · 무시 10%", mods: {}, ignore: 0.1, leash: 0.5, price: -0.2 },
   { name: "굶주린", short: "입힌 피해의 4% 회복 · 공격 템포 -10%", mods: { lifesteal: 0.04, atkSpeed: -0.1 }, ignore: 0 },

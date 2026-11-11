@@ -19,6 +19,8 @@ import {
   ghostHidesAggro,
   personalityOf,
   PERSONALITY_IGNORE_MAX,
+  RETREAT_SEC,
+  RETREAT_COOLDOWN,
   sameEpithetName,
   type Personality,
   CARDS,
@@ -550,6 +552,8 @@ export interface Enemy extends Fighter {
 }
 export interface Merc extends Fighter {
   career: MercCareer; // 전적(공헌 점수의 재료)
+  retreatT?: number; // 체력이 낮아 진형으로 물러나는 남은 시간(성격 "수줍은"·"늙은")
+  retreatCd?: number; // 다시 물러날 수 있을 때까지
   matchBase?: number; // 토너먼트 경기를 시작할 때의 공헌 점수(이번 경기의 기여도 = score - matchBase)
   owner: number;
   respawn: number;
@@ -4490,7 +4494,7 @@ export class Game {
   private hurtMerc(m: Merc, amount: number, by?: Merc): void {
     if (amount <= 0) return;
     m.career.taken += amount;
-    this.xpMerc(m, amount * TUNE.MXP_HURT); // 버틴 만큼 경험치(기여도는 아님)
+    this.xpMerc(m, (amount * TUNE.MXP_HURT) / (1 + TUNE.STAGE_ENEMY_DMG_GROWTH * Math.max(0, this.stage - 1))); // 버틴 만큼 경험치(기여도는 아님). 뒤 스테이지의 적은 한 방이 세므로 적 피해 배율로 나눠 "버틴 공격의 수"에 가깝게 센다
     m.hp -= amount;
     if (m.hp > 0) return;
     const owner = this.slots.get(m.owner);
@@ -4858,6 +4862,23 @@ export class Game {
           m.intent = INTENT.DANGER;
           continue;
         }
+      }
+      {
+        // 성격: 체력이 낮으면 잠깐 진형으로 물러난다(지시를 받았거나 토너먼트 중이면 그대로 싸운다)
+        const rh = this.persona(m).retreatHp;
+        m.retreatCd = Math.max(0, (m.retreatCd ?? 0) - dt);
+        if (rh && !duel && !ordNow) {
+          if ((m.retreatT ?? 0) > 0) {
+            m.retreatT = m.retreatT! - dt;
+            this.moveToward(m, home[0], home[1], st.speed * 1.1, dt, 8);
+            m.intent = INTENT.RETURN;
+            continue;
+          }
+          if (m.retreatCd <= 0 && m.hp < this.mercStats(m).hp * rh) {
+            m.retreatT = RETREAT_SEC;
+            m.retreatCd = RETREAT_COOLDOWN;
+          }
+        } else m.retreatT = 0;
       }
       if (m.cmd && !duel) {
         m.cmd.left -= dt;

@@ -129,3 +129,23 @@ test("성격: 끄면(테스트·튜닝용) 모든 용병이 기본 능력치이�
   g.personality = true;
   assert.ok(g.mercStatsForTest(m).damage > base.damage);
 });
+
+test("성격: 수줍은·늙은은 체력이 낮으면 잠시 진형으로 물러나고, 용감한 등은 그대로 싸운다", () => {
+  const trial = (name: string) => {
+    const g = newGame();
+    const a = g.addPlayer("a")!;
+    const p = g.getPlayer(a)!;
+    p.invuln = 1e9;
+    const id = g.addMerc(a, SPEAR, p.x + 60, p.y, 0, 0, nameOf(name));
+    const m = (g as any).mercs.get(id);
+    const foe = g.spawnEnemyAt(m.x + 40, m.y, 4);
+    (g.getEnemy(foe) as any).hp = (g.getEnemy(foe) as any).maxHp = 1e6;
+    (g as any).mercs.get(id).hp = g.mercStatsForTest(id).hp * 0.2;
+    for (let i = 0; i < TICK_RATE * 2; i++) g.step();
+    return { retreated: (m.retreatT ?? 0) > 0 || m.retreatCd > 0, intent: m.intent };
+  };
+  assert.ok(trial("수줍은").retreated, "수줍은은 물러난다");
+  assert.ok(trial("늙은").retreated, "늙은도 물러난다");
+  assert.ok(!trial("용감한").retreated, "용감한은 물러나지 않는다");
+  assert.ok(!trial("고집쎈").retreated, "다른 성격도 마찬가지");
+});
