@@ -52,7 +52,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
     const sub = document.createElement("div");
     sub.className = "stat";
     const sitRule = (w[24] ?? 0) !== 0 ? personalityOf(nameId).sit?.[Math.abs(w[24]!) - 1] : undefined;
-    sub.textContent = respawn > 0 ? `쓰러짐 · 부활 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 기여 ${w[23] ?? 0}${sitRule ? ` · ${sitRule.label}` : ""}`;
+    sub.textContent = respawn > 0 ? `쓰러짐 · 부활 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 기여 ${w[23] ?? 0}${(w[25] ?? 0) >= 30 ? ` · 연속 ${Math.floor((w[25] ?? 0) / 60)}:${String((w[25] ?? 0) % 60).padStart(2, "0")}` : ""}${sitRule ? ` · ${sitRule.label}` : ""}`;
     if (sitRule && respawn <= 0) sub.style.color = (w[24] ?? 0) > 0 ? "#8ff0a4" : "#ff9a8a";
     name.append(nm, sub);
     const need = mercXpNeed(tier);

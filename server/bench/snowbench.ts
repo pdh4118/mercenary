@@ -3,6 +3,7 @@ if (process.env.PERS !== "1") process.env.MERC_NO_PERSONALITY = "1"; // PERS=1ì
 import { TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, mercXpNeed } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 TUNE.ENEMY_CAV_RAM_FRAC = 0;
+if (process.env.SM) TUNE.MXP_STREAK_MAX = Number(process.env.SM);
 const mul = (seed: number) => {
   let a = seed >>> 0 || 1;
   Math.random = (): number => {

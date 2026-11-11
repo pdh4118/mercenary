@@ -564,6 +564,8 @@ export interface Merc extends Fighter {
   sit?: SitMods; // 지금 켜진 성격 상황 효과(합친 값)
   sitCode?: number; // 첫 번째 켜진 규칙(+n 이로움 / -n 불리함, 0 없음)
   homeDist?: number; // 진형 자리에서 떨어진 거리(AI가 갱신)
+  streak?: number; // 쓰러지지 않고 싸운 시간(초)
+  combatT?: number; // 마지막으로 피해를 주고받은 뒤 남은 "싸우는 중" 시간
   hasteT?: number; // 성격 "날쌘": 처치 뒤 빨라진 남은 시간
   auraDmg?: number; // 성격 "늙은" 곁에 있어서 받는 공격력 보너스
   matchBase?: number; // 토너먼트 경기를 시작할 때의 공헌 점수(이번 경기의 기여도 = score - matchBase)
@@ -1529,6 +1531,7 @@ export class Game {
       m.num,
       Math.round(m.career.score - (this.phase === "tournament" ? m.matchBase ?? 0 : 0)),
       m.respawn > 0 ? 0 : m.sitCode ?? 0,
+      Math.round(m.streak ?? 0),
     ]);
   }
 
@@ -2923,7 +2926,7 @@ export class Game {
         t.sa = t.sb = t.se = 0;
         t.mvp = undefined;
         const fm = t.rounds[t.r]!.matches[t.m]!;
-        for (const m of this.mercs.values()) if (m.owner === fm.a || m.owner === fm.b) m.matchBase = m.career.score; // 이번 판의 기여도는 여기서부터 센다
+        for (const m of this.mercs.values()) if (m.owner === fm.a || m.owner === fm.b) { m.matchBase = m.career.score; m.streak = 0; } // 이번 판의 기여도는 여기서부터 센다(연속 생존도 새로)
         t.side = [fm.a, fm.b].map((id): TourSideTally => {
           const mercs = z6();
           for (const m of this.mercs.values()) if (m.owner === id && m.respawn <= 0) mercs[m.type] = (mercs[m.type] ?? 0) + 1;
@@ -3389,15 +3392,21 @@ export class Game {
   /** 용병이 공헌했다(체력 단위). 기여도가 쌓이고, 그만큼 경험치도 오른다. */
   private meritMerc(m: Merc, merit: number): void {
     if (merit <= 0) return;
+    m.combatT = TUNE.MXP_COMBAT_SEC;
     m.career.score += merit;
     this.xpMerc(m, merit * TUNE.MXP_RATE);
+  }
+
+  /** 연속 생존 배율: 쓰러지지 않고 싸운 시간에 비례해 1에서 1+MXP_STREAK_MAX까지 */
+  private streakMult(m: Merc): number {
+    return 1 + TUNE.MXP_STREAK_MAX * Math.min(1, (m.streak ?? 0) / TUNE.MXP_STREAK_SEC);
   }
 
   /** 용병이 경험치를 얻는다(카드·단계 보너스·토너먼트 비율 반영). 기여도에는 들어가지 않는다 */
   private xpMerc(m: Merc, raw: number): void {
     if (raw <= 0 || m.tier >= MAX_TIER) return;
     const mods = this.slots.get(m.owner)?.mods;
-    const gain = raw * (mods ? this.pstat(m, mods, "xp") : 1) * (MERC_XP_TYPE_MULT[m.type] ?? 1) * (1 + TUNE.MXP_TIER_BONUS * m.tier) * (this.phase === "tournament" ? TUNE.MXP_TOURNAMENT : 1);
+    const gain = raw * (mods ? this.pstat(m, mods, "xp") : 1) * (MERC_XP_TYPE_MULT[m.type] ?? 1) * (1 + TUNE.MXP_TIER_BONUS * m.tier) * this.streakMult(m) * (this.phase === "tournament" ? TUNE.MXP_TOURNAMENT : 1);
     m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + gain);
   }
 
@@ -4507,6 +4516,7 @@ export class Game {
   private hurtMerc(m: Merc, amount: number, by?: Merc): void {
     if (amount <= 0) return;
     m.career.taken += amount;
+    m.combatT = TUNE.MXP_COMBAT_SEC;
     this.xpMerc(m, (amount * TUNE.MXP_HURT) / (1 + TUNE.STAGE_ENEMY_DMG_GROWTH * Math.max(0, this.stage - 1))); // 버틴 만큼 경험치(기여도는 아님). 뒤 스테이지의 적은 한 방이 세므로 적 피해 배율로 나눠 "버틴 공격의 수"에 가깝게 센다
     m.hp -= amount;
     if (m.hp > 0) return;
@@ -4520,6 +4530,7 @@ export class Game {
     this.boss.onDeath(m.x, m.y, m.type, m.owner, false); // 안개 속이면 시체가 남는다
     m.hp = 0;
     m.career.deaths++;
+    m.streak = 0; // 연속 생존이 끊긴다
     if (this.phase !== "tournament") m.xp *= 1 - TUNE.MXP_DEATH_LOSS; // 쓰러지면 모은 경험치 일부를 잃는다(토너먼트 제외)
     if (by && this.phase === "tournament") {
       by.career.kills++; // 토너먼트: 상대 용병을 쓰러뜨렸다
@@ -4719,6 +4730,13 @@ export class Game {
     const alive = new Map<number, number>();
     for (const m of this.mercs.values()) {
       if ((m.hasteT ?? 0) > 0) m.hasteT = Math.max(0, m.hasteT! - dt);
+      if ((m.combatT ?? 0) > 0) {
+        m.combatT = Math.max(0, m.combatT! - dt);
+        if (m.respawn <= 0) {
+          m.streak = (m.streak ?? 0) + dt; // 싸우는 동안 연속 생존 시간이 쌓인다
+          if (m.streak > m.career.bestStreak) m.career.bestStreak = m.streak;
+        }
+      }
       if (m.respawn > 0) continue;
       alive.set(m.owner, (alive.get(m.owner) ?? 0) + 1);
       m.career.alive += dt;
