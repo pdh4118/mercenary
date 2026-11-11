@@ -40,6 +40,9 @@ export const SOUNDS = {
   spear_thrust: d(2, 0.5, 120, 3),
   sword_swing: d(2, 0.5, 100, 3),
   mace_smash: d(2, 0.6, 200, 2),
+  mace_hit: d(1, 0.75, 150, 3), // 둔기병 내려찍기가 맞는 소리
+  shield_bash: d(1, 0.65, 90, 3), // 검방병 방패 밀치기
+  sword_hit: d(1, 0.65, 70, 4), // 검이 갑옷에 맞는 소리
   meteor_fall: d(1, 0.8, 350, 3, 0.03), // 운석이 떨어지기 시작할 때(폭발까지 약 0.6초를 포함한 한 덩어리)
   backstab: d(2, 0.6, 100, 3),
   knockback: d(2, 0.45, 100, 3),
@@ -73,7 +76,7 @@ export const SOUNDS = {
   skill_mace_throw: d(2, 0.6, 200, 3),
   skill_mace_hit: d(2, 0.75, 150, 3),
   skill_slam_charge: d(1, 0.7, 300, 2), // 철퇴 충격파: 힘을 모으는 소리(1.2초)
-  skill_slam_hit: d(1, 0.9, 150, 3), // 철퇴 충격파: 땅을 찍는 소리
+  skill_slam_hit: d(2, 0.9, 150, 3), // 철퇴 충격파: 땅을 찍는 소리
   skill_wall_up: d(1, 0.6, 300, 2),
   skill_wall_break: d(1, 0.45, 300, 2),
   skill_wall_hit: d(3, 0.5, 80, 4),

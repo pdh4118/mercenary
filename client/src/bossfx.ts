@@ -374,7 +374,7 @@ export async function createBossFx(d: BossFxDeps) {
           playSeq(T.bashArc, x + Math.cos(ang) * reach * 0.45, y - 14 + Math.sin(ang) * reach * 0.45, 0.26, w / (500 * 0.8), ang, 0.5, meleeFlip, 1, tint);
         } else playSeq(T.flurryArc, x, y - 14, 0.24, Math.max(0.5, Math.min(1.3, (reach * 2.6) / 300)), ang, 0.53, meleeFlip, 1, tint);
         playSeq(T.flurryHit, fx, fy - 12, 0.2, 0.6, 0, 0.5, false, 0.95, tint);
-        d.sound("sword_swing", x, y, 0.9);
+        d.sound(Math.random() < 0.5 ? "shield_bash" : "sword_hit", x, y, 0.9); // 방패로 밀치거나 칼로 벤다: 번갈아 들린다
       } else {
         playSeq(T.impact, fx, fy - 4, 0.3, Math.max(0.4, Math.min(0.8, reach / 70)), 0, 0.5, false, 0.8, tint);
         if (first(T.smashDust)) {
@@ -386,7 +386,7 @@ export async function createBossFx(d: BossFxDeps) {
           }
           if (!d.maceBoom(fx, fy, Math.max(50, reach * 0.9))) playSeq(T.crash, fx, fy - 6, 0.35, 0.5, 0, 0.5, false, 0.7);
         }
-        d.sound("mace_smash", x, y, 1);
+        d.sound("mace_hit", x, y, 1);
       }
       d.meleeKick?.(x, y, ang, val, reach, team);
     } else if (val === BFX_MTHRUST || val === BFX_MSWING) {
