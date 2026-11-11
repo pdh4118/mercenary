@@ -19,6 +19,8 @@ const secs = Number(process.env.SECS ?? 600);
 const per = Number(process.env.PER ?? 4);
 const bonus = Number(process.env.TB ?? TUNE.MXP_TIER_BONUS);
 TUNE.MXP_TIER_BONUS = bonus;
+TUNE.MERC_TIER_POWER = Number(process.env.TP ?? TUNE.MERC_TIER_POWER);
+TUNE.MXP_DEATH_LOSS = Number(process.env.DL ?? TUNE.MXP_DEATH_LOSS);
 if (process.env.NEED) process.env.NEED.split(",").forEach((v, i) => ((MERC_XP_NEED as any)[i] = Number(v)));
 let topShare = UNIT_TYPES.map(() => 0);
 let tiers = UNIT_TYPES.map(() => 0);
@@ -67,10 +69,13 @@ for (let sd = 1; sd <= seeds; sd++) {
     gini[t]! += (v.reduce((x, y, i) => x + (2 * (i + 1) - n - 1) * y, 0) / (n * sum)) / seeds;
   }
 }
-console.log(`단계 보너스 ${bonus} / 병종당 ${per}명 / ${secs}초 / 스테이지 ${stage}`);
+console.log(`쓰러짐 경험치 손실 ${TUNE.MXP_DEATH_LOSS} / 단계 경험치 보너스 ${bonus} / 능력치 보너스 ${TUNE.MERC_TIER_POWER} / 병종당 ${per}명 / ${secs}초 / 스테이지 ${stage}`);
 console.log("병종    ", UNIT_NAMES.map((x) => x.padStart(5)).join(" "));
 console.log("1등 몫  ", topShare.map((x) => (x * 100).toFixed(0).padStart(4) + "%").join(" "), "(균등 = " + (100 / per).toFixed(0) + "%)");
 console.log("지니    ", gini.map((x) => x.toFixed(2).padStart(5)).join(" "), "(0 = 완전 균등, 1 = 한 명이 전부)");
 console.log("평균단계", tiers.map((x) => x.toFixed(2).padStart(5)).join(" "));
 console.log("최고단계", maxT.map((x) => x.toFixed(2).padStart(5)).join(" "), " 최저단계", minT.map((x) => x.toFixed(2).padStart(5)).join(" "));
 console.log("첫 강화 ", first.map((x) => (x.toFixed(0) + "s").padStart(5)).join(" "));
+
+const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+console.log(`요약: 1등 몫 평균 ${(avg(topShare) * 100).toFixed(1)}% · 지니 평균 ${avg(gini).toFixed(3)} · 같은 병종 안 단계 차이(최고-최저) 평균 ${avg(maxT.map((x, i) => x - minT[i]!)).toFixed(2)} · 평균 단계 ${avg(tiers).toFixed(2)}`);

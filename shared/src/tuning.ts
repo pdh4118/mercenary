@@ -179,6 +179,8 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   MXP_ASSIST_POOL: ["기여도: 어시스트 몫(처치 보너스 대비)", G.xp, 0, 1, 0.05],
   MXP_ASSIST_SEC: ["기여도: 어시스트로 치는 시간(초)", G.xp, 1, 20, 0.5],
   MXP_TIER_BONUS: ["용병 경험치: 단계마다 획득 보너스", G.xp, 0, 1, 0.01],
+  MERC_TIER_POWER: ["용병 단계마다 공격력·체력 추가 보너스(스노우볼)", G.merc, 0, 0.5, 0.01],
+  MXP_DEATH_LOSS: ["용병 경험치: 쓰러질 때 잃는 비율", G.xp, 0, 1, 0.05],
   MXP_TOURNAMENT: ["용병 경험치: 토너먼트 획득 비율", G.xp, 0, 1, 0.05],
   MXP_MVP: ["용병 경험치: 토너먼트 경기 MVP 보너스", G.xp, 0, 500, 5],
   PAY_PER_COST: ["용병 급여(통솔력 1당 금화)", G.hire, 0, 5, 0.1],

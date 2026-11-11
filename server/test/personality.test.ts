@@ -130,7 +130,7 @@ test("성격: 끄면(테스트·튜닝용) 모든 용병이 기본 능력치이�
   assert.ok(g.mercStatsForTest(m).damage > base.damage);
 });
 
-test("성격: 수줍은·늙은은 체력이 낮으면 잠시 진형으로 물러나고, 용감한 등은 그대로 싸운다", () => {
+test("성격: 수줍은은 체력이 낮으면 잠시 진형으로 물러나고, 나머지는 그대로 싸운다", () => {
   const trial = (name: string) => {
     const g = newGame();
     const a = g.addPlayer("a")!;
@@ -145,7 +145,35 @@ test("성격: 수줍은·늙은은 체력이 낮으면 잠시 진형으로 물�
     return { retreated: (m.retreatT ?? 0) > 0 || m.retreatCd > 0, intent: m.intent };
   };
   assert.ok(trial("수줍은").retreated, "수줍은은 물러난다");
-  assert.ok(trial("늙은").retreated, "늙은도 물러난다");
+  assert.ok(!trial("늙은").retreated, "늙은은 물러나지 않는다(곁의 아군을 돕는 쪽이다)");
   assert.ok(!trial("용감한").retreated, "용감한은 물러나지 않는다");
   assert.ok(!trial("고집쎈").retreated, "다른 성격도 마찬가지");
+});
+
+test("성격: 용감한은 체력이 절반 아래면 공격력이 오르고, 날쌘은 처치하면 잠깐 빨라지며, 늙은은 곁의 아군 공격력을 올린다", () => {
+  const g = newGame();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  p.invuln = 1e9;
+  const brave = g.addMerc(a, SPEAR, p.x + 100, p.y, 0, 0, nameOf("용감한"));
+  const bm = (g as any).mercs.get(brave);
+  const full = g.mercStatsForTest(brave).damage;
+  bm.hp = g.mercStatsForTest(brave).hp * 0.4;
+  assert.ok(Math.abs(g.mercStatsForTest(brave).damage / full - 1.25) < 1e-6, "용감한: 사생결단 +25%");
+  const swift = g.addMerc(a, SPEAR, p.x + 140, p.y, 0, 0, nameOf("날쌘"));
+  const sm = (g as any).mercs.get(swift);
+  const sp0 = g.mercStatsForTest(swift).speed;
+  const e = g.spawnEnemyAt(p.x + 400, p.y, 4);
+  (g as any).killEnemy(g.getEnemy(e), a, sm);
+  assert.ok(Math.abs(g.mercStatsForTest(swift).speed / sp0 - 1.25) < 1e-6, "날쌘: 처치하면 빨라진다");
+  run(g, 3.5);
+  assert.ok(Math.abs(g.mercStatsForTest(swift).speed / sp0 - 1) < 1e-6, "3초 뒤 원래대로");
+  const old = g.addMerc(a, SPEAR, p.x + 180, p.y, 0, 0, nameOf("늙은"));
+  const mate = g.addMerc(a, SPEAR, p.x + 190, p.y + 20, 0, 0, nameOf("말없는")); // 공격력 보정이 없는 성격
+  const far = g.addMerc(a, SPEAR, p.x + 900, p.y, 0, 0, nameOf("말없는")); // 같은 성격·병종인데 멀리 있다
+  void old;
+  run(g, 1);
+  const ratio = g.mercStatsForTest(mate).damage / g.mercStatsForTest(far).damage;
+  assert.ok(Math.abs(ratio - 1.06) < 1e-6, `곁의 아군 +6% (${ratio})`);
+  assert.equal((g as any).mercs.get(far).auraDmg, 0, "먼 용병은 받지 않는다");
 });

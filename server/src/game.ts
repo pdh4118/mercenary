@@ -20,6 +20,8 @@ import {
   personalityOf,
   PERSONALITY_IGNORE_MAX,
   RETREAT_SEC,
+  KILL_HASTE_SEC,
+  AURA_RADIUS,
   RETREAT_COOLDOWN,
   sameEpithetName,
   type Personality,
@@ -554,6 +556,8 @@ export interface Merc extends Fighter {
   career: MercCareer; // 전적(공헌 점수의 재료)
   retreatT?: number; // 체력이 낮아 진형으로 물러나는 남은 시간(성격 "수줍은"·"늙은")
   retreatCd?: number; // 다시 물러날 수 있을 때까지
+  hasteT?: number; // 성격 "날쌘": 처치 뒤 빨라진 남은 시간
+  auraDmg?: number; // 성격 "늙은" 곁에 있어서 받는 공격력 보너스
   matchBase?: number; // 토너먼트 경기를 시작할 때의 공헌 점수(이번 경기의 기여도 = score - matchBase)
   owner: number;
   respawn: number;
@@ -4507,6 +4511,7 @@ export class Game {
     this.boss.onDeath(m.x, m.y, m.type, m.owner, false); // 안개 속이면 시체가 남는다
     m.hp = 0;
     m.career.deaths++;
+    if (this.phase !== "tournament") m.xp *= 1 - TUNE.MXP_DEATH_LOSS; // 쓰러지면 모은 경험치 일부를 잃는다(토너먼트 제외)
     if (by && this.phase === "tournament") {
       by.career.kills++; // 토너먼트: 상대 용병을 쓰러뜨렸다
       this.meritMerc(by, this.killMerit(this.mercStats(m).hp));
@@ -4650,12 +4655,31 @@ export class Game {
     this.pushEvent(EVT_QUIT, pick.x, pick.y, pick.tier, pick.type, owner);
   }
 
+  private auraT = 0;
   private stepMercs(dt: number): void {
     const alive = new Map<number, number>();
     for (const m of this.mercs.values()) {
+      if ((m.hasteT ?? 0) > 0) m.hasteT = Math.max(0, m.hasteT! - dt);
       if (m.respawn > 0) continue;
       alive.set(m.owner, (alive.get(m.owner) ?? 0) + 1);
       m.career.alive += dt;
+    }
+    this.auraT -= dt;
+    if (this.auraT <= 0) {
+      // 성격 "늙은": 곁(AURA_RADIUS 안)의 같은 주인 용병들이 공격력 보너스를 받는다(0.4초마다 갱신)
+      this.auraT = 0.4;
+      const olds: Merc[] = [];
+      for (const m of this.mercs.values()) {
+        m.auraDmg = 0;
+        if (m.respawn <= 0 && this.persona(m).auraDmg) olds.push(m);
+      }
+      for (const o of olds) {
+        const bonus = this.persona(o).auraDmg!;
+        for (const m of this.mercs.values()) {
+          if (m === o || m.owner !== o.owner || m.respawn > 0) continue;
+          if (Math.hypot(m.x - o.x, m.y - o.y) <= AURA_RADIUS && bonus > (m.auraDmg ?? 0)) m.auraDmg = bonus;
+        }
+      }
     }
     for (const sl of this.slots.values()) {
       sl.state.swarm = Math.min(SWARM_MAX, (alive.get(sl.state.id) ?? 0) * SWARM_PER_MERC);
@@ -6650,6 +6674,7 @@ export class Game {
     if (src) {
       src.career.kills++;
       this.meritMerc(src, killBonus); // 막타: 그 적 체력의 일부를 더 인정한다
+      if (this.persona(src).killHaste) src.hasteT = KILL_HASTE_SEC; // 날쌘: 처치하면 잠깐 빨라진다
     }
     if (e.contrib && e.contrib.size > 0) {
       // 어시스트: 최근 몇 초 안에 피해를 준 다른 용병들이 처치 보너스의 일부를, 준 피해의 제곱 비율로 나눈다(많이 준 쪽이 더 가져간다)
@@ -6900,16 +6925,21 @@ export class Game {
     if (!mods) return base;
     const t = m.type;
     const tier = m.tier;
-    const hpMult = this.pstat(m, mods, "hp") * TIER_HP[tier]!;
+    const power = 1 + TUNE.MERC_TIER_POWER * tier; // 단계가 오를수록 더 강해지는 보너스(스노우볼)
+    const hpMult = this.pstat(m, mods, "hp") * TIER_HP[tier]! * power;
     const area = this.pstat(m, mods, "area");
+    const pers = this.persona(m);
+    const maxHp = Math.round(base.hp * hpMult);
+    const rage = pers.berserkHp && m.hp > 0 && m.hp < maxHp * pers.berserkHp ? 1 + (pers.berserkDmg ?? 0) : 1; // 용감한: 체력이 절반 아래면 사생결단
+    const quick = (m.hasteT ?? 0) > 0 ? 1 + (pers.killHaste ?? 0) : 1; // 날쌘: 처치 뒤 잠깐 빨라진다
     return {
       ...base,
-      hp: Math.round(base.hp * hpMult),
+      hp: maxHp,
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
-      damage: base.damage * this.pstat(m, mods, "dmg") * TIER_DMG[tier]! * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)),
+      damage: base.damage * this.pstat(m, mods, "dmg") * TIER_DMG[tier]! * power * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)) * rage * (1 + (m.auraDmg ?? 0)),
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier),
-      cooldown: base.cooldown / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
-      speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier),
+      cooldown: base.cooldown / quick / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
+      speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick,
       reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier), area * (1 + TIER_AREA[t]! * tier)),
       splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier),
       arc: meleeArc(t, base.arc, area),
