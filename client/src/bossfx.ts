@@ -168,6 +168,8 @@ export async function createBossFx(d: BossFxDeps) {
     impact: ["boss1_impact", [0, 1, 2, 3]],
     thrust: ["boss2_thrust", [0, 1, 2]],
     dust: ["boss3_dust", [0, 1, 2, 3]],
+    bashArc: ["fx_bash_arc", [0, 1, 2, 3]],
+    smashDust: ["fx_smash_dust", [0, 1, 2, 3, 4, 5]],
     slash: ["boss1_slash", [1, 2, 3]],
     cry: ["boss1_cry", [0, 1, 2]],
     ice: ["boss3_ice", [0, 1, 2, 3, 4]],
@@ -366,16 +368,24 @@ export async function createBossFx(d: BossFxDeps) {
       const fy = y + Math.sin(ang) * reach * 0.85;
       if (val === BFX_MBASH) {
         meleeFlip = !meleeFlip;
-        playSeq(T.flurryArc, x, y - 14, 0.24, Math.max(0.5, Math.min(1.3, (reach * 2.6) / 300)), ang, 0.53, meleeFlip, 1, tint);
+        if (first(T.bashArc)) {
+          // 새 그림: 정면으로 휘두르는 흰푸른 초승달 호(그림 폭의 약 80%가 호의 지름)
+          const w = Math.max(70, reach * 2.6);
+          playSeq(T.bashArc, x + Math.cos(ang) * reach * 0.45, y - 14 + Math.sin(ang) * reach * 0.45, 0.26, w / (500 * 0.8), ang, 0.5, meleeFlip, 1, tint);
+        } else playSeq(T.flurryArc, x, y - 14, 0.24, Math.max(0.5, Math.min(1.3, (reach * 2.6) / 300)), ang, 0.53, meleeFlip, 1, tint);
         playSeq(T.flurryHit, fx, fy - 12, 0.2, 0.6, 0, 0.5, false, 0.95, tint);
         d.sound("sword_swing", x, y, 0.9);
       } else {
-        playSeq(T.impact, fx, fy - 4, 0.38, Math.max(0.5, Math.min(1, reach / 60)), 0, 0.5, false, 0.95, tint);
-        for (let i = 0; i < 3; i++) {
-          const a = ang + (i - 1) * 0.7;
-          playSeq(T.dust, fx + Math.cos(a) * reach * 0.35, fy + Math.sin(a) * reach * 0.35 + 6, 0.35 + 0.1 * i, 0.3 + 0.12 * i, 0, 0.5, false, 0.75, 0xdcc9a8);
+        playSeq(T.impact, fx, fy - 4, 0.3, Math.max(0.4, Math.min(0.8, reach / 70)), 0, 0.5, false, 0.8, tint);
+        if (first(T.smashDust)) {
+          playSeq(T.smashDust, fx, fy - 2, 0.48, Math.max(0.5, (reach * 2.8) / (333 * 0.65)), 0, 0.5, false, 0.95, 0xffffff);
+        } else {
+          for (let i = 0; i < 3; i++) {
+            const a = ang + (i - 1) * 0.7;
+            playSeq(T.dust, fx + Math.cos(a) * reach * 0.35, fy + Math.sin(a) * reach * 0.35 + 6, 0.35 + 0.1 * i, 0.3 + 0.12 * i, 0, 0.5, false, 0.75, 0xdcc9a8);
+          }
+          if (!d.maceBoom(fx, fy, Math.max(50, reach * 0.9))) playSeq(T.crash, fx, fy - 6, 0.35, 0.5, 0, 0.5, false, 0.7);
         }
-        if (!d.maceBoom(fx, fy, Math.max(50, reach * 0.9))) playSeq(T.crash, fx, fy - 6, 0.35, 0.5, 0, 0.5, false, 0.7);
         d.sound("mace_smash", x, y, 1);
       }
       d.meleeKick?.(x, y, ang, val, reach, team);

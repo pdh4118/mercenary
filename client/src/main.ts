@@ -312,6 +312,8 @@ async function main() {
   const maceTrailTex = await Promise.all([0, 1, 2].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_trail_${i}.png`).catch(() => null)));
   // 철퇴 충격파: 땅을 찍는 충격파 6컷, 갈라진 땅 자국, 급여 금화 아이콘. 없으면 도형으로 대신한다.
   const slamWaveTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/skill_slam_wave_${i}.png`).catch(() => null)));
+  const sparkTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/fx_hit_spark_${i}.png`).catch(() => null)));
+  const sparkCritTex = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => Assets.load<Texture>(`assets/fx/fx_hit_spark_crit_${i}.png`).catch(() => null)));
   const slamCrackTex = await Assets.load<Texture>("assets/fx/skill_slam_crack.png").catch(() => null);
   const coinTex = await Assets.load<Texture>("assets/fx/icon_gold_coin.png").catch(() => null);
   const maceHitTex = await Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/fx/skill_mace_hit_${i}.png`).catch(() => null)));
@@ -1346,7 +1348,7 @@ async function main() {
   const bursts: { kind: number; x: number; y: number; ang: number; age: number }[] = [];
   // 근접 타격감: 때리는 쪽이 앞으로 쏠리는 동작(lunge)과 맞는 자리의 불꽃(sparks)
   const lunges = new Map<Sprite, { ang: number; amp: number; age: number; dur: number }>();
-  const sparks: { x: number; y: number; ang: number; age: number; big: boolean }[] = [];
+  const sparks: { x: number; y: number; ang: number; age: number; big: boolean; sp?: Sprite }[] = [];
   const BURST_SEC = 0.35;
   const RING_SEC = 0.5;
   let latest: Extract<ServerMsg, { t: "state" }> | null = null;
@@ -1667,7 +1669,19 @@ async function main() {
           if (kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) {
             const hit = nearestSprite(enemies.views, x, y, 60);
             if (hit) flashSprite(hit.sprite, kind === EVT_DMG_ENEMY_CRIT ? 0.13 : 0.08);
-            if (!arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14) && sparks.length < 90) sparks.push({ x, y: y - 10, ang: Math.random() * Math.PI * 2, age: 0, big: kind === EVT_DMG_ENEMY_CRIT || val >= 40 }); // 근접 타격 불꽃
+            if (!arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14) && sparks.length < 90) {
+              const big = kind === EVT_DMG_ENEMY_CRIT || val >= 40;
+              const texs = big ? sparkCritTex : sparkTex;
+              let spr: Sprite | undefined;
+              if (texs.every((t) => t !== null)) {
+                spr = new Sprite(texs[0]!);
+                spr.anchor.set(0.5);
+                spr.position.set(x, y - 10);
+                spr.rotation = Math.random() * Math.PI * 2;
+                bulletLayer.addChild(spr);
+              }
+              sparks.push({ x, y: y - 10, ang: Math.random() * Math.PI * 2, age: 0, big, sp: spr });
+            } // 근접 타격 불꽃
             if (owner === myId) heroHitFeel(x, y, val, kind === EVT_DMG_ENEMY_CRIT);
           } else if (kind === EVT_DMG_ALLY) {
             const hit = nearestSprite(mercs.views, x, y, 45) ?? nearestSprite(players.views, x, y, 45);
@@ -3119,9 +3133,19 @@ async function main() {
     for (let i = sparks.length - 1; i >= 0; i--) {
       const sp = sparks[i]!;
       sp.age += ticker.deltaMS / 1000;
-      const t = sp.age / 0.18;
+      const t = sp.age / (sp.sp ? 0.26 : 0.18);
       if (t >= 1) {
+        sp.sp?.destroy();
         sparks.splice(i, 1);
+        continue;
+      }
+      if (sp.sp) {
+        // 그림 6컷: 맞은 자리에서 터졌다가 흩어진다
+        const texs = sp.big ? sparkCritTex : sparkTex;
+        const tex = texs[Math.min(5, Math.floor(t * 6))]!;
+        sp.sp.texture = tex;
+        sp.sp.width = sp.big ? 120 : 72;
+        sp.sp.height = (sp.sp.width * tex.height) / tex.width;
         continue;
       }
       const n = sp.big ? 7 : 5;
