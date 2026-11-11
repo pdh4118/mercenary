@@ -187,6 +187,8 @@ import {
   BFX_CRASH,
   BFX_MTHRUST,
   BFX_MSWING,
+  BFX_MBASH,
+  BFX_MSMASH,
   MELEE_TEAM_ENEMY,
   MELEE_TEAM_BOSS,
   MELEE_TEAM_ALLY,
@@ -3023,6 +3025,15 @@ export class Game {
       [s.state.x, s.state.y] = this.freeSpot(s.state.x, s.state.y, PLAYER_RADIUS);
       this.tourRestore(s);
       s.state.invuln = 2;
+      // 토너먼트 중에 내린 지시(이동·공격·지점 방어)는 끝나면 모두 풀린다
+      s.orders = UNIT_TYPES.map(() => null);
+      this.clearMercCmds(s.state.id, (1 << UNIT_TYPES.length) - 1);
+      for (const t of UNIT_TYPES) {
+        if (s.stances[t] === STANCE_HOLD) s.stances[t] = STANCE_DEFEND;
+        s.holdSets[t] = false;
+      }
+      s.state.chargeLeft = 0;
+      this.syncStance(s);
     }
     this.tour = null;
     this.bullets = [];
@@ -5759,7 +5770,9 @@ export class Game {
     if (this.meleeFxLeft <= 0) return;
     this.meleeFxLeft--;
     const thrust = type === SPEAR || type === CAVALRY;
-    this.pushEvent(EVT_BOSSFX, x, y, ang, thrust ? BFX_MTHRUST : BFX_MSWING, Math.round(Math.min(600, reach)) * 4 + team);
+    // 검방병·둔기병은 눈에 띄게(밀치기 베기 / 내려찍기). 장군의 기본 공격은 장군 쪽 연출이 따로 있다
+    const kind = thrust ? BFX_MTHRUST : team !== MELEE_TEAM_BOSS && type === SHIELD ? BFX_MBASH : team !== MELEE_TEAM_BOSS && type === BLUNT ? BFX_MSMASH : BFX_MSWING;
+    this.pushEvent(EVT_BOSSFX, x, y, ang, kind, Math.round(Math.min(600, reach)) * 4 + team);
   }
 
   /** 은신(투명화) 시간을 흘리고, 주인공 투명도를 상태에 싣는다. 장군의 은신은 스킬이 끝났는데 안 풀렸으면 풀어 준다. */

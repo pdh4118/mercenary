@@ -10,6 +10,8 @@ import {
   BFX_THRUST,
   BFX_MTHRUST,
   BFX_MSWING,
+  BFX_MBASH,
+  BFX_MSMASH,
   BFX_DRIFT,
   BFX_BOLT,
   BFX_RALLY,
@@ -131,6 +133,8 @@ export interface BossFxDeps {
   maceBoom: (x: number, y: number, r: number) => boolean;
   /** 성문을 때렸다(owner = 때린 플레이어): 성문이 흔들리고 내가 때렸으면 화면이 살짝 흔들린다 */
   gateHit?: (owner: number) => void;
+  /** 검방병 밀치기·둔기병 내려찍기가 나갔다(kind = BFX_MBASH / BFX_MSMASH, team = MELEE_TEAM_*): 그 유닛이 앞으로 쏠리고, 가까우면 화면이 흔들린다 */
+  meleeKick?: (x: number, y: number, ang: number, kind: number, reach: number, team: number) => void;
 }
 
 const BOSS_UNIT_TEX = [
@@ -353,6 +357,28 @@ export async function createBossFx(d: BossFxDeps) {
         lastThrustSound = now0();
         d.sound("spear_thrust", x, y, 0.8); // 방어 태세의 연속 찌르기는 소리를 겹쳐 내지 않는다
       }
+    } else if (val === BFX_MBASH || val === BFX_MSMASH) {
+      // 검방병 밀치기 베기 / 둔기병 내려찍기: 일반 휘두르기보다 훨씬 크고 진하게, 앞으로 쏠리는 동작·소리와 함께
+      const reach = Math.floor(len / 4);
+      const team = len % 4;
+      const tint = team === MELEE_TEAM_ENEMY ? 0xffb0a0 : 0xffffff;
+      const fx = x + Math.cos(ang) * reach * 0.85;
+      const fy = y + Math.sin(ang) * reach * 0.85;
+      if (val === BFX_MBASH) {
+        meleeFlip = !meleeFlip;
+        playSeq(T.flurryArc, x, y - 14, 0.24, Math.max(0.5, Math.min(1.3, (reach * 2.6) / 300)), ang, 0.53, meleeFlip, 1, tint);
+        playSeq(T.flurryHit, fx, fy - 12, 0.2, 0.6, 0, 0.5, false, 0.95, tint);
+        d.sound("sword_swing", x, y, 0.9);
+      } else {
+        playSeq(T.impact, fx, fy - 4, 0.38, Math.max(0.5, Math.min(1, reach / 60)), 0, 0.5, false, 0.95, tint);
+        for (let i = 0; i < 3; i++) {
+          const a = ang + (i - 1) * 0.7;
+          playSeq(T.dust, fx + Math.cos(a) * reach * 0.35, fy + Math.sin(a) * reach * 0.35 + 6, 0.35 + 0.1 * i, 0.3 + 0.12 * i, 0, 0.5, false, 0.75, 0xdcc9a8);
+        }
+        if (!d.maceBoom(fx, fy, Math.max(50, reach * 0.9))) playSeq(T.crash, fx, fy - 6, 0.35, 0.5, 0, 0.5, false, 0.7);
+        d.sound("mace_smash", x, y, 1);
+      }
+      d.meleeKick?.(x, y, ang, val, reach, team);
     } else if (val === BFX_MTHRUST || val === BFX_MSWING) {
       // 일반 근접 유닛의 공격 효과: 창·기병은 찌르기 줄기, 나머지는 휘두르기 호. 편마다 색이 다르다(내 편 하늘색 · 적 붉은색 · 장군 금색).
       const reach = Math.floor(len / 4);

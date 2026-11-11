@@ -12,6 +12,7 @@ import { createMercPanel, isReady } from "./mercpanel.js";
 import {
   CARDS,
   CARD_CATEGORY_NAMES,
+  BFX_MSMASH,
   RARITY_NAMES,
   CAMP_USE_RADIUS,
   SHIELD,
@@ -409,6 +410,14 @@ async function main() {
     gateHit: (owner) => {
       castle?.hit();
       if (owner === myId) shake(2.6, 0.09);
+    },
+    meleeKick: (x, y, ang, kind, reach, team) => {
+      const views = team === 1 || team === 2 ? enemies.views : mercs.views;
+      const hit = nearestSprite(views, x, y, 30) ?? (team === 0 ? nearestSprite(players.views, x, y, 30) : null);
+      const smash = kind === BFX_MSMASH;
+      if (hit) lunges.set(hit.sprite, { ang, amp: smash ? 13 : 10, age: 0, dur: smash ? 0.26 : 0.18 });
+      const me = players.views.get(myId);
+      if (smash && me && team === 0 && Math.hypot(me.x - x, me.y - y) < 260) shake(1.8 + Math.min(1, reach / 80), 0.1); // 내 근처에서 내려찍으면 화면이 울린다
     },
     maceBoom: (x, y, r) => {
       if (!maceHitTex.every((t) => t !== null)) return false;
@@ -1335,6 +1344,9 @@ async function main() {
   };
   const numFmt = (v: number) => (v >= 10 ? String(Math.round(v)) : String(Math.max(0.1, Math.round(v * 10) / 10)));
   const bursts: { kind: number; x: number; y: number; ang: number; age: number }[] = [];
+  // 근접 타격감: 때리는 쪽이 앞으로 쏠리는 동작(lunge)과 맞는 자리의 불꽃(sparks)
+  const lunges = new Map<Sprite, { ang: number; amp: number; age: number; dur: number }>();
+  const sparks: { x: number; y: number; ang: number; age: number; big: boolean }[] = [];
   const BURST_SEC = 0.35;
   const RING_SEC = 0.5;
   let latest: Extract<ServerMsg, { t: "state" }> | null = null;
@@ -1655,6 +1667,7 @@ async function main() {
           if (kind === EVT_DMG_ENEMY || kind === EVT_DMG_ENEMY_CRIT) {
             const hit = nearestSprite(enemies.views, x, y, 60);
             if (hit) flashSprite(hit.sprite, kind === EVT_DMG_ENEMY_CRIT ? 0.13 : 0.08);
+            if (!arrowSpots.some((q) => Math.abs(q[1] - x) < 14 && Math.abs(q[2] - y) < 14) && sparks.length < 90) sparks.push({ x, y: y - 10, ang: Math.random() * Math.PI * 2, age: 0, big: kind === EVT_DMG_ENEMY_CRIT || val >= 40 }); // 근접 타격 불꽃
             if (owner === myId) heroHitFeel(x, y, val, kind === EVT_DMG_ENEMY_CRIT);
           } else if (kind === EVT_DMG_ALLY) {
             const hit = nearestSprite(mercs.views, x, y, 45) ?? nearestSprite(players.views, x, y, 45);
@@ -1907,6 +1920,7 @@ async function main() {
   });
   // 지정 위치: 우클릭으로 찍어 두고, 이동·공격·수비 명령을 그 위치에 내린다(음성 지시와 이름으로 부른 개인 명령도 이 위치를 쓴다)
   let marker: { x: number; y: number } | null = null;
+  let markerTourSeen = false; // 지난 프레임에 토너먼트 중이었다
   const pointBar = document.getElementById("pointBar")!;
   const markG = new Graphics();
   const markLabel = new Text({ text: "지정 위치", style: { fill: 0xffe08a, fontSize: 12, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
@@ -3101,6 +3115,37 @@ async function main() {
       if (v) fxLayer.ellipse(v.x, v.y + 22, 34, 15).stroke({ width: 3, color: 0xffd45d, alpha: 0.85 });
     }
     // 서버가 알려 준 순간 효과(명중·방패·부활)
+    // 근접 타격 불꽃: 맞은 자리에서 짧은 선이 사방으로 튄다
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i]!;
+      sp.age += ticker.deltaMS / 1000;
+      const t = sp.age / 0.18;
+      if (t >= 1) {
+        sparks.splice(i, 1);
+        continue;
+      }
+      const n = sp.big ? 7 : 5;
+      for (let j = 0; j < n; j++) {
+        const a = sp.ang + (j * Math.PI * 2) / n;
+        const r0 = (sp.big ? 8 : 5) + (sp.big ? 20 : 13) * t;
+        const r1 = r0 + (sp.big ? 11 : 7) * (1 - t);
+        fxLayer
+          .moveTo(sp.x + Math.cos(a) * r0, sp.y + Math.sin(a) * r0)
+          .lineTo(sp.x + Math.cos(a) * r1, sp.y + Math.sin(a) * r1)
+          .stroke({ width: sp.big ? 3 : 2, color: sp.big ? 0xffd45d : 0xfff2c8, alpha: 0.95 * (1 - t) });
+      }
+    }
+    // 앞으로 쏠리는 동작: 때린 유닛 그림이 휘두른 쪽으로 빠르게 밀렸다 돌아온다
+    for (const [spr, lg] of lunges) {
+      lg.age += ticker.deltaMS / 1000;
+      if (lg.age >= lg.dur || spr.destroyed) {
+        if (!spr.destroyed) spr.position.set(0, 0);
+        lunges.delete(spr);
+        continue;
+      }
+      const k = Math.sin((lg.age / lg.dur) * Math.PI);
+      spr.position.set(Math.cos(lg.ang) * lg.amp * k, Math.sin(lg.ang) * lg.amp * k * 0.7);
+    }
     for (let i = bursts.length - 1; i >= 0; i--) {
       const b = bursts[i]!;
       b.age += ticker.deltaMS / 1000;
@@ -3799,6 +3844,8 @@ async function main() {
       chargeLabel.position.set(meState.chargeX, meState.chargeY - 32);
     }
     const tourNow = latest.g?.phase === "tournament" ? latest.g.tour : null;
+    if (!tourNow && markerTourSeen) clearMarker(); // 토너먼트가 끝나면 우클릭으로 찍어 둔 지정 위치도 풀린다
+    markerTourSeen = !!tourNow;
     const duelSpec = !!tourNow && myId !== tourNow.a && myId !== tourNow.b; // 토너먼트 구경꾼
     if (!meState?.down && !duelSpec) spectating = false; // 일어나면(또는 토너먼트가 끝나면) 관전 끝
     let camTarget = me;
