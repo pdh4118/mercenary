@@ -75,9 +75,9 @@ export const PERSONALITIES: readonly Personality[] = [
   { name: "날쌘", short: "이동 속도 +8% · 체력 -6% · 처치하면 3초간 이동·공격 +25% · 적이 1~3명이면 공격 템포 +12% · 6명 이상이면 -10%", mods: { speed: 0.08, hp: -0.06 }, ignore: 0, killHaste: 0.25, sit: [r("few", { atkSpeed: 0.12 }, true, "깔끔"), r("many", { atkSpeed: -0.1 }, false, "정신없음")] },
   { name: "철벽", short: "체력 +8% · 진형을 지킴(덜 쫓음) · 진형 자리 가까이서 받는 피해 -18% · 멀리 끌려 나가면 공격력 -8%·받는 피해 +8%", mods: { hp: 0.08 }, ignore: 0, leash: -0.3, sit: [r("home", { taken: -0.18 }, true, "굳건"), r("away", { dmg: -0.08, taken: 0.08 }, false, "휘청")] },
   { name: "늙은", short: "경험치 +15% · 곁의 아군 용병 공격력 +6% · 아군이 곁에 넷 이상이면 공격력 +12% · 혼자면 -8%", mods: { xp: 0.15 }, ignore: 0, auraDmg: 0.06, sit: [r("allies", { dmg: 0.12 }, true, "노련"), r("alone", { dmg: -0.08 }, false, "고독")] },
-  { name: "행운의", short: "체력 -4% · 치명타 +3%p · 적이 6명 이상이면 치명타 +15%p · 1~3명이면 -6%p", mods: { hp: -0.04, crit: 0.03 }, ignore: 0, sit: [r("many", { crit: 0.15 }, true, "신들림"), r("few", { crit: -0.06 }, false, "불운")] },
-  { name: "떠돌이", short: "고용비 -20% · 멀리 쫓음 · 무시 10% · 진형에서 멀리 나가면 공격력 +8% · 진형 자리에 있으면 -12%", mods: {}, ignore: 0.1, leash: 0.35, price: -0.2, sit: [r("away", { dmg: 0.08 }, true, "방랑"), r("home", { dmg: -0.12 }, false, "답답")] },
-  { name: "굶주린", short: "입힌 피해의 3% 회복 · 공격 템포 -5% · 적이 6명 이상이면 회복 +5% · 방패 든 적 앞에서 공격력 -12%", mods: { lifesteal: 0.03, atkSpeed: -0.05 }, ignore: 0, sit: [r("many", { lifesteal: 0.05 }, true, "허기"), r("shield", { dmg: -0.12 }, false, "단단해")] },
+  { name: "행운의", short: "체력 -4% · 치명타 +5%p · 적이 6명 이상이면 치명타 +15%p · 1~3명이면 -6%p", mods: { hp: -0.04, crit: 0.05 }, ignore: 0, sit: [r("many", { crit: 0.15 }, true, "신들림"), r("few", { crit: -0.06 }, false, "불운")] },
+  { name: "떠돌이", short: "고용비 -20% · 멀리 쫓음 · 무시 10% · 진형에서 멀리 나가면 공격력 +8% · 진형 자리에 있으면 -12%", mods: {}, ignore: 0.1, leash: 0.3, price: -0.2, sit: [r("away", { dmg: 0.08 }, true, "방랑"), r("home", { dmg: -0.12 }, false, "답답")] },
+  { name: "굶주린", short: "입힌 피해의 4% 회복 · 공격 템포 -4% · 적이 6명 이상이면 회복 +5% · 방패 든 적 앞에서 공격력 -12%", mods: { lifesteal: 0.04, atkSpeed: -0.04 }, ignore: 0, sit: [r("many", { lifesteal: 0.05 }, true, "허기"), r("shield", { dmg: -0.12 }, false, "단단해")] },
 ];
 const BY_NAME = new Map(PERSONALITIES.map((p) => [p.name, p]));
 const NEUTRAL: Personality = { name: "", short: "", mods: {}, ignore: 0 };
