@@ -1,17 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EVT_BOSSFX, BFX_MTHRUST, BFX_MSWING, MELEE_TEAM_ALLY, MELEE_TEAM_ENEMY, MELEE_TEAM_BOSS, BOSS_NAMES, BOSS_TITLES, bossLabel, STAGE_COUNT, SPEAR, SHIELD, BLUNT, CAVALRY, TICK_RATE } from "@mercenary/shared";
+import { EVT_BOSSFX, BFX_MTHRUST, BFX_MSWING, BFX_MBASH, BFX_MSMASH, MELEE_TEAM_ALLY, MELEE_TEAM_ENEMY, MELEE_TEAM_BOSS, BOSS_NAMES, BOSS_TITLES, bossLabel, STAGE_COUNT, SPEAR, SHIELD, BLUNT, CAVALRY, TICK_RATE } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
   for (let i = 0; i < Math.round(sec * TICK_RATE); i++) g.step();
 };
 /** 이번 틱들에 나온 근접 효과 이벤트 */
-const meleeEvents = (g: Game): number[][] => g.takeEvents().filter((e) => e[0] === EVT_BOSSFX && (e[4] === BFX_MTHRUST || e[4] === BFX_MSWING));
+const meleeEvents = (g: Game): number[][] => g.takeEvents().filter((e) => e[0] === EVT_BOSSFX && (e[4] === BFX_MTHRUST || e[4] === BFX_MSWING || e[4] === BFX_MBASH || e[4] === BFX_MSMASH));
 
-test("근접 효과: 창·기병은 찌르기 줄기, 방패·철퇴는 휘두르기 호로 나가고 사거리와 편이 실린다", () => {
-  for (const [type, style] of [[SPEAR, BFX_MTHRUST], [CAVALRY, BFX_MTHRUST], [SHIELD, BFX_MSWING], [BLUNT, BFX_MSWING]] as const) {
+test("근접 효과: 창·기병은 찌르기 줄기, 검방병은 밀치기 베기, 둔기병은 내려찍기로 나가고 사거리와 편이 실린다", () => {
+  for (const [type, style] of [[SPEAR, BFX_MTHRUST], [CAVALRY, BFX_MTHRUST], [SHIELD, BFX_MBASH], [BLUNT, BFX_MSMASH]] as const) {
     const g = new Game();
     g.autoSpawn = false;
     const a = g.addPlayer("a")!;

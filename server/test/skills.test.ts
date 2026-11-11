@@ -497,3 +497,15 @@ test("화살통 카드: 전통 크기가 늘고 고르는 즉시 그만큼 채�
   assert.equal(s.ammo, 40);
   assert.equal(p.gold, 500 - Math.ceil(35 * TUNE.ARROW_COST));
 });
+
+test("토너먼트가 끝나면 그 전에 내린 이동·공격·지점 방어 지시가 모두 풀린다", () => {
+  const { g, a } = start(0);
+  const s = (g as any).slots.get(a);
+  g.addMerc(a, 1, s.state.x + 40, s.state.y);
+  g.setHold(a, s.state.x + 100, s.state.y, undefined);
+  s.orders[1] = { kind: 1, x: 100, y: 100, left: 30, targetId: 0, seq: 1 };
+  (g as any).tourEnd();
+  assert.ok(s.orders.every((o: unknown) => o === null), "병종별 지시가 없다");
+  assert.ok(s.stances.every((v: number) => v !== 2), "지점 방어 태세가 풀렸다"); // STANCE_HOLD가 아니다
+  assert.equal(s.state.chargeLeft, 0);
+});
