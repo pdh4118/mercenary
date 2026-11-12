@@ -31,6 +31,10 @@ let minT = UNIT_TYPES.map(() => 0);
 let first = UNIT_TYPES.map(() => 0);
 let gini = UNIT_TYPES.map(() => 0);
 const avg0 = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+let tps = UNIT_TYPES.map(() => 0);
+let stg = UNIT_TYPES.map(() => 0);
+let blk = UNIT_TYPES.map(() => 0);
+let dps = UNIT_TYPES.map(() => 0);
 let sps = UNIT_TYPES.map(() => 0);
 for (let sd = 1; sd <= seeds; sd++) {
   mul(sd * 104729 + stage);
@@ -67,6 +71,10 @@ for (let sd = 1; sd <= seeds; sd++) {
     maxT[t]! += Math.max(...mine.map((r) => r.tier)) / seeds;
     minT[t]! += Math.min(...mine.map((r) => r.tier)) / seeds;
     first[t]! += (firstAt[t]! < 0 ? secs : firstAt[t]!) / seeds;
+    tps[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.taken / r.alive : 0), 0) / mine.length / seeds;
+    stg[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.stagger / r.alive : 0), 0) / mine.length / seeds;
+    blk[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? (r.blocked + r.counter) / r.alive : 0), 0) / mine.length / seeds;
+    dps[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.dealt / r.alive : 0), 0) / mine.length / seeds;
     sps[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.score / r.alive : 0), 0) / mine.length / seeds;
     const v = mine.map((r) => r.score).sort((x, y) => x - y);
     const n = v.length;
@@ -81,6 +89,10 @@ console.log("지니    ", gini.map((x) => x.toFixed(2).padStart(5)).join(" "), "
 console.log("평균단계", tiers.map((x) => x.toFixed(2).padStart(5)).join(" "));
 console.log("최고단계", maxT.map((x) => x.toFixed(2).padStart(5)).join(" "), " 최저단계", minT.map((x) => x.toFixed(2).padStart(5)).join(" "));
 console.log("초당기여", sps.map((x) => x.toFixed(1).padStart(5)).join(" "), " (5분 ≈", (avg0(sps) * 300).toFixed(0) + ")");
+console.log("초당 준피해", dps.map((x) => x.toFixed(1).padStart(5)).join(" "));
+console.log("초당 받은 ", tps.map((x) => x.toFixed(1).padStart(5)).join(" "));
+console.log("초당 경직 ", stg.map((x) => x.toFixed(1).padStart(5)).join(" "));
+console.log("초당 방어+반격", blk.map((x) => x.toFixed(1).padStart(5)).join(" "));
 console.log("첫 강화 ", first.map((x) => (x.toFixed(0) + "s").padStart(5)).join(" "));
 
 const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
