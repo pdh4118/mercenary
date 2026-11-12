@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 if (process.env.PERS !== "1") process.env.MERC_NO_PERSONALITY = "1"; // PERS=1이면 성격을 켠다
-import { TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, mercXpNeed } from "@mercenary/shared";
+import { MERC_XP_TYPE_MULT, TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, mercXpNeed } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 TUNE.ENEMY_CAV_RAM_FRAC = 0;
 if (process.env.SM) TUNE.MXP_STREAK_MAX = Number(process.env.SM);
@@ -15,6 +15,7 @@ const mul = (seed: number) => {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 };
+if (process.env.MT) process.env.MT.split(",").forEach((v, i) => ((MERC_XP_TYPE_MULT as any)[i] = Number(v))); // MT = 병종별 경험치 보정 6개(기병,창병,궁병,검방병,둔기병,마법사)
 const stage = Number(process.env.STAGE ?? 3);
 const seeds = Number(process.env.SEEDS ?? 4);
 const secs = Number(process.env.SECS ?? 600);
