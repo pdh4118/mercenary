@@ -4,6 +4,7 @@ import { TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MERC_XP_TYPE_MULT } from "@mer
 import { Game } from "../src/game.js";
 TUNE.ENEMY_CAV_RAM_FRAC = 0;
 if (process.env.SM) TUNE.MXP_STREAK_MAX = Number(process.env.SM);
+if (process.env.SS) TUNE.MXP_STREAK_SEC = Number(process.env.SS);
 const mul = (seed: number) => {
   let a = seed >>> 0 || 1;
   Math.random = (): number => {
