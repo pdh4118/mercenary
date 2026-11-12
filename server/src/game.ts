@@ -564,7 +564,8 @@ export interface Merc extends Fighter {
   sit?: SitMods; // 지금 켜진 성격 상황 효과(합친 값)
   sitCode?: number; // 첫 번째 켜진 규칙(+n 이로움 / -n 불리함, 0 없음)
   homeDist?: number; // 진형 자리에서 떨어진 거리(AI가 갱신)
-  streak?: number; // 쓰러지지 않고 싸운 시간(초)
+  streak?: number; // 쓰러지지 않고 싸운 시간(초, 표시용)
+  streakMerit?: number; // 쓰러지지 않고 쌓은 기여도 — 경험치 배율의 기준
   combatT?: number; // 마지막으로 피해를 주고받은 뒤 남은 "싸우는 중" 시간
   hasteT?: number; // 성격 "날쌘": 처치 뒤 빨라진 남은 시간
   auraDmg?: number; // 성격 "늙은" 곁에 있어서 받는 공격력 보너스
@@ -2926,7 +2927,7 @@ export class Game {
         t.sa = t.sb = t.se = 0;
         t.mvp = undefined;
         const fm = t.rounds[t.r]!.matches[t.m]!;
-        for (const m of this.mercs.values()) if (m.owner === fm.a || m.owner === fm.b) { m.matchBase = m.career.score; m.streak = 0; } // 이번 판의 기여도는 여기서부터 센다(연속 생존도 새로)
+        for (const m of this.mercs.values()) if (m.owner === fm.a || m.owner === fm.b) { m.matchBase = m.career.score; m.streak = 0; m.streakMerit = 0; } // 이번 판의 기여도는 여기서부터 센다(연속 생존도 새로)
         t.side = [fm.a, fm.b].map((id): TourSideTally => {
           const mercs = z6();
           for (const m of this.mercs.values()) if (m.owner === id && m.respawn <= 0) mercs[m.type] = (mercs[m.type] ?? 0) + 1;
@@ -3394,12 +3395,13 @@ export class Game {
     if (merit <= 0) return;
     m.combatT = TUNE.MXP_COMBAT_SEC;
     m.career.score += merit;
-    this.xpMerc(m, merit * TUNE.MXP_RATE);
+    this.xpMerc(m, merit * TUNE.MXP_RATE); // 이번 공헌은 지금까지 쌓은 연속 생존 배율로 받고
+    m.streakMerit = (m.streakMerit ?? 0) + merit; // 그 뒤에 쌓인다
   }
 
-  /** 연속 생존 배율: 쓰러지지 않고 싸운 시간에 비례해 1에서 1+MXP_STREAK_MAX까지 */
+  /** 연속 생존 배율: 쓰러지지 않고 쌓은 기여도에 비례해 1에서 1+MXP_STREAK_MAX까지(기여를 많이 하는 용병이 더 빨리 오른다) */
   private streakMult(m: Merc): number {
-    return 1 + TUNE.MXP_STREAK_MAX * Math.min(1, (m.streak ?? 0) / TUNE.MXP_STREAK_SEC);
+    return 1 + TUNE.MXP_STREAK_MAX * Math.min(1, (m.streakMerit ?? 0) / TUNE.MXP_STREAK_MERIT);
   }
 
   /** 용병이 경험치를 얻는다(카드·단계 보너스·토너먼트 비율 반영). 기여도에는 들어가지 않는다 */
@@ -4531,6 +4533,7 @@ export class Game {
     m.hp = 0;
     m.career.deaths++;
     m.streak = 0; // 연속 생존이 끊긴다
+    m.streakMerit = 0;
     if (this.phase !== "tournament") m.xp *= 1 - TUNE.MXP_DEATH_LOSS; // 쓰러지면 모은 경험치 일부를 잃는다(토너먼트 제외)
     if (by && this.phase === "tournament") {
       by.career.kills++; // 토너먼트: 상대 용병을 쓰러뜨렸다

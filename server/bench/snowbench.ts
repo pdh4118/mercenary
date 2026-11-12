@@ -4,7 +4,7 @@ import { TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, mercXp
 import { Game } from "../src/game.js";
 TUNE.ENEMY_CAV_RAM_FRAC = 0;
 if (process.env.SM) TUNE.MXP_STREAK_MAX = Number(process.env.SM);
-if (process.env.SS) TUNE.MXP_STREAK_SEC = Number(process.env.SS);
+if (process.env.SS) TUNE.MXP_STREAK_MERIT = Number(process.env.SS); // SS = 연속 생존 최대까지 필요한 기여도
 const mul = (seed: number) => {
   let a = seed >>> 0 || 1;
   Math.random = (): number => {
@@ -30,6 +30,8 @@ let maxT = UNIT_TYPES.map(() => 0);
 let minT = UNIT_TYPES.map(() => 0);
 let first = UNIT_TYPES.map(() => 0);
 let gini = UNIT_TYPES.map(() => 0);
+const avg0 = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+let sps = UNIT_TYPES.map(() => 0);
 for (let sd = 1; sd <= seeds; sd++) {
   mul(sd * 104729 + stage);
   const g = new Game();
@@ -65,6 +67,7 @@ for (let sd = 1; sd <= seeds; sd++) {
     maxT[t]! += Math.max(...mine.map((r) => r.tier)) / seeds;
     minT[t]! += Math.min(...mine.map((r) => r.tier)) / seeds;
     first[t]! += (firstAt[t]! < 0 ? secs : firstAt[t]!) / seeds;
+    sps[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.score / r.alive : 0), 0) / mine.length / seeds;
     const v = mine.map((r) => r.score).sort((x, y) => x - y);
     const n = v.length;
     const sum = v.reduce((x, y) => x + y, 0) || 1;
@@ -77,6 +80,7 @@ console.log("1등 몫  ", topShare.map((x) => (x * 100).toFixed(0).padStart(4) +
 console.log("지니    ", gini.map((x) => x.toFixed(2).padStart(5)).join(" "), "(0 = 완전 균등, 1 = 한 명이 전부)");
 console.log("평균단계", tiers.map((x) => x.toFixed(2).padStart(5)).join(" "));
 console.log("최고단계", maxT.map((x) => x.toFixed(2).padStart(5)).join(" "), " 최저단계", minT.map((x) => x.toFixed(2).padStart(5)).join(" "));
+console.log("초당기여", sps.map((x) => x.toFixed(1).padStart(5)).join(" "), " (5분 ≈", (avg0(sps) * 300).toFixed(0) + ")");
 console.log("첫 강화 ", first.map((x) => (x.toFixed(0) + "s").padStart(5)).join(" "));
 
 const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;

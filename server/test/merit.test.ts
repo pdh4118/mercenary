@@ -97,6 +97,7 @@ test("경험치: 단계가 높을수록 더 받고, 토너먼트에서는 절반
   assert.ok(Math.abs(low.xp - 100 * TUNE.MXP_RATE * MERC_XP_TYPE_MULT[SPEAR]!) < 1e-6, `0단계 경험치(${low.xp})`);
   assert.ok(Math.abs(high.xp / low.xp - (1 + TUNE.MXP_TIER_BONUS * 2)) < 1e-6, "단계 보너스");
   (g as any).phase = "tournament";
+  low.streakMerit = 0;
   const x0 = low.xp;
   (g as any).meritMerc(low, 100);
   assert.ok(Math.abs(low.xp - x0 - (100 * TUNE.MXP_RATE * MERC_XP_TYPE_MULT[SPEAR]!) * TUNE.MXP_TOURNAMENT) < 1e-6, "토너먼트 절반");
@@ -168,31 +169,25 @@ test("병종 균형: 같은 조건에서 싸운 병종별 경험치 속도가 �
   void ({} as EventWire);
 });
 
-test("연속 생존: 싸우는 동안만 시간이 쌓여 경험치 배율이 오르고, 쓰러지면 끊긴다", () => {
+test("연속 생존: 쓰러지지 않고 쌓은 기여도에 비례해 경험치 배율이 오르고, 쓰러지면 끊긴다", () => {
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
-  const idle = (g as any).mercs.get(g.addMerc(a, SPEAR, p.x + 20, p.y, 0, 0));
-  const fighter = (g as any).mercs.get(g.addMerc(a, SPEAR, p.x + 20, p.y + 30, 0, 0));
-  // 가만히 있으면(싸우지 않으면) 아무리 시간이 지나도 쌓이지 않는다
+  const m = (g as any).mercs.get(g.addMerc(a, SPEAR, p.x + 20, p.y, 0, 0));
+  const gain = () => { const x0 = m.xp; (g as any).meritMerc(m, 100); return m.xp - x0; };
+  // 기여가 없으면(가만히 있으면) 아무리 시간이 지나도 배율이 오르지 않는다
   run(g, 20);
-  assert.equal(idle.streak ?? 0, 0, "싸우지 않으면 연속 생존이 쌓이지 않는다");
-  // 싸우는 중으로 표시되는 동안만 쌓인다
-  fighter.combatT = TUNE.MXP_COMBAT_SEC;
-  run(g, 3);
-  assert.ok(fighter.streak > 2.5 && fighter.streak < 3.5, `싸운 만큼만(${fighter.streak})`);
-  // 배율: 0 → 1, 최대 시간 → 1 + MXP_STREAK_MAX
-  const gain = (m: any) => { const x0 = m.xp; (g as any).meritMerc(m, 100); return m.xp - x0; };
-  idle.streak = 0;
-  const base = gain(idle);
-  idle.streak = TUNE.MXP_STREAK_SEC;
-  assert.ok(Math.abs(gain(idle) / base - (1 + TUNE.MXP_STREAK_MAX)) < 1e-6, "최대 배율");
-  idle.streak = TUNE.MXP_STREAK_SEC * 5;
-  assert.ok(Math.abs(gain(idle) / base - (1 + TUNE.MXP_STREAK_MAX)) < 1e-6, "배율은 최대를 넘지 않는다");
-  // 쓰러지면 처음부터, 최장 기록은 남는다
-  fighter.streak = 120;
-  fighter.career.bestStreak = 120;
-  (g as any).hurtMerc(fighter, 99999);
-  assert.equal(fighter.streak, 0, "쓰러지면 연속 생존이 끊긴다");
-  assert.equal(fighter.career.bestStreak, 120, "최장 기록은 남는다");
+  assert.equal(m.streakMerit ?? 0, 0, "기여 없이는 쌓이지 않는다");
+  m.streakMerit = 0;
+  const base = gain();
+  const at = (x: number) => { m.streakMerit = x; return gain() / base; };
+  assert.ok(Math.abs(at(TUNE.MXP_STREAK_MERIT / 2) - (1 + TUNE.MXP_STREAK_MAX / 2)) < 1e-6, "절반이면 보너스도 절반");
+  assert.ok(Math.abs(at(TUNE.MXP_STREAK_MERIT * 5) - (1 + TUNE.MXP_STREAK_MAX)) < 1e-6, "배율은 최대를 넘지 않는다");
+  // 쓰러지면 처음부터, 최장 시간 기록은 남는다
+  m.streak = 120;
+  m.career.bestStreak = 120;
+  (g as any).hurtMerc(m, 99999);
+  assert.equal(m.streak, 0, "쓰러지면 연속 생존 시간이 끊긴다");
+  assert.equal(m.streakMerit, 0, "쓰러지면 쌓인 기여도도 끊긴다");
+  assert.equal(m.career.bestStreak, 120, "최장 기록은 남는다");
 });
