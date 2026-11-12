@@ -132,9 +132,9 @@ export const TUNE = {
   MXP_BLOCK: 1.5, // 검방병: 방패가 막아 낸 피해 1당 기여도
   MXP_COUNTER: 1, // 창병: 기병 돌격을 되받아친 피해 1당 기여도
   MXP_STAGGER: 8, // 둔기병: 적을 경직시킨 1회의 기여도(같은 적은 0.6초에 한 번)
-  MXP_KILL_FRAC: 0.35, // 처치 보너스 = 그 적 최대 체력(최대 MXP_KILL_CAP) x 이 값. 센 적을 잡을수록 크다
+  MXP_KILL_FRAC: 0.42, // 처치 보너스 = 그 적 최대 체력(최대 MXP_KILL_CAP) x 이 값. 센 적을 잡을수록 크다
   MXP_KILL_CAP: 800,
-  MXP_ASSIST_POOL: 0.4, // 어시스트: 처치 보너스의 이 비율을, 최근 MXP_ASSIST_SEC초 안에 피해를 준 다른 용병들이 피해량의 제곱 비율로 나눈다
+  MXP_ASSIST_POOL: 0.5, // 어시스트: 처치 보너스의 이 비율을, 최근 MXP_ASSIST_SEC초 안에 피해를 준 다른 용병들이 피해량의 제곱 비율로 나눈다
   MXP_ASSIST_SEC: 5,
   MXP_TIER_BONUS: 0.3, // 단계가 오를수록 경험치를 더 받는다(단계마다 +30%): 앞서가는 용병이 더 빨리 큰다
   MERC_TIER_POWER: 0, // 단계가 오를수록 공격력과 체력에 더 붙는 보너스(단계마다 +이 값, 공격력·체력 둘 다). 앞서가는 용병이 더 강해져 더 기여하는 스노우볼. 단계 표(TIER_DMG·TIER_HP)에 더해진다

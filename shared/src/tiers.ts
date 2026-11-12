@@ -33,7 +33,7 @@ export const MERC_XP_OVERFLOW = 1.5; // 필요량의 이 배수까지는 쌓아 
  * 기여도를 그대로 경험치로 바꾸면 특정 병종만 빨리 큰다. 병종별 경험치 속도가 비슷해지도록 측정해서 맞춘 값이다(server/bench/xpbench.ts).
  * 기여도(결과 화면·토너먼트 표시)에는 곱하지 않는다. 경험치에만 곱한다.
  */
-export const MERC_XP_TYPE_MULT = [1.11, 0.76, 1.37, 1.24, 1.0, 0.82] as const;
+export const MERC_XP_TYPE_MULT = [1.17, 0.75, 1.33, 1.3, 1.02, 0.77] as const;
 export const mercXpNeed = (tier: number): number => MERC_XP_NEED[tier] ?? Infinity;
 
 /** 통솔력: 병종 기본 비용에 단계마다 +1. 정예는 자리를 많이 차지하므로 숫자로 밀어붙이는 쪽이 통솔력당 더 강하다. */
