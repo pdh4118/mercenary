@@ -295,7 +295,7 @@ Captions: icon_gold, icon_hp, icon_leadership, icon_level
 
 | 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
 | --- | --- | --- | --- |
-| `bow_shot` | 활을 쏠 때(주인공·궁병) | `short wooden bow release, dry string twang, no echo` | 0.2초, 3종 |
+| `bow_shot` | 활을 쏠 때(주인공·궁병) | `short wooden bow release, dry string twang, no echo` | 0.2초, 2종 (3종을 요청했고 2종 적용됨, 하나 더 받으면 3종) |
 | `arrow_volley` | 궁병 여럿이 동시에 쏠 때(화살 연사) | `volley of many arrows released at once, bowstrings snapping together then a rush of arrows through the air` | 0.8초, 1종 |
 | `arrow_hit` | 화살이 적에게 맞을 때 | `soft arrow thud into leather and flesh, short, low volume` | 0.15~0.27초, 3종 |
 | `melee_hit` | 근접 타격(검·창·철퇴로 몸을 때림) | `quick melee weapon hit, dull cloth and metal impact, medium thud` | 0.2~0.4초, 6종 |
