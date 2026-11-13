@@ -24,7 +24,7 @@ const d = (variants: number, volume: number, cooldownMs: number, maxVoices: numb
 /** docs/asset-prompts.md 10장의 파일 이름과 같다. 파일이 없으면 조용히 건너뛴다. */
 export const SOUNDS = {
   // 1순위
-  bow_shot: d(3, 0.5, 70, 4),
+  bow_shot: d(2, 0.5, 70, 4),
   arrow_volley: d(1, 0.6, 350, 2, 0.04), // 여러 명이 한꺼번에 쏠 때(화살 연사)
   arrow_hit: d(3, 0.45, 60, 5),
   melee_hit: d(6, 0.55, 60, 5),
@@ -43,7 +43,7 @@ export const SOUNDS = {
   mace_hit: d(2, 0.75, 150, 3), // 둔기병 내려찍기가 맞는 소리
   shield_bash: d(1, 0.65, 90, 3), // 검방병 방패 밀치기
   sword_hit: d(4, 0.65, 70, 4), // 검이 갑옷에 맞는 소리
-  meteor_fall: d(1, 0.8, 350, 3, 0.03), // 운석이 떨어지기 시작할 때(폭발까지 약 0.6초를 포함한 한 덩어리)
+  meteor_fall: d(1, 0.8, 350, 3, 0.03), // 운석이 떨어지기 시작할 때(낙하음이 커지다 약 0.6초에 폭발이 가장 크게 터지는 2.5초 한 덩어리)
   backstab: d(2, 0.6, 100, 3),
   knockback: d(2, 0.45, 100, 3),
   dodge: d(2, 0.4, 100, 2),
