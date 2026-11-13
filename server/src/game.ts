@@ -6376,7 +6376,9 @@ export class Game {
       src.career.dealt += amt;
       if (hit.crit) src.career.crits++;
       if (hit.charge > 0 && src.type === CAVALRY) src.career.charge += hit.charge;
-      this.meritMerc(src, amt); // 준 피해가 기여도의 바탕이다
+      // 준 피해가 기여도의 바탕이다. 기병의 돌격 몫과 궁병·마법사의 후방 화력은 조금 더 쳐준다(맞붙어 싸우는 병종보다 때리는 시간이 짧다)
+      const chargeShare = hit.charge > 0 && src.type === CAVALRY ? (amt * hit.charge) / Math.max(1e-9, hit.damage + hit.charge) : 0;
+      this.meritMerc(src, amt + chargeShare * TUNE.MXP_CHARGE_BONUS + (src.type === ARCHER || src.type === MAGE ? amt * TUNE.MXP_RANGED_DMG : 0));
       if (amt > 0) {
         const c = (e.contrib ??= new Map()).get(src.id);
         e.contrib.set(src.id, { d: (c?.d ?? 0) + amt, t: this.time });
@@ -6755,7 +6757,7 @@ export class Game {
     const killBonus = this.killMerit(e.maxHp, !!e.boss);
     if (src) {
       src.career.kills++;
-      this.meritMerc(src, killBonus); // 막타: 그 적 체력의 일부를 더 인정한다
+      this.meritMerc(src, killBonus * (src.type === ARCHER || src.type === MAGE ? 1 + TUNE.MXP_RANGED_KILL : 1)); // 막타: 그 적 체력의 일부를 더 인정한다
       if (this.persona(src).killHaste) src.hasteT = KILL_HASTE_SEC; // 날쌘: 처치하면 잠깐 빨라진다
     }
     if (e.contrib && e.contrib.size > 0) {

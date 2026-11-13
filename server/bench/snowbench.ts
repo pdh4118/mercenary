@@ -16,6 +16,7 @@ const mul = (seed: number) => {
   };
 };
 if (process.env.MT) process.env.MT.split(",").forEach((v, i) => ((MERC_XP_TYPE_MULT as any)[i] = Number(v))); // MT = 병종별 경험치 보정 6개(기병,창병,궁병,검방병,둔기병,마법사)
+if (process.env.TJ) Object.assign(TUNE, JSON.parse(process.env.TJ)); // TJ = TUNE 덮어쓰기(JSON)
 const stage = Number(process.env.STAGE ?? 3);
 const seeds = Number(process.env.SEEDS ?? 4);
 const secs = Number(process.env.SECS ?? 600);
