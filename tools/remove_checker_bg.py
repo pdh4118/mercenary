@@ -6,7 +6,7 @@
 생성 도구가 투명 배경이라며 체크무늬를 그림에 구워서 내놓을 때 쓴다(흰 배경만 지우는 `remove_bg.py`는 회색 칸을 못 지운다).
 1. '무채색이고 밝은'(채널 차이 6 이하, 밝기 min-v 이상) 픽셀을 배경 후보로 본다.
 2. 이미지 가장자리에서 이어진 후보를 바깥 배경으로 지운다(어두운 외곽선이 막아 주므로 그림 속은 지워지지 않는다).
-3. 바깥과 이어지지 않은 후보 덩어리(말 다리 사이·창과 깃발 사이 같은 구멍)는 체크무늬의 연회색 칸이 6% 이상 들어 있을 때만 지운다(진짜 흰 물체는 연회색 칸이 없다).
+3. 바깥과 이어지지 않은 후보 덩어리(말 다리 사이·창과 깃발 사이 같은 구멍)는 체크무늬의 연회색 칸이 6% 이상 들어 있을 때만 지운다(진짜 흰 물체는 연회색 칸이 없다). 300px 넘게 큰 덩어리는 칸 색이 달라도 배경으로 본다(--pocket-big).
 4. 배경 바로 옆 1px는 어두운 외곽선과 배경이 섞인 회색이라 무채색이고 어두운 정도가 중간이면 지운다. 남는 흰 번짐은 `tools/fix_halo.py`로 정리한다.
 """
 from __future__ import annotations
@@ -52,6 +52,7 @@ def main() -> int:
     ap.add_argument("dst")
     ap.add_argument("--min-v", type=int, default=190)
     ap.add_argument("--pocket-area", type=int, default=10)
+    ap.add_argument("--pocket-big", type=int, default=300, help="이 넓이(px) 이상의 닫힌 무채색 밝은 덩어리는 연회색 칸이 없어도 배경으로 본다(체크무늬 색이 이미지마다 다르다)")
     args = ap.parse_args()
 
     rgb = np.asarray(Image.open(args.src).convert("RGB"), dtype=np.int32)
@@ -89,7 +90,7 @@ def main() -> int:
         if len(pts) < args.pocket_area:
             continue
         ys, xs = pts[:, 0], pts[:, 1]
-        if gray[ys, xs].mean() >= 0.06:
+        if gray[ys, xs].mean() >= 0.06 or len(pts) >= args.pocket_big:
             bg[ys, xs] = True
             pockets += 1
 

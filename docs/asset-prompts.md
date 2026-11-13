@@ -18,7 +18,7 @@
 | 기병 장군 본체 2포즈(스테이지 1 보스) | **메인 화풍으로 재제작해 적용됨(베타 1.287)**: `assets/units/boss1_idle.png`(240x303), `boss1_attack.png`(268x295). 예전 그림은 `boss1_idle_old`·`boss1_attack_old`로 보관. 체크무늬 가짜 투명 배경은 `tools/remove_checker_bg.py`로 지우고 `tools/fix_halo.py`로 밝은 테두리를 정리했다. 화면 배율 0.5에서 아군 기병의 약 2.2배 크기 |
 | 기병 장군 선회 베기 호·돌격 함성 오라 | 흰 배경 재요청본을 받아 적용 준비 완료, 보관 (`assets/fx/boss1_slash_0~3.png`, `boss1_cry_0~2.png`). **돌격 함성 3번 컷은 못 받음**(고리가 완전히 닫힌 컷). 처음에 받은 시안에서 오려 둔 이전 그림은 `*_old.png`로 보관 |
 | 기병 장군 돌진 충돌 임팩트 | 섬광 2장(`boss1_impact_0`, `0b`)과 흰 배경 재요청본 연기 3컷(`boss1_impact_1~3`) 모두 받음, 보관 (`assets/fx/`). 3번 연기는 반투명이라 옅다 |
-| 창병 장군 본체 3포즈 + 여분 1 | 받음, 보관 (`assets/units/boss2_idle.png`(113x314), `boss2_guard.png`(창 겨눔, 249x127), `boss2_thrust.png`(278x130), `boss2_guard_b.png`(창 없이 웅크린 자세, 여분)). 시트에 `boss2_guard` 캡션이 둘이라 창을 겨눈 쪽을 방어 자세로 썼다 |
+| 창병 장군 본체 3포즈 | **메인 화풍으로 재제작해 적용됨(베타 1.288)**: `assets/units/boss2_idle.png`(188x329), `boss2_guard.png`(252x209), `boss2_thrust.png`(258x206). 예전 그림(여분 `boss2_guard_b` 포함)은 `_old`로 보관. 받은 시안에서 손본 것: 체크무늬 배경 제거, 발 밑 지면선 삭제, **찌르기 포즈의 창날이 캔버스 끝에서 잘려 있어 방어 포즈의 같은 창날을 이어 붙여 복원**, 창날 안쪽 하이라이트가 배경으로 지워진 곳 채움. 다음에 요청할 때는 "캔버스 오른쪽에 창끝 여백을 둘 것, 지면선을 그리지 말 것"을 덧붙인다 |
 | 창병 장군 이펙트 (장창 찌르기 선 3컷, 창 방어 쓸기 3컷, 던진 창, 박힌 창) | 받음, 보관 (`assets/fx/boss2_thrust_0~2`, `boss2_sweep_0~2`, `boss2_spear_fly`, `boss2_spear_stuck`). 시안의 테두리 선은 잘라 냈다. 연한 초록 이펙트는 반투명으로 처리해 옅게 보인다 |
 | 궁병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss3_idle`, `boss3_aim`, `boss3_sky`, `assets/fx/boss3_ice_0~4`, `boss3_snipe`, `boss3_snipe_hit`, `boss3_rain_0·1·stuck·fade`, `boss3_dust_0~3`, `boss3_frost_0~2`). 얼음 둔화 표시는 얼음 고리 그림 대신 **파란 틴트(독과 같은 방식)** 로 하기로 해서 `boss3_frost_*`는 쓰지 않고 보관만 한다 |
 | 검방병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss4_idle`, `boss4_reflect`, `boss4_charge`, `assets/fx/boss4_shield_0~2`, `boss4_reflect_0~3`, `boss4_inv_0~3`, `boss4_bash_1~3`, 대체 시안 `boss4_bash_1b~3b`). **방패 돌진 섬광 `boss4_bash_0`은 못 씀**: 흰 섬광을 흰 배경에 그려서 지우면 중심이 사라진다. 흰 섬광·빛 이펙트는 **검은 배경**으로 다시 요청해야 한다(돌진 임팩트 섬광은 `boss1_impact_0`으로 대신할 수 있다) |
@@ -1194,3 +1194,5 @@ out. The same character size and the same ground line in all three poses. Facing
 네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, perspective, top-down view, cropped, overlapping items, text`
 
 **받은 뒤 확인**: 세 포즈의 몸 크기·발 높이가 같은지, 창끝이 잘리지 않았는지, 외곽선 바깥에 밝은 테두리가 없는지, 체크무늬 배경이면 `tools/remove_checker_bg.py`로 지우기, 아군 창병(`ally_spear`)과 같은 배율로 나란히 놓았을 때 같은 화풍으로 보이는지.
+
+**13-2 진행**: 받음, 적용됨(베타 1.288). 다음은 창병 장군의 이펙트(`assets/fx/boss2_*`: 장창 찌르기 선, 창 방어 쓸기, 던진 창, 박힌 창)를 메인 화풍에 맞춰 다시 받는 것이다. **다음 요청 문구에 추가할 주의**: 그림 둘레와 오른쪽에 여백을 충분히 둘 것(창끝이 잘렸었다), 시트 아래에 지면선을 그리지 말 것.
