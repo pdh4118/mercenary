@@ -1296,3 +1296,31 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, photo
 ```
 
 **13-4 진행**: 받음, 적용됨(베타 1.290). 한 번에 비율·얼굴(투구와 눈 두 점) 모두 맞아 첫 시안을 그대로 썼다. 다음은 검방병 장군 이펙트를 메인 화풍에 맞춰 다시 받는 것이다.
+
+### 13-5. 둔기병 장군 (스테이지 5 보스) 본체 3포즈 - `assets/units/boss5_idle`, `boss5_jump`, `boss5_smash` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 평소 `idle`, 점프 내려찍기 `jump`(공중), 내려찍기 직후 `smash`. 화면 배율 0.42. 이 보스에는 **휘두르기 2포즈(`boss5_swing_a`·`boss5_swing_b`, 철퇴 난타에 사용 중)와 도는 포즈 4방향(`boss5_whirlpose_0~3`, 휠윈드)** 도 있다. 기본 3포즈를 먼저 받아 적용하고, 나머지 6장은 이 3포즈가 확정된 뒤 **같은 캐릭터로** 따로 요청한다(휘두르기는 발 위치를 맞춘 같은 크기 캔버스 필요).
+**크기 목표**: 이전(idle 209x250, jump 194x258, smash 169x253)과 비슷하게, 받은 뒤 제가 맞춘다. 세 포즈의 몸 크기와 발 높이(점프는 공중이므로 몸 크기만)는 같게.
+**얼굴**: 해골 투구라서 눈구멍 두 개만 단순하게. 해골 디테일 금지.
+
+#### 13-5 제미나이(Gemini)에 붙여넣는 최종본
+
+1. 새 대화를 열고 **이미지 2장을 먼저 첨부**한다: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss5_character_ref.png`.
+2. 아래 글을 **통째로 한 번에** 붙여넣는다(네거티브는 맨 끝 `Avoid:`에 들어 있다).
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference (keep who he is, redraw him in the style of Image 1).
+
+Make ONE sprite sheet image with three items side by side, each large and clearly separated, with at least 40px of empty space around every item so no mace head, spike, cape or flying rubble touches the edge of the image, and a small caption under each item ("boss5_idle", "boss5_jump", "boss5_smash"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+Style and proportions: cute chibi exactly like the units in Image 1. A huge round head (the skull helmet) that is about half of his whole body height, on a very wide, heavy, stubby body with thick short legs and big round shoulders. Never tall, lean or adult proportions. He is bigger than the units only because he is scaled up, not because his proportions change. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights.
+
+Face: his face is a simple skull mask on the helmet. Show only two plain black oval eye sockets and a tiny nose notch, nothing else, no detailed teeth, no realistic bone texture.
+
+Character: a mace general boss, the stage 5 boss of a dark fantasy mercenary game, a hulking brute warlord. A big dark brown and black skull helmet, huge dark brown plate armor with a round purple gem on the chest and purple trim, big round shoulder plates, a tattered dark brown cape and a small tattered banner strip on his back, and a gigantic spiked mace with a dark brown handle and a huge head with purple diamond studs and metal spikes. Color theme: dark brown, black and purple, so he reads as the big brother of the purple mace unit. He looks clearly bigger and more menacing than a normal mace unit through his size and the gigantic mace, while still being cute chibi. Same character size and same ground position in all three poses. Facing right.
+1. "boss5_idle": standing firmly, the gigantic mace resting on his shoulder held with one hand, the other arm hanging, cape hanging.
+2. "boss5_jump": leaping high into the air, knees bent, both hands raising the gigantic mace above his head, ready to slam it down, cape streaming.
+3. "boss5_smash": crouched low just after slamming the gigantic mace into the ground in front of him, both hands holding the mace handle, a few small pieces of rubble flying up around the mace head.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed skull, realistic bone texture, detailed teeth, detailed eyes, cropped or overlapping items, logo, watermark, any text other than the three captions.
+```
