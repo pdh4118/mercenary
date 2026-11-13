@@ -15,7 +15,7 @@
 | 투사체 (화살, 아군·적 각 5컷) | 완료, 적용됨 (`assets/fx/`). 속도선 컷으로 날아가고 명중 컷을 잠깐 보여 줌 |
 | 레벨업 카드 아이콘 19종 | 이 문서 7번 |
 | 무기·HUD 아이콘 | 이 문서 8번 |
-| 기병 장군 본체 2포즈(스테이지 1 보스) | 받음, 보관 (`assets/units/boss1_idle.png`, `boss1_attack.png`, 224x295와 295x297). 깃발·창이 길어 일반 유닛(약 120x110)보다 세로가 큽니다. 보스 구현 때 몸통 크기를 맞춰 씁니다 |
+| 기병 장군 본체 2포즈(스테이지 1 보스) | **메인 화풍으로 재제작해 적용됨(베타 1.287)**: `assets/units/boss1_idle.png`(240x303), `boss1_attack.png`(268x295). 예전 그림은 `boss1_idle_old`·`boss1_attack_old`로 보관. 체크무늬 가짜 투명 배경은 `tools/remove_checker_bg.py`로 지우고 `tools/fix_halo.py`로 밝은 테두리를 정리했다. 화면 배율 0.5에서 아군 기병의 약 2.2배 크기 |
 | 기병 장군 선회 베기 호·돌격 함성 오라 | 흰 배경 재요청본을 받아 적용 준비 완료, 보관 (`assets/fx/boss1_slash_0~3.png`, `boss1_cry_0~2.png`). **돌격 함성 3번 컷은 못 받음**(고리가 완전히 닫힌 컷). 처음에 받은 시안에서 오려 둔 이전 그림은 `*_old.png`로 보관 |
 | 기병 장군 돌진 충돌 임팩트 | 섬광 2장(`boss1_impact_0`, `0b`)과 흰 배경 재요청본 연기 3컷(`boss1_impact_1~3`) 모두 받음, 보관 (`assets/fx/`). 3번 연기는 반투명이라 옅다 |
 | 창병 장군 본체 3포즈 + 여분 1 | 받음, 보관 (`assets/units/boss2_idle.png`(113x314), `boss2_guard.png`(창 겨눔, 249x127), `boss2_thrust.png`(278x130), `boss2_guard_b.png`(창 없이 웅크린 자세, 여분)). 시트에 `boss2_guard` 캡션이 둘이라 창을 겨눈 쪽을 방어 자세로 썼다 |
@@ -1160,3 +1160,5 @@ orange and crimson stand out. Facing right.
 네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, perspective, top-down view, cropped, overlapping items, text`
 
 **받은 뒤 확인**: 두 포즈의 말 발굽 높이가 같은지, 외곽선 바깥에 밝은 테두리가 없는지, 아군 기병(`ally_cavalry`)과 나란히 놓았을 때 같은 화풍으로 보이는지.
+
+**13-1 진행**: 받음, 적용됨(베타 1.287). 같은 화풍으로 보이는지는 아군 기병·창병·검방병과 같은 배율로 나란히 놓아 확인했다. 다음은 같은 보스의 이펙트(선회 베기 호·돌격 함성·돌진 충돌 임팩트, `assets/fx/boss1_*`)를 메인 화풍에 맞춰 다시 받는 것이다.
