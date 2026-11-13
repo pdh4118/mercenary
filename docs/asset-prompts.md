@@ -81,7 +81,7 @@ python3 tools/slice_sheet.py /tmp/arrows.png client/public/assets/fx --names arr
 | 항목 | 규칙 | 잰 값 |
 |---|---|---|
 | 시점 | 옆모습(위에서 내려다본 시점 아님), 오른쪽을 보고 선 자세 (왼쪽으로 갈 때 코드가 좌우 반전) | - |
-| 비율 | 치비: 머리가 몸의 약 1/3, 손발은 단순하게 | 높이 88~114px(기병·주인공이 큼) |
+| 비율 | **치비: 머리(모자·깃털 제외)가 전체 키의 약 45~50%**, 얼굴은 넓고 둥글게(눈은 얼굴 아래쪽에 낮게 붙임), 몸통·팔다리는 짧고 통통하게. 호리호리하거나 키 큰 어른 비율 금지. 보스도 몸집이 큰 것이지 비율은 유닛과 같다 | 높이 88~114px(기병·주인공이 큼) |
 | 외곽선 | **거의 검정**(`#050505` 부근) 굵은 선, 바깥쪽에 밝은 테두리를 남기지 않기 | 두께 약 2~3px, 색 RGB 1~14 |
 | 색칠 | 면을 2~3톤으로 나눈 평평한 색칠(만화풍). 그라데이션·무지개빛 광택·사실적 질감 금지 | - |
 | 채도·밝기 | 팀 색이 한눈에 보이게 선명하되 너무 짙지 않게 | 채도 0.30~0.62, 평균 밝기 0.22~0.31, 대비 0.51~0.76 |
@@ -1146,8 +1146,8 @@ Two frames side by side, each about 64 x 28 px: a thin glowing crimson ellipse r
 ```
 Two items side by side on a transparent background, large and clearly separated, a small caption under each.
 Character: a cavalry general boss, the stage 1 boss of a dark fantasy mercenary game. He is a mounted warlord,
-drawn in the exact style of the attached main-style sheet: cute chibi proportions with a big head and a short
-sturdy body, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in
+drawn in the exact style of the attached main-style sheet: cute chibi proportions: a huge round head that is about half of the whole body height (the hat does not count), a wide round face
+with the eyes placed low, a short stubby body and short thick legs, never tall, lean or adult proportions, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in
 2-3 tones, no gradients, no realistic texture, no glossy highlights. Use the second attached image only as a
 character design reference (keep the identity, redraw in the main style).
 Identity to keep: a tall ornate dark-steel helmet with a big orange horsehair plume, dark crimson and black plate
@@ -1217,7 +1217,7 @@ out. The same character size and the same ground line in all three poses. Facing
 Three items side by side on a transparent background, large and clearly separated, with at least 40px of empty
 space around every item so no bow tip or arrow tip touches the edge of the image, a small caption under each.
 No ground line, no floor, no shadow line, no checkerboard pattern drawn into the picture.
-Character: an archer general boss, the stage 3 boss of a dark fantasy mercenary game. He is a lean, cunning master
+Character: an archer general boss, the stage 3 boss of a dark fantasy mercenary game. He is a cunning master
 archer, drawn in the exact style of the attached main-style sheet: cute chibi proportions with a big head and a short
 sturdy body, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3
 tones, no gradients, no realistic texture, no glossy highlights. His face is very simple like the units in the main
@@ -1238,7 +1238,7 @@ The same character size and the same standing position in all three poses. Facin
 3. "boss3_sky": leaning back slightly, the bow drawn and tilted upward about 60 degrees, the arrow pointing up and to
    the right toward the sky, shooting a volley.
 ```
-네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, ground line, floor line, checkerboard, perspective, top-down view, cropped, overlapping items, text, detailed eyes, iris, eyelashes, realistic face, face shading, nose shadow, pointed elf ears, bowstring across the face`
+네거티브: `realistic, realistic proportions, tall lean adult body, long legs, small head, narrow long face, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, ground line, floor line, checkerboard, perspective, top-down view, cropped, overlapping items, text, detailed eyes, iris, eyelashes, realistic face, face shading, nose shadow, pointed elf ears, bowstring across the face`
 
 **받은 뒤 확인**: 얼굴이 주인공·아군처럼 단순한지(눈이 점·타원인지), 활 끝·화살 끝이 잘리지 않았는지, 지면선이 없는지, 세 포즈의 몸 크기·발 높이가 같은지, 외곽선 바깥에 밝은 테두리가 없는지, 체크무늬 배경이면 `tools/remove_checker_bg.py`로 지우기, 아군 궁병(`ally_archer`)과 같은 배율로 나란히 놓았을 때 같은 화풍으로 보이는지.
 
@@ -1253,12 +1253,12 @@ Generate an image. I attached two images: Image 1 is the art STYLE reference (co
 
 Make ONE sprite sheet image with three items side by side, each large and clearly separated, with at least 40px of empty space around every item so no bow tip or arrow tip touches the edge of the image, and a small caption under each item ("boss3_idle", "boss3_aim", "boss3_sky"). Plain transparent-looking background, no ground line, no floor, no shadow line.
 
-Style: exactly like Image 1: side view, cute chibi proportions with a big head and a short sturdy body, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon. His face must be very simple like the units in Image 1: eyes are small solid black dots or ovals with at most a tiny white highlight, one thick simple eyebrow line, no nose or just a tiny dot, a short line for the mouth, small rounded ears. The bowstring must not cross his face; draw it passing behind the cheek or leave it out near the face.
+Style: exactly like Image 1: side view, cute chibi proportions exactly like the units in Image 1: a huge round head that is about half of his whole body height (the hat does not count, and keep the hat modest, not much wider than the head), a wide round face with the eyes placed low on it, a short stubby body and short thick legs, never tall, lean or adult proportions; he is bigger than the units only because he is scaled up, not because his proportions change. A thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon. His face must be very simple like the units in Image 1: eyes are small solid black dots or ovals with at most a tiny white highlight, one thick simple eyebrow line, no nose or just a tiny dot, a short line for the mouth, small rounded ears. The bowstring must not cross his face; draw it passing behind the cheek or leave it out near the face.
 
-Character: an archer general boss, the stage 3 boss of a dark fantasy mercenary game, a lean cunning master archer. A wide-brimmed olive hat with a long pale feather, a hooded olive-green cloak, tan and olive leather armor with gold trim, a big quiver on his back full of arrows with golden fletching, a small dark banner with a gold emblem on his back, and a big ornate longbow with gold trim. Color theme: olive, tan and gold, so he reads as the big brother of the yellow archer unit. He looks clearly bigger and more menacing than a normal archer unit through his size and the big bow, while still being cute chibi. Same character size and same standing position in all three poses. Facing right.
+Character: an archer general boss, the stage 3 boss of a dark fantasy mercenary game, a cunning master archer. A wide-brimmed olive hat with a long pale feather, a hooded olive-green cloak, tan and olive leather armor with gold trim, a big quiver on his back full of arrows with golden fletching, a small dark banner with a gold emblem on his back, and a big ornate longbow with gold trim. Color theme: olive, tan and gold, so he reads as the big brother of the yellow archer unit. He looks clearly bigger and more menacing than a normal archer unit through his size and the big bow, while still being cute chibi. Same character size and same standing position in all three poses. Facing right.
 1. "boss3_idle": standing calmly and alertly, the bow held low in the front hand, the other hand near the quiver strap.
 2. "boss3_aim": a wide stance, an arrow nocked and the bow fully drawn, the arrow pointing to the right at chest height, a sharp focused expression.
 3. "boss3_sky": leaning back slightly, the bow drawn and tilted upward about 60 degrees, the arrow pointing up and to the right toward the sky, shooting a volley.
 
-Avoid: realistic proportions, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern drawn as scenery, detailed eyes, iris, eyelashes, realistic face, face shading, nose shadow, long pointed elf ears, bowstring across the face, cropped or overlapping items, any text other than the three captions.
+Avoid: realistic proportions, tall lean adult body, long legs, small head, narrow long face, huge wide hat, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern drawn as scenery, detailed eyes, iris, eyelashes, realistic face, face shading, nose shadow, long pointed elf ears, bowstring across the face, cropped or overlapping items, any text other than the three captions.
 ```
