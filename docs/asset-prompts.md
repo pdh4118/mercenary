@@ -1521,3 +1521,5 @@ Character: the final boss, a tyrant warlord king of a dark fantasy mercenary gam
 
 Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glow blur, smoke, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, cropped or overlapping items, logo, watermark, any text other than the three captions.
 ```
+
+**13-10 진행**: 받음, 적용됨(베타 1.298). 투구 틈의 빨간 점 눈, 왕관 가시, 금장식, 진홍 망토 모두 첫 시안에서 맞았다. `assets/units/boss10_idle.png`·`boss10_scepter.png`·`boss10_cast.png`(401x317 같은 캔버스, 발 중심 정렬; 이전과 높이가 같다), 예전 그림은 `_old`로 보관. **장군 본체 1~10스테이지 모두 교체 완료.** 이 보스는 **근위대 `boss10_guard_*` 5종과 초소병 `boss10_post_*` 10종이 아직 예전(사실적) 그림**이라 군주 옆에서 화풍이 섞여 보인다. 다음: 군주 본체를 기준으로 근위대 5종·초소병 10종을 같은 색조로 요청하고, 그다음 각 보스 이펙트와 스켈레톤 6종(`skel_*`)을 메인 화풍에 맞춘다.
