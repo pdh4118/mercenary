@@ -1400,3 +1400,32 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, photo
 ```
 
 **13-6 진행**: 받음, 적용됨(베타 1.294). 얼굴(두건 속 파란 점 눈)·비율 모두 첫 시안에서 맞았고, 순간이동(`blink`)도 번짐 없이 납작한 얼음 조각으로 그려졌다. 세 포즈를 `tools/slice_aligned.py`로 같은 캔버스(270x278)에 맞췄다. `assets/units/boss6_idle`·`boss6_blink`·`boss6_cast`, 예전 그림은 `_old`로 보관. 이펙트(`assets/fx/boss6_*`: 얼음벽·얼음 깨짐·불꽃·순간이동 등)는 아직 예전 그림이다. 다음은 스테이지 7 기마궁수.
+
+### 13-7. 기마궁수 (스테이지 7 보스) 본체 2포즈 - `assets/units/boss7_gallop`, `boss7_shoot` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 평소·도주 `gallop`(달리는 모습), 사격·궁지 상태 등 공격 `shoot`(활을 당김). 화면 배율 0.55. **분신 잔상**에도 같은 그림을 쓴다(`gallop`·`shoot` 둘 다).
+**크기 목표**: 이전(gallop 206x171, shoot 196x170)과 비슷하게, 받은 뒤 제가 맞춘다. 두 포즈의 몸 크기와 말발굽 높이는 같게.
+**얼굴**: 기수 얼굴을 단순하게. 활시위가 얼굴·모자를 가로지르지 않게(궁병 장군 때 제미나이가 반복한 문제).
+
+#### 13-7 제미나이(Gemini)에 붙여넣는 최종본
+
+1. 새 대화를 열고 **이미지 2장을 먼저 첨부**한다: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss7_character_ref.png`.
+2. 아래 글을 **통째로 한 번에** 붙여넣는다(네거티브는 맨 끝 `Avoid:`에 들어 있다).
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference (keep who he is, redraw him in the style of Image 1).
+
+Make ONE sprite sheet image with two items side by side, each large and clearly separated, with at least 40px of empty space around every item so no bow tip, arrow tip, tail or hoof touches the edge of the image, and a small caption under each item ("boss7_gallop", "boss7_shoot"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+Style and proportions: cute chibi exactly like the cavalry unit in Image 1. The rider has a huge round head that is about half of his own body height, a short stubby body; the horse is also chibi: a short stout body, short thick legs, a big round head. Never tall, lean, long-legged or realistic horse proportions. He is bigger than the units only because he is scaled up, not because his proportions change. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no motion lines, no dust clouds, no speed effects.
+
+Face: very simple like the units in Image 1. Eyes are small solid black dots or ovals with at most a tiny white highlight, one thick simple eyebrow line, no nose or just a tiny dot, a short line for the mouth, small rounded ears (the rider's ear may be hidden by the cap). The horse's face is also simple: a small black dot eye, no detail.
+
+Character: a horse archer boss, the stage 7 boss of a dark fantasy mercenary game, a fast and slippery steppe horse archer. The rider wears a round fur-trimmed cap with a small feather, an olive-green cloak with a gold edge streaming behind him, light brown leather armor, and carries a big curved bow with a quiver of arrows with golden fletching on his back. The horse is a cream-white warhorse with a brown saddle blanket with gold trim and a long flowing white tail and mane. Color theme: cream white, olive green and brown with gold, so he reads as the big brother of the yellow archer unit and the orange cavalry unit. He looks clearly bigger and more menacing than a normal cavalry unit through his size and the big bow, while still being cute chibi. Same character size and same hoof height in both poses. Facing right.
+1. "boss7_gallop": galloping at full speed in a flying-gallop pose, the horse's legs stretched out forward and back, the rider leaning forward low over the horse's neck with the bow held low in one hand, cloak and tail streaming behind.
+2. "boss7_shoot": still galloping, but the rider sits up and draws the bow, aiming forward to the right at chest height, an arrow nocked, a focused expression, the horse's legs in a gallop pose.
+
+The bowstring must never cross the rider's face or the cap: draw the string behind his head, or leave the string out near the face.
+
+Avoid: realistic proportions, tall lean adult rider, long-legged horse, small head, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, realistic horse, motion lines, dust, bowstring across the face or cap, cropped or overlapping items, logo, watermark, any text other than the two captions.
+```
