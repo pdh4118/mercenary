@@ -1398,3 +1398,5 @@ Character: a mage general boss, the stage 6 boss of a dark fantasy mercenary gam
 
 Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glow blur, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, realistic face, cropped or overlapping items, logo, watermark, any text other than the three captions.
 ```
+
+**13-6 진행**: 받음, 적용됨(베타 1.294). 얼굴(두건 속 파란 점 눈)·비율 모두 첫 시안에서 맞았고, 순간이동(`blink`)도 번짐 없이 납작한 얼음 조각으로 그려졌다. 세 포즈를 `tools/slice_aligned.py`로 같은 캔버스(270x278)에 맞췄다. `assets/units/boss6_idle`·`boss6_blink`·`boss6_cast`, 예전 그림은 `_old`로 보관. 이펙트(`assets/fx/boss6_*`: 얼음벽·얼음 깨짐·불꽃·순간이동 등)는 아직 예전 그림이다. 다음은 스테이지 7 기마궁수.
