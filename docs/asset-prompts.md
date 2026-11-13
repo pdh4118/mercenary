@@ -1128,3 +1128,35 @@ Two frames side by side, each about 64 x 28 px: a thin glowing crimson ellipse r
 ```
 
 **넘겨 주실 때**: (A)는 두 명을 한 장으로, (B)는 3프레임을 한 장으로, (C)는 2프레임을 한 장으로 주시면 `tools/slice_sheet.py`로 자르겠습니다. 이 그림이 들어오면 깃발병만 해당 그림으로 바꿔 그리고, 깃발 천은 깃발병 머리 위 깃대에 얹어 흔들리게 하겠습니다.
+
+## 13. 보스 재제작 (메인 화풍으로 다시 그리기)
+
+0장의 메인 화풍(`docs/style-reference/main_style_sheet.png`)에 맞춰 보스를 한 명씩 다시 그립니다. 기존 그림은 `_old`로 보관하고(삭제 금지), 받은 그림은 `python3 tools/asset_outliers.py`로 튀는지 확인하고 밝은 테두리가 남으면 `python3 tools/fix_halo.py`로 고칩니다.
+
+### 13-1. 기병 장군 (스테이지 1 보스) 본체 2포즈 - `assets/units/boss1_idle`, `boss1_attack` (한 시트, 가로로 나란히)
+
+**첨부할 이미지 2장**: ① `docs/style-reference/main_style_sheet.png`(그림체 기준) ② 지금의 `assets/units/boss1_idle.png`·`boss1_attack.png`(**캐릭터 설정 참고용**: 투구·깃털·군기·갑옷 색만 가져오고, 그림체는 ①을 따르라고 적습니다).
+
+**크기**: 아군 기병(약 122x109)의 2~2.5배인 가로 약 270x세로 250 안팎. 군기와 창이 길어서 세로가 더 커져도 됩니다. 두 포즈의 **말 발굽 위치(땅에 닿는 선)를 같은 높이**로 맞춰 주세요(게임에서 포즈를 바꿀 때 발이 떠 보이지 않게).
+
+<시트 요청 머리말>
+```
+Two items side by side on a transparent background, large and clearly separated, a small caption under each.
+Character: a cavalry general boss, the stage 1 boss of a dark fantasy mercenary game. He is a mounted warlord,
+drawn in the exact style of the attached main-style sheet: cute chibi proportions with a big head and a short
+sturdy body, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in
+2-3 tones, no gradients, no realistic texture, no glossy highlights. Use the second attached image only as a
+character design reference (keep the identity, redraw in the main style).
+Identity to keep: a tall ornate dark-steel helmet with a big orange horsehair plume, dark crimson and black plate
+armor with gold trim, a long flowing dark crimson cape, a tall black war banner with an orange emblem on a pole
+held upright, and a very long lance. The horse is a large heavy warhorse in dark barding (armored cloth) with
+red trim and a small orange plume on its head. He should look clearly bigger and more menacing than a normal
+cavalry unit through his size, banner and lance, while still being cute chibi in style, saturated enough that the
+orange and crimson stand out. Facing right.
+1. "boss1_idle": standing calmly, all four hooves on the ground, banner and lance held upright, cape resting.
+2. "boss1_attack": the horse rearing up on its hind legs, the lance lowered forward and pointed ahead to charge,
+   the banner flying back, the cape streaming, a fierce attack pose.
+```
+네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, perspective, top-down view, cropped, overlapping items, text`
+
+**받은 뒤 확인**: 두 포즈의 말 발굽 높이가 같은지, 외곽선 바깥에 밝은 테두리가 없는지, 아군 기병(`ally_cavalry`)과 나란히 놓았을 때 같은 화풍으로 보이는지.
