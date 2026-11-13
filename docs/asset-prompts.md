@@ -1459,3 +1459,5 @@ Character: a war chariot boss, the stage 8 boss of a dark fantasy mercenary game
 
 Avoid: realistic proportions, tall lean adult knight, long-legged horses, small head, photo, 3d render, gradients, glow blur, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, realistic horses, motion lines, dust, sparks, flames, smoke, cropped or overlapping items, logo, watermark, any text other than the two captions.
 ```
+
+**13-8 진행**: 받음, 적용됨(베타 1.296). 기수(투구가 키의 절반)·말·수레 모두 짧고 통통한 치비 비율, 로고 없음. `assets/units/boss8_wheel.png`·`boss8_mad.png`(353x212 같은 캔버스; 이전 338x180보다 세로가 조금 큼), 예전 그림은 `_old`로 보관. 손본 것: 단색 회색 배경 제거, **`boss8_wheel`의 뒤쪽 두 번째 바퀴에 들어 있던 주황빛을 나무색으로 교체**(폭주 불꽃은 코드가 얹으므로 평소 그림은 달아오르면 안 된다). **폭주 이펙트(`wheelHeat`) 위치를 새 바퀴에 맞춰 `bossfx.ts`의 오프셋을 고쳤다**: 큰 바퀴 (-74,-24)→(-72,-19)(지름 83px로 이전과 같아 크기 그대로), 둘째 바퀴 (-6,-18)→(-12,-10), 배율 0.85→0.75. 정지 이미지에 코드와 같은 규칙으로 불꽃을 겹쳐 확인했다. 이펙트 그림(`assets/fx/boss8_*`: 폭주 불꽃·충돌 등)은 예전 그림이다. 다음은 스테이지 9 네크로맨서.

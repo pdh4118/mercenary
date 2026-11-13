@@ -1224,8 +1224,8 @@ export async function createBossFx(d: BossFxDeps) {
     const s = Math.abs(scale);
     const dir = scale < 0 ? -1 : 1;
     const pulse = 0.75 + 0.25 * Math.sin(now / 70);
-    mark(id, "heatA", pick(T.heat, 2), x + dir * -74 * s, y - 24 * s, s * 0.95, 0.5 + 0.3 * pulse);
-    mark(id, "heatB", pick(T.heat, 1 + (Math.floor(now / 110) % 2)), x + dir * -6 * s, y - 18 * s, s * 0.85, 0.3 + 0.25 * pulse);
+    mark(id, "heatA", pick(T.heat, 2), x + dir * -72 * s, y - 19 * s, s * 0.95, 0.5 + 0.3 * pulse); // 큰 바퀴 중심(새 그림 기준)
+    mark(id, "heatB", pick(T.heat, 1 + (Math.floor(now / 110) % 2)), x + dir * -12 * s, y - 10 * s, s * 0.75, 0.3 + 0.25 * pulse); // 뒤쪽 둘째 바퀴
     for (const k of ["heatA", "heatB"]) {
       const sp = marks.get(`${id}:${k}`);
       if (sp) sp.zIndex = y + 3; // 장군 그림 위에 얹는다
