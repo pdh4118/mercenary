@@ -36,6 +36,9 @@ let tps = UNIT_TYPES.map(() => 0);
 let stg = UNIT_TYPES.map(() => 0);
 let blk = UNIT_TYPES.map(() => 0);
 let dps = UNIT_TYPES.map(() => 0);
+let totXp = UNIT_TYPES.map(() => 0);
+let aliveFr = UNIT_TYPES.map(() => 0);
+let dths = UNIT_TYPES.map(() => 0);
 let sps = UNIT_TYPES.map(() => 0);
 for (let sd = 1; sd <= seeds; sd++) {
   mul(sd * 104729 + stage);
@@ -76,6 +79,10 @@ for (let sd = 1; sd <= seeds; sd++) {
     stg[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.stagger / r.alive : 0), 0) / mine.length / seeds;
     blk[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? (r.blocked + r.counter) / r.alive : 0), 0) / mine.length / seeds;
     dps[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.dealt / r.alive : 0), 0) / mine.length / seeds;
+    const live = [...(g as any).mercs.values()].filter((m: any) => m.type === t);
+    totXp[t]! += live.reduce((x: number, m: any) => x + m.xp + MERC_XP_NEED.slice(0, m.tier).reduce((a, b) => a + b, 0), 0) / Math.max(1, live.length) / seeds;
+    aliveFr[t]! += mine.reduce((x, r) => x + r.alive / secs, 0) / mine.length / seeds;
+    dths[t]! += mine.reduce((x, r) => x + r.deaths, 0) / mine.length / seeds;
     sps[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.score / r.alive : 0), 0) / mine.length / seeds;
     const v = mine.map((r) => r.score).sort((x, y) => x - y);
     const n = v.length;
@@ -94,6 +101,9 @@ console.log("초당 준피해", dps.map((x) => x.toFixed(1).padStart(5)).join(" 
 console.log("초당 받은 ", tps.map((x) => x.toFixed(1).padStart(5)).join(" "));
 console.log("초당 경직 ", stg.map((x) => x.toFixed(1).padStart(5)).join(" "));
 console.log("초당 방어+반격", blk.map((x) => x.toFixed(1).padStart(5)).join(" "));
+console.log("총경험치", totXp.map((x) => x.toFixed(0).padStart(5)).join(" "), " (강화에 쓴 것 포함)");
+console.log("생존비율", aliveFr.map((x) => x.toFixed(2).padStart(5)).join(" "));
+console.log("쓰러짐  ", dths.map((x) => x.toFixed(1).padStart(5)).join(" "));
 console.log("첫 강화 ", first.map((x) => (x.toFixed(0) + "s").padStart(5)).join(" "));
 
 const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
