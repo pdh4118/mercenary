@@ -86,6 +86,7 @@ python3 tools/slice_sheet.py /tmp/arrows.png client/public/assets/fx --names arr
 | 색칠 | 면을 2~3톤으로 나눈 평평한 색칠(만화풍). 그라데이션·무지개빛 광택·사실적 질감 금지 | - |
 | 채도·밝기 | 팀 색이 한눈에 보이게 선명하되 너무 짙지 않게 | 채도 0.30~0.62, 평균 밝기 0.22~0.31, 대비 0.51~0.76 |
 | 아군·적 | 아군은 밝고 선명하게, 적은 어둡고 탁하게(붉은 포인트) | - |
+| 얼굴 | **아주 단순하게**: 눈은 작은 검은 점이나 타원(흰자위·홍채·속눈썹 없음, 작은 흰 하이라이트 점 정도), 눈썹은 굵은 선 하나, 코는 생략하거나 점 하나, 입은 짧은 선, 귀는 둥글게 생략하거나 작게. 얼굴 그림자·가는 선 묘사 금지 | 기준 시트의 주인공·아군 얼굴을 따른다 |
 | 투명 배경 | 흰 배경을 지울 때 **외곽선 바깥에 밝은 테두리가 남지 않게**. 남으면 `python3 tools/fix_halo.py`로 고친다 | 맨 바깥 링 밝기 차 0 |
 
 **보스도 이 화풍으로 맞춥니다(재제작 대상).** 지금 보스 그림은 사실적인 비율·어두운 색조·약한 대비라서 유닛과 다른 게임처럼 보입니다. 위압감은 **크기(일반 유닛의 2~2.5배), 소품(큰 무기·망토·왕관), 색(어둡지만 채도는 유지), 자세**로 내고, **그림체 자체는 위 규칙 그대로**(치비 비율, 같은 외곽선, 평평한 색칠)로 합니다.
@@ -1217,8 +1218,12 @@ No ground line, no floor, no shadow line, no checkerboard pattern drawn into the
 Character: an archer general boss, the stage 3 boss of a dark fantasy mercenary game. He is a lean, cunning master
 archer, drawn in the exact style of the attached main-style sheet: cute chibi proportions with a big head and a short
 sturdy body, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3
-tones, no gradients, no realistic texture, no glossy highlights. Use the second attached image only as a character
-design reference (keep the identity, redraw in the main style).
+tones, no gradients, no realistic texture, no glossy highlights. His face is very simple like the units in the main
+sheet: eyes are small solid black dots or ovals with at most a tiny white highlight, no iris, no white of the eye, no
+eyelashes, one thick simple eyebrow line, no nose or just a tiny dot, a short line for the mouth, small rounded ears
+(not long pointed elf ears), no face shading. The bowstring must not cross his face: draw it passing behind the cheek,
+or leave it out near the face. Use the second attached image only as a character design reference (keep the identity,
+redraw in the main style).
 Identity to keep: a wide-brimmed olive hat with a long pale feather, a hooded olive-green cloak, tan and olive leather
 armor with gold trim, a big quiver on his back full of arrows with golden fletching, a small dark banner with a gold
 emblem on his back, and a big ornate longbow with gold trim. His color theme is olive, tan and gold so he reads as the
@@ -1231,6 +1236,6 @@ The same character size and the same standing position in all three poses. Facin
 3. "boss3_sky": leaning back slightly, the bow drawn and tilted upward about 60 degrees, the arrow pointing up and to
    the right toward the sky, shooting a volley.
 ```
-네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, ground line, floor line, checkerboard, perspective, top-down view, cropped, overlapping items, text`
+네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, ground line, floor line, checkerboard, perspective, top-down view, cropped, overlapping items, text, detailed eyes, iris, eyelashes, realistic face, face shading, nose shadow, pointed elf ears, bowstring across the face`
 
-**받은 뒤 확인**: 활 끝·화살 끝이 잘리지 않았는지, 지면선이 없는지, 세 포즈의 몸 크기·발 높이가 같은지, 외곽선 바깥에 밝은 테두리가 없는지, 체크무늬 배경이면 `tools/remove_checker_bg.py`로 지우기, 아군 궁병(`ally_archer`)과 같은 배율로 나란히 놓았을 때 같은 화풍으로 보이는지.
+**받은 뒤 확인**: 얼굴이 주인공·아군처럼 단순한지(눈이 점·타원인지), 활 끝·화살 끝이 잘리지 않았는지, 지면선이 없는지, 세 포즈의 몸 크기·발 높이가 같은지, 외곽선 바깥에 밝은 테두리가 없는지, 체크무늬 배경이면 `tools/remove_checker_bg.py`로 지우기, 아군 궁병(`ally_archer`)과 같은 배율로 나란히 놓았을 때 같은 화풍으로 보이는지.
