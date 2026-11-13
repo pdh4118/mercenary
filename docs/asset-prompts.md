@@ -1490,3 +1490,5 @@ Character: a necromancer boss, the stage 9 boss of a dark fantasy mercenary game
 
 Avoid: realistic proportions, tall lean adult body, long legs, small head, hunched back, photo, 3d render, gradients, glow blur, smoke, big energy explosions, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed skull, realistic bone texture, detailed teeth, cropped or overlapping items, logo, watermark, any text other than the three captions.
 ```
+
+**13-9 진행**: 받음, 적용됨(베타 1.297). 똑바로 선 치비 자세(구부정한 예전 자세 삭제), 해골 가면 단순 얼굴, 흡수 포즈의 초록 빛도 작게 들어가 잘림이 없고 로고도 없어 첫 시안을 그대로 썼다. `assets/units/boss9_idle.png`·`boss9_cast.png`·`boss9_drain.png`(305x298 같은 캔버스, 발 중심 정렬), 예전 그림은 `_old`로 보관. 본체 3포즈 외 부속 그림은 아직 예전 그림이다: 스켈레톤 6종(`assets/units/skel_*`), 안개·영혼 구슬·시체·사슬 이펙트(`assets/fx/boss9_*`). 다음은 스테이지 10 군주(본체 3포즈 + 근위대·초소 등 18장).
