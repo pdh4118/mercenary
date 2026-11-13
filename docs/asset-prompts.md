@@ -1461,3 +1461,32 @@ Avoid: realistic proportions, tall lean adult knight, long-legged horses, small 
 ```
 
 **13-8 진행**: 받음, 적용됨(베타 1.296). 기수(투구가 키의 절반)·말·수레 모두 짧고 통통한 치비 비율, 로고 없음. `assets/units/boss8_wheel.png`·`boss8_mad.png`(353x212 같은 캔버스; 이전 338x180보다 세로가 조금 큼), 예전 그림은 `_old`로 보관. 손본 것: 단색 회색 배경 제거, **`boss8_wheel`의 뒤쪽 두 번째 바퀴에 들어 있던 주황빛을 나무색으로 교체**(폭주 불꽃은 코드가 얹으므로 평소 그림은 달아오르면 안 된다). **폭주 이펙트(`wheelHeat`) 위치를 새 바퀴에 맞춰 `bossfx.ts`의 오프셋을 고쳤다**: 큰 바퀴 (-74,-24)→(-72,-19)(지름 83px로 이전과 같아 크기 그대로), 둘째 바퀴 (-6,-18)→(-12,-10), 배율 0.85→0.75. 정지 이미지에 코드와 같은 규칙으로 불꽃을 겹쳐 확인했다. 이펙트 그림(`assets/fx/boss8_*`: 폭주 불꽃·충돌 등)은 예전 그림이다. 다음은 스테이지 9 네크로맨서.
+
+### 13-9. 네크로맨서 (스테이지 9 보스) 본체 3포즈 - `assets/units/boss9_idle`, `boss9_cast`, `boss9_drain` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 평소 `idle`, 안개·영혼 사슬·영혼 구슬 시전 `cast`, 생명 흡수 `drain`. 화면 배율 0.42. **본체 3포즈만 먼저** 받고, 스켈레톤 6종(`skel_*`)·영혼 구슬·시체 이펙트 등 부속 그림은 본체가 확정된 뒤 같은 캐릭터 색으로 따로 요청한다.
+**크기 목표**: 이전(idle 219x286, cast 253x289, drain 311x265)과 비슷하게, 받은 뒤 제가 맞춘다. 세 포즈의 몸 크기와 발 높이는 같게.
+**예전 `drain` 그림은 큰 초록 폭발이 오른쪽 캔버스 끝에 잘려 있었다.** 폭발은 이펙트(`boss9_drain_*`)가 따로 그리므로 새 그림에는 **손바닥의 작은 초록 빛만** 넣게 했다(그래서 잘림이 생기지 않는다). 예전보다 구부정한 자세도 **똑바로 선 치비 자세**로 바꾼다(화풍 규칙: 머리가 키의 절반).
+**얼굴**: 해골 가면이라 눈구멍 두 개(작은 초록 점)와 코 홈만 단순하게.
+
+#### 13-9 제미나이(Gemini)에 붙여넣는 최종본
+
+1. 새 대화를 열고 **이미지 2장을 먼저 첨부**한다: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss9_character_ref.png`.
+2. 아래 글을 **통째로 한 번에** 붙여넣는다(네거티브는 맨 끝 `Avoid:`에 들어 있다).
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference (keep who he is, redraw him in the style of Image 1).
+
+Make ONE sprite sheet image with three items side by side, each large and clearly separated, with at least 40px of empty space around every item so no horn, staff tip, hand or energy touches the edge of the image, and a small caption under each item ("boss9_idle", "boss9_cast", "boss9_drain"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+Style and proportions: cute chibi exactly like the units in Image 1. A huge round head (the horned skull hood) that is about half of his whole body height, a short stubby body in a robe and short thick legs, standing upright, not hunched. Never tall, lean or adult proportions. He is bigger than the units only because he is scaled up, not because his proportions change. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no glow blur, no smoke.
+
+Face: a simple horned skull mask inside a dark hood: only two plain dark oval eye sockets with a tiny pale-green glowing dot in each, and a tiny nose notch, nothing else, no detailed bone texture, no teeth.
+
+Character: a necromancer boss, the stage 9 boss of a dark fantasy mercenary game, a sinister lich-like sorcerer. A big black hood with two curved bone-colored horns and a skull mask, a tattered black and dark green robe with ragged edges, small bones and skulls hanging from his belt on a chain, a round purple gem amulet on the chest, and a tall dark staff topped with a horned skull. Color theme: black, dark green, bone white, a purple gem and glowing toxic green magic, so he reads as the big brother of the purple mage and the skeleton units. He looks clearly bigger and more menacing than a normal mage unit through his size and the tall skull staff, while still being cute chibi. Same character size and same standing position in all three poses. Facing right.
+1. "boss9_idle": standing calmly and creepily, leaning slightly on the tall skull staff held in the front hand, the other hand hanging, robe hanging.
+2. "boss9_cast": casting: the staff held in one hand with a small glowing green skull, the other arm stretched out to the right with the palm open, a small flat swirl of green magic floating at his chest, the robe ragged edges flaring.
+3. "boss9_drain": life draining: the staff held back in one hand, the other arm thrust forward to the right with the hand wide open and a small flat bright green glowing shape in the palm (small, no huge burst), leaning forward, the robe flaring behind him.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, hunched back, photo, 3d render, gradients, glow blur, smoke, big energy explosions, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed skull, realistic bone texture, detailed teeth, cropped or overlapping items, logo, watermark, any text other than the three captions.
+```
