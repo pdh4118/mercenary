@@ -7,9 +7,9 @@
   sat        평균 채도(0~1). 생성 도구마다 색이 짙거나 바랜 정도가 다르다.
   lum        평균 밝기(0~1).
   contrast   밝기 분포의 90% 값 - 10% 값. 낮으면 밋밋하고, 높으면 대비가 세다.
-  outline    '가장자리 띠(안쪽 3px)의 평균 밝기 - 안쪽 평균 밝기'. 음수일수록 어두운 외곽선이 또렷하다.
-  edge_dark  가장자리 띠 중 어두운(밝기 0.3 미만) 픽셀의 비율. 외곽선이 얇거나 없으면 낮다.
-  white_halo 가장자리 띠 중 거의 흰색인 픽셀의 비율. 흰 배경을 지우고 남은 하얀 테두리다.
+  outline    '바깥 4px 안에서 가장 어두운 링의 밝기 - 몸통 평균 밝기'. 음수일수록 외곽선이 또렷하다.
+  edge_dark  외곽선 두께 추정(px, 맨 바깥부터 어두운 링이 몇 겹인가). 얇거나 없으면 작다.
+  white_halo 맨 바깥 1px 링이 그 안쪽 외곽선보다 얼마나 밝은가(0~1). 흰 배경을 지우고 남은 밝은 테두리이며, 어두운 배경에서 하얀 선으로 보인다.
   semi       알파가 반투명(32~224)인 픽셀의 비율. 이펙트는 높고 유닛은 낮은 것이 정상이다.
   margin     그림이 캔버스 가장자리에서 떨어진 최소 거리(px). 0이면 잘렸을 수 있다.
   fill       그림이 자기 상자(bbox)를 채운 비율.
@@ -40,13 +40,13 @@ Z_BY_KIND = {"일러스트": 1.0, "이펙트": 1.6, "지형": 1.2, "UI": 1.0}
 METRICS = ["sat", "lum", "contrast", "outline", "edge_dark", "white_halo", "semi"]
 LABEL = {
     "sat": "채도", "lum": "밝기", "contrast": "대비", "outline": "외곽선(음수일수록 진함)",
-    "edge_dark": "어두운 가장자리 비율", "white_halo": "흰 테두리 비율", "semi": "반투명 비율",
+    "edge_dark": "외곽선 두께(px)", "white_halo": "맨 바깥 밝은 테두리", "semi": "반투명 비율",
 }
 # 값이 어느 쪽으로 벗어났을 때 읽을 말
 WORDS = {
     "sat": ("바랜 색", "과하게 짙은 색"), "lum": ("어두움", "밝음"), "contrast": ("밋밋함", "대비 셈"),
-    "outline": ("외곽선이 진함", "외곽선이 약함/없음"), "edge_dark": ("가장자리가 거의 안 어두움", "가장자리가 아주 어두움"),
-    "white_halo": ("", "흰 테두리 남음"), "semi": ("거의 불투명", "반투명이 많음"),
+    "outline": ("외곽선이 진함", "외곽선이 약함/없음"), "edge_dark": ("외곽선이 얇음", "외곽선이 두꺼움"),
+    "white_halo": ("", "맨 바깥에 밝은 테두리 남음"), "semi": ("거의 불투명", "반투명이 많음"),
 }
 
 
@@ -72,10 +72,22 @@ def measure(path: Path) -> dict | None:
     mx, mn = rgb.max(-1), rgb.min(-1)
     sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0.0)
     lum = 0.299 * rgb[..., 0] + 0.587 * rgb[..., 1] + 0.114 * rgb[..., 2]
+    # 가장 바깥부터 1px씩 벗겨 가며 링별 평균 밝기를 잰다(링1=맨 바깥 1px).
+    rings: list[float] = []
+    cur = opaque.copy()
+    for _ in range(6):
+        nxt = erode(cur, 1)
+        ring = cur & ~nxt
+        rings.append(float(lum[ring].mean()) if ring.any() else 1.0)
+        cur = nxt
     band = opaque & ~erode(opaque, 3)
     inner = opaque & ~band
     lo, hi = np.percentile(lum[opaque], [10, 90])
     bl = lum[band]
+    body = float(lum[inner].mean()) if inner.any() else float(lum[opaque].mean())
+    darkest = min(rings[:4])  # 외곽선 자리(맨 바깥 4px 안)의 가장 어두운 링
+    thick = sum(1 for v in rings if v < max(0.15, darkest + 0.08))  # 외곽선 두께 추정(px)
+    halo = rings[0] - min(rings[1:4])  # 맨 바깥 링이 외곽선보다 얼마나 밝은가(하얀 번짐)
     def longest_run(line: np.ndarray) -> int:
         best = cur = 0
         for v in line:
@@ -94,9 +106,9 @@ def measure(path: Path) -> dict | None:
         "sat": float(sat[opaque].mean()),
         "lum": float(lum[opaque].mean()),
         "contrast": float(hi - lo),
-        "outline": float(bl.mean() - (lum[inner].mean() if inner.any() else lum[opaque].mean())) if band.any() else 0.0,
-        "edge_dark": float((bl < 0.3).mean()) if band.any() else 0.0,
-        "white_halo": float(((mn[band] > 0.88) & (al[band] > 0.3)).mean()) if band.any() else 0.0,
+        "outline": float(darkest - body),  # 외곽선이 몸통보다 얼마나 어두운가(음수일수록 진함)
+        "edge_dark": float(thick),  # 외곽선 두께 추정(px)
+        "white_halo": float(max(0.0, halo)),  # 맨 바깥 링이 외곽선보다 밝은 정도(0이면 번짐 없음)
         "semi": float(((al > 0.125) & (al < 0.88)).sum() / cnt),
         "margin": int(min(x0, y0, w - 1 - x1, h - 1 - y1)),
         "fill": float(cnt / ((x1 - x0 + 1) * (y1 - y0 + 1))),
@@ -209,11 +221,11 @@ def main() -> int:
 
     L: list[str] = []
     L.append(f"# 그림 에셋 이상치 보고서\n\n측정한 PNG {len(rows)}개 (`_old`·`_raw` 제외). 기준 |z| ≥ {args.z}.\n")
-    L.append("| 종류 | 개수 | 채도 중앙값 | 밝기 중앙값 | 대비 중앙값 | 외곽선 중앙값 | 어두운 가장자리 | 흰 테두리 | 반투명 |")
+    L.append("| 종류 | 개수 | 채도 중앙값 | 밝기 중앙값 | 대비 중앙값 | 외곽선 중앙값 | 외곽선 두께(px) | 밝은 테두리 | 반투명 |")
     L.append("|---|---|---|---|---|---|---|---|---|")
     for kind, g in by_kind.items():
         med = lambda m: float(np.median([x[m] for x in g]))
-        L.append(f"| {kind} | {len(g)} | {med('sat'):.2f} | {med('lum'):.2f} | {med('contrast'):.2f} | {med('outline'):+.2f} | {med('edge_dark'):.2f} | {med('white_halo'):.3f} | {med('semi'):.2f} |")
+        L.append(f"| {kind} | {len(g)} | {med('sat'):.2f} | {med('lum'):.2f} | {med('contrast'):.2f} | {med('outline'):+.2f} | {med('edge_dark'):.1f} | {med('white_halo'):.2f} | {med('semi'):.2f} |")
     L.append("")
 
     # 1) 확실한 결함: 잘림, 흰 테두리
@@ -225,11 +237,11 @@ def main() -> int:
     if len(cut) > 40:
         L.append(f"- … 외 {len(cut) - 40}개")
     L.append("")
-    halo = sorted([r for r in rows if r["white_halo"] > 0.12 and r["kind"] in ("일러스트", "이펙트")], key=lambda r: -r["white_halo"])
-    L.append(f"## 2. 흰 테두리가 남은 그림 ({len(halo)}개)\n")
-    L.append("가장자리 띠의 12% 넘게 거의 흰색이다. 흰 배경을 지운 흔적일 수 있다(흰 이펙트·흰 갑옷이면 정상).\n")
+    halo = sorted([r for r in rows if r["white_halo"] > 0.3 and r["kind"] == "일러스트"], key=lambda r: -r["white_halo"])
+    L.append(f"## 2. 맨 바깥에 밝은 테두리가 남은 일러스트 ({len(halo)}개)\n")
+    L.append("일러스트의 맨 바깥 1px 링이 그 안쪽 외곽선보다 0.3 넘게 밝다. 흰 배경을 지운 흔적이며 어두운 바닥 위에서 가는 흰 선으로 보인다. 이펙트는 밝은 것이 정상이라 뺐다.\n")
     for r in halo[: args.top * 2]:
-        L.append(f"- `{r['path']}` 흰 테두리 {r['white_halo'] * 100:.0f}%")
+        L.append(f"- `{r['path']}` 밝은 테두리 +{r['white_halo']:.2f}")
     L.append("")
 
     # 2) 종류 안에서 화풍이 어긋난 그림
