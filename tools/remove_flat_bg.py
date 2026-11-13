@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """한 가지 단색(회색 등)으로 칠해진 배경을 진짜 투명 PNG로 바꾼다.
 
-  python3 tools/remove_flat_bg.py input.webp output.png [--tol 22] [--pocket-area 12] [--bg R,G,B]
+  python3 tools/remove_flat_bg.py input.webp output.png [--tol 10] [--pocket-area 12] [--bg R,G,B]
 
 생성 도구가 '투명 배경' 대신 기준 시트의 회색 같은 단색을 깔아서 내놓을 때 쓴다.
 1. 배경색은 네 모서리의 가장 흔한 색으로 자동으로 정한다(--bg로 지정 가능).
@@ -50,7 +50,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("src")
     ap.add_argument("dst")
-    ap.add_argument("--tol", type=float, default=22.0, help="배경색과의 RGB 거리")
+    ap.add_argument("--tol", type=float, default=10.0, help="배경색과의 RGB 거리. 너무 크면 배경과 비슷한 밝은 회색 물체(칼날 등)의 안쪽이 같이 지워진다(검방병 장군에서 22일 때 칼날이 비었고 8로 해결)")
     ap.add_argument("--pocket-area", type=int, default=12)
     ap.add_argument("--bg", default="")
     ap.add_argument("--min-piece", type=int, default=400, help="이보다 작은 떨어진 조각은 지운다(로고 등)")
