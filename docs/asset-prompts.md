@@ -1241,3 +1241,24 @@ The same character size and the same standing position in all three poses. Facin
 네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, ground line, floor line, checkerboard, perspective, top-down view, cropped, overlapping items, text, detailed eyes, iris, eyelashes, realistic face, face shading, nose shadow, pointed elf ears, bowstring across the face`
 
 **받은 뒤 확인**: 얼굴이 주인공·아군처럼 단순한지(눈이 점·타원인지), 활 끝·화살 끝이 잘리지 않았는지, 지면선이 없는지, 세 포즈의 몸 크기·발 높이가 같은지, 외곽선 바깥에 밝은 테두리가 없는지, 체크무늬 배경이면 `tools/remove_checker_bg.py`로 지우기, 아군 궁병(`ally_archer`)과 같은 배율로 나란히 놓았을 때 같은 화풍으로 보이는지.
+
+#### 13-3 제미나이(Gemini)에 붙여넣는 최종본
+
+1. 새 대화를 열고 **이미지 2장을 먼저 첨부**한다: ① `docs/style-reference/main_style_sheet.png`, ② 지금의 `boss3_idle`·`boss3_aim`·`boss3_sky` 그림(한 장으로 합쳐도 됨).
+2. 아래 글을 **통째로 한 번에** 붙여넣는다(네거티브는 맨 끝 `Avoid:` 문장에 들어 있어서 따로 넣지 않는다).
+3. 결과가 마음에 안 들면 같은 대화에서 "얼굴을 더 단순하게(눈은 검은 점), 활시위가 얼굴을 가로지르지 않게 다시 만들어 줘"처럼 **고칠 점만** 말한다. 한 번에 안 되면 새 대화에서 처음부터 다시 3~4번 뽑아 가장 나은 것을 고른다.
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style exactly), Image 2 is only a CHARACTER DESIGN reference (keep who he is, redraw him in the style of Image 1).
+
+Make ONE sprite sheet image with three items side by side, each large and clearly separated, with at least 40px of empty space around every item so no bow tip or arrow tip touches the edge of the image, and a small caption under each item ("boss3_idle", "boss3_aim", "boss3_sky"). Plain transparent-looking background, no ground line, no floor, no shadow line.
+
+Style: exactly like Image 1: side view, cute chibi proportions with a big head and a short sturdy body, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon. His face must be very simple like the units in Image 1: eyes are small solid black dots or ovals with at most a tiny white highlight, one thick simple eyebrow line, no nose or just a tiny dot, a short line for the mouth, small rounded ears. The bowstring must not cross his face; draw it passing behind the cheek or leave it out near the face.
+
+Character: an archer general boss, the stage 3 boss of a dark fantasy mercenary game, a lean cunning master archer. A wide-brimmed olive hat with a long pale feather, a hooded olive-green cloak, tan and olive leather armor with gold trim, a big quiver on his back full of arrows with golden fletching, a small dark banner with a gold emblem on his back, and a big ornate longbow with gold trim. Color theme: olive, tan and gold, so he reads as the big brother of the yellow archer unit. He looks clearly bigger and more menacing than a normal archer unit through his size and the big bow, while still being cute chibi. Same character size and same standing position in all three poses. Facing right.
+1. "boss3_idle": standing calmly and alertly, the bow held low in the front hand, the other hand near the quiver strap.
+2. "boss3_aim": a wide stance, an arrow nocked and the bow fully drawn, the arrow pointing to the right at chest height, a sharp focused expression.
+3. "boss3_sky": leaning back slightly, the bow drawn and tilted upward about 60 degrees, the arrow pointing up and to the right toward the sky, shooting a volley.
+
+Avoid: realistic proportions, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern drawn as scenery, detailed eyes, iris, eyelashes, realistic face, face shading, nose shadow, long pointed elf ears, bowstring across the face, cropped or overlapping items, any text other than the three captions.
+```
