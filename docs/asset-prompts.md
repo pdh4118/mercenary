@@ -1429,3 +1429,5 @@ The bowstring must never cross the rider's face or the cap: draw the string behi
 
 Avoid: realistic proportions, tall lean adult rider, long-legged horse, small head, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, realistic horse, motion lines, dust, bowstring across the face or cap, cropped or overlapping items, logo, watermark, any text other than the two captions.
 ```
+
+**13-7 진행**: 받음, 적용됨(베타 1.295). 기수·말 모두 치비 비율, 얼굴 단순, 활시위가 얼굴을 가로지르지 않고 로고도 없어 첫 시안을 그대로 썼다. `assets/units/boss7_gallop`·`boss7_shoot`(206x172 같은 캔버스, 이전 206x171과 같은 크기라 충돌 크기와 어긋나지 않는다), 예전 그림은 `_old`로 보관. **말이 다리를 벌리고 달려서 발 중심이 포즈마다 달라지므로 `tools/slice_aligned.py --align bbox`(그림 상자의 가로 중심으로 정렬)를 썼다.** 이펙트(`assets/fx/boss7_*`: 불, 궁지, 올가미 등)는 아직 예전 그림이다. 다음은 스테이지 8 전차.

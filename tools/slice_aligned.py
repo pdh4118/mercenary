@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """가로로 늘어선 스프라이트 시트(투명 배경)를 한 장씩 자르되, 모든 그림의 캔버스 크기와 발 위치를 똑같이 맞춰 저장한다.
 
-  python3 tools/slice_aligned.py sheet.png outdir --names boss5_swing_a,boss5_swing_b [--scale 0.5] [--foot-rows 24] [--pad 4]
+  python3 tools/slice_aligned.py sheet.png outdir --names boss5_swing_a,boss5_swing_b [--scale 0.5] [--foot-rows 24] [--pad 4] [--align feet|bbox]
 
 같은 보스의 포즈를 번갈아 보여 줄 때(휘두르기 2장, 도는 포즈 4장 등) 몸이 튀지 않으려면 크기와 발 위치가 같아야 한다.
 - 항목 나누기: 세로 방향으로 합쳐 본 투명 열(--gap px 이상 이어진 빈 구간)을 경계로 나눈다. 글자 라벨은 --label-y 아래를 미리 지워 둔다.
@@ -28,6 +28,7 @@ def main() -> int:
     ap.add_argument("--gap", type=int, default=20)
     ap.add_argument("--pad", type=int, default=4)
     ap.add_argument("--alpha", type=int, default=40)
+    ap.add_argument("--align", choices=["feet", "bbox"], default="feet", help="가로 정렬 기준: feet=맨 아래 줄 발 중심(서 있는 보스), bbox=그림 전체 상자의 가로 중심(말처럼 다리를 벌리고 달리는 포즈)")
     args = ap.parse_args()
     names = args.names.split(",")
 
@@ -60,6 +61,9 @@ def main() -> int:
         top, bottom = int(ys.min()), int(ys.max())
         foot = m[max(top, bottom - args.foot_rows + 1) : bottom + 1]
         fx = float(np.where(foot.any(0))[0].mean())  # 서브 이미지 안 발 중심 x
+        if args.align == "bbox":
+            xs_ = np.where(m.any(0))[0]
+            fx = float((xs_.min() + xs_.max()) / 2)
         items.append({"img": sub[top : bottom + 1], "fx": fx, "w": x1 - x0 + 1, "h": bottom - top + 1})
     left = max(i["fx"] for i in items)
     right = max(i["w"] - i["fx"] for i in items)
