@@ -14,6 +14,7 @@ const mul = (seed: number) => {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 };
+if (process.env.TJ) Object.assign(TUNE, JSON.parse(process.env.TJ)); // TJ = TUNE 덮어쓰기(JSON). 예: {"BOSS_HARD_TIMEOUT_SEC":100}은 보스를 못 잡아도 100초 뒤 다음 스테이지로
 const seeds = Number(process.env.SEEDS ?? 3);
 const maxSec = Number(process.env.SECS ?? 1800);
 const start = Number(process.env.START ?? 6); // 처음 용병 수
