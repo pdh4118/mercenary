@@ -1492,3 +1492,32 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, hunch
 ```
 
 **13-9 진행**: 받음, 적용됨(베타 1.297). 똑바로 선 치비 자세(구부정한 예전 자세 삭제), 해골 가면 단순 얼굴, 흡수 포즈의 초록 빛도 작게 들어가 잘림이 없고 로고도 없어 첫 시안을 그대로 썼다. `assets/units/boss9_idle.png`·`boss9_cast.png`·`boss9_drain.png`(305x298 같은 캔버스, 발 중심 정렬), 예전 그림은 `_old`로 보관. 본체 3포즈 외 부속 그림은 아직 예전 그림이다: 스켈레톤 6종(`assets/units/skel_*`), 안개·영혼 구슬·시체·사슬 이펙트(`assets/fx/boss9_*`). 다음은 스테이지 10 군주(본체 3포즈 + 근위대·초소 등 18장).
+
+### 13-10. 군주 "파멸의 군주 그라크" (스테이지 10 보스) 본체 3포즈 - `assets/units/boss10_idle`, `boss10_scepter`, `boss10_cast` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 평소 `idle`, 홀 내려찍기 `scepter`(치켜든 자세), 칙령·호령·처형령·근위대 소집 `cast`(손을 든 자세). 화면 배율 0.46. 최종 보스라서 **모든 보스 중 가장 크고 위압적으로** 보이게 한다(그림체는 같게).
+**크기 목표**: 이전(idle 221x320, scepter 222x292, cast 232x304)과 비슷하게, 받은 뒤 제가 맞춘다. 세 포즈의 몸 크기와 발 높이는 같게.
+**나머지 15장은 따로**: 근위대 `boss10_guard_*` 5종, 초소병 `boss10_post_*` 10종은 군주 본체가 확정된 뒤 같은 색조(검정·보라·금·진홍)로 요청한다.
+**얼굴**: 폐쇄형 투구라 눈 점 두 개(작은 빨강)만.
+
+#### 13-10 제미나이(Gemini)에 붙여넣는 최종본
+
+1. 새 대화를 열고 **이미지 2장을 먼저 첨부**한다: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss10_character_ref.png`.
+2. 아래 글을 **통째로 한 번에** 붙여넣는다(네거티브는 맨 끝 `Avoid:`에 들어 있다).
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference (keep who he is, redraw him in the style of Image 1).
+
+Make ONE sprite sheet image with three items side by side, each large and clearly separated, with at least 40px of empty space around every item so no crown spike, scepter, cape or magic touches the edge of the image, and a small caption under each item ("boss10_idle", "boss10_scepter", "boss10_cast"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+Style and proportions: cute chibi exactly like the units in Image 1. A huge round head (the crowned helmet) that is about half of his whole body height, not counting the crown spikes, on a very wide, heavy, stubby body with thick short legs and big round shoulders. Never tall, lean or adult proportions. He is bigger than the units only because he is scaled up, not because his proportions change. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no glow blur, no smoke.
+
+Face: his face is hidden by a closed black helmet with a dark visor slit, in the slit only two tiny solid glowing red dots as eyes, nothing else, no detailed eyes.
+
+Character: the final boss, a tyrant warlord king of a dark fantasy mercenary game. A black helmet with a jagged iron crown of sharp spikes, heavy black and dark purple plate armor with gold trim and a gold emblem on the chest, big spiked round shoulder plates, a torn crimson cape, and a gigantic spiked iron scepter-mace with a huge spiked head and a long dark handle. Color theme: black, dark purple, gold and crimson, with purple magic, so he reads as the ruler of all the generals. He looks the biggest and most menacing of all, through his size, the spiked crown and the gigantic scepter, while still being cute chibi. Same character size and same ground position in all three poses. Facing right.
+1. "boss10_idle": standing firmly and majestically, the gigantic scepter planted upright on the ground beside him held in one hand, the other arm hanging, cape hanging.
+2. "boss10_scepter": raising the gigantic scepter high above his head with both hands, about to slam it down, the cape flaring, a wide braced stance.
+3. "boss10_cast": issuing a decree: one arm raised high with the hand open and a small flat swirl of purple magic above the palm, the gigantic scepter held low in the other hand pointing forward to the right, cape flaring.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glow blur, smoke, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, cropped or overlapping items, logo, watermark, any text other than the three captions.
+```
