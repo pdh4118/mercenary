@@ -1266,3 +1266,31 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, narro
 ```
 
 **13-3 진행**: 받음, 적용됨(베타 1.289). 두 번 다시 뽑아 얼굴(눈 점·단순한 얼굴)과 비율(머리가 큼)을 맞췄다. **제미나이가 반복해서 남기는 문제**: ① 활시위가 얼굴을 가로지름, ② 오른쪽 아래에 별 모양 로고. 프롬프트에 금지를 적어도 남으므로 받은 뒤 도구로 지운다. 다음은 궁병 장군 이펙트를 메인 화풍에 맞춰 다시 받는 것이다.
+
+### 13-4. 검방병 장군 (스테이지 4 보스) 본체 3포즈 - `assets/units/boss4_idle`, `boss4_reflect`, `boss4_charge` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 평소 `idle`, 반사 태세·거대 방패 `reflect`(방패를 앞에 세우고 웅크림), 방패 돌진 `charge`. 화면 배율 0.42. 투구로 얼굴이 가려져 얼굴 단순화 문제가 없다.
+**크기 목표**: 이전(idle 184x279, reflect 184x260, charge 204x222)과 비슷하게, 받은 뒤 제가 맞춘다. 세 포즈의 몸 크기와 발 높이는 같게.
+**지난 시안에서 배운 점**: 여백 40px 이상, 지면선·체크무늬·로고 금지, 머리(투구)가 키의 절반. 제미나이 배경은 단색 회색으로 받는다(`tools/remove_flat_bg.py`).
+
+#### 13-4 제미나이(Gemini)에 붙여넣는 최종본
+
+1. 새 대화를 열고 **이미지 2장을 먼저 첨부**한다: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss4_character_ref.png`.
+2. 아래 글을 **통째로 한 번에** 붙여넣는다(네거티브는 맨 끝 `Avoid:`에 들어 있다).
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference (keep who he is, redraw him in the style of Image 1).
+
+Make ONE sprite sheet image with three items side by side, each large and clearly separated, with at least 40px of empty space around every item so no sword tip, shield edge or cape touches the edge of the image, and a small caption under each item ("boss4_idle", "boss4_reflect", "boss4_charge"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+Style and proportions: cute chibi exactly like the units in Image 1. A huge round head (the horned helmet) that is about half of his whole body height, not counting the horns and the plume, a short stubby body and short thick legs. Never tall, lean or adult proportions. He is bigger than the units only because he is scaled up, not because his proportions change. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights.
+
+Face: his face is hidden by a full-face helmet with a dark visor slit. In the slit show only two tiny solid pale-blue dots as eyes, nothing else, no detailed eyes.
+
+Character: a sword-and-shield general boss, the stage 4 boss of a dark fantasy mercenary game, a heavy armored knight commander. A big dark bronze and steel helmet with two curved horns and a short blue plume, heavy dark bronze plate armor with gold trim, a deep blue cape, a small blue war banner with a gold emblem on a pole on his back, a very big round bronze shield with a dark blue face and a gold star emblem, and a long straight sword. Color theme: blue, bronze and gold, so he reads as the big brother of the blue sword-and-shield unit. He looks clearly bigger and more menacing than a normal sword-and-shield unit through his size and the huge shield, while still being cute chibi. Same character size and same ground position in all three poses. Facing right.
+1. "boss4_idle": standing firmly, the huge round shield held in the front arm at his side, the sword pointing down in the other hand, cape hanging.
+2. "boss4_reflect": a defensive crouch, the huge round shield raised in front of his body and held with both hands, only his helmet and horns showing above the shield rim, the sword tucked behind the shield, a sturdy braced stance.
+3. "boss4_charge": a low fast charge to the right, leaning far forward, the huge shield thrust out in front, the sword held back low, the blue plume and cape streaming behind him.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, realistic face, cropped or overlapping items, logo, watermark, any text other than the three captions.
+```
