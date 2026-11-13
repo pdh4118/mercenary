@@ -1369,3 +1369,32 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, the o
 **13-5 휘두르기 진행**: 시트 1(휘두르기 2포즈) 받음, 적용됨(베타 1.292). 두 포즈의 몸 크기·발 높이가 처음부터 맞게 나왔고, `tools/slice_aligned.py`로 캔버스 크기와 발 중심을 똑같이 맞췄다(포즈를 번갈아 보여도 몸이 튀지 않게). 남은 것: 시트 2(도는 포즈 4방향).
 
 **13-5 도는 포즈 진행**: 시트 2(도는 포즈 4방향) 받음, 적용됨(베타 1.293). 네 장의 몸 크기·발 높이가 처음부터 맞게 나왔고, 기본 포즈(idle)의 해골부터 발까지 높이와 같아지도록 배율(0.68)을 정해 `tools/slice_aligned.py`로 같은 캔버스에 맞췄다. 다음은 둔기병 장군 이펙트(`boss5_shard`·`quake`·`spin`·`flurry` 등)를 메인 화풍에 맞춰 다시 받는 것이다.
+
+### 13-6. 마법사 장군 (스테이지 6 보스) 본체 3포즈 - `assets/units/boss6_idle`, `boss6_blink`, `boss6_cast` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 평소 `idle`, 위협 순간이동 `blink`(몸이 얼음 조각으로 흩어지는 모습), 얼음 감옥·메테오·확산 불꽃·매직 쉴드 등 시전 `cast`(지팡이를 높이 듦). 화면 배율 0.5.
+**얼굴**: 깊은 두건 속 그늘이라 파란 점 두 개 눈만. 얼굴 문제가 없다.
+**크기 목표**: 이전(idle 153x252, blink 193x252, cast 167x292)과 비슷하게, 받은 뒤 제가 맞춘다. 세 포즈의 몸 크기와 발 높이는 같게(blink는 흩어지는 모습이라 몸 크기만).
+**조심할 점**: `blink`가 가장 어렵다. 반투명 번짐·광선 효과(글로우)가 아니라 **납작한 색 조각**으로 그리게 했다. 안 맞으면 이것만 따로 다시 뽑는다.
+
+#### 13-6 제미나이(Gemini)에 붙여넣는 최종본
+
+1. 새 대화를 열고 **이미지 2장을 먼저 첨부**한다: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss6_character_ref.png`.
+2. 아래 글을 **통째로 한 번에** 붙여넣는다(네거티브는 맨 끝 `Avoid:`에 들어 있다).
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference (keep who he is, redraw him in the style of Image 1).
+
+Make ONE sprite sheet image with three items side by side, each large and clearly separated, with at least 40px of empty space around every item so no staff tip, flame, crystal or flying shard touches the edge of the image, and a small caption under each item ("boss6_idle", "boss6_blink", "boss6_cast"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+Style and proportions: cute chibi exactly like the units in Image 1. A huge round hooded head that is about half of his whole body height, a short stubby body in a robe and short thick legs. Never tall, lean or adult proportions. He is bigger than the units only because he is scaled up, not because his proportions change. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights.
+
+Face: his face is hidden deep inside the hood, a flat dark shadow with only two tiny solid pale-blue glowing dots as eyes, nothing else, no detailed eyes, no nose, no mouth.
+
+Character: a mage general boss, the stage 6 boss of a dark fantasy mercenary game, an ice and fire archmage. A big dark brown-gray hooded robe with deep teal trim, pale-blue ice crystal shoulder plates, a small dark banner with a blue ice emblem on a pole on his back, and a tall dark metal staff topped with a large pale-blue ice crystal with a small orange flame floating above it. Color theme: deep teal, dark brown, pale ice blue and a little orange, so he reads as the big brother of the blue mage unit. He looks clearly bigger and more menacing than a normal mage unit through his size and the tall staff, while still being cute chibi. Same character size and same standing position in all three poses. Facing right.
+1. "boss6_idle": standing calmly and ominously, the tall staff held upright in the front hand, the other hand hanging, robe hanging.
+2. "boss6_blink": mid-teleport: his whole body is breaking apart into flat pale-blue ice shards and small orange sparks, the hood and robe half dissolved into shards flying outward, the shape still readable as him, the staff and its crystal still intact beside him.
+3. "boss6_cast": casting a spell: one arm raised high, the staff raised overhead with the big ice crystal glowing and a swirl of pale-blue energy drawn as flat shapes around the crystal, the robe flaring up from the power.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glow blur, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, realistic face, cropped or overlapping items, logo, watermark, any text other than the three captions.
+```
