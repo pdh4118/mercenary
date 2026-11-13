@@ -4,7 +4,7 @@
 
 | 종류 | 개수 | 채도 중앙값 | 밝기 중앙값 | 대비 중앙값 | 외곽선 중앙값 | 외곽선 두께(px) | 밝은 테두리 | 반투명 |
 |---|---|---|---|---|---|---|---|---|
-| 일러스트 | 152 | 0.42 | 0.25 | 0.43 | -0.20 | 2.0 | 0.00 | 0.07 |
+| 일러스트 | 152 | 0.42 | 0.25 | 0.42 | -0.20 | 2.0 | 0.00 | 0.07 |
 | 이펙트 | 412 | 0.38 | 0.45 | 0.47 | -0.25 | 2.0 | 0.00 | 0.15 |
 | 지형 | 64 | 0.46 | 0.36 | 0.53 | -0.31 | 2.0 | 0.80 | 0.07 |
 | UI | 7 | 0.31 | 0.29 | 0.42 | -0.21 | 3.0 | 0.04 | 0.02 |
@@ -55,26 +55,16 @@
 - `fx/boss9_drain_mote_0.png` (51x27, 닿은 길이 26%)
 - … 외 7개
 
-## 2. 맨 바깥에 밝은 테두리가 남은 일러스트 (10개)
+## 2. 맨 바깥에 밝은 테두리가 남은 일러스트 (0개)
 
 일러스트의 맨 바깥 1px 링이 그 안쪽 외곽선보다 0.3 넘게 밝다. 흰 배경을 지운 흔적이며 어두운 바닥 위에서 가는 흰 선으로 보인다. 이펙트는 밝은 것이 정상이라 뺐다.
 
-- `units/ally_sword.png` 밝은 테두리 +0.67
-- `units/ally_archer.png` 밝은 테두리 +0.63
-- `units/ally_spear.png` 밝은 테두리 +0.63
-- `units/enemy_sword.png` 밝은 테두리 +0.61
-- `units/enemy_spear.png` 밝은 테두리 +0.61
-- `units/ally_mace.png` 밝은 테두리 +0.60
-- `units/ally_cavalry.png` 밝은 테두리 +0.57
-- `units/enemy_mace.png` 밝은 테두리 +0.55
-- `units/enemy_archer.png` 밝은 테두리 +0.55
-- `units/enemy_cavalry.png` 밝은 테두리 +0.55
 
 ## 3. 같은 종류 안에서 화풍이 어긋난 그림
 
 같은 종류의 묶음별 중앙값에서 크게 벗어난 그림. 이펙트는 모양·밝기가 원래 제각각이고 색을 입혀 쓰는 흰색 계열(`skill_*`)이 많아 기준을 1.6배로 높이고 두 가지 이상이 벗어난 것만 적었다(`--z`로 조정). 같은 세트가 같은 이유로 3장 이상 튀면 한 줄로 합쳤다.
 
-### 일러스트 (152개 중 15개가 튐)
+### 일러스트 (152개 중 29개가 튐)
 
 - `units/boss5_whirlpose_3.png`: 외곽선이 두꺼움, 외곽선이 약함/없음
 - `units/boss5_whirlpose_1.png`: 외곽선이 두꺼움, 외곽선이 약함/없음
@@ -84,13 +74,23 @@
 - `cards/art_mage.png`: 외곽선이 두꺼움
 - `cards/art_spear.png`: 외곽선이 두꺼움
 - `cards/art_sword.png`: 외곽선이 두꺼움
-- `units/boss6_blink.png`: 밝음
+- `units/skel_archer.png`: 대비 셈, 외곽선이 진함
 - `units/boss8_mad.png`: 외곽선이 두꺼움
 - `units/boss8_mad_b.png`: 외곽선이 두꺼움
 - `hero/hero_mace_raised.png`: 외곽선이 두꺼움
-- `hero/hero_mage.png`: 과하게 짙은 색
-- `units/boss7_gallop.png`: 외곽선이 진함
-- `units/skel_archer.png`: 외곽선이 진함
+- `units/boss6_blink.png`: 밝음
+- `units/ally_archer.png`: 외곽선이 두꺼움
+- `units/ally_cavalry.png`: 외곽선이 두꺼움
+- `units/ally_mace.png`: 외곽선이 두꺼움
+- `units/ally_spear.png`: 외곽선이 두꺼움
+- `units/ally_sword.png`: 외곽선이 두꺼움
+- `units/enemy_archer.png`: 외곽선이 두꺼움
+- `units/enemy_cavalry.png`: 외곽선이 두꺼움
+- `units/enemy_mace.png`: 외곽선이 두꺼움
+- `units/enemy_spear.png`: 외곽선이 두꺼움
+- `units/enemy_sword.png`: 외곽선이 두꺼움
+- `hero/hero_f_mace_raised.png`: 외곽선이 두꺼움
+- … 외 5줄
 
 ### 이펙트 (412개 중 17개가 튐)
 
@@ -185,7 +185,7 @@
 - `units/cav_thrust_0.png`: 과하게 짙은 색, 밝음
 - `units/cav_thrust_1.png`: 과하게 짙은 색
 - `units/cav_thrust_7.png`: 과하게 짙은 색
-- `units/enemy_mage.png`: 외곽선이 두꺼움
+- `units/enemy_sword.png`: 밝음, 대비 셈
 - `units/skel_archer.png`: 밝음, 대비 셈
 - `units/supply_hurt.png`: 외곽선이 약함/없음
 - `units/supply_run_2.png`: 외곽선이 진함, 밝음
@@ -199,17 +199,17 @@
 | 묶음 | 개수 | 채도 | 밝기 | 대비 | 외곽선 | 종류 중앙값과의 거리 |
 |---|---|---|---|---|---|---|
 | `cards/art` | 6 | 0.51 | 0.33 | 0.63 | -0.11 | 8.2 |
-| `units/boss8` | 5 | 0.31 | 0.17 | 0.29 | -0.10 | 8.1 |
-| `units/ally` | 6 | 0.45 | 0.30 | 0.65 | -0.29 | 6.6 |
+| `units/boss8` | 5 | 0.31 | 0.17 | 0.29 | -0.10 | 7.9 |
 | `units/supply` | 7 | 0.44 | 0.31 | 0.47 | -0.32 | 5.6 |
-| `units/boss5` | 9 | 0.31 | 0.20 | 0.36 | -0.13 | 5.5 |
-| `units/boss2` | 4 | 0.37 | 0.16 | 0.30 | -0.18 | 5.0 |
-| `units/boss10` | 18 | 0.29 | 0.19 | 0.33 | -0.20 | 4.3 |
+| `units/boss5` | 9 | 0.31 | 0.20 | 0.36 | -0.13 | 5.4 |
+| `units/ally` | 6 | 0.47 | 0.26 | 0.59 | -0.29 | 5.2 |
+| `units/boss2` | 4 | 0.37 | 0.16 | 0.30 | -0.18 | 4.9 |
+| `units/boss10` | 18 | 0.29 | 0.19 | 0.33 | -0.20 | 4.2 |
 | `units/skel` | 6 | 0.35 | 0.23 | 0.49 | -0.25 | 3.5 |
 | `hero/hero` | 16 | 0.39 | 0.24 | 0.52 | -0.25 | 3.0 |
-| `units/enemy` | 8 | 0.34 | 0.23 | 0.47 | -0.19 | 2.2 |
+| `units/enemy` | 8 | 0.35 | 0.18 | 0.41 | -0.19 | 3.0 |
 | `units/cav` | 48 | 0.44 | 0.25 | 0.42 | -0.20 | 0.4 |
-| (종류 중앙값) | 152 | 0.42 | 0.25 | 0.43 | -0.20 | - |
+| (종류 중앙값) | 152 | 0.42 | 0.25 | 0.42 | -0.20 | - |
 
 ### 이펙트
 

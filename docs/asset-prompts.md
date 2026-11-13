@@ -70,11 +70,28 @@ python3 tools/slice_sheet.py /tmp/arrows.png client/public/assets/fx --names arr
 
 ## 0. 먼저 읽어 주세요 (그림체와 시트 형식)
 
-**1. 그림체는 이미 만든 유닛 시트로 고정합니다.** 새로 만들 때마다 **유닛 시트 이미지를 스타일 기준(reference / style reference)으로 같이 첨부**하세요. 그러면 주인공·캠프·아이콘이 같은 화풍으로 나옵니다. 지금 화풍은 다음과 같습니다.
+**1. 메인 그림체(확정): 아군 5병종 유닛 + 주인공.** 새 그림은 모두 이 화풍에 맞춥니다. 요청할 때마다 **기준 이미지 `docs/style-reference/main_style_sheet.png`(아군 5병종 + 검방병 + 주인공 2종)를 스타일 기준(reference)으로 같이 첨부**하세요. 이 방식을 빼면 사실적으로 나옵니다(방벽 시안이 그랬습니다).
 
-- **옆모습**(위에서 내려다본 시점이 아님), 치비 비율, 굵은 검정 윤곽선, 약간의 질감이 있는 채색
-- 아군은 밝고 선명하게, 적은 어둡고 탁하게(붉은 포인트)
-- 오른쪽을 보고 서 있는 자세 (게임에서 왼쪽으로 갈 때 좌우 반전합니다)
+![메인 화풍 기준 시트](style-reference/main_style_sheet.png)
+
+**왜 이 화풍인가**: 캐주얼 2D 게임이라서 작게 줄여도 알아보는 큰 머리의 귀여운 비율과 굵은 외곽선이 맞습니다.
+
+**화풍 규칙(기준 그림 10장을 실제로 잰 값)**
+
+| 항목 | 규칙 | 잰 값 |
+|---|---|---|
+| 시점 | 옆모습(위에서 내려다본 시점 아님), 오른쪽을 보고 선 자세 (왼쪽으로 갈 때 코드가 좌우 반전) | - |
+| 비율 | 치비: 머리가 몸의 약 1/3, 손발은 단순하게 | 높이 88~114px(기병·주인공이 큼) |
+| 외곽선 | **거의 검정**(`#050505` 부근) 굵은 선, 바깥쪽에 밝은 테두리를 남기지 않기 | 두께 약 2~3px, 색 RGB 1~14 |
+| 색칠 | 면을 2~3톤으로 나눈 평평한 색칠(만화풍). 그라데이션·무지개빛 광택·사실적 질감 금지 | - |
+| 채도·밝기 | 팀 색이 한눈에 보이게 선명하되 너무 짙지 않게 | 채도 0.30~0.62, 평균 밝기 0.22~0.31, 대비 0.51~0.76 |
+| 아군·적 | 아군은 밝고 선명하게, 적은 어둡고 탁하게(붉은 포인트) | - |
+| 투명 배경 | 흰 배경을 지울 때 **외곽선 바깥에 밝은 테두리가 남지 않게**. 남으면 `python3 tools/fix_halo.py`로 고친다 | 맨 바깥 링 밝기 차 0 |
+
+**보스도 이 화풍으로 맞춥니다(재제작 대상).** 지금 보스 그림은 사실적인 비율·어두운 색조·약한 대비라서 유닛과 다른 게임처럼 보입니다. 위압감은 **크기(일반 유닛의 2~2.5배), 소품(큰 무기·망토·왕관), 색(어둡지만 채도는 유지), 자세**로 내고, **그림체 자체는 위 규칙 그대로**(치비 비율, 같은 외곽선, 평평한 색칠)로 합니다.
+- 재제작 목록(포즈 / 이펙트 수): 보스1 2/12, 보스2 4/8, 보스3 3/18, 보스4 3/25, 보스5 9/31, 보스6 3/24, 보스7 2/10, 보스8 5/24, 보스9 3/39, 보스10 18/69. 이펙트는 유닛과 별개로 **외곽선 없이 색과 밝기로** 만들어도 되지만, 채도·밝기 범위는 유닛 규칙을 따릅니다.
+- 순서 제안: 보스 본체 포즈부터(눈에 가장 띄는 것) → 자주 쓰는 이펙트. 한 보스씩 만들어 `python3 tools/asset_outliers.py`로 기존 그림과 비교해 확인합니다.
+- 새로 만든 그림은 넣기 전에 `python3 tools/asset_outliers.py`로 튀는지 보고, 밝은 테두리가 남았으면 `tools/fix_halo.py`로 고칩니다. 기존 그림은 `_old`로 보관합니다(삭제 금지).
 
 **2. 한 장에 여러 개를 뽑는 "시트" 형식으로 요청하세요.** `tools/slice_sheet.py`가 시트를 한 장씩 자릅니다. 잘리려면 이 규칙을 지켜야 합니다.
 
@@ -87,8 +104,10 @@ python3 tools/slice_sheet.py /tmp/arrows.png client/public/assets/fx --names arr
 시트 요청 머리말(아래 시트 프롬프트 앞에 공통으로 붙임):
 
 ```
-Reference: match the art style of the attached unit sheet exactly (side view,
-chibi proportions, thick dark outline, painterly flat colors with subtle texture).
+Reference: match the art style of the attached main-style sheet exactly (side view,
+chibi proportions with a big head, thick near-black outline about 2-3px with no light
+fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no
+gradients, no realistic texture, no glossy highlights).
 Output a sprite sheet on a fully transparent background, items arranged in a
 clean grid with generous empty space between them, nothing touching or overlapping,
 each item large and fully visible, a small caption with the file name under each item.
