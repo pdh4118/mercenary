@@ -1604,3 +1604,5 @@ The attack poses, all facing right:
 
 Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glow blur, smoke, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, cropped or overlapping items, logo, watermark, any text other than the five captions.
 ```
+
+**13-11 ① 근위대 진행**: 5종 받음, 적용됨(베타 1.299). 모두 치비 비율·단순한 얼굴·같은 색조(검정·보라·금), 기병은 말도 치비, 궁병 활시위가 얼굴을 가로지르지 않아 첫 시안을 그대로 썼다. `assets/units/boss10_guard_*.png`(궁 163x149, 기병 223x205, 마법 157x172, 창 141x209, 검방 170x172 정도로 이전 높이에 가깝게 0.48배), 예전 그림은 `_old`로 보관. 남은 것: ② 초소병 서 있는 5종, ③ 초소병 공격 5종.
