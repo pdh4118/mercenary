@@ -1431,3 +1431,31 @@ Avoid: realistic proportions, tall lean adult rider, long-legged horse, small he
 ```
 
 **13-7 진행**: 받음, 적용됨(베타 1.295). 기수·말 모두 치비 비율, 얼굴 단순, 활시위가 얼굴을 가로지르지 않고 로고도 없어 첫 시안을 그대로 썼다. `assets/units/boss7_gallop`·`boss7_shoot`(206x172 같은 캔버스, 이전 206x171과 같은 크기라 충돌 크기와 어긋나지 않는다), 예전 그림은 `_old`로 보관. **말이 다리를 벌리고 달려서 발 중심이 포즈마다 달라지므로 `tools/slice_aligned.py --align bbox`(그림 상자의 가로 중심으로 정렬)를 썼다.** 이펙트(`assets/fx/boss7_*`: 불, 궁지, 올가미 등)는 아직 예전 그림이다. 다음은 스테이지 8 전차.
+
+### 13-8. 전차 (스테이지 8 보스) 본체 2상태 - `assets/units/boss8_wheel`(평소), `boss8_mad`(폭주) (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 게임은 **`boss8_wheel` 한 장만** 쓴다(바퀴가 온전한 그림). 폭주의 **달아오른 바퀴는 코드(`wheelHeat`)가 그림 위에 `boss8_heat_*` 이펙트를 얹는다.** 그래서 `boss8_wheel`의 바퀴는 **평범한 나무색**이어야 한다. `boss8_mad`는 지금 코드가 쓰지 않지만(보관), 같은 캐릭터를 맞춰 두려고 함께 받는다. 화면 배율 0.75.
+**크기 목표**: 이전(wheel 338x180)과 같은 화면 크기로 맞춘다.
+**꼭 확인할 것(받은 뒤 제가 처리)**: `wheelHeat`의 불꽃 이펙트 위치가 **예전 그림의 바퀴 위치 기준으로 박혀 있다**(`bossfx.ts`의 `-74*s`, `-6*s`). 새 그림의 바퀴 위치를 재서 이 값을 다시 맞춘다. 바퀴가 캔버스 안에서 **왼쪽(뒤)에 크게 잘 보이게** 요청했다.
+**얼굴**: 기수가 폐쇄형 투구라 눈 점 두 개만. 말은 점 눈.
+
+#### 13-8 제미나이(Gemini)에 붙여넣는 최종본
+
+1. 새 대화를 열고 **이미지 2장을 먼저 첨부**한다: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss8_character_ref.png`.
+2. 아래 글을 **통째로 한 번에** 붙여넣는다(네거티브는 맨 끝 `Avoid:`에 들어 있다).
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference (keep what he is, redraw him in the style of Image 1).
+
+Make ONE sprite sheet image with two items side by side, each large and clearly separated, with at least 40px of empty space around every item so no banner pole, spike, horse tail or wheel touches the edge of the image, and a small caption under each item ("boss8_wheel", "boss8_mad"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+Style and proportions: cute chibi exactly like the cavalry unit in Image 1. The knight driver has a huge round helmeted head that is about half of his own body height and a short stubby body; the two war horses are chibi too: short stout bodies, short thick legs, big round heads; the chariot is a short, chunky, toy-like wooden cart with two big round wooden wheels. Never tall, lean, long-legged or realistic proportions. He is bigger than the units only because he is scaled up, not because his proportions change. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no motion lines, no dust, no sparks, no speed effects.
+
+Face: the driver's face is hidden by a closed steel helmet with a dark visor slit, in the slit only two tiny solid pale-yellow dots as eyes, nothing else. The horses' faces are simple: a small black dot eye, no detail.
+
+Character: a war chariot boss, the stage 8 boss of a dark fantasy mercenary game, big, heavy and unstoppable. A heavy dark wooden war chariot with an iron-plated front covered in iron spikes, pulled at full gallop by two black armored war horses side by side with dark purple barding and iron head armor. The driver is an armored knight in steel plate with a short purple cape and a plume, holding the reins. Two tall poles on the cart with tattered banners, one orange and one purple. Color theme: dark wood, black, steel gray and purple with orange accents. He looks clearly bigger and more menacing than a normal cavalry unit through his size and the spiked chariot, while still being cute chibi. The two big round wooden wheels of the chariot must be clearly visible, fully round and completely intact, the big wheel at the rear (left side of the picture) and a second wheel partly behind it. Same character size and same wheel and hoof height in both poses. The chariot is facing right, the horses at the right.
+1. "boss8_wheel": the calm full gallop, the horses galloping with legs stretched, the driver sitting upright holding the reins, the wooden wheels plain brown wood, banners flying behind.
+2. "boss8_mad": the frenzied rampage, the same chariot at full gallop, the horses with wide angry eyes and flared nostrils, the driver leaning forward and whipping the reins, both wheels glowing red-hot orange as flat shapes, banners flying wildly.
+
+Avoid: realistic proportions, tall lean adult knight, long-legged horses, small head, photo, 3d render, gradients, glow blur, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, realistic horses, motion lines, dust, sparks, flames, smoke, cropped or overlapping items, logo, watermark, any text other than the two captions.
+```
