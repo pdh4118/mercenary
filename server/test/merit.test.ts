@@ -192,3 +192,16 @@ test("연속 생존: 쓰러지지 않고 쌓은 기여도에 비례해 경험치
   assert.equal(m.streakMerit, 0, "쓰러지면 쌓인 기여도도 끊긴다");
   assert.equal(m.career.bestStreak, 120, "최장 기록은 남는다");
 });
+
+test("경험치: 용병이 쓰러져도 모은 경험치를 잃지 않는다", () => {
+  const g = quiet();
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const m = (g as any).mercs.get(g.addMerc(a, SPEAR, p.x + 20, p.y, 0, 0));
+  (g as any).meritMerc(m, 500);
+  const x0 = m.xp;
+  assert.ok(x0 > 0);
+  (g as any).hurtMerc(m, 99999);
+  assert.ok(m.xp >= x0, `쓰러져도 경험치가 줄지 않는다(${x0} -> ${m.xp}). 받은 피해로 오히려 늘 수 있다`);
+  assert.equal(TUNE.MXP_DEATH_LOSS, 0, "기본은 잃지 않는다");
+});
