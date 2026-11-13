@@ -1326,3 +1326,42 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, photo
 ```
 
 **13-5 진행**: 기본 3포즈 받음, 적용됨(베타 1.291). 해골 얼굴(눈구멍 두 개)과 비율 모두 첫 시안에서 맞았다. **남은 일(우선)**: 철퇴가 새 가시 공 모양이므로 휘두르기 2포즈(`swing_a` 젖힌 자세·`swing_b` 휘두르는 자세, **발 위치를 맞춘 같은 크기 캔버스**)와 도는 포즈 4방향(`whirlpose_0~3`: 앞·옆·뒤·옆)을 같은 캐릭터로 다시 받는다.
+
+#### 13-5 나머지 6포즈 (휘두르기 2 + 도는 포즈 4): 제미나이에 붙여넣는 최종본
+
+**쓰이는 곳**: 철퇴 난타 `boss5_swing_a`(젖힌 자세)·`boss5_swing_b`(휘두르는 자세), 휠윈드 `boss5_whirlpose_0~3`(0.055초마다 한 장씩 돌려 가며 보여 준다). 소용돌이 모양의 하얀 호는 **그림에 넣지 않는다**(이펙트는 `boss5_spin_*`·`boss5_flurry_*`가 따로 그린다). 시트는 **둘(휘두르기)과 넷(도는 포즈)으로 나눠 따로** 뽑는다.
+**첨부할 이미지 3장(두 번 다 같은 3장)**: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss5_new_character_ref.png`(새 기본 3포즈, 캐릭터 기준), ③ `docs/style-reference/boss5_old_poses_ref.png`(예전 6포즈, **포즈 참고용**).
+
+**시트 1: 휘두르기 2포즈**
+
+```
+Generate an image. I attached three images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is the CHARACTER reference (this exact boss with his skull helmet, dark brown and purple armor, tattered cape and gigantic SPIKED BALL mace with purple studs), Image 3 shows only the POSES I need (copy the poses, but redraw them as the character of Image 2 in the style of Image 1; the mace in Image 3 is the old barrel shape, replace it with the spiked ball mace of Image 2).
+
+Make ONE sprite sheet image with two items side by side, each large and clearly separated, with at least 40px of empty space around every item so no mace head, spike or cape touches the edge of the image, and a small caption under each item ("boss5_swing_a", "boss5_swing_b"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark. IMPORTANT: draw both poses at exactly the same character size, with his feet standing at exactly the same height in both, so they can be swapped in a game without the body jumping.
+
+Style and proportions: cute chibi exactly like Image 1 and Image 2: a huge round head (the skull helmet) about half of his whole body height, on a very wide, heavy, stubby body with thick short legs and big round shoulders, never tall, lean or adult proportions. Side or three-quarter views as described, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no motion lines, no swirl effects, no speed arcs, no dust. Face: a simple skull mask, only two plain black oval eye sockets and a tiny nose notch, no detailed bone or teeth.
+
+Poses (facing right):
+1. "boss5_swing_a": the wind-up. A deep wide crouch, leaning back, both hands gripping the handle of the gigantic mace pulled far back behind him to the left side of the picture, the mace head pointing to the left, cape swinging back.
+2. "boss5_swing_b": the swing. A deep lunge forward to the right, both arms fully extended, the gigantic mace swung all the way out in front of him to the right at chest height, the mace head far to the right, cape streaming back.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, the old barrel-shaped mace, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed skull, motion blur, swirl or slash effects, cropped or overlapping items, logo, watermark, any text other than the two captions.
+```
+
+**시트 2: 도는 포즈 4방향**
+
+```
+Generate an image. I attached three images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is the CHARACTER reference (this exact boss with his skull helmet, dark brown and purple armor, tattered cape and gigantic SPIKED BALL mace with purple studs), Image 3 shows only the POSES I need (copy the poses, but redraw them as the character of Image 2 in the style of Image 1; the mace in Image 3 is the old barrel shape, replace it with the spiked ball mace of Image 2).
+
+Make ONE sprite sheet image with four items side by side in one row, each large and clearly separated, with at least 40px of empty space around every item so no mace head, spike or cape touches the edge of the image, and a small caption under each item ("boss5_whirl_0", "boss5_whirl_1", "boss5_whirl_2", "boss5_whirl_3"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark. IMPORTANT: this is one spinning animation turned into four turn-around frames. Draw all four at exactly the same character size, with his feet standing at exactly the same height and the body in the same position in all four, so they can be played quickly in a loop without the body jumping.
+
+Style and proportions: cute chibi exactly like Image 1 and Image 2: a huge round head (the skull helmet) about half of his whole body height, on a very wide, heavy, stubby body with thick short legs and big round shoulders, never tall, lean or adult proportions. Side or three-quarter views as described, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no motion lines, no swirl effects, no speed arcs, no dust. Face: a simple skull mask, only two plain black oval eye sockets and a tiny nose notch, no detailed bone or teeth.
+
+The same character turning around on the spot (a turntable), with the gigantic spiked mace always held horizontally behind his head across his shoulders so that the mace head sticks out on the RIGHT side of the picture in all four frames:
+1. "boss5_whirl_0": facing the viewer (front view), the skull face visible, the mace resting across his shoulders with the head to the right.
+2. "boss5_whirl_1": turned to face right (side view), the skull face in profile, the mace across his shoulders with the head to the right.
+3. "boss5_whirl_2": seen from behind (back view), no face, the tattered cape covering his back, the mace across his shoulders with the head to the right.
+4. "boss5_whirl_3": turned to face left (side view), the skull face in profile looking left, the mace across his shoulders with the head to the right.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, the old barrel-shaped mace, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed skull, motion blur, swirl or slash effects, cropped or overlapping items, logo, watermark, any text other than the four captions.
+```
