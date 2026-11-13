@@ -20,7 +20,7 @@
 | 기병 장군 돌진 충돌 임팩트 | 섬광 2장(`boss1_impact_0`, `0b`)과 흰 배경 재요청본 연기 3컷(`boss1_impact_1~3`) 모두 받음, 보관 (`assets/fx/`). 3번 연기는 반투명이라 옅다 |
 | 창병 장군 본체 3포즈 | **메인 화풍으로 재제작해 적용됨(베타 1.288)**: `assets/units/boss2_idle.png`(188x329), `boss2_guard.png`(252x209), `boss2_thrust.png`(258x206). 예전 그림(여분 `boss2_guard_b` 포함)은 `_old`로 보관. 받은 시안에서 손본 것: 체크무늬 배경 제거, 발 밑 지면선 삭제, **찌르기 포즈의 창날이 캔버스 끝에서 잘려 있어 방어 포즈의 같은 창날을 이어 붙여 복원**, 창날 안쪽 하이라이트가 배경으로 지워진 곳 채움. 다음에 요청할 때는 "캔버스 오른쪽에 창끝 여백을 둘 것, 지면선을 그리지 말 것"을 덧붙인다 |
 | 창병 장군 이펙트 (장창 찌르기 선 3컷, 창 방어 쓸기 3컷, 던진 창, 박힌 창) | 받음, 보관 (`assets/fx/boss2_thrust_0~2`, `boss2_sweep_0~2`, `boss2_spear_fly`, `boss2_spear_stuck`). 시안의 테두리 선은 잘라 냈다. 연한 초록 이펙트는 반투명으로 처리해 옅게 보인다 |
-| 궁병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss3_idle`, `boss3_aim`, `boss3_sky`, `assets/fx/boss3_ice_0~4`, `boss3_snipe`, `boss3_snipe_hit`, `boss3_rain_0·1·stuck·fade`, `boss3_dust_0~3`, `boss3_frost_0~2`). 얼음 둔화 표시는 얼음 고리 그림 대신 **파란 틴트(독과 같은 방식)** 로 하기로 해서 `boss3_frost_*`는 쓰지 않고 보관만 한다 |
+| 궁병 장군 본체 3포즈 | **메인 화풍으로 재제작해 적용됨(베타 1.289)**: `assets/units/boss3_idle.png`(225x271), `boss3_aim.png`(231x271), `boss3_sky.png`(223x288). 예전 그림은 `_old`로 보관. 제미나이 시안에서 손본 것: 단색 회색 배경 제거(`tools/remove_flat_bg.py`), 오른쪽 아래 제미나이 별 로고와 그에 가려진 신발창 복원, 활시위가 모자·얼굴·몸을 가로지르던 선을 지워 "시위가 머리 뒤로 지나가는" 모습으로 정리. 이펙트(`assets/fx/boss3_*`: 얼음 화살·저격 볼트·화살비 등)는 아직 예전 그림이라 본체와 화풍이 다르다 |
 | 검방병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss4_idle`, `boss4_reflect`, `boss4_charge`, `assets/fx/boss4_shield_0~2`, `boss4_reflect_0~3`, `boss4_inv_0~3`, `boss4_bash_1~3`, 대체 시안 `boss4_bash_1b~3b`). **방패 돌진 섬광 `boss4_bash_0`은 못 씀**: 흰 섬광을 흰 배경에 그려서 지우면 중심이 사라진다. 흰 섬광·빛 이펙트는 **검은 배경**으로 다시 요청해야 한다(돌진 임팩트 섬광은 `boss1_impact_0`으로 대신할 수 있다) |
 | 둔기병 장군 본체 3포즈·이펙트 | 받음, 보관 (`assets/units/boss5_idle`, `boss5_jump`, `boss5_smash`, `assets/fx/boss5_mace_fly`, `boss5_mace_stuck`, `boss5_shard_0~2`, `boss5_quake_0~4`, `boss5_spin_0~3`, `boss5_swing_0~2`). 시안의 칸 선과 고리 안 흰 칸은 지웠다 |
 | 둔기병 장군 철퇴 난타 이펙트 | 받음, 적용됨 (`assets/fx/boss5_flurry_arc_0~2` 휘두르는 호, `boss5_flurry_hit_0~2` 타격 임팩트 3컷). 보스 휘두르기 포즈 2장 받아 적용(`assets/units/boss5_swing_a`(젖힌 자세)·`boss5_swing_b`(휘두르는 자세), 발 위치를 맞춘 같은 크기 캔버스) |
@@ -1264,3 +1264,5 @@ Character: an archer general boss, the stage 3 boss of a dark fantasy mercenary 
 
 Avoid: realistic proportions, tall lean adult body, long legs, small head, narrow long face, huge wide hat, photo, 3d render, gradients, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed eyes, iris, eyelashes, realistic face, face shading, nose shadow, long pointed elf ears, bowstring across the face or hat, cropped or overlapping items, logo, watermark, any text other than the three captions.
 ```
+
+**13-3 진행**: 받음, 적용됨(베타 1.289). 두 번 다시 뽑아 얼굴(눈 점·단순한 얼굴)과 비율(머리가 큼)을 맞췄다. **제미나이가 반복해서 남기는 문제**: ① 활시위가 얼굴을 가로지름, ② 오른쪽 아래에 별 모양 로고. 프롬프트에 금지를 적어도 남으므로 받은 뒤 도구로 지운다. 다음은 궁병 장군 이펙트를 메인 화풍에 맞춰 다시 받는 것이다.
