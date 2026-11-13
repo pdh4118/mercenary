@@ -1162,3 +1162,35 @@ orange and crimson stand out. Facing right.
 **받은 뒤 확인**: 두 포즈의 말 발굽 높이가 같은지, 외곽선 바깥에 밝은 테두리가 없는지, 아군 기병(`ally_cavalry`)과 나란히 놓았을 때 같은 화풍으로 보이는지.
 
 **13-1 진행**: 받음, 적용됨(베타 1.287). 같은 화풍으로 보이는지는 아군 기병·창병·검방병과 같은 배율로 나란히 놓아 확인했다. 다음은 같은 보스의 이펙트(선회 베기 호·돌격 함성·돌진 충돌 임팩트, `assets/fx/boss1_*`)를 메인 화풍에 맞춰 다시 받는 것이다.
+
+### 13-2. 창병 장군 (스테이지 2 보스) 본체 3포즈 - `assets/units/boss2_idle`, `boss2_guard`, `boss2_thrust` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 평소 `idle`, 창 방어 태세 `guard`(웅크려 앞을 겨눔), 분신 돌진·장창 3연 찌르기·창 던지기·평타 `thrust`(앞으로 찌름). 예전의 여분 `boss2_guard_b`(창 없이 웅크린 자세)는 쓰지 않으므로 다시 만들지 않습니다.
+
+**첨부할 이미지 2장**: ① `docs/style-reference/main_style_sheet.png`(그림체 기준) ② 지금의 `assets/units/boss2_idle.png`·`boss2_guard.png`·`boss2_thrust.png`(**캐릭터 설정 참고용**).
+
+**크기**: 화면 배율이 0.6이라 이전 그림(idle 113x314, guard 249x127, thrust 278x130)과 비슷한 화면 크기가 되게, 새 그림은 **idle 가로 약 140 x 세로 300, guard·thrust 가로 약 300 x 세로 170** 안팎(창이 길어서 가로·세로가 넓다). 세 포즈의 **몸 크기와 발이 땅에 닿는 선을 같게** 맞춰 주세요(포즈가 바뀔 때 몸이 커지거나 떠 보이지 않게).
+
+<시트 요청 머리말>
+```
+Three items side by side on a transparent background, large and clearly separated, a small caption under each.
+Character: a spear general boss, the stage 2 boss of a dark fantasy mercenary game. He is a tall stern veteran
+spearman warlord, drawn in the exact style of the attached main-style sheet: cute chibi proportions with a big head
+and a short sturdy body, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded
+colors in 2-3 tones, no gradients, no realistic texture, no glossy highlights. Use the second attached image only
+as a character design reference (keep the identity, redraw in the main style).
+Identity to keep: a steel helmet with a gray feather crest, dark brown and steel plate armor with leather straps,
+a dark green cape, and an extremely long spear (about twice his own height) with a steel leaf-shaped head, a green
+tassel and a small tattered dark banner below the head. His color theme is dark green and brown so he reads as the
+big brother of the green spearman unit. He should look clearly bigger and more menacing than a normal spearman unit
+through his size and the very long spear, while still being cute chibi in style, saturated enough that the green stands
+out. The same character size and the same ground line in all three poses. Facing right.
+1. "boss2_idle": standing upright and calm, the long spear planted upright in one hand beside him, cape hanging.
+2. "boss2_guard": a low defensive crouch with bent knees, the spear leveled forward and pointed to the right,
+   ready to counter-stab, cape swaying.
+3. "boss2_thrust": a deep forward lunge with the spear fully extended forward to the right at chest height,
+   the cape flaring backward, a fierce attack pose.
+```
+네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, perspective, top-down view, cropped, overlapping items, text`
+
+**받은 뒤 확인**: 세 포즈의 몸 크기·발 높이가 같은지, 창끝이 잘리지 않았는지, 외곽선 바깥에 밝은 테두리가 없는지, 체크무늬 배경이면 `tools/remove_checker_bg.py`로 지우기, 아군 창병(`ally_spear`)과 같은 배율로 나란히 놓았을 때 같은 화풍으로 보이는지.
