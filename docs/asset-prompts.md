@@ -1523,3 +1523,84 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, photo
 ```
 
 **13-10 진행**: 받음, 적용됨(베타 1.298). 투구 틈의 빨간 점 눈, 왕관 가시, 금장식, 진홍 망토 모두 첫 시안에서 맞았다. `assets/units/boss10_idle.png`·`boss10_scepter.png`·`boss10_cast.png`(401x317 같은 캔버스, 발 중심 정렬; 이전과 높이가 같다), 예전 그림은 `_old`로 보관. **장군 본체 1~10스테이지 모두 교체 완료.** 이 보스는 **근위대 `boss10_guard_*` 5종과 초소병 `boss10_post_*` 10종이 아직 예전(사실적) 그림**이라 군주 옆에서 화풍이 섞여 보인다. 다음: 군주 본체를 기준으로 근위대 5종·초소병 10종을 같은 색조로 요청하고, 그다음 각 보스 이펙트와 스켈레톤 6종(`skel_*`)을 메인 화풍에 맞춘다.
+
+### 13-11. 군주의 근위대 5종 + 성벽 초소병 10종 - `assets/units/boss10_guard_*`, `boss10_post_*`
+
+**쓰이는 곳**: 근위대 `boss10_guard_archer·cavalry·mage·spear·sword`(군주의 정예·성문 개방 돌격 기병, 둔기병은 없다), 초소병 `boss10_post_<병종>_idle|aim·cast·atk`(성벽 위 수비병: 궁·마·창·검방·둔기 각 서 있는 모습과 공격 모습). 군주 본체(13-10)와 **같은 색조(검정 갑옷·진한 보라·금)**여야 한다.
+**3번에 나눠 요청한다**(한 번에 15장을 뽑으면 캐릭터가 서로 달라진다): ① 근위대 5종 ② 초소병 서 있는 5종 ③ 초소병 공격 5종(②의 결과를 **캐릭터 기준 이미지로 첨부**해 같은 인물로 맞춘다).
+**크기**: 이전 그림 크기에 맞춰 제가 줄인다(근위대 104~197x168~218, 초소병 158~316x246~400). 각 시트에서 모든 병사의 땅 높이와 몸 크기는 같게.
+**참고 이미지(예전 그림, 포즈 참고용)**: `docs/style-reference/boss10_guards_old_ref.png`, `docs/style-reference/boss10_posts_old_ref.png`.
+
+**첨부할 이미지**
+- ① 근위대: `main_style_sheet.png` + `boss10_guards_old_ref.png`
+- ② 초소병 서 있기: `main_style_sheet.png` + `boss10_posts_old_ref.png`
+- ③ 초소병 공격: `main_style_sheet.png` + `boss10_posts_old_ref.png` + **②에서 받은 결과 그림**(이 순서)
+
+#### ① 근위대 5종
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference showing the old versions of these five royal guards (keep who they are, redraw them in the style of Image 1).
+
+Make ONE sprite sheet image with five items side by side in one row, each large and clearly separated, with at least 40px of empty space around every item so no weapon, plume, cape or hoof touches the edge of the image, and a small caption under each item ("boss10_guard_archer", "boss10_guard_cavalry", "boss10_guard_mage", "boss10_guard_spear", "boss10_guard_sword"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark. All five stand on the same ground height.
+
+Style and proportions: cute chibi exactly like the units in Image 1. Each soldier has a huge round head (helmet or hood) that is about half of his whole body height, a short stubby body and short thick legs. Never tall, lean or adult proportions. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no glow blur, no smoke, no motion lines.
+
+Faces: very simple like the units in Image 1. Helmeted soldiers have a closed black helmet with a dark visor slit and only two tiny solid pale dots as eyes in the slit. Hooded or hatted soldiers have a simple face with two small solid black dot eyes, a short mouth line, no nose or a tiny dot, small rounded ears.
+
+Color theme for the whole army: black plate armor with gold trim, deep purple capes, plumes, sashes and cloth, so they clearly belong to the tyrant king (the final boss, black armor, dark purple, gold, crimson cape). Small gold details only, no realistic metal shine.
+
+The five elite royal guards of the tyrant king, a little bigger and more ornate than normal soldiers, all facing right:
+1. "boss10_guard_archer": a hooded archer in a purple hood and cloak over black leather armor with gold trim, drawing a bow to the right, a quiver on his back (the bowstring must not cross his face).
+2. "boss10_guard_cavalry": a cavalry knight on a chibi black war horse with purple barding with gold trim, the knight in black armor with a purple plume and cape, holding a long lance pointing forward to the right; the horse short and stout with short thick legs and a big round head.
+3. "boss10_guard_mage": a battle mage in a long black robe with purple and gold trim and a tall purple hat or hood, holding a gold staff with a small glowing purple gem, standing calmly.
+4. "boss10_guard_spear": a spearman in black plate armor with a purple plume and cape, holding a long spear upright in the front hand, standing firmly.
+5. "boss10_guard_sword": a sword and shield knight in black plate armor with a purple cape and a small plume, holding a big tall black tower shield in front and a sword in the other hand, braced.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glow blur, smoke, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, cropped or overlapping items, logo, watermark, any text other than the five captions.
+```
+
+#### ② 초소병 서 있는 5종
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference showing the old versions of the wall defenders (ten poses: five soldiers, each in an idle pose and an attack pose; keep who they are, redraw them in the style of Image 1). This request is only for the five IDLE poses.
+
+Make ONE sprite sheet image with five items side by side in one row, each large and clearly separated, with at least 40px of empty space around every item so no weapon, plume or cape touches the edge of the image, and a small caption under each item ("boss10_post_archer_idle", "boss10_post_mage_idle", "boss10_post_spear_idle", "boss10_post_sword_idle", "boss10_post_blunt_idle"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark. All five stand on the same ground height.
+
+Style and proportions: cute chibi exactly like the units in Image 1. Each soldier has a huge round head (helmet or hood) that is about half of his whole body height, a short stubby body and short thick legs. Never tall, lean or adult proportions. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no glow blur, no smoke, no motion lines.
+
+Faces: very simple like the units in Image 1. Helmeted soldiers have a closed black helmet with a dark visor slit and only two tiny solid pale dots as eyes in the slit. Hooded or hatted soldiers have a simple face with two small solid black dot eyes, a short mouth line, no nose or a tiny dot, small rounded ears.
+
+Color theme for the whole army: black plate armor with gold trim, deep purple capes, plumes, sashes and cloth, so they clearly belong to the tyrant king (the final boss, black armor, dark purple, gold, crimson cape). Small gold details only, no realistic metal shine.
+
+Five castle wall defenders of the tyrant king, standing at attention in their idle poses, all facing right:
+1. "boss10_post_archer_idle": an archer in a black helmet and black leather armor with a purple cape, a bow held low in one hand, standing alert.
+2. "boss10_post_mage_idle": a mage in a long black robe with purple and gold trim and a hood, holding a gold staff with a small purple gem upright in one hand.
+3. "boss10_post_spear_idle": a spearman in black plate armor with a purple plume and cape, a long spear held upright in the front hand.
+4. "boss10_post_sword_idle": a sword and shield soldier in black plate armor with a purple cape, a tall black shield held in front and the sword hanging down in the other hand.
+5. "boss10_post_blunt_idle": a heavy mace soldier in big black plate armor with big round spiked shoulder plates, a purple plume and cape, a big spiked mace resting on the shoulder.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glow blur, smoke, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, cropped or overlapping items, logo, watermark, any text other than the five captions.
+```
+
+#### ③ 초소병 공격 5종 (②의 결과를 3번째 이미지로 첨부)
+
+```
+Generate an image. I attached three images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a POSE reference showing the old attack poses (keep the poses, redraw them in the style of Image 1), and Image 3 is the CHARACTER reference: the same five soldiers in their idle poses. Draw the SAME five characters (same helmets, armor, colors, weapons and proportions as Image 3), now in their attack poses.
+
+Make ONE sprite sheet image with five items side by side in one row, each large and clearly separated, with at least 40px of empty space around every item so no weapon, plume, cape or magic touches the edge of the image, and a small caption under each item ("boss10_post_archer_aim", "boss10_post_mage_cast", "boss10_post_spear_atk", "boss10_post_sword_atk", "boss10_post_blunt_atk"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark. All five stand on the same ground height, and each soldier has exactly the same body size as in Image 3.
+
+Style and proportions: cute chibi exactly like the units in Image 1. Each soldier has a huge round head (helmet or hood) that is about half of his whole body height, a short stubby body and short thick legs. Never tall, lean or adult proportions. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no glow blur, no smoke, no motion lines.
+
+Faces: very simple like the units in Image 1. Helmeted soldiers have a closed black helmet with a dark visor slit and only two tiny solid pale dots as eyes in the slit. Hooded or hatted soldiers have a simple face with two small solid black dot eyes, a short mouth line, no nose or a tiny dot, small rounded ears.
+
+Color theme for the whole army: black plate armor with gold trim, deep purple capes, plumes, sashes and cloth, so they clearly belong to the tyrant king (the final boss, black armor, dark purple, gold, crimson cape). Small gold details only, no realistic metal shine.
+
+The attack poses, all facing right:
+1. "boss10_post_archer_aim": the archer drawing his bow to the right at chest height with an arrow nocked (the bowstring must not cross his face or helmet).
+2. "boss10_post_mage_cast": the mage with one arm raised high holding the staff, a small flat swirl of purple magic above the staff gem.
+3. "boss10_post_spear_atk": the spearman in a low lunge thrusting the long spear straight to the right.
+4. "boss10_post_sword_atk": the sword and shield soldier stepping forward, the shield up in front and the sword thrust forward to the right.
+5. "boss10_post_blunt_atk": the mace soldier raising the big spiked mace high above his head with both hands, about to smash it down.
+
+Avoid: realistic proportions, tall lean adult body, long legs, small head, photo, 3d render, gradients, glow blur, smoke, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed face, detailed eyes, cropped or overlapping items, logo, watermark, any text other than the five captions.
+```
