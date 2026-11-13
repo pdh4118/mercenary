@@ -108,7 +108,9 @@ python3 tools/slice_sheet.py /tmp/arrows.png client/public/assets/fx --names arr
 Reference: match the art style of the attached main-style sheet exactly (side view,
 chibi proportions with a big head, thick near-black outline about 2-3px with no light
 fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no
-gradients, no realistic texture, no glossy highlights).
+gradients, no realistic texture, no glossy highlights, a very simple face: eyes are small solid black dots or
+ovals with at most a tiny white highlight, no iris, no white of the eye, no eyelashes, one thick simple eyebrow line,
+no nose or just a tiny dot, a short line for the mouth, small rounded ears).
 Output a sprite sheet on a fully transparent background, items arranged in a
 clean grid with generous empty space between them, nothing touching or overlapping,
 each item large and fully visible, a small caption with the file name under each item.
