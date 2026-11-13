@@ -1196,3 +1196,41 @@ out. The same character size and the same ground line in all three poses. Facing
 **받은 뒤 확인**: 세 포즈의 몸 크기·발 높이가 같은지, 창끝이 잘리지 않았는지, 외곽선 바깥에 밝은 테두리가 없는지, 체크무늬 배경이면 `tools/remove_checker_bg.py`로 지우기, 아군 창병(`ally_spear`)과 같은 배율로 나란히 놓았을 때 같은 화풍으로 보이는지.
 
 **13-2 진행**: 받음, 적용됨(베타 1.288). 다음은 창병 장군의 이펙트(`assets/fx/boss2_*`: 장창 찌르기 선, 창 방어 쓸기, 던진 창, 박힌 창)를 메인 화풍에 맞춰 다시 받는 것이다. **다음 요청 문구에 추가할 주의**: 그림 둘레와 오른쪽에 여백을 충분히 둘 것(창끝이 잘렸었다), 시트 아래에 지면선을 그리지 말 것.
+
+### 13-3. 궁병 장군 (스테이지 3 보스) 본체 3포즈 - `assets/units/boss3_idle`, `boss3_aim`, `boss3_sky` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 평소 `idle`, 은신 저격·얼음 화살·평타 `aim`(수평으로 시위를 당김), 화살비 `sky`(하늘로 쏨). 화면 배율이 0.4라 크게 보이지 않으므로 얼굴·활·화살이 **작게 줄여도 알아볼 정도로 굵고 단순하게**.
+
+**첨부할 이미지 2장**: ① `docs/style-reference/main_style_sheet.png`(그림체 기준) ② 지금의 `assets/units/boss3_idle.png`·`boss3_aim.png`·`boss3_sky.png`(**캐릭터 설정 참고용**).
+
+**크기**: 이전 그림(idle 208x261, aim 203x287, sky 191x293)과 비슷한 화면 크기가 되게, 새 그림은 **idle 가로 약 200 x 세로 270, aim 약 260 x 270, sky 약 230 x 300** 안팎. 세 포즈의 **몸 크기와 발이 땅에 닿는 선을 같게** 맞춰 주세요.
+
+**지난 시안에서 생긴 문제를 막는 주의 (꼭 적어 주세요)**
+- **활 끝·화살 끝이 캔버스 밖으로 나가 잘리지 않게**, 각 항목 둘레에 **빈 여백을 40px 이상** 둘 것(창병 장군 시안은 창끝이 잘렸습니다).
+- **지면선(땅을 나타내는 가로선)을 그리지 말 것.** 배경은 진짜 투명(체크무늬를 그림에 굽지 않기).
+
+<시트 요청 머리말>
+```
+Three items side by side on a transparent background, large and clearly separated, with at least 40px of empty
+space around every item so no bow tip or arrow tip touches the edge of the image, a small caption under each.
+No ground line, no floor, no shadow line, no checkerboard pattern drawn into the picture.
+Character: an archer general boss, the stage 3 boss of a dark fantasy mercenary game. He is a lean, cunning master
+archer, drawn in the exact style of the attached main-style sheet: cute chibi proportions with a big head and a short
+sturdy body, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3
+tones, no gradients, no realistic texture, no glossy highlights. Use the second attached image only as a character
+design reference (keep the identity, redraw in the main style).
+Identity to keep: a wide-brimmed olive hat with a long pale feather, a hooded olive-green cloak, tan and olive leather
+armor with gold trim, a big quiver on his back full of arrows with golden fletching, a small dark banner with a gold
+emblem on his back, and a big ornate longbow with gold trim. His color theme is olive, tan and gold so he reads as the
+big brother of the yellow archer unit. He should look clearly bigger and more menacing than a normal archer unit
+through his size and the big bow, while still being cute chibi in style, saturated enough that the gold stands out.
+The same character size and the same standing position in all three poses. Facing right.
+1. "boss3_idle": standing calmly and alertly, the bow held low in the front hand, the other hand near the quiver strap.
+2. "boss3_aim": a wide stance, an arrow nocked and the bow fully drawn, the arrow pointing to the right at chest
+   height, a sharp focused expression.
+3. "boss3_sky": leaning back slightly, the bow drawn and tilted upward about 60 degrees, the arrow pointing up and to
+   the right toward the sky, shooting a volley.
+```
+네거티브: `realistic, realistic proportions, photo, 3d render, gradients, glossy, painterly texture, thin outline, white outline, white halo, ground line, floor line, checkerboard, perspective, top-down view, cropped, overlapping items, text`
+
+**받은 뒤 확인**: 활 끝·화살 끝이 잘리지 않았는지, 지면선이 없는지, 세 포즈의 몸 크기·발 높이가 같은지, 외곽선 바깥에 밝은 테두리가 없는지, 체크무늬 배경이면 `tools/remove_checker_bg.py`로 지우기, 아군 궁병(`ally_archer`)과 같은 배율로 나란히 놓았을 때 같은 화풍으로 보이는지.
