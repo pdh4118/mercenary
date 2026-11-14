@@ -14,7 +14,6 @@ export interface MercPanel {
   hovered(): number;
 }
 
-const SPEAR_ICON_ORDER = [3, 1, 2, 4] as const; // 2단 찌르기=두 번 찌르는 그림, 수비 태세=창과 방패 그림, 휩쓸기=휘어진 호 그림
 const SKILL_ICON = ["cav", "spear", "archer", "shield", "blunt", "mage"] as const;
 /** 승급 스킬 4칸: 얻은 스킬은 밝게, 아직인 스킬은 어둡게(금색 테두리 = 액티브, 은청색 = 패시브). 마우스를 올리면 설명 */
 function skillStrip(type: number, tier: number): HTMLElement {
@@ -22,7 +21,7 @@ function skillStrip(type: number, tier: number): HTMLElement {
   box.className = "skstrip";
   (MERC_SKILLS[type] ?? []).forEach((sk, i) => {
     const img = document.createElement("img");
-    img.src = `assets/ui/mskill_${SKILL_ICON[type]}_${(type === 1 ? SPEAR_ICON_ORDER[i]! : i + 1)}.png`; // 창병은 스킬이 바뀌어 맞는 그림을 임시로 돌려 쓴다(새 그림을 받기 전까지)
+    img.src = `assets/ui/mskill_${SKILL_ICON[type]}_${(i + 1)}.png`;
     img.className = tier >= i + 1 ? "on" : "off";
     img.title = `${i + 1}단계 ${sk.name} (${sk.kind === "passive" ? "패시브" : "액티브"}): ${sk.desc}`;
     img.onerror = () => img.remove(); // 그림이 아직 없는 병종은 칸을 감춘다

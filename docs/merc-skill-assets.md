@@ -247,4 +247,26 @@ Style: cute chibi cartoon like Image 1, flat cel-shaded colors in 2-3 tones, thi
 Avoid: realistic style, gradients, glow blur, thin lines, tiny details, text inside icons, cropped items, checkerboard pattern, logo, watermark, any text other than the two captions.
 ```
 
-**받은 뒤**: `tools/remove_flat_bg.py`로 배경을 지우고 `tools/slice_sheet.py`(`--rows 1 --scale 0.32 --min-height 150 --attach 4`)로 자른 뒤, 클라이언트의 임시 순서(`SPEAR_ICON_ORDER`)를 지운다.
+**받음, 적용됨(베타 1.335)**: 수비 태세=`mskill_spear_2`(방패와 튕기는 화살), 휩쓸기=`mskill_spear_3`(크게 휘두르는 호와 밀려나는 적), 2단 찌르기=`mskill_spear_1`(두 번 찌르는 그림을 옮김). 예전 그림은 `_old`로 보관, 임시 순서(`SPEAR_ICON_ORDER`)는 지웠다.
+
+**(원래 계획)**: `tools/remove_flat_bg.py`로 배경을 지우고 `tools/slice_sheet.py`(`--rows 1 --scale 0.32 --min-height 150 --attach 4`)로 자른 뒤, 클라이언트의 임시 순서(`SPEAR_ICON_ORDER`)를 지운다.
+
+## 7. 휩쓸기 이펙트 요청 (`assets/fx/mskill_swing_0~3`)
+
+**쓰이는 곳**: 창병 3단계 패시브 "휩쓸기"(25% 확률로 전방 약 160도를 훑는 공격). 지금은 방패 밀치기용 흰 반원 그림을 임시로 쓴다. 창을 크게 휘두르는 **넓은 호 + 속도선** 4컷을 새로 받는다. 첨부: `main_style_sheet.png` 한 장.
+**방향/크기**: 오른쪽(전방)으로 휘두르는 모양, 4컷 모두 같은 캔버스(약 300x200)·같은 기준점(창병 앞쪽 중심)으로.
+
+```
+Generate an image. I attached one image: Image 1 is the art STYLE reference (copy its flat cel-shaded, thick-outlined cartoon style). Draw a short VISUAL EFFECT animation, four frames in one row, on a plain flat light-gray background with at least 40px of empty space around each frame, captions "mskill_swing_0", "mskill_swing_1", "mskill_swing_2", "mskill_swing_3". No characters, no weapons, no ground line, no logo or watermark.
+
+The effect is a WIDE SPEAR SWEEP: a spear swung in a big horizontal arc in front of the wielder, seen from the side, sweeping toward the RIGHT of the picture (the wielder stands at the left):
+- frame 0: a thin crescent arc just starting at the upper left, cream-white with a pale orange edge, with three short speed lines trailing behind it;
+- frame 1: the arc grows into a big wide crescent covering about 160 degrees of a circle opening to the left, thick in the middle and tapering at both ends, bright cream-white core with pale orange outer band, a few small flat white sparks along its outer edge;
+- frame 2: the arc at its widest and brightest, slightly thicker, with five small flat starburst impacts (pale yellow and white) scattered along the front of the arc;
+- frame 3: the arc fading: thinner and paler, impacts gone, only two or three tiny sparks and faint speed lines left.
+Style: flat cel-shaded shapes in 2-3 tones, a thick dark orange-brown outline about 2px, warm cream-white and pale orange palette (NOT green, NOT blue), no gradients, no glow blur, no realistic smoke. All four frames centered on the same point and the same canvas size, each about 300x200 in a 4x1 layout.
+
+Avoid: green or blue colors, gradients, glow blur, realistic smoke, characters, spear shaft, text other than the four captions, ground line, logo, watermark.
+```
+
+**받은 뒤**: `tools/slice_fx_rows.py`(`--rows swing:4`)로 자르고, 클라이언트의 `MSK_FRAMES`에 `swing: 4`를 넣은 뒤 `MSK_DEF[13]`을 `swing`으로 바꾼다.
