@@ -272,8 +272,8 @@ const statCards = (): CardDef[] => {
 export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "leadershipPct" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
   { k: "heroMaxHp", label: "최대 체력", base: 18.75, weight: 8, fmt: "flat" },
   { k: "heroSpeed", label: "이동 속도", base: 0.09, weight: 6, fmt: "pct" },
-  { k: "heroDmg", label: "공격력", base: 0.1875, weight: 8, fmt: "pct" },
-  { k: "heroFireRate", label: "공격 속도", base: 0.27, weight: 6, fmt: "pct" },
+  { k: "heroDmg", label: "공격력", base: 0.14, weight: 8, fmt: "pct" },
+  { k: "heroFireRate", label: "공격 속도", base: 0.2, weight: 6, fmt: "pct" },
   { k: "heroRange", label: "사거리", base: 0.09, weight: 6, fmt: "pct" },
   { k: "heroPierce", label: "관통", base: 1, weight: 4, minLevel: 3, fmt: "int" },
   { k: "heroMulti", label: "발사 수", base: 1, weight: 3, minLevel: 3, fmt: "int" },
