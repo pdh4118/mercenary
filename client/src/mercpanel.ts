@@ -30,6 +30,12 @@ function skillStrip(type: number, tier: number): HTMLElement {
   return box;
 }
 
+/** 목록을 다시 그릴지 정하는 키: 경험치는 매 프레임 변하므로 레벨과 막대 5% 단위만 본다(자주 다시 그리면 버튼이 깜박이고 클릭이 씹힌다) */
+const progKey = (w: MercWire): string => {
+  const p = mercProg(w[15], w[17]);
+  return `${p.level}.${Math.floor(p.frac * 20)}${p.ready ? "r" : ""}`;
+};
+
 /** 강화할 수 있는 상태인가: 경험치를 다 채웠고 최고 단계가 아니다 */
 export const isReady = (w: MercWire): boolean => w[8] <= 0 && w[15] < 4 && mercProg(w[15], w[17]).ready;
 
@@ -89,7 +95,10 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       btn.className = "primary";
       btn.disabled = gold < cost || respawn > 0 || freeLeadership < 1;
       btn.title = freeLeadership < 1 ? "통솔력이 부족합니다 (강화하면 통솔력 +1)" : `${tierName(type, tier + 1)}로 강화`;
-      btn.onclick = () => opts.send({ t: "upgrade", merc: id });
+      btn.onpointerdown = (ev) => { // 누르는 순간 보낸다(목록이 다시 그려져 버튼이 바뀌어도 클릭이 사라지지 않게)
+        ev.preventDefault();
+        opts.send({ t: "upgrade", merc: id });
+      };
       row.append(btn);
     } else {
       const t = document.createElement("span");
@@ -134,7 +143,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       const bigOpen = panel.classList.contains("open");
       if (!bigOpen && !docked) return;
       mine.sort((a, b) => Number(isReady(b)) - Number(isReady(a)) || a[4] - b[4] || b[15] - a[15] || a[0] - b[0]);
-      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil(w[3] / 5)}:${Math.ceil(w[8])}:${w[17]}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}:${Math.round((w[23] ?? 0) / 10)}:${w[24] ?? 0}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}${bigOpen ? 1 : 0}${docked ? 1 : 0}`;
+      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil((20 * w[3]) / Math.max(1, w[9]))}:${Math.ceil(w[8])}:${progKey(w)}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}:${Math.round((w[23] ?? 0) / 10)}:${w[24] ?? 0}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}${bigOpen ? 1 : 0}${docked ? 1 : 0}`;
       if (confirm >= 0 && performance.now() - confirmT > 2500) confirm = -1;
       if (next === sig) return;
       sig = next;
@@ -211,7 +220,10 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           btn.title = noLeader ? "통솔력이 부족합니다 (강화하면 통솔력 +1)" : `강화하면 통솔력 +1 · ${bonus.join(" · ")}`;
           btn.className = "primary";
           btn.disabled = gold < cost || respawn > 0 || noLeader;
-          btn.onclick = () => opts.send({ t: "upgrade", merc: id });
+          btn.onpointerdown = (ev) => { // 누르는 순간 보낸다(목록이 다시 그려져 버튼이 바뀌어도 클릭이 사라지지 않게)
+        ev.preventDefault();
+        opts.send({ t: "upgrade", merc: id });
+      };
           row.append(btn);
         } else {
           const t = document.createElement("span");
