@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage } from "node:http";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import { TICK_RATE, tuneOverrides, voiceOverrides, type ClientMsg, type ServerMsg } from "@mercenary/shared";
@@ -12,6 +13,15 @@ const PORT = Number(process.env.PORT ?? 8080);
 const HOST = process.env.HOST ?? "0.0.0.0";
 /** 빌드된 클라이언트 위치. 기본은 저장소의 client/dist */
 const STATIC_DIR = process.env.STATIC_DIR ?? fileURLToPath(new URL("../../client/dist", import.meta.url));
+/** 서비스 중인 클라이언트 버전: 빌드된 changelog.json의 맨 위 버전(없으면 빈 문자열 = 확인하지 않음) */
+const BUILD_VER = (() => {
+  try {
+    const j = JSON.parse(readFileSync(join(STATIC_DIR, "changelog.json"), "utf8")) as { versions?: { version?: string }[] };
+    return j.versions?.[0]?.version ?? "";
+  } catch {
+    return "";
+  }
+})();
 /** 쉼표로 구분한 허용 출처(예: https://game.example.com). 비우면 모두 허용한다. */
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const MAX_CONNECTIONS = Number(process.env.MAX_CONNECTIONS ?? 300);
@@ -105,6 +115,7 @@ wss.on("connection", (ws, req) => {
   const meta: Meta = { conn, alive: true, windowStart: Date.now(), count: 0 };
   metas.set(ws, meta);
   manager.connect(conn);
+  if (BUILD_VER) conn.send({ t: "ver", ver: BUILD_VER }); // 열어 둔 화면이 옛 버전이면 클라이언트가 스스로 새로 고친다
   const tuned = tuneOverrides();
   const voiceTuned = voiceOverrides();
   if (Object.keys(voiceTuned).length > 0) conn.send({ t: "voice", words: voiceTuned });

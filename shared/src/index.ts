@@ -438,6 +438,7 @@ export type ClientMsg =
   | { t: "record" }; // 지금까지의 기록 요청(중도 종료 전에 확인용)
 
 export type ServerMsg =
+  | { t: "ver"; ver: string } // 서버가 서비스 중인 클라이언트 버전(changelog 맨 위 버전). 접속하면 제일 먼저 온다. 열어 둔 화면이 옛 버전이면 새로 고친다
   | { t: "rooms"; rooms: RoomInfo[] } // 로비에 있는 동안 방 목록이 바뀔 때마다 온다
   | { t: "terrain"; items: [number, number, number, number, number][] } // 이번 판의 지형(스프라이트 번호, x, y, 배율, 뒤집기). 비면 평지
   | { t: "voice"; words: Record<string, string[]> } // 음성 명령 단어(기본과 다른 묶음만). 받으면 기본 단어로 되돌린 뒤 적용한다

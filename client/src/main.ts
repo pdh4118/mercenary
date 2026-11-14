@@ -1547,6 +1547,22 @@ async function main() {
     };
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data) as ServerMsg;
+      if (msg.t === "ver") {
+        // 서버가 새 버전으로 바뀌었는데 열어 둔 화면이 옛 것이면(예: 카드 두 줄 선택을 못 그린다) 새로 고친다. 1분 안에 이미 새로 고쳤다면 반복하지 않고 안내만 한다
+        if (msg.ver && __BUILD_VER__ && msg.ver !== __BUILD_VER__) {
+          const last = Number(sessionStorage.getItem("merc_reload_at") ?? 0);
+          const again = Date.now() - last > 60_000;
+          const bar = document.createElement("div");
+          bar.style.cssText = "position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:99;background:#7a2a2a;color:#fff;padding:10px 18px;border-radius:8px;font-size:15px;font-weight:700;box-shadow:0 2px 10px #000a";
+          bar.textContent = again ? `새 버전(${msg.ver})이 나왔습니다. 화면을 새로 고칩니다...` : `새 버전(${msg.ver})이 나왔습니다. Ctrl+F5로 새로 고쳐 주세요.`;
+          document.body.append(bar);
+          if (again) {
+            sessionStorage.setItem("merc_reload_at", String(Date.now()));
+            setTimeout(() => location.reload(), 1200);
+          }
+        }
+        return;
+      }
       if (msg.t === "voice") {
         applyVoiceWords(msg.words, true); // 서버에서 고친 음성 명령 단어를 같이 쓴다
         return;
