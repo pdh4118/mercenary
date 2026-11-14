@@ -681,3 +681,20 @@ test("공성전: 근접 용병은 주변에 졸개가 없어도 성문으로 가
   void ids;
   assert.ok(gate.hp < hp0 || (g as any).siege.open, `성문 체력이 줄었다(${Math.round(hp0)} -> ${Math.round(gate.hp)})`);
 });
+
+test("충돌형 적 기병은 부딪혀도 돌아서 빠지지 않고 속도를 조금만 잃으며, 몸이 닿지 않으면 맞지 않는다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const p = g.getPlayer(a)!;
+  const e = (g as any).makeEnemy(p.x + 200, p.y, 0, {});
+  e.ram = true; e.momentum = 1; e.ramT = 0;
+  const st = ENEMY_STATS[0]!;
+  const f = { x: e.x + st.radius + 20 + 8, y: e.y, radius: 20, ownerId: a, hit: () => 0, merc: undefined };
+  (g as any).enemyBump(e, [f], 10, 0); // 8px 떨어진 곳(예전 여유 안): 닿지 않았으니 맞지 않는다
+  assert.equal(e.momentum, 1, "닿지 않으면 속도가 그대로");
+  f.x = e.x + st.radius + 20 - 4; // 실제로 겹침
+  (g as any).enemyBump(e, [f], 10, 0);
+  assert.ok(e.momentum < 1 && e.momentum > 0.8, `속도를 조금만 잃는다(${e.momentum})`);
+  assert.equal(e.ramT, 0, "돌아서 빠지지 않고 그대로 달린다");
+});

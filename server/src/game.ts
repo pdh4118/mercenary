@@ -310,6 +310,7 @@ import { type ArmySlot, SQUAD_KINDS, armyComposition, armyLayout, armySize, boss
 
 /** 이 대상(주인공 또는 병종)에게 전설 능력이 있는가 */
 /** 한 번에 n발을 쏠 때 i번째 화살의 각도 오프셋: 0번은 정면, 나머지는 좌우로 번갈아 퍼진다 */
+const ENEMY_RAM_LOSS_FRAC = 0.35; // 충돌형 적 기병이 부딪힐 때 잃는 속도(아군 기병 충돌 손실 대비)
 const fanOffset = (i: number, n: number): number => {
   if (i === 0 || n <= 1) return 0;
   const k = Math.ceil(i / 2);
@@ -7531,19 +7532,19 @@ export class Game {
     const maxSpeed = this.enemySpeed(e);
     for (const f of friendlies) {
       const d = Math.hypot(f.x - e.x, f.y - e.y);
-      if (d > st.radius + f.radius + 8 || ((f.x - e.x) * fx + (f.y - e.y) * fy) / (d || 1) < 0.2) continue;
+      if (d > st.radius + f.radius || ((f.x - e.x) * fx + (f.y - e.y) * fy) / (d || 1) < 0.4) continue; // 몸이 실제로 닿았을 때만(예전엔 +8px 여유가 있어 "왜 맞았지?" 싶었다)
       const key = `e${e.id}:${f.merc ? f.merc.id : -f.ownerId}`;
       if ((this.rams.get(key) ?? 0) > this.tick) continue;
       this.rams.set(key, this.tick + Math.ceil(TUNE.CAV_COLLIDE_CD * TICK_RATE));
       const before = cavSpeed(maxSpeed, e.momentum);
-      e.momentum *= 1 - TUNE.CAV_COLLIDE_LOSS;
-      const lost = before - cavSpeed(maxSpeed, e.momentum);
+      const mom0 = e.momentum;
+      const lost = before - cavSpeed(maxSpeed, mom0 * (1 - TUNE.CAV_COLLIDE_LOSS)); // 피해는 예전처럼 기본 손실 기준
+      e.momentum = mom0 * (1 - TUNE.CAV_COLLIDE_LOSS * ENEMY_RAM_LOSS_FRAC); // 충돌형 적 기병은 부딪혀도 속도를 조금만 잃고 뚫고 지나간다
       const dmg = TUNE.CAV_DAMAGE_PER_SPEED * lost * TUNE.CAV_COLLIDE_MULT * e.dmgMult;
       this.pushEvent(EVT_KNOCK, f.x, f.y, Math.atan2(f.y - e.y, f.x - e.x));
       const back = f.hit({ damage: dmg, charge: 0, srcType: CAVALRY, fromAngle: Math.atan2(e.y - f.y, e.x - f.x), src: e });
       if (back > 0) this.reflectToEnemy(e, back, f.ownerId, f.merc);
-      e.ramT = TUNE.CAV_RUNUP_SEC * 0.55; // 부딪혔으니 빠져나가 다시 속도를 붙인다
-      e.ramMin = Infinity;
+      // 부딪혀도 돌아서 빠지지 않고 그대로 달려 지나간다(지나친 뒤에야 돌아 나가 다시 속도를 붙인다: moveCavalry의 "지나쳤다" 판정)
       if (e.hp <= 0 || e.momentum < TUNE.CAV_COLLIDE_MIN_MOM) break;
     }
   }

@@ -637,9 +637,9 @@ export const BOSS_LORD = {
   catapultCd: 7,
   oilTele: 0.9, // 끓는 기름: 깔리기 전 예고
   oilPatches: 4, // 한 번에 깔리는 장판 수
-  oilRadius: 95,
-  oilSec: 8, // 장판이 남는 시간
-  oilDmg: 2, // 0.5초마다 들어오는 피해(배율)
+  oilRadius: 80,
+  oilSec: 5, // 장판이 남는 시간
+  oilDmg: 1, // 0.5초마다 들어오는 피해(배율)
   oilSlowMult: 0.7, // 장판 위 이동 속도 배율
   oilGateRange: 520, // 성문 둘레 이 거리 안의 대상을 노린다
   oilCd: 9,

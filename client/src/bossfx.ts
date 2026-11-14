@@ -1072,9 +1072,12 @@ export async function createBossFx(d: BossFxDeps) {
               boulderSprites.set(id, bs);
             }
             boulderSeen.add(id);
-            const fall = (1 - pr) * (1 - pr);
-            bs.position.set(x, y - 30 - fall * 760);
-            bs.scale.set((a * 0.62) / Math.max(1, T.boulder.height) * (0.8 + 0.5 * pr));
+            // 예고 원만 켜져 있다가 마지막 0.22초에 하늘에서 가속하며 내리꽂힌다(떨어지다 끝에서 느려지지 않고 "꿍" 하고 찍는다)
+            const DROP_B = 0.22;
+            const fp = Math.min(1, Math.max(0, 1 - remain / DROP_B));
+            bs.visible = remain <= DROP_B;
+            bs.position.set(x, y - 30 - (1 - fp * fp) * 760);
+            bs.scale.set((a * 0.62) / Math.max(1, T.boulder.height) * (0.8 + 0.5 * fp));
             bs.alpha = 1;
           }
           continue;
