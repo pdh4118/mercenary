@@ -46,7 +46,7 @@ test("용병 공용 카드가 기본이고, 병종 전용 카드는 그 병종�
     const base = MERC_STAT_BASE[c.effect.stat];
     assert.ok(Math.abs(c.effect.v - scaledValue(c.effect.stat, base, c.rarity as 0 | 1 | 2) * GLOBAL_CARD_FACTOR * (c.effect.stat === "lifesteal" ? 5 : 1)) < 2e-3, c.name);
   }
-  const special = new Set(["pierce", "multi", "poison", "cast", "knock", "quiver"]); // 피해 감소·피해 반사는 공용 카드
+  const special = new Set(["pierce", "multi", "poison", "slow", "cast", "knock", "quiver"]); // 피해 감소·피해 반사는 공용 카드
   for (const c of types) assert.ok(c.effect.k === "mercStat" && special.has(c.effect.stat), `${c.name}은 특화 능력치가 아니다`);
   // 병종마다 특화 능력치마다 일반/희귀/영웅 세 등급(방어구는 두 등급)이 있고, 모두 그 병종을 가진 사람에게만 나온다
   for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.filter((st) => special.has(st)).reduce((n, st) => n + (st === "multi" ? 2 : 3), 0));

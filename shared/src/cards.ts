@@ -64,7 +64,7 @@ for (const [id, d] of Object.entries(legendDescs())) LEGENDS[id as LegendId].des
 export const legendScopeName = (scope: LegendScope): string => (scope === "hero" ? "주인공" : UNIT_NAMES[scope]!);
 
 /** 용병 능력치 종류. 배율 계열(hp~area, xp)은 곱해지고, 나머지는 더해진다. 방어력·회피율·부활 속도·시전 속도는 더한 값 x를 x/(1+x) 꼴로 환산한다(상한 없음). */
-export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "lifesteal" | "pierce" | "multi" | "poison" | "armor" | "respawn" | "knock" | "thorns" | "xp" | "cast" | "quiver";
+export type MercStat = "hp" | "dmg" | "atkSpeed" | "speed" | "range" | "area" | "crit" | "critMult" | "defense" | "dodge" | "regen" | "lifesteal" | "pierce" | "multi" | "poison" | "slow" | "armor" | "respawn" | "knock" | "thorns" | "xp" | "cast" | "quiver";
 
 export type CardEffect =
   | { k: "leadership"; v: number } // 통솔력 +v
@@ -130,7 +130,8 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
   lifesteal: "흡혈",
   pierce: "관통",
   multi: "발사 수",
-  poison: "독 화살",
+  poison: "독 강화",
+  slow: "둔화 강화",
   armor: "피해 감소",
   respawn: "부활 속도",
   knock: "넉백",
@@ -141,7 +142,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 };
 /** 병종 전용 일반 카드 한 장의 효과량(이전의 1.5배: 후반에는 용병술이 더 중요하도록). 관통·발사 수는 개수라 그대로다. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.375, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.04, quiver: 6,
+  hp: 0.375, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.12, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, slow: 0.06, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.04, quiver: 6,
 };
 /** 수치 조정 도구로 바꿀 수 있는 카드 설정 */
 export const CARD_TUNE = { globalFactor: 0.35, globalLifesteal: 5, globalWeight: 6, legendWeight: 0.6, bloodthirstWeight: 1.6, legendMinLevel: 6 };
@@ -170,7 +171,7 @@ export const GLOBAL_CARD_FACTOR = 0.35; // 기본값(수치 조정 도구가 바
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
   ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "area", "xp"], // 기병
   ["hp", "dmg", "range", "defense", "armor", "thorns", "lifesteal", "atkSpeed", "area", "knock", "xp"], // 창병
-  ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "quiver", "armor", "knock", "xp"], // 궁병(화살이라 범위는 없다. 거리를 유지하는 병종이라 넉백을 쓴다)
+  ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "slow", "quiver", "armor", "knock", "xp"], // 궁병(화살이라 범위는 없다. 거리를 유지하는 병종이라 넉백을 쓴다)
   ["hp", "defense", "armor", "thorns", "regen", "lifesteal", "dmg", "respawn", "atkSpeed", "area", "xp"], // 검방병
   ["dmg", "area", "hp", "armor", "thorns", "lifesteal", "critMult", "atkSpeed", "xp"], // 둔기병
   ["dmg", "area", "range", "atkSpeed", "cast", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
@@ -188,6 +189,7 @@ export function describeStat(stat: MercStat, v: number): string {
   if (stat === "armor") return `-${v}`;
   if (stat === "thorns") return `${v}`;
   if (stat === "poison") return `화살 피해의 ${Math.round(v * 100)}%`;
+  if (stat === "slow") return `+${Math.round(v * 100)}%p`;
   if (stat === "knock") return `+${Math.round(v)}`;
   const pct = Math.abs(v) * 100;
   const text = pct >= 10 ? String(Math.round(pct)) : String(Math.round(pct * 10) / 10);
@@ -206,7 +208,9 @@ const EFFICIENCY_NOTE: Partial<Record<string, string>> = {
 };
 const statDesc = (t: number, stat: MercStat, v: number): string =>
   stat === "poison"
-    ? `${UNIT_NAMES[t]}만: 맞은 적이 ${describeStat(stat, v)}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)`
+    ? `${UNIT_NAMES[t]}만: 독 화살(1단계 승급 스킬)의 독이 세진다. 맞은 적이 화살 피해의 ${Math.round(v * 100)}%만큼 독 피해를 ${POISON_SEC}초에 걸쳐 더 입는다(방패에 막히면 없음)`
+    : stat === "slow"
+      ? `${UNIT_NAMES[t]}만: 얼음 화살(3단계 승급 스킬)에 맞은 적이 ${describeStat(stat, v)} 더 느려진다(이동 속도 하한 30%)`
     : stat === "thorns"
       ? `${UNIT_NAMES[t]}만: 근접 공격을 받으면 ${describeStat(stat, v)}의 피해를 공격자에게 되돌린다 (맞을 때마다 고정 피해, 방어력·방패와 무관, 화살·마법은 해당 없음)`
       : stat === "armor"
@@ -220,14 +224,14 @@ export const ARCHER_KNOCK_FACTOR = 0.5;
 const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 };
 
 /** 병종 전용 카드로만 나오는 능력치(그 병종의 특화): 관통·발사 수·독은 궁병, 방어구·가시는 몸으로 싸우는 병종, 시전 시간은 마법사, 넉백은 창병·궁병 */
-const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "cast", "knock", "quiver"]); // 피해 감소·피해 반사는 용병 공용 카드로 나온다
+const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "slow", "cast", "knock", "quiver"]); // 피해 감소·피해 반사는 용병 공용 카드로 나온다
 
 const statCards = (): CardDef[] => {
   const out: CardDef[] = [];
   for (const t of UNIT_TYPES) {
     for (const stat of MERC_TYPE_FOCUS[t]!) {
       if (!TYPE_ONLY_STATS.has(stat)) continue; // 그 병종만의 특화 능력이 아니면 용병 공용 카드로만 나온다
-      const special = stat === "pierce" || stat === "multi" || stat === "poison" || stat === "critMult" || stat === "thorns" || stat === "quiver";
+      const special = stat === "pierce" || stat === "multi" || stat === "poison" || stat === "slow" || stat === "critMult" || stat === "thorns" || stat === "quiver";
       for (let r = stat === "armor" || stat === "multi" ? 1 : 0; r < 3; r++) { // 방어구·발사 수는 희귀부터
         const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * (stat === "knock" && t === ARCHER ? ARCHER_KNOCK_FACTOR : 1));
         out.push({
@@ -245,7 +249,7 @@ const statCards = (): CardDef[] => {
     }
   }
   for (const stat of Object.keys(MERC_STAT_BASE) as MercStat[]) {
-    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "cast" || stat === "knock" || stat === "quiver") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
+    if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "slow" || stat === "cast" || stat === "knock" || stat === "quiver") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
     for (let r = stat === "armor" ? 1 : 0; r < 3; r++) { // 피해 감소는 희귀부터(일반은 0이다)
       const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * CARD_TUNE.globalFactor * (stat === "lifesteal" ? CARD_TUNE.globalLifesteal : 1));
       out.push({

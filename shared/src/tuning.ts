@@ -424,7 +424,7 @@ function build(): Map<string, Entry> {
   });
   const stats = Object.keys(MERC_STAT_BASE) as MercStat[];
   for (const st of stats) {
-    const fmt = st === "pierce" || st === "multi" || st === "armor" || st === "thorns" || st === "knock" ? undefined : st === "poison" ? undefined : "%";
+    const fmt = st === "pierce" || st === "multi" || st === "armor" || st === "thorns" || st === "knock" ? undefined : st === "poison" || st === "slow" ? undefined : "%";
     add({ key: `MERC_STAT_BASE.${st}`, label: `용병 ${MERC_STAT_LABEL[st]} 카드(일반 등급) 기준 효과`, group: "용병 능력치 카드", tab: "카드", min: 0, max: Math.max(2, MERC_STAT_BASE[st] * 5), step: MERC_STAT_BASE[st] < 0.05 ? 0.0005 : MERC_STAT_BASE[st] < 1 ? 0.005 : 0.5, sheet: "용병 능력치 카드", row: MERC_STAT_LABEL[st], col: "병종 전용 카드 기준 효과", unit: fmt, scale: fmt ? 100 : undefined, hint: "공용 카드는 이 값에 아래 '공용 카드 효율'을 곱합니다" }, () => MERC_STAT_BASE[st], (v) => (MERC_STAT_BASE[st] = v), true);
   }
   const ct = CARD_TUNE as Record<string, number>;

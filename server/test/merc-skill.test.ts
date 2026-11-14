@@ -204,3 +204,13 @@ test("마법사: 점멸은 멀어지고 연쇄 운석은 시간차로 떨어진�
     assert.ok(es.some((x: any) => x.hp < x.maxHp));
   });
 });
+
+test("둔화 강화 카드: 얼음 화살의 둔화가 더 강해진다", () => {
+  withLevels(() => {
+    const { g, m } = setup(ARCHER, 3);
+    (g as any).slots.get(m.owner).mods.type[ARCHER].slow = 0.2;
+    const e = dummy(g, 500, 500);
+    (g as any).damageEnemy(e, { damage: 10, charge: 0, srcType: ARCHER, fromAngle: 0 }, m.owner, m);
+    assert.ok(e.slowMult < SK.iceMult);
+  });
+});

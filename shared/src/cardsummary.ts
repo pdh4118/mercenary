@@ -21,7 +21,7 @@ const HERO_ROW: Partial<Record<CardEffect["k"], MercStat>> = {
   heroArmor: "armor", heroCrit: "crit", heroCritMult: "critMult", heroArea: "area", heroKnock: "knock", heroThorns: "thorns", heroDefense: "defense", heroDodge: "dodge",
   heroRegen: "regen", heroLifesteal: "lifesteal", heroCast: "cast",
 };
-const ROW_ORDER: MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "crit", "critMult", "defense", "dodge", "regen", "lifesteal", "armor", "thorns", "pierce", "multi", "poison", "knock", "quiver", "cast", "xp", "respawn"];
+const ROW_ORDER: MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "crit", "critMult", "defense", "dodge", "regen", "lifesteal", "armor", "thorns", "pierce", "multi", "poison", "slow", "knock", "quiver", "cast", "xp", "respawn"];
 
 const pct = (v: number) => {
   const p = Math.abs(v) * 100;
@@ -95,7 +95,7 @@ export function summarizePicks(picks: readonly number[]): CardSummary {
     if (!r) continue;
     rows.push({
       label: MERC_STAT_LABEL[stat],
-      cells: r.map((v, col) => (v === 0 ? "" : col === 0 ? heroText(heroKey.get(stat)!, v) : stat === "poison" ? `${Math.round(v * 100)}%` : describeStat(stat, v))),
+      cells: r.map((v, col) => (v === 0 ? "" : col === 0 ? heroText(heroKey.get(stat)!, v) : stat === "poison" || stat === "slow" ? `${Math.round(v * 100)}%` : describeStat(stat, v))),
     });
   }
   for (const h of heroOnly.values()) rows.push({ label: h.label, cells: ["", ...Array(nCol - 1).fill("")].map((_, col) => (col === 0 ? heroText(h.k, h.v) : "")) });

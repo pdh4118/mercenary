@@ -342,7 +342,7 @@ type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "xp"];
 const newMercMods = (): MercMods => ({
   hp: 1, dmg: 1, atkSpeed: 1, speed: 1, range: 1, area: 1, respawn: 0, cast: 0,
-  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, armor: 0, knock: 0, thorns: 0, xp: 1, quiver: 0,
+  crit: 0, critMult: 0, defense: 0, dodge: 0, regen: 0, lifesteal: 0, pierce: 0, multi: 0, poison: 0, slow: 0, armor: 0, knock: 0, thorns: 0, xp: 1, quiver: 0,
 });
 /** 전체 강화와 병종 강화를 합친 값 */
 const NO_PERSONALITY: Personality = { name: "", short: "", mods: {}, ignore: 0 };
@@ -6478,7 +6478,7 @@ export class Game {
     if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
     if (src?.type === ARCHER && skillOn(ARCHER, src.tier, 3) && hit.srcType === ARCHER && !hit.dot && r.body > 0 && e.hp > 0) {
       e.slowT = Math.max(e.slowT ?? 0, SK.iceSec); // 얼음 화살
-      e.slowMult = SK.iceMult;
+      e.slowMult = Math.max(0.3, SK.iceMult - (owner ? mstat(owner.mods, ARCHER, "slow") : 0)); // 둔화 강화 카드
     }
     // 흡혈: 카드로 쌓은 비율 + 전설 피의 갈증(치명타는 2배). 때린 쪽(주인공 또는 그 병종)만 회복한다.
     const steal = (owner ? (src ? this.pstat(src, owner.mods, "lifesteal") : owner.mods.heroLifesteal) : 0) + (has("bloodthirst") ? LEGEND_CONST.bloodthirstFrac : 0);
