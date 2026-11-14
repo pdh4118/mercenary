@@ -1675,3 +1675,39 @@ Avoid: realistic horse legs, long thin legs, different rider poses between frame
 **13-7 다리 애니메이션 진행**: 달리기 4컷 + 사격 4컷 받음, 적용됨(베타 1.305). 기수·몸은 거의 같고 말 다리만 바뀌어 한 번에 맞게 나왔다. `assets/units/boss7_gallop_0~3`·`boss7_shoot_0~3`(189x172 같은 캔버스; 기수 모자 위치로 가로를 맞춰 몸이 흔들리지 않게 했다). 코드: `BossArt.run`이 있으면(`bossfx.ts`) `main.ts`가 이동 거리 14px마다 한 컷씩 돌린다(멈추면 첫 컷). 정지 그림은 프레임이 없을 때 대체.
 
 **정정**: 앞에서 기마궁수가 분신 잔상에 같은 그림을 쓴다고 적은 것은 틀렸다. 분신 돌진(`HZ_GHOST`)은 **창병 장군(스테이지 2)의 스킬**이고, 분신은 그 스테이지의 `boss2_thrust`(달리며 찌름)·`boss2_idle`(서 있음) 그림을 쓴다.
+
+### 13-1 추가. 기병 장군 뒷발차기 - `assets/units/boss1_kick`(포즈 1장) + `assets/fx/boss1_kick_fx_0~3`(이펙트 4컷)
+
+**왜**: 지금 뒷발차기는 앞발 드는 공격 그림이 나오고 먼지 충격만 한 번 생겨서 **발로 차는 느낌이 없다.** 코드로 그림을 기울이는 임시 방식은 쓰지 않기로 해서 되돌렸고, 전용 **포즈 그림 + 이펙트 그림**을 받아 연결한다. 연결 지점은 `bossfx.ts`의 `BFX_KICK` 처리(서버는 이미 `BFX_KICK`을 보낸다)와 `boss1` 자세(`BSK_KICK`일 때 `boss1_kick`).
+**따로 두 번 요청한다**: ① 포즈 그림 ② 이펙트 4컷(캐릭터가 없는 효과만).
+**첨부(① 포즈)**: `main_style_sheet.png`, `boss1_new_ref.png`(현재 기병 장군 서 있기·앞발 들기). **첨부(② 이펙트)**: `main_style_sheet.png`만.
+**받은 뒤**: ① 서 있는 그림과 같은 캔버스·앞발 위치로 맞춰 `boss1_kick.png`로 넣고, ② 로 `boss1_kick_fx_0~3`을 뒷발 위치에 4컷 재생한다.
+
+#### ① 뒷발차기 포즈 (제미나이에 붙여넣는 최종본)
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is the CHARACTER reference: this exact cavalry general boss (the mounted warlord with the tall dark helmet with an orange horsehair plume, dark crimson and black armor, black war banner with an orange emblem, long lance, and his dark armored warhorse in two poses: standing and rearing). Draw the SAME character (same rider, same horse, same armor, same colors, same size and proportions, same outline) in ONE new pose.
+
+Make ONE sprite sheet image with one item, large, with at least 40px of empty space around it, a small caption under it ("boss1_kick"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+The pose "boss1_kick": a BACK KICK (a horse bucking). The horse leans forward with its FRONT legs planted on the ground and its head lowered, while both HIND legs are thrown up and backward behind it, kicked high with the hooves pointing backward (to the left of the picture), the rump lifted high. The horse's body is tilted nose-down, tail flying up. The rider holds on, leaning back slightly with the lance pointing forward to the right, the cape and banner flying forward from the sudden jolt. The horse's hind hooves must be clearly visible and clearly kicking out to the left, high above the ground. Facing right (the horse's head to the right, its kicking hooves to the left). Same character size and the same front-hoof ground position as the standing pose in Image 2.
+
+Style: cute chibi exactly like Image 1 and Image 2 (huge round rider head, short stout chibi horse with short thick legs), a thick near-black outline about 2-3px with no light fringe, flat cel-shaded colors in 2-3 tones, no gradients, no motion lines, no dust, no speed effects, no impact effects (they are drawn separately).
+
+Avoid: realistic horse, long thin legs, motion lines, dust, impact flash, shadows, ground line, checkerboard pattern, cropped items, logo, watermark, any text other than the caption.
+```
+
+#### ② 뒷발차기 이펙트 4컷 (제미나이에 붙여넣는 최종본)
+
+```
+Generate an image. I attached one image: Image 1 is the art STYLE reference (copy its flat cel-shaded, thick-outlined cartoon style). Draw a short VISUAL EFFECT animation, four frames in one row, on a plain flat light-gray background with at least 40px of empty space around each frame, captions "boss1_kick_fx_0", "boss1_kick_fx_1", "boss1_kick_fx_2", "boss1_kick_fx_3". No characters, no ground line, no logo or watermark.
+
+The effect is the impact of a horse's hind-legs back kick, seen from the side, flying to the LEFT of the picture:
+- frame 0: two sharp, thin curved white-and-pale-orange speed arcs (crescent swooshes) starting at the right and sweeping toward the left, thick at the middle and tapering at both ends, like two hoof kicks one above the other, small;
+- frame 1: the arcs bigger and brighter, with a small flat star-shaped impact burst (pale yellow and white, thick outline) at their left tip;
+- frame 2: the impact burst at its largest, a flat jagged burst with a few small flat dust puffs (cream colored, thick outline) flying left;
+- frame 3: the burst gone, only the dust puffs drifting and fading, smaller and paler.
+Style: flat cel-shaded shapes in 2-3 tones with a thick dark orange-brown outline about 2px, no gradients, no glow blur, no realistic smoke. All four frames centered on the same point (the center of the burst) and the same canvas size, each about 200x200 in a 4x1 layout.
+
+Avoid: gradients, glow blur, realistic smoke, characters, horse, text other than the four captions, ground line, logo, watermark.
+```

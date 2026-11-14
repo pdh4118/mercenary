@@ -51,7 +51,6 @@ import {
   EF_STEALTH,
   EF_MAD,
   BSK_RAMPAGE,
-  BSK_KICK,
   EF_SKEL,
   EF_ELITE,
   EF_POST,
@@ -2509,8 +2508,6 @@ async function main() {
         }
         const as = v.art.scale * (BOSS_SIZE / BOSS_SIZE_BASE); // 장군 크기 배율이 바뀐 만큼 그림도 키운다
         v.sprite.scale.set(as * v.face, as);
-        // 기병 장군 뒷발차기: 몸을 앞으로 숙여(코를 숙이고) 뒤쪽이 들리게 한다. 차기 직전까지 점점 더 숙이다 찬 뒤 풀린다.
-        v.sprite.rotation = latest?.g?.stage === 1 && (w[13] ?? 0) === BSK_KICK ? 0.42 * v.face : 0;
         if (latest?.g?.stage === 8 && ((((w[14] ?? 0) & EF_MAD) !== 0) || (w[13] ?? 0) === BSK_RAMPAGE)) heatTint = bossFx.wheelHeat(w[0]!, v.x, v.y, as * v.face, performance.now()); // 전차 장군 폭주: 달아오른 바퀴
       } else if (((w[14] ?? 0) & EF_SUPPLY) !== 0 && bossFx.supply.idle) {
         // 군량병: 도망칠 때는 달리는 그림, 멈추면 서 있는 그림, 맞은 직후에는 놀란 그림
