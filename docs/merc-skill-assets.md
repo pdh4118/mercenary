@@ -203,7 +203,7 @@ Avoid: gradients, glow blur, realistic fire, realistic smoke, characters, text o
 
 | 에셋 | 상태 |
 |---|---|
-| 스킬 아이콘 24종 | 요청 전 |
+| 스킬 아이콘 | **궁병·기병·창병·검방병·둔기병 20종 받음, 적용됨(베타 1.312)**: `assets/ui/mskill_<archer|cav|spear|shield|blunt>_1~4`(약 131x129). 회색 배경을 지우고 같은 배율로 잘랐다. 용병 패널에 22px 4칸(얻은 스킬 밝게, 아직인 스킬 어둡게, 올리면 설명)으로 표시. **마법사 4종은 아직**(`mskill_mage_1~4`). 기병 3번(철갑마)은 대포처럼 보여 다시 요청 권장 |
 | 이동·은신 이펙트 | 요청 전 |
 | 타격·방어 이펙트 | 요청 전 |
 | 지면·마법·화살 이펙트 | 요청 전 |

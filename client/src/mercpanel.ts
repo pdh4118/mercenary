@@ -14,6 +14,22 @@ export interface MercPanel {
   hovered(): number;
 }
 
+const SKILL_ICON = ["cav", "spear", "archer", "shield", "blunt", "mage"] as const;
+/** 승급 스킬 4칸: 얻은 스킬은 밝게, 아직인 스킬은 어둡게(금색 테두리 = 액티브, 은청색 = 패시브). 마우스를 올리면 설명 */
+function skillStrip(type: number, tier: number): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "skstrip";
+  (MERC_SKILLS[type] ?? []).forEach((sk, i) => {
+    const img = document.createElement("img");
+    img.src = `assets/ui/mskill_${SKILL_ICON[type]}_${i + 1}.png`;
+    img.className = tier >= i + 1 ? "on" : "off";
+    img.title = `${i + 1}단계 ${sk.name} (${sk.kind === "passive" ? "패시브" : "액티브"}): ${sk.desc}`;
+    img.onerror = () => img.remove(); // 그림이 아직 없는 병종은 칸을 감춘다
+    box.append(img);
+  });
+  return box;
+}
+
 /** 강화할 수 있는 상태인가: 경험치를 다 채웠고 최고 단계가 아니다 */
 export const isReady = (w: MercWire): boolean => w[8] <= 0 && w[15] < 4 && mercProg(w[15], w[17]).ready;
 
@@ -172,6 +188,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           bar.append(fill);
           name.append(bar);
         }
+        if (TUNE.LV_MODE) name.append(skillStrip(type, tier));
         const nextSkill = TUNE.LV_MODE ? MERC_SKILLS[type]?.[tier] : undefined;
         const bonus = nextSkill ? [`${nextSkill.name}(${nextSkill.kind === "passive" ? "패시브" : "액티브"}): ${nextSkill.desc}`] : TUNE.LV_MODE ? [] : nextTierBonus(type, tier);
         if (bonus.length > 0) {
