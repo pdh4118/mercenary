@@ -14,6 +14,7 @@ import {
   EVT_KNOCK,
   BOSS_LORD,
   HZ_CALTROP,
+  BFX_CALTROPHIT,
   HZ_GATE,
   HZ_OIL,
   HZ_FIRE,
@@ -455,6 +456,7 @@ export class BossSystem {
             h.hit.add(key);
             this.hitFriendly(boss, f, h.dmg, 0);
             f.status(ST_SLOW, h.d.slow ?? 2, h.d.mult ?? 0.5);
+            this.fx(f.x, f.y, 0, BFX_CALTROPHIT);
           }
           break;
         }

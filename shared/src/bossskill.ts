@@ -186,6 +186,7 @@ export const BFX_BOLT = 21; // 군주 처형령 벼락(맞은 자리, 위에서 
 export const BFX_RALLY = 22; // 군주 호령: 군주 중심으로 번지는 진홍색 고리
 export const BFX_SUMMON = 23; // 군주 근위대 소집: 소환진(위치 = 소환진 중심)
 export const BFX_MBASH = 26; // 검방병(일반 유닛·용병·주인공 검)의 방패 밀치기 베기(ang = 방향, owner = 사거리 x 4 + 편)
+export const BFX_CALTROPHIT = 29; // 마름쇠를 밟아 찔림(작은 빨간 충격 3컷)
 export const BFX_KICK = 28; // 기병 장군 뒷발차기: 몸 뒤에서 발굽이 찍는 호와 충격(ang = 뒤쪽 방향, owner = 사거리)
 export const BFX_MSMASH = 27; // 둔기병(일반 유닛·용병·주인공 철퇴)의 내려찍기(ang = 방향, owner = 사거리 x 4 + 편)
 export const BFX_GATEHIT = 25; // 성문을 때리는 충격(섬광·먼지·소리, owner = 때린 플레이어)

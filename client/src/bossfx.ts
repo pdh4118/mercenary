@@ -14,6 +14,7 @@ import {
   BFX_MSMASH,
   BFX_DRIFT,
   BFX_KICK,
+  BFX_CALTROPHIT,
   BFX_BOLT,
   BFX_RALLY,
   BFX_SUMMON,
@@ -173,6 +174,7 @@ export async function createBossFx(d: BossFxDeps) {
     impact: ["boss1_impact", [0, 1, 2, 3]],
     kickFx: ["boss1_kick_fx", [0, 1, 2, 3]],
     caltrop: ["caltrop", [0, 1, 2]],
+    caltropHit: ["caltrop_hit", [0, 1, 2]],
     thrust: ["boss2_thrust", [0, 1, 2]],
     dust: ["boss3_dust", [0, 1, 2, 3]],
     bashArc: ["fx_bash_arc", [0, 1, 2, 3]],
@@ -423,6 +425,10 @@ export async function createBossFx(d: BossFxDeps) {
       playSeq(T.summon, x, y, 1.0, 1.7, 0, 0.5, false, 0.95, 0xffffff, 0.79);
     } else if (val === BFX_SLAM) {
       playSeq(T.slam, x, y, 0.6, (len * 2) / 190, 0, 0.5, false, 0.9, 0xffffff, 0.64);
+    } else if (val === BFX_CALTROPHIT) {
+      // 마름쇠를 밟아 찔림: 발치에 작은 충격 3컷
+      playSeq(T.caltropHit, x, y - 6, 0.34, 0.42, 0);
+      d.sound("knockback", x, y, 0.4);
     } else if (val === BFX_KICK) {
       // 뒷발차기: 몸 뒤쪽으로 발굽 호가 그어지며 걷어찬 자리에 충격·먼지가 터진다(그림은 왼쪽으로 날아가는 모양이라 뒤쪽 방향 ang에서 PI를 뺀다)
       const reach = len > 0 ? len : 130;
