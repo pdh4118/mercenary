@@ -427,7 +427,9 @@ test("용병이 처치하면 주인이 금화를 얻는다", () => {
   assert.equal(me(g, a).kills, 1);
 });
 
-test("용병도 체력이 0이면 쓰러졌다가 일정 시간 뒤 부활한다", () => {
+test("용병도 체력이 0이면 쓰러졌다가 일정 시간 뒤 부활한다", (t) => {
+  TUNE.LV_MODE = 0; // 단계제(예전 방식) 검사
+  t.after(() => { TUNE.LV_MODE = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);

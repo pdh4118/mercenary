@@ -300,6 +300,7 @@ import {
   levelHp,
   levelDmg,
   levelXpCap,
+  levelXpAt,
   mercLevel,
   promoLevel,
   TIER_REACH,
@@ -3288,6 +3289,7 @@ export class Game {
     let num = 1;
     while (used.has(num)) num++;
     const merc: Merc = { num, id, type, owner, x, y, hp: MERC_STATS[type]!.hp, atkT: 0, atkAng: 0, face: 0, cd: 0, respawn: 0, paid, evadeT: 0, flankT: 0, tier, nameId: nameId === undefined ? this.pickName(owner) : sameEpithetName(nameId, usedNames), xp: 0, shield: 0, regenT: 0, momentum: 0, chargeSnap: 0, career: newCareer() };
+    if (TUNE.LV_MODE && tier > 0) merc.xp = levelXpAt(promoLevel(tier - 1)); // 높은 단계를 바로 산 용병은 그 승급 레벨에서 시작한다
     this.mercs.set(id, merc);
     merc.hp = this.mercStats(merc).hp; // 이미 받은 강화가 반영된 체력으로 시작한다
     merc.shield = this.mercStats(merc).shield;

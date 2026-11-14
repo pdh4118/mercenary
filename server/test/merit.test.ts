@@ -86,7 +86,9 @@ test("기여도: 처치 보너스는 센 적을 잡을수록 크고, 어시스�
   assert.ok(m1.career.score - s0 < bonus, "약한 적은 보너스가 작다");
 });
 
-test("경험치: 단계가 높을수록 더 받고, 토너먼트에서는 절반 비율이며, 병종 보정이 곱해진다", () => {
+test("경험치: 단계가 높을수록 더 받고, 토너먼트에서는 절반 비율이며, 병종 보정이 곱해진다", (t) => {
+  TUNE.LV_MODE = 0; // 단계제(예전 방식) 검사
+  t.after(() => { TUNE.LV_MODE = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;

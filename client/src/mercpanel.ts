@@ -1,4 +1,4 @@
-import { personalityOf, nextTierBonus, unitCost, mercName, mercProg, TUNE, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
+import { personalityOf, nextTierBonus, unitCost, mercName, mercProg, MERC_SKILLS, TUNE, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -172,11 +172,12 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           bar.append(fill);
           name.append(bar);
         }
-        const bonus = nextTierBonus(type, tier);
+        const nextSkill = TUNE.LV_MODE ? MERC_SKILLS[type]?.[tier] : undefined;
+        const bonus = nextSkill ? [`${nextSkill.name}(${nextSkill.kind === "passive" ? "패시브" : "액티브"}): ${nextSkill.desc}`] : TUNE.LV_MODE ? [] : nextTierBonus(type, tier);
         if (bonus.length > 0) {
           const b = document.createElement("div");
           b.className = "bonus";
-          b.textContent = `강화 시: ${bonus.join(" · ")}`;
+          b.textContent = `${TUNE.LV_MODE ? "승급 시 스킬" : "강화 시"}: ${bonus.join(" · ")}`;
           name.append(b);
         }
         row.append(dot, name);

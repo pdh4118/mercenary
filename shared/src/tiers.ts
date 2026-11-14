@@ -44,6 +44,12 @@ export const levelXpCap = (): number => {
   for (let l = 0; l < TUNE.LV_MAX; l++) t += levelNeed(l);
   return t;
 };
+/** 레벨 모드: 그 레벨에 막 도달한 용병의 누적 경험치 */
+export const levelXpAt = (lv: number): number => {
+  let t = 0;
+  for (let l = 0; l < lv; l++) t += levelNeed(l);
+  return t;
+};
 /** 레벨 모드: 누적 경험치 → 레벨 */
 export const mercLevel = (xp: number): number => {
   let lv = 0;

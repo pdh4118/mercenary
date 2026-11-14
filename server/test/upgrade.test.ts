@@ -108,7 +108,9 @@ test("병종 카드: 기병 속도 카드는 기병만 빠르게 한다", () => 
   assert.ok(Math.abs(g.mercStatsForTest(cav).speed - MERC_STATS[CAVALRY]!.speed * 1.12 * 1.024) < 1e-9);
 });
 
-test("용병 강화: 단계가 오를 때마다 금화를 내고 능력치가 오르며 최고 단계에서 멈춘다", () => {
+test("용병 강화: 단계가 오를 때마다 금화를 내고 능력치가 오르며 최고 단계에서 멈춘다", (t) => {
+  TUNE.LV_MODE = 0; // 단계제(예전 방식) 검사
+  t.after(() => { TUNE.LV_MODE = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = g.getPlayer(a)!;
@@ -221,7 +223,9 @@ test("용병 경험치: 피해를 주거나 받으면 조금, 막타를 치면 �
   assert.ok(g.getMerc(m)!.career.kills >= 1 && g.getMerc(m)!.career.score > 0, "처치와 기여도가 기록된다");
 });
 
-test("용병 강화는 경험치를 모아야 가능하고, 강화하면 경험치가 소모된다", () => {
+test("용병 강화는 경험치를 모아야 가능하고, 강화하면 경험치가 소모된다", (t) => {
+  TUNE.LV_MODE = 0; // 단계제(예전 방식) 검사
+  t.after(() => { TUNE.LV_MODE = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   g.getPlayer(a)!.gold = 10_000;

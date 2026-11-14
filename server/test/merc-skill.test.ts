@@ -33,7 +33,10 @@ const dummy = (g: Game, x: number, y: number, shield = 0) => {
 };
 
 test("스킬은 레벨 모드에서 승급 단계에 따라 열린다", () => {
+  const keep = TUNE.LV_MODE;
+  TUNE.LV_MODE = 0;
   assert.equal(skillOn(ARCHER, 4, 1), false); // 레벨 모드가 꺼져 있으면 없다
+  TUNE.LV_MODE = keep;
   withLevels(() => {
     assert.equal(skillOn(ARCHER, 0, 1), false);
     assert.equal(skillOn(ARCHER, 1, 1), true);
