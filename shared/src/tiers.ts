@@ -37,7 +37,7 @@ export const MERC_XP_TYPE_MULT = [1.17, 0.75, 1.33, 1.3, 0.55, 1.0] as const;
 export const mercXpNeed = (tier: number): number => MERC_XP_NEED[tier] ?? Infinity;
 
 /** 레벨 모드: 레벨 L→L+1에 필요한 경험치 */
-export const levelNeed = (lv: number): number => TUNE.LV_XP_BASE + TUNE.LV_XP_STEP * lv;
+export const levelNeed = (lv: number): number => Math.round(TUNE.LV_XP_BASE + TUNE.LV_XP_STEP * lv);
 /** 레벨 모드: 최고 레벨까지 쌓을 수 있는 경험치 총량 */
 export const levelXpCap = (): number => {
   let t = 0;
