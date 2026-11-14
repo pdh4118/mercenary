@@ -182,14 +182,14 @@ Avoid: gradients, glow blur, realistic fire, realistic smoke, characters, text o
 |---|---|---|
 | `mskill_jump` | 궁병 뒤로 점프 | a quick leather boot push-off with a short cloth whoosh and a soft thud landing, no voice, 0.4 seconds |
 | `mskill_stealth` | 궁병 은신 | a soft airy shimmer, a quiet cloth rustle fading into near silence, no voice, 0.6 seconds |
-| `mskill_stealth_end` | 은신 해제 | close-up and loud: a sharp snap of a thick cloak being thrown off with a crisp leather whip crack right at the very first moment, followed by a short bright bow string twang, dry and punchy, no reverb, no voice, 0.3 seconds |
+| `mskill_stealth_end` | 은신 해제 | subtle and gentle: a soft cloth rustle with a faint airy shimmer slowly fading in, as if someone quietly steps out of the shadows, delicate, no sharp attack, no voice, 0.6 seconds |
 | `mskill_gallop` | 기병 일제 질주 | several horse hooves breaking into a gallop with a short rising wind whoosh, no voice, 0.7 seconds |
 | `mskill_phantom` | 환영 기병대 | a ghostly low horse whinny blended with a airy magical whoosh and distant hoof beats, no human voice, 0.8 seconds |
 | `mskill_spear_throw` | 창 던지기 | a heavy spear thrown, a short strained whoosh and a sharp thunk into a target, no voice, 0.5 seconds |
-| `mskill_lunge` | 돌진 찌르기 | close-up and loud: a fast boot stomp then a violent spear stab, a sharp metallic stab impact right at the very first moment followed by a short air whoosh tail, dense, punchy and powerful, no voice, 0.4 seconds |
+| `mskill_lunge` | 돌진 찌르기 | a spear thrust sound effect: a fast air-cutting whoosh that ends in a sharp metallic stab hit, swoosh then shink, clear and punchy, no voice, 0.6 seconds |
 | `mskill_bash` | 방패 밀치기 | a wooden shield slamming into armor with a dull heavy thud and a small metal clank, no voice, 0.3 seconds |
 | `mskill_thorn` | 가시 방패 반사 | a short sharp metallic scrape and spark zing as spikes scratch a weapon, no voice, 0.25 seconds |
-| `mskill_taunt` | 도발 결계 | loud and clear: a short medieval war horn blast, one low brass horn note with a sharp attack, followed by two quick heavy sword strikes banged on a shield, battlefield provocation, dense and powerful, no voice, 1.0 seconds |
+| `mskill_taunt` | 도발 결계 | layered battle provocation: three rapid heavy war drum hits, swords banging on shields in a rolling rhythm and a low brass horn swell with a little echo, rising and intimidating, rich and full, no voice, 1.2 seconds |
 | `mskill_leap` | 둔기병 도약 내려찍기 | a heavy armored jump, a whoosh and a huge crunching ground slam with rocks, no voice, 0.7 seconds |
 | `mskill_quake` | 지진 | close-up, very loud and powerful: a huge ground slam, a deep thunderous boom with a sharp heavy impact at the very first moment, cracking stone and a short rolling rumble tail, dense and full, no voice, 1.0 seconds |
 | `mskill_blink` | 마법사 점멸 | a quick magical pop with a tiny glassy sparkle whoosh, no voice, 0.3 seconds |
@@ -200,6 +200,8 @@ Avoid: gradients, glow blur, realistic fire, realistic smoke, characters, text o
 연쇄 운석은 기존 운석 소리를 쓰고, 연속 찌르기·돌파·철갑마·수호·분쇄·충격파·마력 집중 같은 패시브는 소리를 따로 만들지 않습니다(평소 타격 소리를 씁니다).
 
 **다시 요청한 4종(받아 보니 소리가 너무 작거나 어울리지 않아서 문구를 바꿈)**: 은신 해제·돌진 찌르기·도발 결계·지진. 공통으로 `close-up and loud`, `sharp ... right at the very first moment`(시작 직후 강한 타격음), `dense and punchy`(꽉 찬 소리)를 넣어 소리가 작게 나오는 것을 막고, 도발 결계는 마법 허밍 대신 뿔피리와 방패 두드리는 소리로 바꿨다.
+
+**2차 수정(사용자 의견)**: 돌진 찌르기는 소리가 안 나와서 문구를 단순한 "휙 + 찌르는 쇳소리"로 바꾸고 길이를 0.6초로(생성 AI는 0.5초 아래를 못 만드는 듯), 은신 해제는 조용하고 은근하게 드러나는 소리로, 도발 결계는 경적 같은 단음 대신 북·방패·뿔피리를 겹친 소리로 바꿨다.
 
 ## 4. 진행 상황
 
