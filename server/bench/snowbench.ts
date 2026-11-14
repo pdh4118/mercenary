@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 if (process.env.PERS !== "1") process.env.MERC_NO_PERSONALITY = "1"; // PERS=1이면 성격을 켠다
-import { MERC_XP_TYPE_MULT, TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, mercXpNeed, mercLevel, promoLevel } from "@mercenary/shared";
+import { MERC_XP_TYPE_MULT, TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, SK, mercXpNeed, mercLevel, promoLevel } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 TUNE.ENEMY_CAV_RAM_FRAC = 0;
 if (process.env.SM) TUNE.MXP_STREAK_MAX = Number(process.env.SM);
@@ -22,6 +22,7 @@ const seeds = Number(process.env.SEEDS ?? 4);
 const secs = Number(process.env.SECS ?? 600);
 const per = Number(process.env.PER ?? 4);
 for (const k of ["LV_MODE", "LV_HP", "LV_DMG", "LV_XP_BASE", "LV_XP_STEP", "LV_MAX", "LV_PROMO_EVERY", "LV_TIER_KEEP"]) if (process.env[k] !== undefined) (TUNE as any)[k] = Number(process.env[k]);
+if (process.env.SKO) for (const kv of process.env.SKO.split(",")) { const [k, v] = kv.split("="); (SK as any)[k!] = Number(v); }
 const bonus = Number(process.env.TB ?? TUNE.MXP_TIER_BONUS);
 TUNE.MXP_TIER_BONUS = bonus;
 TUNE.MERC_TIER_POWER = Number(process.env.TP ?? TUNE.MERC_TIER_POWER);

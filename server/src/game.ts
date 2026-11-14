@@ -6484,7 +6484,11 @@ export class Game {
       e.atkT = 0;
       if (skillOn(BLUNT, src.tier, 3) && this.rng() < SK.shockChance) {
         // 충격파: 경직이 곁의 적에게 번진다
-        for (const o of this.enemies.values()) if (o !== e && !o.boss && o.hp > 0 && Math.hypot(o.x - e.x, o.y - e.y) <= SK.shockRange && sec > (o.stunT ?? 0)) { o.stunT = sec; o.atkT = 0; }
+        const near = [...this.enemies.values()]
+          .filter((o) => o !== e && !o.boss && o.hp > 0 && Math.hypot(o.x - e.x, o.y - e.y) <= SK.shockRange)
+          .sort((x, y) => Math.hypot(x.x - e.x, x.y - e.y) - Math.hypot(y.x - e.x, y.y - e.y))
+          .slice(0, SK.shockCount);
+        for (const o of near) if (sec * SK.shockFrac > (o.stunT ?? 0)) { o.stunT = sec * SK.shockFrac; o.atkT = 0; }
       }
       if (this.time - (e.staggerXpT ?? -9) >= 0.6) {
         e.staggerXpT = this.time;

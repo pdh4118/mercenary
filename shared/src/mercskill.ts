@@ -66,6 +66,8 @@ export const SK = {
   crush: 0.3, // 분쇄
   shockChance: 0.3, // 충격파
   shockRange: 110,
+  shockCount: 2, // 번지는 적 수
+  shockFrac: 0.5, // 번진 경직 길이(원래 대비)
   focusCast: 0.15, // 마력 집중: 시전 시간 감소
   focusArea: 0.1,
   emberSec: 3, // 불씨
