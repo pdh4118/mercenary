@@ -52,7 +52,9 @@ test("용병 공용 카드가 기본이고, 병종 전용 카드는 그 병종�
   for (const t of UNIT_TYPES) assert.equal(types.filter((c) => c.unitType === t).length, MERC_TYPE_FOCUS[t]!.filter((st) => special.has(st)).reduce((n, st) => n + (st === "multi" ? 2 : 3), 0));
 });
 
-test("카드를 고를 때마다 새로고침이 1회씩 쌓이고 상한이 있다", () => {
+test("카드를 고를 때마다 새로고침이 1회씩 쌓이고 상한이 있다", (t) => {
+  TUNE.CARD_ROWS = 0; // 한 줄(3장 중 하나) 방식 검사
+  t.after(() => { TUNE.CARD_ROWS = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   assert.equal(g.getPlayer(a)!.rerolls, REROLL_START);
@@ -63,7 +65,9 @@ test("카드를 고를 때마다 새로고침이 1회씩 쌓이고 상한이 있
   assert.equal(g.getPlayer(a)!.rerolls, REROLL_MAX);
 });
 
-test("새로고침: 제시된 카드를 다시 뽑고(겹치지 않게) 횟수를 쓴다. 없으면 실패", () => {
+test("새로고침: 제시된 카드를 다시 뽑고(겹치지 않게) 횟수를 쓴다. 없으면 실패", (t) => {
+  TUNE.CARD_ROWS = 0; // 한 줄(3장 중 하나) 방식 검사
+  t.after(() => { TUNE.CARD_ROWS = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   assert.equal(g.reroll(a), false, "제시된 카드가 없으면 못 한다");
@@ -80,7 +84,9 @@ test("새로고침: 제시된 카드를 다시 뽑고(겹치지 않게) 횟수�
   assert.equal(p.pending, 1, "선택 횟수는 그대로");
 });
 
-test("병종 전용 카드는 그 병종을 가진 사람에게만 나온다", () => {
+test("병종 전용 카드는 그 병종을 가진 사람에게만 나온다", (t) => {
+  TUNE.CARD_ROWS = 0; // 한 줄(3장 중 하나) 방식 검사
+  t.after(() => { TUNE.CARD_ROWS = 1; });
   const g = new Game(() => 0.5);
   g.autoSpawn = false;
   const a = g.addPlayer("a")!;
@@ -239,9 +245,9 @@ test("용병 강화는 경험치를 모아야 가능하고, 강화하면 경험�
   assert.equal(g.upgrade(a, m).ok, false, "다음 단계는 다시 모아야 한다");
 });
 
-test("레벨업이 잦다: 첫 레벨은 적 몇 마리로 오른다", () => {
+test("레벨업: 첫 레벨은 적 몇 마리로 오르고, 두 줄 선택이라 뒤로 갈수록 천천히 오른다", () => {
   assert.ok(xpNeeded(1) <= 15);
-  assert.ok(xpNeeded(10) <= 100);
+  assert.ok(xpNeeded(10) <= 220);
 });
 
 test("전설 카드: 드물고 한 번만 나오며 다섯 이상의 레벨에서부터 등장한다", () => {

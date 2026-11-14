@@ -122,7 +122,7 @@ export interface PlayerState {
   payT: number; // 다음 급여까지 남은 시간(초). 용병이 없거나 급여가 멈춘 단계면 0
   salary: number; // 다음 급여 총액(금화)
   shaken: number; // 사기 저하가 남은 시간(초), 0이면 정상
-  offer: number[]; // 지금 고를 수 있는 카드(CARDS 인덱스). 없으면 빈 배열
+  offer: number[]; // 지금 고를 수 있는 카드(CARDS 인덱스). 없으면 빈 배열. 두 줄 선택이면 6칸(0~2 주인공·운영, 3~5 용병)이고 이미 고른 줄의 칸은 -1
   priceMult: number; // 고용 가격 배율(할인 카드)
   leadership: number; // 통솔력(보유할 수 있는 용병 비용 합의 최대치)
   chargeLeft: number; // 기병 지시(공격·이동)가 남은 시간(초), 지시 중이 아니면 0
@@ -423,7 +423,7 @@ export type ClientMsg =
   | { t: "skill" } // 스페이스: 지금 든 무기의 스킬
   | { t: "reload" } // R: 활의 전통을 채운다(카드 선택이 없을 때)
   | { t: "formation"; zones: number[]; spacing: number } // 진형 변경(병종별 구역 + 간격)
-  | { t: "pick"; index: number } // 레벨업 카드 선택(0..2)
+  | { t: "pick"; index: number } // 레벨업 카드 선택(0..2, 두 줄 선택이면 0..5: 0~2 주인공·운영 줄, 3~5 용병 줄)
   | { t: "reroll" } // 지금 제시된 카드를 새로 뽑는다(새로고침 1회 소모)
   | { t: "upgrade"; merc: number } // 용병 한 명을 다음 단계로 강화
   | { t: "dismiss"; type: number; merc?: number } // 캠프 근처에서 해당 병종 용병 1명을 해고

@@ -80,7 +80,9 @@ test("보스를 1분 안에 못 잡으면 보스군이 격노해 병력이 늘�
   assert.equal(g.info().stage, 2);
 });
 
-test("보스를 잡으면 접속 인원만큼 상자가 떨어지고, 주인이 다가가면 레벨업과 별개로 카드를 고른다", () => {
+test("보스를 잡으면 접속 인원만큼 상자가 떨어지고, 주인이 다가가면 레벨업과 별개로 카드를 고른다", (t) => {
+  TUNE.CARD_ROWS = 0; // 한 줄(3장 중 하나) 방식 검사
+  t.after(() => { TUNE.CARD_ROWS = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   const b = g.addPlayer("b")!;
@@ -323,7 +325,9 @@ test("시간 초과 판정은 마지막 순간이 아니라 경기 내내의 평
   assert.equal(done.winner, done.an, "경기 내내 앞선 선수가 이긴다");
 });
 
-test("레벨업 선택지가 떠 있을 때 상자를 열어도 그 선택지는 그대로이고, 고른 뒤에 상자 카드가 이어진다", () => {
+test("레벨업 선택지가 떠 있을 때 상자를 열어도 그 선택지는 그대로이고, 고른 뒤에 상자 카드가 이어진다", (t) => {
+  TUNE.CARD_ROWS = 0; // 한 줄(3장 중 하나) 방식 검사
+  t.after(() => { TUNE.CARD_ROWS = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   g.addPlayer("b");

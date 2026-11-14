@@ -370,6 +370,9 @@ export function rebuildCards(): void {
 }
 
 export const OFFER_SIZE = 3;
+/** 두 줄 선택(TUNE.CARD_ROWS)에서 카드가 어느 줄에 나오는가: 0 = 주인공·운영(규모·주인공 강화·주인공 전설), 1 = 용병(용병 강화·병종 전설) */
+export const cardRow = (c: CardDef): 0 | 1 => (c.category === 1 || (c.effect.k === "legend" && c.effect.scope !== "hero") ? 1 : 0);
+export const CARD_ROW_NAMES = ["주인공·운영", "용병"] as const;
 /** 행운 1.0이면 등급별 카드 확률 배율이 (1 + 행운 x 이 값)이 된다(일반 카드는 그대로). 전설 포함. */
 export const LUCK_RARITY_BOOST = [0, 3, 6, 8] as const;
 export const LUCK_MAX = 3;

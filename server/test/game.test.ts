@@ -626,7 +626,9 @@ test("경험치: 용병이 처치해도 주인에게 개인 몫이 간다", () =
   assert.ok(g.getPlayer(a)!.xp > g.getPlayer(b)!.xp);
 });
 
-test("레벨업: 경험치가 차면 레벨이 오르고 서로 다른 선택지 3장이 생긴다", () => {
+test("레벨업: 경험치가 차면 레벨이 오르고 서로 다른 선택지 3장이 생긴다", (t) => {
+  TUNE.CARD_ROWS = 0; // 한 줄(3장 중 하나) 방식 검사
+  t.after(() => { TUNE.CARD_ROWS = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   g.giveXp(a, xpNeeded(1) + 1);
@@ -656,7 +658,9 @@ test("레벨업 선택지는 가진 병종의 카드만 나오고 한 종류로�
   }
 });
 
-test("레벨업 선택: 효과가 적용되고 쌓인 선택이 이어서 뜬다", () => {
+test("레벨업 선택: 효과가 적용되고 쌓인 선택이 이어서 뜬다", (t) => {
+  TUNE.CARD_ROWS = 0; // 한 줄(3장 중 하나) 방식 검사
+  t.after(() => { TUNE.CARD_ROWS = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   g.giveXp(a, xpNeeded(1) + xpNeeded(2) + 1); // 두 번 레벨업
@@ -675,7 +679,9 @@ test("레벨업 선택: 효과가 적용되고 쌓인 선택이 이어서 뜬다
   assert.equal(g.pick(a, 0), false, "고를 게 없으면 무시");
 });
 
-test("레벨업 선택: 잘못된 번호는 무시된다", () => {
+test("레벨업 선택: 잘못된 번호는 무시된다", (t) => {
+  TUNE.CARD_ROWS = 0; // 한 줄(3장 중 하나) 방식 검사
+  t.after(() => { TUNE.CARD_ROWS = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   g.giveXp(a, xpNeeded(1));

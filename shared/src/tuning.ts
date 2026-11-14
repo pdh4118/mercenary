@@ -180,6 +180,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   MXP_ASSIST_SEC: ["기여도: 어시스트로 치는 시간(초)", G.xp, 1, 20, 0.5],
   MXP_BLUNT_T0: ["둔기병 경험치: 승급 전(0단계) 보정 배율(레벨 모드)", G.xp, 1, 5, 0.1],
   MXP_TIER_BONUS: ["용병 경험치: 단계마다 획득 보너스", G.xp, 0, 1, 0.01],
+  CARD_ROWS: ["레벨업 카드: 주인공·용병 두 줄에서 하나씩 고르기(1 = 켬)", G.merc, 0, 1, 1],
   LV_MODE: ["레벨 모드(1 = 용병이 레벨로 큰다)", G.merc, 0, 1, 1],
   LV_HP: ["레벨마다 체력 증가율", G.merc, 0, 0.2, 0.0001],
   LV_DMG: ["레벨마다 공격력 증가율", G.merc, 0, 0.2, 0.0001],

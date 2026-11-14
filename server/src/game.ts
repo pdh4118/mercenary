@@ -96,6 +96,7 @@ import {
   boxWidthMult,
   ARCHER_KITE_SPEED_MULT,
   OFFER_SIZE,
+  cardRow,
   xpNeeded,
   type CardEffect,
   BULLET_DAMAGE,
@@ -7223,12 +7224,21 @@ export class Game {
   pick(playerId: number, index: number): boolean {
     const s = this.slots.get(playerId);
     if (!s || s.state.pending <= 0 || !Number.isInteger(index)) return false;
-    const card = s.state.offer[index] !== undefined ? CARDS[s.state.offer[index]!] : undefined;
+    const offer = s.state.offer;
+    const rowMode = offer.length === OFFER_SIZE * 2;
+    const ci = offer[index];
+    const card = ci !== undefined && ci >= 0 ? CARDS[ci] : undefined;
     if (!card) return false;
     this.applyCard(s, card.effect);
-    s.picks.push(s.state.offer[index]!);
+    s.picks.push(ci!);
     s.detail.cards[card.name] = (s.detail.cards[card.name] ?? 0) + 1;
-    s.state.rerolls = Math.min(REROLL_MAX, s.state.rerolls + REROLL_PER_PICK); // 고를 때마다 새로고침 1회 적립
+    if (rowMode) {
+      // 고른 줄은 비우고(-1), 다른 줄도 다 골랐거나 고를 카드가 없으면 레벨업 선택이 끝난다
+      const r0 = Math.floor(index / OFFER_SIZE) * OFFER_SIZE;
+      for (let k = r0; k < r0 + OFFER_SIZE; k++) offer[k] = -1;
+      if (offer.some((v) => v >= 0)) return true;
+    }
+    s.state.rerolls = Math.min(REROLL_MAX, s.state.rerolls + REROLL_PER_PICK); // 레벨업 한 번을 마칠 때마다 새로고침 1회 적립
     s.state.pending--;
     if (s.offerBoxed && s.state.box > 0) s.state.box--; // 상자 보너스로 뽑힌 선택지를 골랐을 때만 상자를 쓴 것으로 센다
     s.state.offer = s.state.pending > 0 ? this.rollOffer(s) : [];
@@ -7245,7 +7255,13 @@ export class Game {
     const s = this.slots.get(playerId);
     if (!s || s.state.offer.length === 0 || s.state.rerolls <= 0) return false;
     s.state.rerolls--;
-    s.state.offer = this.rollOffer(s, s.state.offer);
+    const before = s.state.offer;
+    const next = this.rollOffer(s, before);
+    if (before.length === OFFER_SIZE * 2) {
+      // 이미 고른 줄(모두 -1)은 그대로 비워 둔다
+      for (const r0 of [0, OFFER_SIZE]) if (before.slice(r0, r0 + OFFER_SIZE).every((v) => v < 0)) for (let k = r0; k < r0 + OFFER_SIZE; k++) next[k] = -1;
+    }
+    s.state.offer = next;
     return true;
   }
 
@@ -7261,6 +7277,7 @@ export class Game {
         (c.unitType === undefined || owned.has(c.unitType)) &&
         !(c.unique && c.effect.k === "legend" && s.state.legends.includes(legendKey(c.effect.id, c.effect.scope))),
     );
+    const allEligible = eligible;
     // 새로고침은 방금 본 카드를 빼고 뽑는다(남는 카드가 모자라면 그대로 둔다)
     const fresh = eligible.filter(({ i }) => !exclude.includes(i));
     if (fresh.length >= OFFER_SIZE) eligible = fresh;
@@ -7269,6 +7286,30 @@ export class Game {
     const leadFull = this.leadershipUsed(s.state.id) >= s.state.leadership - 1 ? 2.5 : 1;
     const weightOf = (c: (typeof CARDS)[number]) =>
       (c.unitType === undefined ? c.weight : c.weight * Math.min(2, 1 + 0.25 * (count(c.unitType) - 1))) * luckWeight(c.rarity, s.state.luck + (s.state.box > 0 ? TUNE.CHEST_LUCK_BONUS : 0)) * (c.effect.k === "leadership" || c.effect.k === "leadershipPct" ? leadFull : 1); // 행운이 높을수록 높은 등급이 잘 뜬다
+    const drawN = (from: typeof eligible, n: number): number[] => {
+      const pool = [...from];
+      const out: number[] = [];
+      while (out.length < n && pool.length > 0) {
+        let roll = this.rng() * pool.reduce((sum, { c }) => sum + weightOf(c), 0);
+        let k = 0;
+        while (k < pool.length - 1 && roll >= weightOf(pool[k]!.c)) roll -= weightOf(pool[k++]!.c);
+        out.push(pool.splice(k, 1)[0]!.i);
+      }
+      return out;
+    };
+    if (TUNE.CARD_ROWS) {
+      // 두 줄: 주인공·운영 카드 3장 + 용병 카드 3장(모자라면 -1로 채운다). 새로고침은 방금 본 카드를 빼고 뽑는다
+      const rowCards = (row: 0 | 1): number[] => {
+        const base = allEligible.filter(({ c }) => cardRow(c) === row);
+        const freshRow = base.filter(({ i }) => !exclude.includes(i));
+        let picked = drawN(freshRow.length >= OFFER_SIZE ? freshRow : base, OFFER_SIZE);
+        // 주인공 줄은 규모(통솔력·금화 등) 카드만 세 장 나오지 않게, 주인공 강화·전설이 한 장은 섞이도록 몇 번 다시 뽑는다
+        for (let attempt = 0; row === 0 && attempt < 8 && picked.every((i) => CARDS[i]!.category === 0); attempt++) picked = drawN(freshRow.length >= OFFER_SIZE ? freshRow : base, OFFER_SIZE);
+        while (picked.length < OFFER_SIZE) picked.push(-1);
+        return picked;
+      };
+      return [...rowCards(0), ...rowCards(1)];
+    }
     let best: number[] = [];
     for (let attempt = 0; attempt < 8; attempt++) {
       const pool = [...eligible];

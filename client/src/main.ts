@@ -1126,7 +1126,16 @@ async function main() {
   const cardPanel = new Container();
   const cardHeader = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 18, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
   cardPanel.addChild(cardHeader);
-  const cardViews = [0, 1, 2].map((i) => {
+  const ROW_SCALE = 0.78; // 두 줄 선택(카드 6장)일 때 패널을 줄여서 화면을 덜 가린다
+  const COL_GAP = 14;
+  let cardPanelW = CARD_W; // 패널이 차지하는 가로(화면 배치용)
+  const rowLabels = [0, 1].map((c) => {
+    const t = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 16, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+    t.position.set(c * (CARD_W + COL_GAP), 30);
+    cardPanel.addChild(t);
+    return t;
+  });
+  const cardViews = [0, 1, 2, 3, 4, 5].map((i) => {
     const node = new Container();
     node.position.set(0, 32 + i * (CARD_H + CARD_GAP));
     const bg = new Graphics();
@@ -1140,7 +1149,7 @@ async function main() {
     glyph.position.set(12 + ART / 2, 12 + ART / 2);
     const keyBg = new Graphics().circle(0, 0, 14).fill(0x11141b).stroke({ width: 2, color: 0xffd45d });
     keyBg.position.set(12, 12 + ART);
-    const key = new Text({ text: "ZXC"[i]!, style: { fill: 0xffffff, fontSize: 17, fontWeight: "bold" } });
+    const key = new Text({ text: i < 3 ? "ZXC"[i]! : `+${"ZXC"[i - 3]}`, style: { fill: 0xffffff, fontSize: i < 3 ? 17 : 13, fontWeight: "bold" } });
     key.anchor.set(0.5);
     key.position.set(12, 12 + ART);
     const tag = new Text({ text: "", style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" } });
@@ -1166,10 +1175,19 @@ async function main() {
     if (key === shownOffer) return;
     shownOffer = key;
     cardPanel.visible = offer.length > 0;
-    cardHeader.text = offer.length > 0 ? `${box > 0 ? "보상 상자 카드!" : "LEVEL UP!"}${pending > 1 ? ` x${pending}` : ""}  ·  [R] 새로고침 ${rerolls}` : "";
+    const rowMode = offer.length === 6;
+    cardPanel.scale.set(rowMode ? ROW_SCALE : 1);
+    cardPanelW = rowMode ? (2 * CARD_W + COL_GAP) * ROW_SCALE : CARD_W;
+    cardHeader.text = offer.length > 0 ? `${box > 0 ? "보상 상자 카드!" : "LEVEL UP!"}${pending > 1 ? ` x${pending}` : ""}  ·  [R] 새로고침 ${rerolls}${rowMode ? "  ·  줄마다 하나씩 (Shift+ZXC = 용병)" : ""}` : "";
+    const rowName = ["주인공·운영", "용병"];
+    rowLabels.forEach((t, c) => {
+      t.visible = rowMode;
+      t.text = rowMode ? (offer.slice(c * 3, c * 3 + 3).every((v) => v < 0) ? `${rowName[c]}  ✓ 선택 완료` : rowName[c]!) : "";
+    });
     cardViews.forEach((v, i) => {
-      const card = offer[i] !== undefined ? CARDS[offer[i]!] : undefined;
+      const card = offer[i] !== undefined && offer[i]! >= 0 ? CARDS[offer[i]!] : undefined;
       v.node.visible = !!card;
+      v.node.position.set(rowMode ? Math.floor(i / 3) * (CARD_W + COL_GAP) : 0, (rowMode ? 54 : 32) + (i % 3) * (CARD_H + CARD_GAP));
       if (!card) return;
       const color = CATEGORY_COLORS[card.category]!;
       const art = artOf(card);
@@ -1960,9 +1978,10 @@ async function main() {
     if (formations.isOpen()) return; // 편성 화면에서는 게임 조작을 받지 않는다
     if (!e.repeat && k === "q") cycleWeapon(1);
     if (!e.repeat && (k === "z" || k === "x" || k === "c")) {
-      const idx = "zxc".indexOf(k);
-      const offered = latest?.players.find((p) => p.id === myId)?.offer[idx];
-      if (offered !== undefined) audio.play(CARDS[offered]?.category === 3 ? "legend_card" : "card_pick");
+      const mineP = latest?.players.find((p) => p.id === myId);
+      const idx = "zxc".indexOf(k) + (e.shiftKey && (mineP?.offer.length ?? 0) === 6 ? 3 : 0); // 두 줄 선택에서는 Shift+Z/X/C가 용병 줄
+      const offered = mineP?.offer[idx];
+      if (offered !== undefined && offered >= 0) audio.play(CARDS[offered]?.category === 3 ? "legend_card" : "card_pick");
       send({ t: "pick", index: idx });
     }
     if (k === "m" && !e.repeat) audio.toggleMute();
@@ -4298,7 +4317,7 @@ async function main() {
     weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 118);
     // 캠프 고용창은 오른쪽 위에 뜨고, 레벨업 카드가 함께 떠 있으면 카드를 그 아래로 내린다
     const campBottom = campPanel.visible ? 52 + campPanel.height + 10 : 0;
-    cardPanel.position.set(app.screen.width - CARD_W - 12, Math.max(90, campBottom, app.screen.height / 2 - 230));
+    cardPanel.position.set(app.screen.width - cardPanelW - 12, Math.max(90, campBottom, app.screen.height / 2 - 230));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 120);

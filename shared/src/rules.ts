@@ -5,7 +5,7 @@ export const TUNE = {
   GUARD_MID_FRAC: 0.5, // 검방병·창병이 지키는 궁병과 위협을 잇는 선에서 서는 위치(0=궁병 곁, 1=위협 앞, 0.5=중간)
   ENEMY_SPEED_MULT: 1.15, // 적 이동 속도 배율(빠를수록 포위가 위협적이고 주인공 이동 속도의 가치가 커진다)
   XP_BASE: 12, // 1레벨에서 필요한 경험치
-  XP_PER_LEVEL: 9, // 레벨이 오를 때마다 늘어나는 필요 경험치
+  XP_PER_LEVEL: 20, // 레벨이 오를 때마다 늘어나는 필요 경험치
   START_LEADERSHIP: 5,
   MERC_PRICE_GROWTH: 0.3, // 이미 가진 용병 1명당 가격 +30%
   DISMISS_REFUND: 0.5, // 해고하면 지불한 금화의 이 비율을 돌려받는다
@@ -23,8 +23,8 @@ export const TUNE = {
   STAGE_SPAWN_GROWTH: 0.18, // 일반 적 생성량 +18%
   ENEMY_TIME_HP_GROWTH: 0.16, // 스테이지 시작 후 60초마다 적 체력 +16%
   ENEMY_TIME_DMG_GROWTH: 0.07, // 60초마다 적 피해 +7%
-  ENEMY_LEVEL_HP_GROWTH: 0.06, // 접속자 평균 레벨이 1 오를 때마다 적 체력 +6%
-  ENEMY_LEVEL_DMG_GROWTH: 0.03, // 적 피해 +3%
+  ENEMY_LEVEL_HP_GROWTH: 0.09, // 접속자 평균 레벨이 1 오를 때마다 적 체력 +6%
+  ENEMY_LEVEL_DMG_GROWTH: 0.045, // 적 피해 +3%
   STAGE_CLEAR_GOLD: 40, // 클리어 보상 금화 = 이 값 x 스테이지 (모든 플레이어에게)
   STAGE_CLEAR_XP: 30, // 클리어 보상 경험치 = 이 값 + 15 x 스테이지
   BOSS_HP_BASE: 10, // 보스 체력 = 병종 체력 x (기본 + 스테이지 x 증가)
@@ -138,6 +138,7 @@ export const TUNE = {
   MXP_ASSIST_SEC: 5,
   MXP_BLUNT_T0: 1.9, // 레벨 모드: 승급 전(0단계) 둔기병은 경직이 없어 경직 기여도를 못 받으므로 경험치를 이만큼 더 받는다
   MXP_TIER_BONUS: 0.3, // 단계가 오를수록 경험치를 더 받는다(단계마다 +30%): 앞서가는 용병이 더 빨리 큰다
+  CARD_ROWS: 1, // 1이면 레벨업마다 주인공·운영 카드 3장과 용병 카드 3장을 한 번에 보여 주고 각 줄에서 하나씩 고른다(0이면 예전처럼 3장 중 하나)
   LV_MODE: 1, // 1이면 용병이 레벨로 큰다: 경험치는 쓰지 않고 쌓여 레벨이 되고(체력·공격력이 레벨마다 조금씩 오름), 승급은 정해진 레벨에서 금화만 내면 된다
   LV_HP: 0.0201, // 레벨마다 체력 +이 비율(복리)
   LV_DMG: 0.0155, // 레벨마다 공격력 +이 비율(복리)
