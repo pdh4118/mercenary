@@ -295,6 +295,8 @@ import {
   tierHp,
   skillOn,
   SK,
+  ACTIVE_CD,
+  EVT_MERC_SKILL,
   levelHp,
   levelDmg,
   levelXpCap,
@@ -577,6 +579,12 @@ export interface Merc extends Fighter {
   streak?: number; // 쓰러지지 않고 싸운 시간(초, 표시용)
   streakMerit?: number; // 쓰러지지 않고 쌓은 기여도 — 경험치 배율의 기준
   combatT?: number; // 마지막으로 피해를 주고받은 뒤 남은 "싸우는 중" 시간
+  skCd?: [number, number]; // 액티브 스킬(2·4단계) 쿨다운 남은 시간
+  skThink?: number; // 다음 발동 판단까지
+  stealthT?: number; // 은신 남은 시간(적이 노리지 못한다)
+  stealthShot?: boolean; // 은신이 풀려 다음 화살이 강하다
+  tauntT?: number; // 도발 결계 남은 시간(적이 이 용병을 먼저 노린다)
+  dashT?: number; // 일제 질주 남은 시간
   hasteT?: number; // 성격 "날쌘": 처치 뒤 빨라진 남은 시간
   auraDmg?: number; // 성격 "늙은" 곁에 있어서 받는 공격력 보너스
   matchBase?: number; // 토너먼트 경기를 시작할 때의 공헌 점수(이번 경기의 기여도 = score - matchBase)
@@ -1430,6 +1438,7 @@ export class Game {
     this.tickDuelPoison(dt, friendlies); // 토너먼트 독 화살과 독 궁병의 화살 모두 아군에게 독을 건다
     this.stepEmbers(dt);
     this.stepMercs(dt);
+    this.stepActives(dt);
     this.separateMercs(dt);
     if (!duel) {
       this.stepEnemies(dt, friendlies);
@@ -6294,7 +6303,8 @@ export class Game {
     const crit = this.rollCrit(this.pstat(m, mods, "crit"));
     const critChance = this.pstat(m, mods, "crit");
     const critMult = critDamageMult(critChance, TUNE.CRIT_BASE_MULT + mstat(mods, m.type, "critMult"));
-    const dmg = st.damage * (crit ? critMult : 1);
+    const dmg = st.damage * (crit ? critMult : 1) * (m.stealthShot ? SK.stealthBonus : 1);
+    if (m.type === ARCHER) m.stealthShot = false; // 은신이 풀린 뒤 첫 화살
     if (crit && hasLegend(mods, "stormfire", m.type) && !m.stormBurst) {
       m.cd = 0;
       m.stormBurst = true;
@@ -6668,6 +6678,220 @@ export class Game {
     }
     if (src && skillOn(MAGE, src.tier, 3)) this.embers.push({ x, y, r: radius * 0.8, t: SK.emberSec, dps: damage * SK.emberDps, owner: ownerId, src });
     if (src && struck > 1) src.career.aoe += struck - 1; // 한 번에 여럿 맞힌 횟수(기록만. 피해는 각 적에게 준 만큼 이미 기여도에 들어간다)
+  }
+
+  private pendingMeteors: { t: number; x: number; y: number; radius: number; dmg: number; owner: number; src: Merc }[] = [];
+
+  /** 액티브 스킬(2·4단계): 쿨다운이 돌아오면 상황을 보고 자동으로 쓴다. 토너먼트에서는 쓰지 않는다. */
+  private stepActives(dt: number): void {
+    if (!TUNE.LV_MODE || this.phase === "tournament") return;
+    if (this.pendingMeteors.length > 0) {
+      for (const q of this.pendingMeteors) {
+        q.t -= dt;
+        if (q.t <= 0) this.landMeteor(q.x, q.y, q.radius, q.dmg, q.owner, false, q.src);
+      }
+      this.pendingMeteors = this.pendingMeteors.filter((q) => q.t > 0);
+    }
+    for (const m of this.mercs.values()) {
+      if (m.respawn > 0) {
+        m.stealthT = 0;
+        continue;
+      }
+      if ((m.stealthT ?? 0) > 0) {
+        m.stealthT = Math.max(0, m.stealthT! - dt);
+        if (m.stealthT === 0) m.stealthShot = true;
+      }
+      if ((m.tauntT ?? 0) > 0) m.tauntT = Math.max(0, m.tauntT! - dt);
+      if ((m.dashT ?? 0) > 0) m.dashT = Math.max(0, m.dashT! - dt);
+      const cd = (m.skCd ??= [0, 0]);
+      cd[0] = Math.max(0, cd[0] - dt);
+      cd[1] = Math.max(0, cd[1] - dt);
+      if (m.stunT && m.stunT > 0) continue;
+      m.skThink = (m.skThink ?? 0) - dt;
+      if (m.skThink > 0) continue;
+      m.skThink = 0.25;
+      for (const n of [2, 4] as const) {
+        const i = n / 2 - 1;
+        if (cd[i]! > 0 || !skillOn(m.type, m.tier, n)) continue;
+        if (this.tryActive(m, n)) cd[i] = ACTIVE_CD[m.type]![i]!;
+      }
+    }
+  }
+
+  private enemiesNear(x: number, y: number, r: number): Enemy[] {
+    const out: Enemy[] = [];
+    for (const e of this.enemies.values()) if (e.hp > 0 && Math.hypot(e.x - x, e.y - y) <= r + radiusOf(e)) out.push(e);
+    return out;
+  }
+  private nearestEnemyTo(m: Merc, r: number): Enemy | undefined {
+    let best: Enemy | undefined;
+    let bd = Infinity;
+    for (const e of this.enemies.values()) {
+      if (e.hp <= 0) continue;
+      const d = Math.hypot(e.x - m.x, e.y - m.y) - radiusOf(e);
+      if (d < bd && d <= r) {
+        bd = d;
+        best = e;
+      }
+    }
+    return best;
+  }
+  private skillHit(m: Merc, e: Enemy, mult: number, pierce = false): void {
+    const st = this.mercStats(m);
+    this.damageEnemy(e, { damage: st.damage * mult, charge: 0, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit: false, pierceGuard: pierce }, m.owner, m);
+  }
+  private stunEnemy(e: Enemy, sec: number): void {
+    const t = e.boss ? sec * 0.3 : sec;
+    if (t > (e.stunT ?? 0)) e.stunT = t;
+    e.atkT = 0;
+  }
+  private skillFx(m: Merc, n: number, ang: number, x = m.x, y = m.y): void {
+    this.pushEvent(EVT_MERC_SKILL, x, y, ang, m.type * 10 + n, m.owner);
+  }
+
+  /** 조건이 맞으면 스킬을 써서 true를 돌려준다 */
+  private tryActive(m: Merc, n: 2 | 4): boolean {
+    const st = this.mercStats(m);
+    const away = (e: Enemy) => Math.atan2(m.y - e.y, m.x - e.x);
+    switch (m.type) {
+      case ARCHER: {
+        if (n === 2) {
+          const e = this.nearestEnemyTo(m, SK.jumpTrigger);
+          if (!e) return false;
+          const a = away(e);
+          this.skillFx(m, n, a);
+          m.x = clampToWorld(m.x + Math.cos(a) * SK.jumpDist, 14);
+          m.y = clampToWorld(m.y + Math.sin(a) * SK.jumpDist, 14);
+          this.skillFx(m, n, a);
+          return true;
+        }
+        const e = this.nearestEnemyTo(m, st.reach * 1.1);
+        if (!e) return false;
+        m.stealthT = SK.stealthSec;
+        this.skillFx(m, n, 0);
+        return true;
+      }
+      case CAVALRY: {
+        const e = this.nearestEnemyTo(m, n === 2 ? 700 : SK.phantomLen);
+        if (!e) return false;
+        const a = Math.atan2(e.y - m.y, e.x - m.x);
+        if (n === 2) {
+          if (m.momentum > 0.5) return false;
+          for (const o of this.mercs.values()) {
+            if (o.owner !== m.owner || o.type !== CAVALRY || o.respawn > 0 || Math.hypot(o.x - m.x, o.y - m.y) > SK.dashRadius) continue;
+            o.dashT = SK.dashSec;
+            o.momentum = Math.max(o.momentum, 0.8);
+          }
+          this.skillFx(m, n, a);
+          return true;
+        }
+        this.skillFx(m, n, a);
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        for (const t of this.enemies.values()) {
+          if (t.hp <= 0) continue;
+          const dx = t.x - m.x;
+          const dy = t.y - m.y;
+          const along = dx * c + dy * sn;
+          const side = Math.abs(-dx * sn + dy * c);
+          if (along < 0 || along > SK.phantomLen || side > SK.phantomWid / 2 + radiusOf(t)) continue;
+          this.skillHit(m, t, SK.phantomDmg);
+        }
+        return true;
+      }
+      case SPEAR: {
+        if (n === 2) {
+          let best: Enemy | undefined;
+          for (const e of this.enemies.values()) if (e.hp > 0 && Math.hypot(e.x - m.x, e.y - m.y) <= SK.throwRange && (!best || e.maxHp > best.maxHp)) best = e;
+          if (!best) return false;
+          this.skillFx(m, n, Math.atan2(best.y - m.y, best.x - m.x), best.x, best.y);
+          this.skillHit(m, best, SK.throwDmg, true);
+          return true;
+        }
+        const e = this.nearestEnemyTo(m, SK.lungeRange);
+        if (!e) return false;
+        const a = Math.atan2(e.y - m.y, e.x - m.x);
+        const d = Math.max(0, Math.hypot(e.x - m.x, e.y - m.y) - st.reach * 0.7);
+        this.skillFx(m, n, a);
+        m.x = clampToWorld(m.x + Math.cos(a) * d, 14);
+        m.y = clampToWorld(m.y + Math.sin(a) * d, 14);
+        this.skillHit(m, e, SK.lungeDmg);
+        this.stunEnemy(e, 0.5);
+        return true;
+      }
+      case SHIELD: {
+        if (n === 2) {
+          const near = this.enemiesNear(m.x, m.y, st.reach + 40);
+          if (near.length === 0) return false;
+          for (const e of near) {
+            this.skillHit(m, e, SK.bashDmg);
+            this.knockBack(e, away(e), SK.bashKnock);
+            this.stunEnemy(e, SK.bashStun);
+          }
+          this.skillFx(m, n, m.atkAng);
+          return true;
+        }
+        if (this.enemiesNear(m.x, m.y, SK.tauntRange).length < 3) return false;
+        m.tauntT = SK.tauntSec;
+        this.skillFx(m, n, 0);
+        return true;
+      }
+      case BLUNT: {
+        if (n === 2) {
+          let best: Enemy | undefined;
+          let bc = 1;
+          for (const e of this.enemies.values()) {
+            if (e.hp <= 0 || Math.hypot(e.x - m.x, e.y - m.y) > SK.leapRange) continue;
+            const c = this.enemiesNear(e.x, e.y, SK.leapRadius).length;
+            if (c > bc) {
+              bc = c;
+              best = e;
+            }
+          }
+          if (!best) return false;
+          const a = Math.atan2(best.y - m.y, best.x - m.x);
+          m.x = clampToWorld(best.x - Math.cos(a) * 40, 14);
+          m.y = clampToWorld(best.y - Math.sin(a) * 40, 14);
+          this.skillFx(m, n, a, best.x, best.y);
+          for (const e of this.enemiesNear(best.x, best.y, SK.leapRadius)) {
+            this.skillHit(m, e, SK.leapDmg);
+            this.stunEnemy(e, SK.leapStun);
+          }
+          return true;
+        }
+        if (this.enemiesNear(m.x, m.y, SK.quakeRadius - 20).length < 3) return false;
+        this.skillFx(m, n, 0);
+        for (const e of this.enemiesNear(m.x, m.y, SK.quakeRadius)) {
+          this.skillHit(m, e, SK.quakeDmg);
+          this.stunEnemy(e, SK.quakeStun);
+        }
+        return true;
+      }
+      case MAGE: {
+        if (n === 2) {
+          const e = this.nearestEnemyTo(m, SK.blinkTrigger);
+          if (!e) return false;
+          const a = away(e);
+          this.skillFx(m, n, a);
+          m.x = clampToWorld(m.x + Math.cos(a) * SK.blinkDist, 14);
+          m.y = clampToWorld(m.y + Math.sin(a) * SK.blinkDist, 14);
+          this.skillFx(m, n, a);
+          this.casts.delete(m.id); // 외우던 주문은 끊긴다
+          return true;
+        }
+        const pool = this.enemiesNear(m.x, m.y, st.reach);
+        if (pool.length < 3) return false;
+        const spots: Enemy[] = [];
+        for (const e of pool.sort((a, b) => this.enemiesNear(b.x, b.y, st.splash).length - this.enemiesNear(a.x, a.y, st.splash).length)) {
+          if (spots.every((s) => Math.hypot(s.x - e.x, s.y - e.y) > st.splash)) spots.push(e);
+          if (spots.length >= SK.chainCount) break;
+        }
+        spots.forEach((e, i) => this.pendingMeteors.push({ t: 0.3 + i * SK.chainGap, x: e.x, y: e.y, radius: st.splash, dmg: st.damage, owner: m.owner, src: m }));
+        this.skillFx(m, n, 0);
+        return true;
+      }
+    }
+    return false;
   }
 
   /** 불씨: 남은 시간 동안 안의 적에게 초당 피해(방패 무시) */
@@ -7131,7 +7355,7 @@ export class Game {
       damage: base.damage * this.pstat(m, mods, "dmg") * tierDmg(tier) * this.lvDmg(m) * power * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)) * (1 + (m.auraDmg ?? 0)),
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 - SK.focusCast : 1),
       cooldown: base.cooldown / quick / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
-      speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick,
+      speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick * ((m.dashT ?? 0) > 0 ? SK.dashSpeed : 1),
       reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier) * (skillOn(t, tier, 1) && t === SPEAR ? SK.reachMult : 1), area * (1 + TIER_AREA[t]! * tier)),
       splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 + SK.focusArea : 1),
       arc: meleeArc(t, base.arc, area),
@@ -7170,6 +7394,7 @@ export class Game {
     const out: Foe[] = [];
     const seen = new Set<string>();
     for (const f of friendlies) {
+      if (f.merc && (f.merc.stealthT ?? 0) > 0) continue; // 은신 중인 용병은 적이 노리지 못한다
       const key = f.merc ? `m${f.merc.id}` : `h${f.ownerId}`;
       seen.add(key);
       const prev = this.foePos.get(key);
@@ -7269,6 +7494,7 @@ export class Game {
           const d = Math.hypot(f.x - e.x, f.y - e.y);
           if (home !== null && d > aggro) continue;
           let w = this.enemyTargetWeight(e, f, d);
+          if (f.f.merc && (f.f.merc.tauntT ?? 0) > 0) w *= SK.tauntWeight; // 도발 결계
           if (e.post) {
             if (f.ranged && f.type !== NO_TYPE) w *= BOSS_LORD.postCounter; // 활·마법사에 대한 대응사격
             if (Math.hypot(f.x - GATE_X, f.y - GATE_Y) < BOSS_LORD.postGateRange) w *= BOSS_LORD.postGateFocus; // 성문을 부수려는 대상 방해

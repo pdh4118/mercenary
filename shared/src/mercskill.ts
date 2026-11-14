@@ -72,7 +72,48 @@ export const SK = {
   focusArea: 0.1,
   emberSec: 3, // 불씨
   emberDps: 0.35, // 운석 피해 대비 초당
+  stealthSec: 3, // 은신
+  stealthBonus: 1.8,
+  jumpDist: 230, // 뒤로 점프
+  jumpTrigger: 110,
+  blinkDist: 300, // 점멸
+  blinkTrigger: 130,
+  dashSec: 2.5, // 일제 질주
+  dashSpeed: 1.5,
+  dashRadius: 520,
+  phantomDmg: 2.4, // 환영 기병대: 기병 공격력 배율
+  phantomLen: 600,
+  phantomWid: 140,
+  throwDmg: 3, // 창 던지기
+  throwRange: 650,
+  lungeDmg: 2.2, // 돌진 찌르기
+  lungeRange: 480,
+  bashDmg: 0.8, // 방패 밀치기
+  bashKnock: 170,
+  bashStun: 1,
+  tauntSec: 4, // 도발 결계
+  tauntRange: 330,
+  tauntWeight: 6,
+  leapDmg: 2, // 도약 내려찍기
+  leapRange: 460,
+  leapRadius: 140,
+  leapStun: 0.8,
+  quakeDmg: 1.2, // 지진
+  quakeRadius: 300,
+  quakeStun: 1.5,
+  chainCount: 3, // 연쇄 운석
+  chainGap: 0.5,
 } as const;
+
+/** 액티브 쿨다운(초): [2단계, 4단계] */
+export const ACTIVE_CD: Record<number, readonly [number, number]> = {
+  [ARCHER]: [12, 20],
+  [CAVALRY]: [14, 24],
+  [SPEAR]: [15, 18],
+  [SHIELD]: [10, 24],
+  [BLUNT]: [14, 25],
+  [MAGE]: [14, 24],
+};
 
 /** 스킬 n(1~4)을 쓸 수 있는가: 레벨 모드이고 승급 단계가 n 이상 */
 export const skillOn = (type: number, tier: number, n: number): boolean => TUNE.LV_MODE === 1 && tier >= n && MERC_SKILLS[type] !== undefined;

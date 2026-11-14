@@ -38,6 +38,8 @@ import {
   EVT_DODGE,
   EVT_INVULN,
   EVT_QUIT,
+  EVT_MERC_SKILL,
+  MERC_SKILLS,
   EVT_PAY,
   EVT_WALL_HIT,
   EVT_HEAL,
@@ -1312,6 +1314,7 @@ async function main() {
   };
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
+  const mercSkillFx: { g: Graphics; age: number; life: number }[] = []; // 용병 액티브 스킬 임시 효과(그림 에셋이 오기 전까지 도형)
   const slamFx: { sp: Sprite; age: number; r: number; kind: 0 | 1 }[] = []; // 충격파(0)·갈라진 자국(1)
   const maceHits: { sp: Sprite; age: number; r: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean; t0: number }[]>(); // 방벽 번호 -> 수정 조각들
@@ -1657,6 +1660,24 @@ async function main() {
               coin.position.set(-node.width / 2 - r - 3, -node.height / 2);
               node.addChild(coin);
             }
+          }
+          else if (kind === EVT_MERC_SKILL) {
+            const type = Math.floor(val / 10);
+            const n = val % 10;
+            const info = MERC_SKILLS[type]?.[n - 1];
+            if (info && owner === myId) spawnFloat(info.name, x, y - 24, { fill: 0xffe27a, fontSize: 15, fontWeight: "800", stroke: { color: 0x3a2a00, width: 4 } }, 1.1, 0.4);
+            const gfx = new Graphics();
+            gfx.position.set(x, y);
+            if (type === 0 && n === 4) {
+              for (const off of [-45, 0, 45]) gfx.moveTo(0, off).lineTo(600, off);
+              gfx.rotation = ang;
+              gfx.stroke({ width: 10, color: 0xbfe3ff, alpha: 0.7 });
+            } else {
+              const r = type === 4 && n === 4 ? 300 : type === 4 ? 140 : type === 3 && n === 4 ? 330 : 60;
+              gfx.circle(0, 0, r).stroke({ width: 6, color: 0xffe27a, alpha: 0.8 });
+            }
+            groundFx.addChild(gfx);
+            mercSkillFx.push({ g: gfx, age: 0, life: 0.5 });
           }
           else if (kind === EVT_QUIT) {
             const nm = UNIT_NAMES[val] ?? "용병";
@@ -3404,6 +3425,15 @@ async function main() {
       if (g.age >= DASH_GHOST_LIFE) {
         g.sp.destroy();
         dashGhosts.splice(i, 1);
+      }
+    }
+    for (let i = mercSkillFx.length - 1; i >= 0; i--) {
+      const f = mercSkillFx[i]!;
+      f.age += ticker.deltaMS / 1000;
+      f.g.alpha = Math.max(0, 1 - f.age / f.life);
+      if (f.age >= f.life) {
+        f.g.destroy();
+        mercSkillFx.splice(i, 1);
       }
     }
     // 철퇴 충격파: 고리 6컷(0.5초)과 갈라진 자국(1.6초 동안 서서히 사라짐)
