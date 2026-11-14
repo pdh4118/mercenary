@@ -1,4 +1,4 @@
-import { BOSS_CAV as C, BSK_CHARGE, BSK_KICK, BSK_ROAR, BSK_SLASH, BSK_SPRINT, BFX_CRASH, BFX_IMPACT, BFX_ROAR, BFX_SLASH, EF_SPRINT, TELE_BAND, TELE_CONE, TELE_CIRCLE, TELE_LINE, chargeBonus, clampToWorld } from "@mercenary/shared";
+import { BOSS_CAV as C, BSK_CHARGE, BSK_KICK, BSK_ROAR, BSK_SLASH, BSK_SPRINT, BFX_CRASH, BFX_IMPACT, BFX_KICK, BFX_ROAR, BFX_SLASH, EF_SPRINT, TELE_BAND, TELE_CONE, TELE_CIRCLE, TELE_LINE, chargeBonus, clampToWorld } from "@mercenary/shared";
 import type { Enemy } from "../game.js";
 import { angDiff } from "./system.js";
 import type { Ctx, KitDef, SkillDef } from "./types.js";
@@ -70,7 +70,7 @@ const kick: SkillDef = {
         sys.hitFoe(e, f, C.kickDmg, C.kickKnock);
         sys.fx(f.x, f.y, Math.atan2(f.y - e.y, f.x - e.x), BFX_IMPACT);
       }
-      sys.fx(e.x, e.y, k.ang, BFX_IMPACT);
+      sys.fx(e.x, e.y, k.ang, BFX_KICK, C.kickRange);
       k.ph = 2;
       k.t = C.kickRest;
     } else if (k.ph === 2 && k.t <= 0) sys.end(c);

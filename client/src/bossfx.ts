@@ -13,6 +13,7 @@ import {
   BFX_MBASH,
   BFX_MSMASH,
   BFX_DRIFT,
+  BFX_KICK,
   BFX_BOLT,
   BFX_RALLY,
   BFX_SUMMON,
@@ -29,6 +30,7 @@ import {
   BFX_SLASH,
   BOSS_SKILL_NAMES,
   BSK_ACCEL,
+  BSK_KICK,
   BSK_SCEPTER,
   BSK_EDICT,
   BSK_RALLY,
@@ -266,7 +268,7 @@ export async function createBossFx(d: BossFxDeps) {
 
   /** 스테이지 1~8 장군 그림과 자세 */
   const art: BossArt[] = [
-    { get idle() { return u("boss1_idle"); }, scale: 0.5, pose: (sk, _fl, atk) => ((atk || sk > 0) && u("boss1_attack")) || u("boss1_idle") },
+    { get idle() { return u("boss1_idle"); }, scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_KICK ? u("boss1_idle") : ((atk || sk > 0) && u("boss1_attack")) || u("boss1_idle")) }, // 뒷발차기는 앞발을 드는 그림(attack)이 아니라 서 있는 그림에 몸을 숙여 뒷발이 올라가게 보인다
     { get idle() { return u("boss2_idle"); }, scale: 0.6, pose: (sk, _fl, atk) => (sk === BSK_GUARD ? u("boss2_guard") : sk === BSK_CLONE || sk === BSK_TRIPLE || sk === BSK_THROW || atk ? u("boss2_thrust") : u("boss2_idle")) },
     { get idle() { return u("boss3_idle"); }, scale: 0.4, pose: (sk, _fl, atk) => (sk === BSK_RAIN ? u("boss3_sky") : sk === BSK_SNIPE || sk === BSK_ICEARROW || atk ? u("boss3_aim") : u("boss3_idle")) },
     { get idle() { return u("boss4_idle"); }, scale: 0.42, pose: (sk, fl) => (sk === BSK_REFLECT || fl & EF_GUARD ? u("boss4_reflect") : sk === BSK_SHIELDRUSH ? u("boss4_charge") : u("boss4_idle")) },
@@ -419,6 +421,16 @@ export async function createBossFx(d: BossFxDeps) {
       playSeq(T.summon, x, y, 1.0, 1.7, 0, 0.5, false, 0.95, 0xffffff, 0.79);
     } else if (val === BFX_SLAM) {
       playSeq(T.slam, x, y, 0.6, (len * 2) / 190, 0, 0.5, false, 0.9, 0xffffff, 0.64);
+    } else if (val === BFX_KICK) {
+      // 뒷발차기: 몸 뒤쪽으로 발굽이 걷어차는 주황 호 두 번(위아래로 어긋나게)과 걷어찬 자리의 충격·먼지
+      const reach = len > 0 ? len : 130;
+      const bx = x + Math.cos(ang) * reach * 0.45;
+      const by = y + Math.sin(ang) * reach * 0.45;
+      playSeq(T.flurryArc, bx, by - 20, 0.26, Math.max(0.35, reach / 300), ang, 0.2, false, 0.9, 0xffc27a); // 호 그림이 가로 약 300px라 사거리에 맞춰 줄인다
+      playSeq(T.flurryArc, bx, by - 4, 0.3, Math.max(0.3, reach / 360), ang, 0.2, true, 0.7, 0xffe1b0);
+      playSeq(T.impact, x + Math.cos(ang) * reach * 0.85, y + Math.sin(ang) * reach * 0.85 - 10, 0.5, 0.8, 0);
+      d.sound("skill_mace_hit", x, y, 0.55);
+      d.sound("knockback", x, y);
     } else if (val === BFX_DRIFT) {
       // 전차 장군 급선회 파쇄: 꼬리(바퀴)가 후방 부채꼴을 쓸며 흙먼지가 퍼지고, 바퀴 자국 호와 충격이 남는다
       const half = (Math.PI * 100) / 180;
