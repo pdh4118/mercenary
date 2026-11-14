@@ -45,7 +45,7 @@ test("스킬은 레벨 모드에서 승급 단계에 따라 열린다", () => {
   });
 });
 
-test("마력 집중·관통 찌르기: 승급하면 시전이 빨라지고 폭발이 넓어지고 창이 길어진다", () => {
+test("마력 집중: 승급하면 시전이 빨라지고 폭발이 넓어진다", () => {
   withLevels(() => {
     const { g, m } = setup(MAGE, 0);
     const base = (g as any).mercStats(m);
@@ -53,10 +53,6 @@ test("마력 집중·관통 찌르기: 승급하면 시전이 빨라지고 폭�
     const up = (g as any).mercStats(m);
     assert.ok(up.windup < base.windup);
     assert.ok(up.splash > base.splash);
-    const s = setup(SPEAR, 0);
-    const r0 = (s.g as any).mercStats(s.m).reach;
-    s.m.tier = 1;
-    assert.ok((s.g as any).mercStats(s.m).reach > r0);
   });
 });
 
@@ -178,8 +174,8 @@ test("기병·창병·검방병·둔기병 액티브가 적에게 피해·경직
     assert.ok(r.ok && r.es[0].hp < r.es[0].maxHp, "환영 기병대");
     r = run(CAVALRY, 2, 300);
     assert.ok(r.ok && r.m.dashT > 0, "일제 질주");
-    r = run(SPEAR, 2, 300);
-    assert.ok(r.ok && r.es[0].hp < r.es[0].maxHp, "창 던지기");
+    r = run(SPEAR, 2, 40, 2);
+    assert.ok(r.ok && r.m.guardT > 0, "수비 태세");
     r = run(SPEAR, 4, 300);
     assert.ok(r.ok && r.es[0].stunT > 0, "돌진 찌르기");
     r = run(SHIELD, 2, 20);
@@ -228,5 +224,24 @@ test("분쇄: 둔기병은 승급해야 경직을 건다(0단계는 경직 없�
     };
     assert.equal(stun(0), 0);
     assert.ok(Math.abs(stun(1) - SK.staggerSec) < 1e-9);
+  });
+});
+
+test("창병: 2단 찌르기는 찌를 때마다 한 번 더, 휩쓸기는 확률로 전방 넓은 범위를 훑는다", () => {
+  withLevels(() => {
+    const dealt = (tier: number, rng: number) => {
+      const { g, m } = setup(SPEAR, tier);
+      (g as any).rng = () => rng;
+      const near = dummy(g, m.x + 60, m.y);
+      const side = dummy(g, m.x + 30, m.y + 70); // 비스듬한 옆(박스 밖)
+      m.atkAng = 0;
+      (g as any).resolveMercAttack(m, (g as any).mercStats(m));
+      return { near: near.maxHp - near.hp, side: side.maxHp - side.hp };
+    };
+    const base = dealt(0, 0.99);
+    const double = dealt(1, 0.99); // 휩쓸기는 아직 없고(1단계) 2단 찌르기만
+    assert.ok(double.near > base.near * 1.3, `2단 찌르기 ${base.near} → ${double.near}`);
+    const sweep = dealt(3, 0.0); // 확률 판정 통과
+    assert.ok(sweep.side > 0, "휩쓸기가 옆의 적도 맞힌다");
   });
 });

@@ -583,6 +583,8 @@ export interface Merc extends Fighter {
   streak?: number; // 쓰러지지 않고 싸운 시간(초, 표시용)
   streakMerit?: number; // 쓰러지지 않고 쌓은 기여도 — 경험치 배율의 기준
   combatT?: number; // 마지막으로 피해를 주고받은 뒤 남은 "싸우는 중" 시간
+  guardT?: number; // 수비 태세(창병 2단계) 남은 시간
+  guardTick?: number; // 다음 찌르기까지
   skCd?: [number, number]; // 액티브 스킬(2·4단계) 쿨다운 남은 시간
   skThink?: number; // 다음 발동 판단까지
   thornFxT?: number; // 가시 방패 반사 이펙트를 마지막으로 보낸 시각
@@ -4499,6 +4501,7 @@ export class Game {
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
           let taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner) * (1 + (m.sit?.taken ?? 0)); // 성격 상황 효과(받는 피해)
+          if ((m.guardT ?? 0) > 0) taken *= 1 - SK.stanceTake; // 수비 태세 중에는 덜 맞는다
           if (m.type === CAVALRY && skillOn(CAVALRY, m.tier, 3) && (m.momentum >= COUNTER_MOMENTUM || m.chargeSnap > 0)) taken *= 1 - SK.ironHorse; // 철갑마: 돌격 중에는 덜 아프다
           if (!h.dot && taken > 0) {
             // 수호: 곁의 검방병이 피해 일부를 대신 받는다
@@ -6452,9 +6455,19 @@ export class Game {
         .slice(0, SK.breakCount);
       for (const o of near) this.damageEnemy(o, { damage: (dmg + charge) * SK.breakFrac, charge: 0, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - o.y, m.x - o.x), crit }, m.owner, m);
     }
-    if (m.type === SPEAR && skillOn(SPEAR, m.tier, 3) && this.rng() < SK.doubleChance) {
-      const t = struck[0]!;
-      if (t.hp > 0) this.damageEnemy(t, { damage: dmg * SK.doubleFrac, charge: 0, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - t.y, m.x - t.x), crit }, m.owner, m);
+    if (m.type === SPEAR && skillOn(SPEAR, m.tier, 1)) {
+      // 2단 찌르기: 찌른 적을 곧바로 한 번 더 찌른다
+      for (const t of struck) if (t.hp > 0) this.damageEnemy(t, { damage: dmg * SK.doubleFrac, charge: 0, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - t.y, m.x - t.x), crit }, m.owner, m);
+    }
+    if (m.type === SPEAR && skillOn(SPEAR, m.tier, 3) && this.rng() < SK.sweepChance) {
+      // 휩쓸기: 창을 크게 휘둘러 전방 넓은 부채꼴의 모든 적을 훑는다
+      const range = this.mercStats(m).reach * SK.sweepRange;
+      for (const t of this.enemies.values()) {
+        if (t.hp <= 0 || Math.hypot(t.x - m.x, t.y - m.y) > range + radiusOf(t)) continue;
+        if (Math.abs(angleDiff(Math.atan2(t.y - m.y, t.x - m.x), m.atkAng)) > SK.sweepHalf) continue;
+        this.damageEnemy(t, { damage: dmg * SK.sweepFrac, charge: 0, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - t.y, m.x - t.x), crit }, m.owner, m);
+      }
+      this.pushEvent(EVT_MERC_SKILL, m.x, m.y, m.atkAng, SPEAR * 10 + 3, m.owner);
     }
   }
 
@@ -6753,6 +6766,7 @@ export class Game {
       }
       if ((m.tauntT ?? 0) > 0) m.tauntT = Math.max(0, m.tauntT! - dt);
       if ((m.dashT ?? 0) > 0) m.dashT = Math.max(0, m.dashT! - dt);
+      if ((m.guardT ?? 0) > 0) this.stepGuard(m, dt);
       const cd = (m.skCd ??= [0, 0]);
       cd[0] = Math.max(0, cd[0] - dt);
       cd[1] = Math.max(0, cd[1] - dt);
@@ -6766,6 +6780,26 @@ export class Game {
         if (this.tryActive(m, n)) cd[i] = ACTIVE_CD[m.type]![i]!;
       }
     }
+  }
+
+  /** 수비 태세: 쉬지 않고 정면 부채꼴(가장 가까운 적 쪽)을 찌르고, 그 안으로 날아오는 적 화살을 막는다 */
+  private stepGuard(m: Merc, dt: number): void {
+    m.guardT = Math.max(0, m.guardT! - dt);
+    m.guardTick = (m.guardTick ?? 0) - dt;
+    if (m.guardTick > 0) return;
+    m.guardTick = SK.stanceStep;
+    const st = this.mercStats(m);
+    const range = st.reach * SK.stanceRange;
+    const target = this.nearestEnemyTo(m, range);
+    const ang = target ? Math.atan2(target.y - m.y, target.x - m.x) : m.atkAng;
+    let hit = false;
+    for (const e of this.enemiesNear(m.x, m.y, range)) {
+      if (Math.abs(angleDiff(Math.atan2(e.y - m.y, e.x - m.x), ang)) > SK.stanceHalf) continue;
+      this.skillHit(m, e, SK.stanceDmg);
+      hit = true;
+    }
+    this.bullets = this.bullets.filter((b) => !(b.hostile && Math.hypot(b.x - m.x, b.y - m.y) <= range && Math.abs(angleDiff(Math.atan2(b.y - m.y, b.x - m.x), ang)) <= SK.stanceHalf));
+    if (hit || target) this.pushEvent(EVT_MERC_SKILL, m.x, m.y, ang, SPEAR * 10 + 6, m.owner); // 찌르는 모습(이름 글자 없이)
   }
 
   private enemiesNear(x: number, y: number, r: number): Enemy[] {
@@ -6851,11 +6885,12 @@ export class Game {
       }
       case SPEAR: {
         if (n === 2) {
-          let best: Enemy | undefined;
-          for (const e of this.enemies.values()) if (e.hp > 0 && Math.hypot(e.x - m.x, e.y - m.y) <= SK.throwRange && (!best || e.maxHp > best.maxHp)) best = e;
-          if (!best) return false;
-          this.skillFx(m, n, Math.atan2(best.y - m.y, best.x - m.x), best.x, best.y);
-          this.skillHit(m, best, SK.throwDmg, true);
+          // 수비 태세: 사거리 안에 적이 둘 이상이면 3초간 정면을 쉬지 않고 찌르며 화살을 막는다
+          const near = this.enemiesNear(m.x, m.y, st.reach * SK.stanceRange);
+          if (near.length < SK.stanceTrigger || (m.guardT ?? 0) > 0) return false;
+          m.guardT = SK.stanceSec;
+          m.guardTick = 0;
+          this.skillFx(m, n, Math.atan2(near[0]!.y - m.y, near[0]!.x - m.x));
           return true;
         }
         const e = this.nearestEnemyTo(m, SK.lungeRange);
@@ -7456,7 +7491,7 @@ export class Game {
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 - SK.focusCast : 1),
       cooldown: base.cooldown / quick / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick * ((m.dashT ?? 0) > 0 ? SK.dashSpeed : 1),
-      reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier) * (skillOn(t, tier, 1) && t === SPEAR ? SK.reachMult : 1), area * (1 + TIER_AREA[t]! * tier)),
+      reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier) , area * (1 + TIER_AREA[t]! * tier)),
       splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 + SK.focusArea : 1),
       arc: meleeArc(t, base.arc, area),
     };

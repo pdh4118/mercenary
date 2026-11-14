@@ -23,9 +23,9 @@ export const MERC_SKILLS: Record<number, readonly MercSkill[]> = {
     { name: "환영 기병대", kind: "active", desc: "환영 기병 3기가 일직선으로 돌격한다" },
   ],
   [SPEAR]: [
-    { name: "관통 찌르기", kind: "passive", desc: "창이 길어져 더 먼 적까지 꿰뚫는다" },
-    { name: "창 던지기", kind: "active", desc: "체력이 가장 많은 적에게 창을 던져 3배 피해" },
-    { name: "연속 찌르기", kind: "passive", desc: "25% 확률로 한 번 더 찌른다(70% 피해)" },
+    { name: "2단 찌르기", kind: "passive", desc: "한 번 찌를 때마다 곧바로 한 번 더 찔러 40% 피해를 더한다" },
+    { name: "수비 태세", kind: "active", desc: "적이 둘러싸면 3초간 정면 부채꼴을 쉬지 않고 찌르고 날아오는 화살을 막는다. 그동안 받는 피해 40% 감소" },
+    { name: "휩쓸기", kind: "passive", desc: "25% 확률로 창을 크게 휘둘러 전방의 넓은 범위를 훑는다(80% 피해)" },
     { name: "돌진 찌르기", kind: "active", desc: "적에게 돌진하며 강하게 찌른다" },
   ],
   [SHIELD]: [
@@ -57,9 +57,11 @@ export const SK = {
   breakFrac: 0.6,
   breakRange: 110, // 돌파: 첫 대상에서 이 거리 안의 적
   ironHorse: 0.25, // 철갑마: 돌격 중 받는 피해 감소
-  reachMult: 1.25, // 관통 찌르기: 창 길이
-  doubleChance: 0.25, // 연속 찌르기
-  doubleFrac: 0.7,
+  doubleFrac: 0.4, // 2단 찌르기: 두 번째 찌르기의 피해 비율(항상 발동)
+  sweepChance: 0.25, // 휩쓸기: 발동 확률
+  sweepFrac: 0.8,
+  sweepHalf: 1.4, // 휩쓸기 부채꼴 절반 각(라디안, 약 80도 = 전방 160도)
+  sweepRange: 1.25, // 휩쓸기 사거리(창 사거리의 배)
   thorns: 0.25, // 가시 방패
   guard: 0.15, // 수호
   guardRange: 130,
@@ -85,8 +87,13 @@ export const SK = {
   phantomDmg: 2.4, // 환영 기병대: 기병 공격력 배율
   phantomLen: 600,
   phantomWid: 140,
-  throwDmg: 3, // 창 던지기
-  throwRange: 650,
+  stanceSec: 3, // 수비 태세
+  stanceStep: 0.2, // 태세 중 이 간격으로 정면을 찌른다
+  stanceDmg: 0.25, // 한 번 찌를 때 창병 공격력 배율
+  stanceHalf: 0.87, // 정면 부채꼴 절반 각(약 50도, 보스 창병 장군과 같은 100도 전방)
+  stanceRange: 1.2, // 사거리(창 사거리의 배)
+  stanceTake: 0.4, // 받는 피해 감소
+  stanceTrigger: 2, // 사거리 안 적이 이만큼 이상이면 쓴다
   lungeDmg: 2.2, // 돌진 찌르기
   lungeRange: 480,
   bashDmg: 0.8, // 방패 밀치기
