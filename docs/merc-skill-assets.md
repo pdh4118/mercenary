@@ -228,3 +228,23 @@ Style: cute chibi cartoon like Image 1, flat cel-shaded colors, thick dark outli
 
 Avoid: cannon, barrel, tube, gun, wheel, realistic horse, human rider, knight, gradients, glow blur, thin lines, tiny details, text inside the icon, cropped items, checkerboard pattern, logo, watermark, any text other than the caption.
 ```
+
+## 6. 창병 스킬 아이콘 새로 요청 (베타 1.333 창병 스킬 개편)
+
+**왜**: 창병 스킬이 "2단 찌르기(패시브1)·수비 태세(액티브2)·휩쓸기(패시브3)·돌진 찌르기(액티브4)"로 바뀌었다. 지금은 기존 그림을 돌려 쓴다(2단 찌르기←`mskill_spear_3`, 수비 태세←`mskill_spear_1`, 휩쓸기←`mskill_spear_2`). **수비 태세와 휩쓸기 두 장만 새로 받으면** 맞는 그림이 된다. 받으면 `mskill_spear_2`(수비 태세)·`mskill_spear_3`(휩쓸기)로 넣고, 지금의 `mskill_spear_3`(두 번 찌르는 그림)는 `mskill_spear_1`(2단 찌르기)로 옮기고, 예전 그림은 `_old`로 보관한다. **첨부**: `main_style_sheet.png`와 받아 둔 창병 아이콘 시트(`mskill_spear_1~4`, 같은 배지 모양·테두리를 맞추려고).
+
+```
+Generate an image. I attached images: Image 1 is the art STYLE reference (copy its flat cel-shaded, thick-outlined cartoon style exactly). Image 2 is a sheet of four sibling skill icons: match their size, rounded-square badge shape, thick near-black outline and border rings exactly.
+
+Make ONE sprite sheet image with TWO square skill ICONS side by side in one row, each large and clearly separated with at least 40px of empty space around it, captions "mskill_spear_2" and "mskill_spear_3". Plain flat light-gray background, no logo or watermark.
+
+Each icon is a rounded-square badge about 128x128 with a thick near-black outline about 3px and a dark flat-colored background, with ONE simple bold symbol drawn big in the middle (readable when shrunk to 40px).
+- "mskill_spear_2" (an ACTIVE skill, so a GOLD border ring): a DEFENSIVE SPEAR STANCE. A long spear held horizontally in front of a round wooden-and-steel shield, the spear tip pointing right, with a wide fan of three short thrust lines spreading out from the tip and two small arrows bouncing off the front of the shield. Dark navy background. The idea is "a wall of spears that stabs and blocks arrows".
+- "mskill_spear_3" (a PASSIVE skill, so a SILVER-BLUE border ring): a WIDE SPEAR SWEEP. A spear drawn diagonally with a big flat white-and-pale-orange crescent slash arc sweeping across the whole icon in front of it, and three small round enemy silhouettes (dark circles with tiny eyes) being knocked back along the arc, tiny impact bursts. Dark brown background. The idea is "the spear swings wide and hits everything in front".
+
+Style: cute chibi cartoon like Image 1, flat cel-shaded colors in 2-3 tones, thick dark outline, no gradients, no glow blur, no realistic rendering, no text or letters inside the icons.
+
+Avoid: realistic style, gradients, glow blur, thin lines, tiny details, text inside icons, cropped items, checkerboard pattern, logo, watermark, any text other than the two captions.
+```
+
+**받은 뒤**: `tools/remove_flat_bg.py`로 배경을 지우고 `tools/slice_sheet.py`(`--rows 1 --scale 0.32 --min-height 150 --attach 4`)로 자른 뒤, 클라이언트의 임시 순서(`SPEAR_ICON_ORDER`)를 지운다.
