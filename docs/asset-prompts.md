@@ -1612,3 +1612,34 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, photo
 **13-11 ② 진행**: 궁수를 갑옷 없는 두건 궁수로 고쳐 다시 뽑은 시트를 받음, 적용됨(베타 1.300). 5종 모두 치비 비율·같은 색조(검정·보라·금)·단순한 얼굴. `assets/units/boss10_post_<archer|mage|spear|sword|blunt>_idle.png`(궁 241x248, 마법 237x258, 창 217x327, 검방 237x267, 둔기 272x286; 이전 높이에 가깝게 0.67배), 예전 그림은 `_old`로 보관. **초소병 공격 5종(`aim`·`cast`·`atk`)은 아직 예전 그림**이라 쏘거나 휘두를 때 모습이 바뀐다. 다음: ③ 초소병 공격 5종(받은 ② 시트를 세 번째 이미지로 첨부).
 
 **13-11 ③ 진행**: 초소병 공격 5종 받음, 적용됨(베타 1.301). ②의 인물과 똑같이 나왔고(궁수는 두건 유지, 활시위가 얼굴을 가로지르지 않음) 서 있는 모습과 같은 배율(0.67)로 맞췄다. `assets/units/boss10_post_archer_aim`(237x226)·`mage_cast`(247x346)·`spear_atk`(339x241)·`sword_atk`(291x237)·`blunt_atk`(240x322), 예전 그림은 `_old`로 보관. **13-11 군주 근위대 5종 + 초소병 10종이 모두 새 그림이다.** 시트를 자를 때 마법사의 소용돌이 조각이 따로 잡혀 한 번 실패했다: `tools/slice_sheet.py`는 높이가 `--min-height` 이상인 조각을 별개 스프라이트로 보므로, 이펙트 조각이 붙은 시트는 `--min-height`를 몸 높이에 가깝게 크게(250) 주고 `--attach`를 크게(120) 줘야 한다. **장군 본체·부속 병사 정리가 끝났다. 남은 것은 스켈레톤 6종(`skel_*`)과 각 보스의 이펙트(`assets/fx/boss*_*`)다.**
+
+### 13-12. 네크로맨서의 스켈레톤 6종 - `assets/units/skel_cavalry`, `skel_spear`, `skel_archer`, `skel_sword`, `skel_blunt`, `skel_mage` (한 시트, 가로로 나란히)
+
+**쓰이는 곳**: 스테이지 9 네크로맨서가 소환하는 스켈레톤(병종 번호 순: 기병·창·궁·검방·둔기·마법). 병종당 **그림 한 장**을 모든 상태(걷기·공격)에 쓴다. 일반 유닛과 같은 크기로 화면에 **많이** 나오므로 아군·적 유닛과 같은 크기·같은 화풍이어야 한다(이전 65~118px).
+**색조**: 네크로맨서 새 그림(13-9)과 같은 검정·진한 초록·뼈색·독초록 빛. 눈구멍 초록 점 두 개만 단순하게.
+**첨부할 이미지 3장(이 순서)**: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/skel_old_ref.png`(예전 그림, 정체성 참고), ③ `docs/style-reference/boss9_new_ref.png`(새 네크로맨서, 색조 기준).
+**크기**: 받은 뒤 예전 크기(65~118px)에 맞춰 줄인다.
+
+#### 13-12 제미나이(Gemini)에 붙여넣는 최종본
+
+```
+Generate an image. I attached three images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is only a CHARACTER DESIGN reference showing the old versions of these six skeleton soldiers (keep who they are, redraw them in the style of Image 1), and Image 3 shows their master, the necromancer boss (use his color theme: black, dark green, bone white and toxic green glow, so the skeletons clearly belong to him).
+
+Make ONE sprite sheet image with six items side by side in one row, each large and clearly separated, with at least 40px of empty space around every item so no weapon, hoof, rag or flame touches the edge of the image, and a small caption under each item ("skel_cavalry", "skel_spear", "skel_archer", "skel_sword", "skel_blunt", "skel_mage"). Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark. All six stand on the same ground height.
+
+Style and proportions: cute chibi exactly like the units in Image 1, the same size and feel as the normal soldiers there. Each skeleton has a huge round skull head that is about half of his whole body height, a short stubby body and short thick limbs made of simple bone shapes. Never tall, lean, realistic or detailed anatomy. Side view, a thick near-black outline about 2-3px with no light fringe outside it, flat cel-shaded colors in 2-3 tones, saturated but not neon, no gradients, no realistic texture, no glossy highlights, no glow blur, no smoke, no motion lines.
+
+Faces: a simple round bone-colored skull with two plain dark oval eye sockets, each with a tiny pale-green glowing dot, and a tiny nose notch, nothing else, no detailed bone texture, no teeth detail.
+
+Color theme: bone white skulls and bones, dull rusty brown and dark gray old armor pieces, tattered dark green and black rags, and a toxic green glow only on the eyes and the mage's flame.
+
+The six skeleton soldiers of the necromancer, all facing right:
+1. "skel_cavalry": a skeleton knight riding a chibi skeletal horse (a horse made of bones with a big round skull head, short stout body, short thick legs), holding a short lance forward to the right, tattered green rags on the rider and the horse.
+2. "skel_spear": a skeleton spearman in a rusty brown helmet, holding a long spear in a ready pose pointing forward to the right, a tattered green loincloth.
+3. "skel_archer": a skeleton archer in a rusty brown cap with a tattered dark green cloak, drawing a bow to the right, a quiver of arrows on his back (the bowstring must not cross his skull).
+4. "skel_sword": a skeleton swordsman in a rusty brown helmet with a small round wooden shield with a metal rim in front and a sword in the other hand.
+5. "skel_blunt": a bigger skeleton warrior in rusty brown and dark gray plate pieces (helmet, big shoulder plates), a spiked mace on his shoulder.
+6. "skel_mage": a skeleton mage in a tattered dark green and black hooded robe holding a tall staff topped with a small toxic-green flame.
+
+Avoid: realistic proportions, tall lean skeleton, realistic anatomy, detailed ribs, long limbs, small head, photo, 3d render, gradients, glow blur, smoke, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed skull, detailed teeth, cropped or overlapping items, logo, watermark, any text other than the six captions.
+```
