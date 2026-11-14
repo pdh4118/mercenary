@@ -4806,6 +4806,8 @@ export class Game {
     const enemyT = duel ? [] : this.enemyTargets();
     const all = fighting ? this.collectFriendlies() : [];
     const foeCache = new Map<number, Target[]>();
+    const gateSiege = this.siege;
+    const gateAlive = !duel && !!gateSiege && !gateSiege.open && !gateSiege.hall && this.boss.hazards.some((h) => h.kind === HZ_GATE && h.t > 0);
     const allyCache = new Map<number, Ally[]>();
 
     for (const m of this.mercs.values()) {
@@ -4901,6 +4903,9 @@ export class Game {
       if (duel) {
         targets = foeCache.get(m.owner) ?? this.duelTargets(m.owner, all);
         foeCache.set(m.owner, targets);
+      } else if (gateAlive && m.type !== ARCHER && m.type !== MAGE) {
+        // 공성전: 근접 용병은 성문도 목표로 삼는다(졸개·수비병만 쫓고 성문은 안 치던 문제). 성문 앞면에서 용병과 가장 가까운 점을 겨눈다
+        targets = [...enemyT, { x: Math.max(GATE_X - SIEGE.gateHalf, Math.min(GATE_X + SIEGE.gateHalf, m.x)), y: GATE_Y + 30, r: 26, type: NO_TYPE, face: Math.PI / 2, shield: 0, ranged: false, id: -1, hero: false, hpFrac: 1 }];
       }
       let allies = allyCache.get(m.owner);
       if (!allies) {
@@ -4912,6 +4917,11 @@ export class Game {
       let assault = this.effStance(ownerSlot, m.type) === STANCE_ASSAULT;
       const trueAssault = ownerSlot?.stances[m.type] === STANCE_ASSAULT; // 보호 진형에서 자유롭게 싸우는 병종은 해당하지 않는다
       if (trueAssault && m.type === CAVALRY) leash = 1e6; // 돌격 진형: 기병은 주인공과의 거리와 상관없이 쫓는다
+      let gateFree = false; // 공성전: 근처(280px)에 졸개·수비병이 없으면 근접 용병은 성문을 치러 간다
+      if (gateAlive && m.type !== ARCHER && m.type !== MAGE) {
+        gateFree = true;
+        for (const t of enemyT) if (Math.hypot(t.x - m.x, t.y - m.y) < 280) { gateFree = false; break; }
+      }
       if (duel && tmode === TOUR_MERCS) {
         leash = 1e6; // 용병전: 주인공이 제자리에 있으므로 용병이 스스로 적진으로 나가 싸운다
         assault = true;
@@ -4994,6 +5004,8 @@ export class Game {
       if (ordNow) {
         c.ordered = true;
         this.aiOrdered(c, ordNow); // 우클릭 지시는 어떤 병종 AI(아군 지키기·물러나기·진형 복귀)보다 앞선다
+      } else if (gateFree) {
+        this.aiGate(c); // 성문 앞으로 가서 성문을 친다
       } else if (m.type !== CAVALRY && trueAssault && !duel) {
         c.ordered = true;
         this.aiAssault(c); // 돌격 진형: 주인공과의 거리와 상관없이 가장 가까운 적에게 곧장 달려가 친다
@@ -5244,6 +5256,20 @@ export class Game {
     }
     const speed = d > 300 ? st.speed * Math.min(TUNE.CATCHUP_MAX, 1.3) : st.speed;
     this.moveToward(m, target.x, target.y, speed, dt, Math.max(4, this.engageDist(c)));
+  }
+
+  /** 공성전: 성문 앞(용병과 가장 가까운 성문 앞면 점)으로 가서 성문을 친다. 졸개·수비병이 가까이 오면 평소 AI로 돌아간다. */
+  private aiGate(c: AiCtx): void {
+    const { m, st, dt } = c;
+    const gx = Math.max(GATE_X - SIEGE.gateHalf + 8, Math.min(GATE_X + SIEGE.gateHalf - 8, m.x));
+    const gy = GATE_Y + 20;
+    const d = Math.hypot(gx - m.x, gy - m.y);
+    m.face = Math.atan2(GATE_Y - m.y, gx - m.x);
+    if (d <= st.reach * 0.7 + 14) {
+      if (m.cd <= 0 && m.atkT <= 0) this.startAttack(m, st, m.face);
+      return;
+    }
+    this.moveToward(m, gx, gy, st.speed, dt, 6);
   }
 
   /** 우클릭 지시(이동·공격): 최우선 명령. 다른 판단 없이 그대로 따른다. */

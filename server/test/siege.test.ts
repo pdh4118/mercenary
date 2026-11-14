@@ -662,3 +662,22 @@ test("성내 전장: 홀 밖으로는 나가지 못하고, 졸개 증원은 홀 
   assert.ok(n > 0);
   for (const e of (g as any).enemies.values()) assert.ok(inHall(e.x, e.y), `증원도 홀 안(${e.x},${e.y})`);
 });
+
+test("공성전: 근접 용병은 주변에 졸개가 없어도 성문으로 가서 성문을 부순다", () => {
+  const { g, a } = setup(0);
+  const p = g.getPlayer(a)!;
+  // 졸개·수비병은 모두 치워서 성문만 남긴다
+  for (const [id, e] of (g as any).enemies) if (!e.boss) (g as any).enemies.delete(id);
+  (g as any).siege.postT = 1e9; (g as any).siege.waveT = 1e9;
+  const ids = [SPEAR, SHIELD, BLUNT].map((t, i) => g.addMerc(a, t, GATE_X + (i - 1) * 40, GATE_Y + 260, 0, 0));
+  const gate = (g as any).boss.hazards.find((h: any) => h.kind === HZ_GATE);
+  const hp0 = gate.hp;
+  p.x = GATE_X; p.y = GATE_Y + 330; // 주인공도 성문 쪽 가까이
+  for (let i = 0; i < 20 * TICK_RATE; i++) {
+    g.step();
+    for (const sl of (g as any).slots.values()) { sl.state.hp = sl.state.maxHp; sl.state.invuln = 1e9; for (const [id, e] of (g as any).enemies) if (!e.boss) (g as any).enemies.delete(id); }
+    for (const m of (g as any).mercs.values()) { m.hp = 1e6; m.respawn = 0; }
+  }
+  void ids;
+  assert.ok(gate.hp < hp0 || (g as any).siege.open, `성문 체력이 줄었다(${Math.round(hp0)} -> ${Math.round(gate.hp)})`);
+});

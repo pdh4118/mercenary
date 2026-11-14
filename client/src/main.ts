@@ -2527,7 +2527,7 @@ async function main() {
         const pt = ((w[14] ?? 0) & EF_POST) !== 0 ? (bossFx.postTex[w[4] === 5 ? "mage" : w[4] === 3 ? "sword" : w[4] === 1 ? "spear" : w[4] === 2 ? "archer" : w[4] === 4 ? "blunt" : "none"] ?? [])[w[5] > 0 ? 1 : 0] ?? null : null;
         v.sprite.texture = (pt ?? bossFx.eliteTex[w[4]])!;
         v.sprite.anchor.set(0.5, pt ? 0.95 : 0.88);
-        const es = (pt ? (w[4] === 4 ? 0.29 : 0.36) : w[4] === 0 ? 0.4 : 0.46) * size;
+        const es = (pt ? (w[4] === 4 ? 0.22 : 0.26) : w[4] === 0 ? 0.4 : 0.46) * size; // 성벽 수비병은 새 치비 그림이 예전보다 넓고 커 보여서 배율을 줄였다(0.36 -> 0.26)
         v.sprite.scale.set(es * v.face, es);
         v.lastX = v.x;
         v.lastY = v.y;
