@@ -1645,3 +1645,29 @@ Avoid: realistic proportions, tall lean skeleton, realistic anatomy, detailed ri
 ```
 
 **13-12 진행**: 스켈레톤 6종 받음, 적용됨(베타 1.302). 큰 머리 치비 비율, 눈구멍 초록 점, 네크로맨서와 같은 뼈색·녹슨 갈색·진한 초록 색조, 기병의 말도 뼈 치비 말, 활시위가 두개골을 가로지르지 않고 로고도 없어 첫 시안을 그대로 썼다. `assets/units/skel_cavalry`(115x108)·`skel_spear`(99x91)·`skel_archer`(93x94)·`skel_sword`(71x93)·`skel_blunt`(97x100)·`skel_mage`(87x112), 이전 65~118px과 같은 크기(0.28배), 예전 그림은 `_old`로 보관. 마법사 로브는 보라에서 진한 초록·검정으로 바뀌었다(네크로맨서와 맞춤). **이제 사람·병사 그림은 모두 메인 화풍이다. 남은 것은 각 보스의 이펙트(`assets/fx/boss*_*`, 약 260장)와 네크로맨서 부속 이펙트다.**
+
+### 13-7 추가. 기마궁수 달리기 다리 애니메이션 - `assets/units/boss7_gallop_0~3`, `boss7_shoot_0~3`
+
+**왜**: 기마궁수가 아군 기병보다 훨씬 큰데 지금 그림은 말 다리가 고정이라 미끄러지듯 움직여 위화감이 크다. 아군·적 기병은 달리는 프레임을 돌려 걷는 느낌을 내므로(`cavGait`), 기마궁수도 **달리기 4컷 x 2자세**를 받아 같은 방식으로 돌린다.
+**원칙**: 다리(와 꼬리·갈기의 작은 흔들림)만 달라지고 **기수·몸·활·망토·크기는 8장 모두 똑같아야** 한다(안 그러면 몸이 떨려 보인다). 그래서 현재 그림(`boss7_new_ref.png`)을 캐릭터 기준으로 첨부한다.
+**첨부할 이미지 2장(이 순서)**: ① `docs/style-reference/main_style_sheet.png`, ② `docs/style-reference/boss7_new_ref.png`(현재 기마궁수 달리기·사격 2포즈).
+**받은 뒤**: 제가 `boss7_gallop_0~3`, `boss7_shoot_0~3`으로 자르고(`tools/slice_aligned.py --align bbox`, 기존과 같은 206x172 크기), 코드가 이동 속도에 맞춰 4컷을 돌리도록 연결한다. 정지 그림(`boss7_gallop`, `boss7_shoot`)은 그대로 두고, 프레임이 없을 때의 대체로 쓴다.
+
+#### 제미나이(Gemini)에 붙여넣는 최종본
+
+```
+Generate an image. I attached two images: Image 1 is the art STYLE reference (copy its style and proportions exactly), Image 2 is the CHARACTER reference: this exact horse archer boss in two poses (gallop and shoot). Draw the SAME character (same rider, same cream-white chibi horse, same colors, same size, same proportions, same outline) as new animation frames in which ONLY the horse's legs (and the tail and mane swaying a little) change.
+
+Make ONE sprite sheet image with TWO rows. Row 1 has four frames of the pose "boss7_gallop" (the rider leaning forward low over the horse's neck, the bow held low in one hand), captions "boss7_gallop_0", "boss7_gallop_1", "boss7_gallop_2", "boss7_gallop_3". Row 2 has four frames of the pose "boss7_shoot" (the rider sitting up and drawing the bow to the right with an arrow nocked), captions "boss7_shoot_0", "boss7_shoot_1", "boss7_shoot_2", "boss7_shoot_3". Each item large and clearly separated, at least 40px of empty space around every item, plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+THIS IS A LOOPING GALLOP ANIMATION. The four frames of a row, played in order 0,1,2,3 and back to 0, must look like a smooth horse gallop:
+- frame 0: all four legs gathered under the body (the horse bunched up, the body at its lowest);
+- frame 1: the front legs stretching forward and the back legs pushing off backward (the body rising);
+- frame 2: all four legs fully stretched out, front legs forward and back legs backward, the horse in the air at the highest point of the stride (the flying gallop);
+- frame 3: the legs coming back toward the body, front legs folding down and back legs swinging forward (the body descending).
+Everything except the legs (and a small sway of the tail and mane) must stay IDENTICAL between the four frames of a row: the same rider pose and the same size, the rider's body and bow in exactly the same position relative to the saddle, the same head, the same saddle blanket and cloak. Only the horse's legs, with a tiny up-and-down bob of the whole horse body of about 4% of its height, change. The horse's hooves in frame 0 and frame 3 should touch the same ground height as in Image 2; in frame 2 the hooves are a little above it. All eight frames have exactly the same character size.
+
+Style and proportions: cute chibi exactly like Image 1 and Image 2: the rider has a huge round head, the horse is short, stout and chibi with short thick legs and a big round head, never tall, long-legged or realistic. Side view facing right, a thick near-black outline about 2-3px with no light fringe, flat cel-shaded colors in 2-3 tones, no gradients, no motion lines, no dust, no speed effects. The bowstring must never cross the rider's face or cap.
+
+Avoid: realistic horse legs, long thin legs, different rider poses between frames, different sizes between frames, motion blur, dust, speed lines, shadows, ground line, checkerboard pattern, cropped or overlapping items, logo, watermark, any text other than the eight captions.
+```
