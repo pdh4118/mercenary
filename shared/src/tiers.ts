@@ -59,9 +59,9 @@ export const mercLevel = (xp: number): number => {
 };
 /** 레벨 모드: 승급 단계 tier → tier+1에 필요한 레벨 */
 export const promoLevel = (tier: number): number => TUNE.LV_PROMO_EVERY * (tier + 1);
-/** 레벨 모드: 레벨이 주는 체력·공격력 배율 */
-export const levelHp = (lv: number): number => (1 + TUNE.LV_HP) ** lv;
-export const levelDmg = (lv: number): number => (1 + TUNE.LV_DMG) ** lv;
+/** 레벨 모드: 레벨이 주는 체력·공격력 기본값 배율(1 + 레벨 x 비율). 병종 기본 수치 자체가 올라가는 셈이라 카드의 % 보너스는 그 위에 곱해진다 */
+export const levelHp = (lv: number): number => 1 + TUNE.LV_HP * lv; // 레벨마다 기본 체력이 일정량 늘어난다(복리 아님). 퍼센트 증가는 카드가 곱해진다
+export const levelDmg = (lv: number): number => 1 + TUNE.LV_DMG * lv;
 /** 화면용 진행 정보: 단계제는 경험치/필요량, 레벨제는 레벨·현재 레벨 안의 진행·승급 가능 여부 */
 export interface MercProg {
   level: number; // 레벨제의 레벨(단계제면 0)

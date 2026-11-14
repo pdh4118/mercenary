@@ -1129,6 +1129,7 @@ async function main() {
   const ROW_SCALE = 0.78; // 두 줄 선택(카드 6장)일 때 패널을 줄여서 화면을 덜 가린다
   const COL_GAP = 14;
   let cardPanelW = CARD_W; // 패널이 차지하는 가로(화면 배치용)
+  let lastCardPickAt = -1e9; // 마지막으로 카드를 고른 시각(ms)
   const rowLabels = [0, 1].map((c) => {
     const t = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 16, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
     t.position.set(c * (CARD_W + COL_GAP), 30);
@@ -1980,6 +1981,8 @@ async function main() {
     if (formations.isOpen()) return; // 편성 화면에서는 게임 조작을 받지 않는다
     if (!e.repeat && k === "q") cycleWeapon(1);
     if (!e.repeat && (k === "z" || k === "x" || k === "c")) {
+      if (performance.now() - lastCardPickAt < 300) return; // 카드를 연달아 누르면 두 번째가 다른 줄을 고르지 않게 0.3초 간격을 둔다
+      lastCardPickAt = performance.now();
       const mineP = latest?.players.find((p) => p.id === myId);
       const offerNow = mineP?.offer ?? [];
       const heroLeft = offerNow.length === 6 && offerNow.slice(0, 3).some((v) => v >= 0);
