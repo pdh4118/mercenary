@@ -87,7 +87,7 @@ export const SOUNDS = {
   mskill_bash: d(1, 1, 150, 3),
   mskill_thorn: d(1, 0.9, 200, 3),
   mskill_blink: d(2, 1, 250, 3),
-  mskill_poison: d(1, 0.8, 200, 3),
+  mskill_poison: d(2, 0.8, 200, 3),
   mskill_ice: d(1, 0.8, 200, 3),
   mskill_ember: d(1, 0.7, 800, 2),
   skill_wall_up: d(1, 0.6, 300, 2),

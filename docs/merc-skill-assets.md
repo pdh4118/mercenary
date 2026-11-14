@@ -182,22 +182,24 @@ Avoid: gradients, glow blur, realistic fire, realistic smoke, characters, text o
 |---|---|---|
 | `mskill_jump` | 궁병 뒤로 점프 | a quick leather boot push-off with a short cloth whoosh and a soft thud landing, no voice, 0.4 seconds |
 | `mskill_stealth` | 궁병 은신 | a soft airy shimmer, a quiet cloth rustle fading into near silence, no voice, 0.6 seconds |
-| `mskill_stealth_end` | 은신 해제 | a short soft cloth snap with a tiny bow string pluck, no voice, 0.3 seconds |
+| `mskill_stealth_end` | 은신 해제 | close-up and loud: a sharp snap of a thick cloak being thrown off with a crisp leather whip crack right at the very first moment, followed by a short bright bow string twang, dry and punchy, no reverb, no voice, 0.3 seconds |
 | `mskill_gallop` | 기병 일제 질주 | several horse hooves breaking into a gallop with a short rising wind whoosh, no voice, 0.7 seconds |
 | `mskill_phantom` | 환영 기병대 | a ghostly low horse whinny blended with a airy magical whoosh and distant hoof beats, no human voice, 0.8 seconds |
 | `mskill_spear_throw` | 창 던지기 | a heavy spear thrown, a short strained whoosh and a sharp thunk into a target, no voice, 0.5 seconds |
-| `mskill_lunge` | 돌진 찌르기 | a quick boot dash followed by a sharp metal spear stab, no voice, 0.4 seconds |
+| `mskill_lunge` | 돌진 찌르기 | close-up and loud: a fast boot stomp then a violent spear stab, a sharp metallic stab impact right at the very first moment followed by a short air whoosh tail, dense, punchy and powerful, no voice, 0.4 seconds |
 | `mskill_bash` | 방패 밀치기 | a wooden shield slamming into armor with a dull heavy thud and a small metal clank, no voice, 0.3 seconds |
 | `mskill_thorn` | 가시 방패 반사 | a short sharp metallic scrape and spark zing as spikes scratch a weapon, no voice, 0.25 seconds |
-| `mskill_taunt` | 도발 결계 | a deep low horn-like hum with a rising magical shimmer ring, no voice, 0.8 seconds |
+| `mskill_taunt` | 도발 결계 | loud and clear: a short medieval war horn blast, one low brass horn note with a sharp attack, followed by two quick heavy sword strikes banged on a shield, battlefield provocation, dense and powerful, no voice, 1.0 seconds |
 | `mskill_leap` | 둔기병 도약 내려찍기 | a heavy armored jump, a whoosh and a huge crunching ground slam with rocks, no voice, 0.7 seconds |
-| `mskill_quake` | 지진 | a deep rumbling ground quake with cracking rock and a low boom, no voice, 1.0 seconds |
+| `mskill_quake` | 지진 | close-up, very loud and powerful: a huge ground slam, a deep thunderous boom with a sharp heavy impact at the very first moment, cracking stone and a short rolling rumble tail, dense and full, no voice, 1.0 seconds |
 | `mskill_blink` | 마법사 점멸 | a quick magical pop with a tiny glassy sparkle whoosh, no voice, 0.3 seconds |
 | `mskill_ember` | 불씨 | a soft crackling small fire loop with tiny pops, seamless loop, no voice, 1.0 seconds |
 | `mskill_ice` | 얼음 화살 맞음 | a short crisp ice crack with a tiny glassy chime, no voice, 0.25 seconds |
 | `mskill_poison` | 독 화살 맞음 | a short wet bubbling splash with a soft sizzle, no voice, 0.3 seconds |
 
 연쇄 운석은 기존 운석 소리를 쓰고, 연속 찌르기·돌파·철갑마·수호·분쇄·충격파·마력 집중 같은 패시브는 소리를 따로 만들지 않습니다(평소 타격 소리를 씁니다).
+
+**다시 요청한 4종(받아 보니 소리가 너무 작거나 어울리지 않아서 문구를 바꿈)**: 은신 해제·돌진 찌르기·도발 결계·지진. 공통으로 `close-up and loud`, `sharp ... right at the very first moment`(시작 직후 강한 타격음), `dense and punchy`(꽉 찬 소리)를 넣어 소리가 작게 나오는 것을 막고, 도발 결계는 마법 허밍 대신 뿔피리와 방패 두드리는 소리로 바꿨다.
 
 ## 4. 진행 상황
 
@@ -207,4 +209,4 @@ Avoid: gradients, glow blur, realistic fire, realistic smoke, characters, text o
 | 이동·은신 이펙트 | **받음, 적용됨(베타 1.313)**: `assets/fx/mskill_jump_0~3`, `blink_0~3`, `stealth_0~2`, `dash_0~2`, `phantom_0~2`. 환영 기병대는 푸른 잔상 3줄이 앞으로 달려가는 것으로만 표현(환영 기병 그림은 아직 안 씀) |
 | 타격·방어 이펙트 | **받음, 적용됨(베타 1.313)**: `mskill_spear_fly`(아직 안 씀), `spear_hit_0~2`, `lunge_0~2`, `bash_0~2`, `thorn_0~2`(가시 반사는 연결 안 함), `taunt_0~3`(안쪽 회색 채움을 반투명으로 바꿈) |
 | 지면·마법·화살 이펙트 | **받음, 적용됨(베타 1.313)**: `mskill_leap_0~3`, `quake_0~3`, `ember_0~3`(반복), `ice_0~2`, `poison_0~2` |
-| 스킬 효과음 16종 | **19개 받음, 적용됨(베타 1.314~1.317)**: `mskill_jump_1~2`(뒤로 점프), `mskill_stealth_1~2`(은신), `mskill_gallop_1~2`(일제 질주), `mskill_phantom_1~2`(환영 기병대), `mskill_spear_throw_1~2`(창 던지기), `mskill_leap_1~3`(도약 내려찍기), `mskill_bash_1`(방패 밀치기), `mskill_thorn_1`(가시 반사), `mskill_blink_1~2`(점멸), `mskill_poison_1`, `mskill_ice_1`, `mskill_ember_1`(불씨). 나머지(`stealth_end`, `lunge`, `taunt`, `quake`, `blink`, `ember`, `ice`, `poison`) 아직 |
+| 스킬 효과음 16종 | **19개 받음, 적용됨(베타 1.314~1.317)**: `mskill_jump_1~2`(뒤로 점프), `mskill_stealth_1~2`(은신), `mskill_gallop_1~2`(일제 질주), `mskill_phantom_1~2`(환영 기병대), `mskill_spear_throw_1~2`(창 던지기), `mskill_leap_1~3`(도약 내려찍기), `mskill_bash_1`(방패 밀치기), `mskill_thorn_1`(가시 반사), `mskill_blink_1~2`(점멸), `mskill_poison_1~2`, `mskill_ice_1`, `mskill_ember_1`(불씨). 나머지(`stealth_end`, `lunge`, `taunt`, `quake`, `blink`, `ember`, `ice`, `poison`) 아직 |
