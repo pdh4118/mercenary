@@ -1510,7 +1510,7 @@ export class Game {
       Math.round(m.heroKnock),
       r2(1 - defenseTakenMult(m.heroDefense)), // 화면에는 실제로 줄어드는 비율로 보여 준다
       r2(dodgeChanceOf(m.heroDodge)),
-      r2(m.heroRegen),
+      Math.round(m.heroRegen * 1000) / 10, // 초당 최대 체력의 % (0.3)
       Math.round(TUNE.PLAYER_SPEED * m.heroSpeed * (WEAPONS[s.state.weapon]!.type === CAVALRY ? TUNE.MOUNT_SPEED_MAX : 1)),
       1 + m.heroMulti,
       r2(m.heroLifesteal),
@@ -3666,7 +3666,7 @@ export class Game {
       p.chargeLeft = Math.max(0, p.chargeLeft - dt);
       const mounted = WEAPONS[p.weapon]!.type === CAVALRY; // 기마: 달릴수록 빨라진다
       const hpBefore = p.hp;
-      p.hp = Math.min(p.maxHp, p.hp + s.mods.heroRegen * dt);
+      p.hp = Math.min(p.maxHp, p.hp + p.maxHp * s.mods.heroRegen * dt); // 초당 최大 체력의 비율
       this.healPop(-p.id, p.x, p.y, p.hp - hpBefore, p.id);
       p.shieldMax = TUNE.HERO_SHIELD_MAX + s.mods.heroShield;
       s.shieldIdle += dt;

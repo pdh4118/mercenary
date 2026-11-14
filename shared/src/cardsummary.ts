@@ -34,7 +34,7 @@ function heroText(k: CardEffect["k"], v: number): string {
   if (k === "heroArmor") return `-${v}`;
   if (k === "heroThorns") return `${v}`;
   if (h?.fmt === "flat" || h?.fmt === "int") return `+${Math.round(v * 10) / 10}`;
-  if (h?.fmt === "regen") return `초당 +${Math.round(v * 10) / 10}`;
+  if (h?.fmt === "regen") return `초당 ${Math.round(v * 1000) / 10}%`;
   return pct(v);
 }
 

@@ -287,7 +287,7 @@ export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "
   { k: "heroThorns", label: "근접 반사", base: 2, weight: 4, minLevel: 3, fmt: "int" },
   { k: "heroDefense", label: "방어력", base: 0.15, weight: 7, fmt: "pct" },
   { k: "heroDodge", label: "회피율", base: 0.1125, weight: 5, fmt: "pct" },
-  { k: "heroRegen", label: "체력 재생", base: 0.12, weight: 9, fmt: "regen" },
+  { k: "heroRegen", label: "체력 재생", base: 0.003, weight: 9, fmt: "regen" }, // 초당 최대 체력의 비율(0.003 = 0.3%/초)
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
   { k: "heroCast", label: "시전 속도", base: 0.03, weight: 4, fmt: "pct" },
   { k: "heroSkill", label: "스킬 가속", base: 0.06, weight: 5, fmt: "pct" }, // 일반 +4%(희귀 x1.6, 영웅 x2.4), 쿨타임 1/(1+합)배
@@ -299,7 +299,7 @@ const heroCards = (): CardDef[] =>
   HERO_STATS.flatMap((h) =>
     (h.k === "heroArmor" || h.k === "heroMulti" ? [1, 2] : [0, 1, 2]).map((r): CardDef => {
       const v = h.k === "heroArmor" ? h.base * r : h.k === "heroThorns" ? h.base * (r + 1) : h.k === "heroMulti" ? h.base * r : h.k === "heroPierce" ? h.base * (r + 1) : h.fmt === "flat" ? Math.round(h.base * RARITY[r]!.mult) : round3(h.base * RARITY[r]!.mult);
-      const text = h.k === "heroArmor" ? `-${v}` : h.k === "heroThorns" ? `${v}` : h.k === "heroPoison" ? `화살 피해의 ${Math.round(v * 100)}%` : h.fmt === "cut" ? `-${Math.round(Math.abs(v) * 1000) / 10}%` : h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 +${Math.round(v * 10) / 10}` : `+${v}`;
+      const text = h.k === "heroArmor" ? `-${v}` : h.k === "heroThorns" ? `${v}` : h.k === "heroPoison" ? `화살 피해의 ${Math.round(v * 100)}%` : h.fmt === "cut" ? `-${Math.round(Math.abs(v) * 1000) / 10}%` : h.fmt === "pct" ? `+${Math.round(v * 1000) / 10}%` : h.fmt === "regen" ? `초당 최대 체력 +${Math.round(v * 1000) / 10}%` : `+${v}`;
       return {
         name: `${h.label} ${text}`,
         desc: h.k === "heroQuiver" ? `주인공 활: 전통에 화살 ${text}발 더 들어간다(고르면 그만큼 바로 채워진다. 채울 때 드는 금화는 화살 수에 비례)` : h.k === "heroPoison" ? `주인공 화살: 맞은 적이 ${text}만큼 독 피해를 ${POISON_SEC}초에 걸쳐 입는다(방패에 막히면 없음)` : h.k === "heroThorns" ? `주인공만: 근접 공격을 받으면 ${text}의 피해를 공격자에게 되돌린다 (맞을 때마다 고정 피해, 방어력·방패와 무관, 화살·마법은 해당 없음)` : h.k === "heroArmor" ? `주인공만: 맞을 때마다 받는 피해 ${text} (방어력과 별개의 고정 감소)` : h.k === "heroSkillPow" ? `주인공만: 스페이스 스킬 효과 ${text} (후퇴·돌진 거리, 검 무적 시간, 철퇴 충격파 범위, 방벽 길이, 기마 가속 속도)` : h.k === "heroCast" ? `주인공이 지팡이를 들었을 때: 시전 속도 ${text}${EFFICIENCY_NOTE.cast}` : h.k === "heroShield" ? `주인공이 검을 들었을 때: 방패 체력 ${text}` : h.k === "heroShieldRegen" ? `주인공이 검을 들었을 때: 방패가 차오르는 속도 ${text} (맞지 않고 기다리는 시간은 그대로)` : `주인공만: ${h.label} ${text}${h.k === "heroDefense" ? EFFICIENCY_NOTE.defense : h.k === "heroDodge" ? EFFICIENCY_NOTE.dodge : h.k === "heroSkill" ? EFFICIENCY_NOTE.skill : ""}`,
