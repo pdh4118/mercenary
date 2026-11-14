@@ -2496,6 +2496,16 @@ async function main() {
         // 스킬을 쓰는 중에는 장군이 바라보는 쪽(서버 방향)으로 그림을 돌린다: 방패·창이 엉뚱한 쪽에 보이지 않게
         if ((w[13] ?? 0) > 0 || ((w[14] ?? 0) & 4) !== 0 || w[4] === SHIELD) v.face = Math.cos(w[8] ?? 0) >= 0 ? 1 : -1; // 방패 장군은 늘 방패 호(서버 방향)와 같은 쪽을 본다
         v.sprite.texture = v.art.pose(w[13] ?? 0, w[14] ?? 0, w[5] > 0) ?? v.art.idle!;
+        const runFr = v.art.run?.(w[13] ?? 0, w[14] ?? 0, w[5] > 0);
+        if (runFr) {
+          // 달리는 보스(기마궁수): 움직인 거리에 맞춰 말 다리 4컷을 돌린다(멈추면 첫 컷)
+          const bv = v as unknown as { bx?: number; by?: number; bph?: number };
+          const moved = Math.hypot(v.x - (bv.bx ?? v.x), v.y - (bv.by ?? v.y));
+          bv.bx = v.x;
+          bv.by = v.y;
+          bv.bph = ((bv.bph ?? 0) + moved / 14) % 4;
+          v.sprite.texture = runFr[moved > 0.15 ? Math.floor(bv.bph) % 4 : 0]!;
+        }
         const as = v.art.scale * (BOSS_SIZE / BOSS_SIZE_BASE); // 장군 크기 배율이 바뀐 만큼 그림도 키운다
         v.sprite.scale.set(as * v.face, as);
         if (latest?.g?.stage === 8 && ((((w[14] ?? 0) & EF_MAD) !== 0) || (w[13] ?? 0) === BSK_RAMPAGE)) heatTint = bossFx.wheelHeat(w[0]!, v.x, v.y, as * v.face, performance.now()); // 전차 장군 폭주: 달아오른 바퀴

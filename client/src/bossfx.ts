@@ -114,6 +114,8 @@ export interface BossArt {
   scale: number;
   /** 스킬 번호·상태 비트·공격 중 여부에 따른 그림 */
   pose: (skill: number, flags: number, atk: boolean) => Tex;
+  /** 달리기 프레임(있으면 움직이는 동안 이 컷들을 이동 거리에 맞춰 돌린다). 기마궁수처럼 말 다리가 움직여야 하는 보스용 */
+  run?: (skill: number, flags: number, atk: boolean) => Tex[] | null;
 }
 
 export interface BossFxDeps {
@@ -146,6 +148,7 @@ const BOSS_UNIT_TEX = [
   "boss5_whirlpose_0", "boss5_whirlpose_1", "boss5_whirlpose_2", "boss5_whirlpose_3",
   "boss6_idle", "boss6_cast", "boss6_blink",
   "boss7_gallop", "boss7_shoot",
+  "boss7_gallop_0", "boss7_gallop_1", "boss7_gallop_2", "boss7_gallop_3", "boss7_shoot_0", "boss7_shoot_1", "boss7_shoot_2", "boss7_shoot_3",
   "boss8_normal", "boss8_mad", "boss8_wheel",
   "boss9_idle", "boss9_cast", "boss9_drain",
   "boss10_idle", "boss10_scepter", "boss10_cast",
@@ -269,7 +272,7 @@ export async function createBossFx(d: BossFxDeps) {
     { get idle() { return u("boss4_idle"); }, scale: 0.42, pose: (sk, fl) => (sk === BSK_REFLECT || fl & EF_GUARD ? u("boss4_reflect") : sk === BSK_SHIELDRUSH ? u("boss4_charge") : u("boss4_idle")) },
     { get idle() { return u("boss5_idle"); }, scale: 0.42, pose: (sk, fl, atk) => (fl & EF_WHIRL ? u(`boss5_whirlpose_${Math.floor(performance.now() / WHIRL_FRAME_MS) % 4}`) : sk === BSK_JUMP ? u("boss5_jump") : sk === BSK_FLURRY ? (performance.now() - lastSwingAt < 170 ? u("boss5_swing_b") : u("boss5_swing_a")) : sk === BSK_MACETHROW || sk === BSK_WHIRL || atk ? u("boss5_smash") : u("boss5_idle")) },
     { get idle() { return u("boss6_idle"); }, scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_BLINK ? u("boss6_blink") : sk > 0 || atk ? u("boss6_cast") : u("boss6_idle")) },
-    { get idle() { return u("boss7_gallop"); }, scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")) },
+    { get idle() { return u("boss7_gallop"); }, scale: 0.55, pose: (sk, _fl, atk) => (sk > 0 || atk ? u("boss7_shoot") : u("boss7_gallop")), run: (sk, _fl, atk) => { const k = sk > 0 || atk ? "shoot" : "gallop"; const f = [0, 1, 2, 3].map((i) => u(`boss7_${k}_${i}`)); return f.every((t) => t) ? f : null; } },
     { get idle() { return u("boss8_wheel"); }, scale: 0.75, pose: () => u("boss8_wheel") }, // 바퀴가 온전한 그림 하나로 쓰고, 폭주의 달아오른 바퀴는 wheelHeat 효과로 얹는다
     { get idle() { return u("boss9_idle"); }, scale: 0.42, pose: (sk) => (sk === BSK_DRAIN ? u("boss9_drain") : sk === BSK_FOG || sk === BSK_CHAIN || sk === BSK_ORB ? u("boss9_cast") : u("boss9_idle")) },
     // 군주(스테이지 10): 홀 내려찍기는 치켜든 자세, 칙령·호령·처형령·근위대 소집은 손을 든 자세

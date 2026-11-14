@@ -1671,3 +1671,5 @@ Style and proportions: cute chibi exactly like Image 1 and Image 2: the rider ha
 
 Avoid: realistic horse legs, long thin legs, different rider poses between frames, different sizes between frames, motion blur, dust, speed lines, shadows, ground line, checkerboard pattern, cropped or overlapping items, logo, watermark, any text other than the eight captions.
 ```
+
+**13-7 다리 애니메이션 진행**: 달리기 4컷 + 사격 4컷 받음, 적용됨(베타 1.305). 기수·몸은 거의 같고 말 다리만 바뀌어 한 번에 맞게 나왔다. `assets/units/boss7_gallop_0~3`·`boss7_shoot_0~3`(189x172 같은 캔버스; 기수 모자 위치로 가로를 맞춰 몸이 흔들리지 않게 했다). 코드: `BossArt.run`이 있으면(`bossfx.ts`) `main.ts`가 이동 거리 14px마다 한 컷씩 돌린다(멈추면 첫 컷). 정지 그림은 프레임이 없을 때 대체.
