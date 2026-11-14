@@ -967,6 +967,9 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 | `mskill_gallop` | 용병 기병 일제 질주(받음·적용됨) | `several horse hooves breaking into a gallop with a short rising wind whoosh, no voice, 0.7 seconds` | 0.73초, 2종 |
 | `mskill_phantom` | 용병 기병 환영 기병대(받음·적용됨) | `a ghostly low horse whinny blended with an airy magical whoosh and distant hoof beats, no human voice, 0.8 seconds` | 0.8초, 2종 |
 | `mskill_spear_throw` | 용병 창병 창 던지기(받음·적용됨) | `a heavy spear thrown, a short strained whoosh and a sharp thunk into a target, no voice, 0.5 seconds` | 0.5초, 2종 |
+| `mskill_leap` | 용병 둔기병 도약 내려찍기(받음·적용됨) | `a heavy armored jump, a whoosh and a huge crunching ground slam with rocks, no voice, 0.7 seconds` | 0.7초, 3종 |
+| `mskill_bash` | 용병 검방병 방패 밀치기(받음·적용됨) | `a wooden shield slamming into armor with a dull heavy thud and a small metal clank, no voice, 0.3 seconds` | 0.3초, 1종 |
+| `mskill_thorn` | 용병 검방병 가시 방패 반사(받음·적용됨) | `a short sharp metallic scrape and spark zing as spikes scratch a weapon, no voice, 0.25 seconds` | 0.25초, 1종 |
 | `skill_backstep` | 활 후퇴 | `quick backward skid on dirt, short scuff and a small cloth rustle` | 0.2초, 2종 |
 | `skill_dash` | 창 돌진 | (다시 만듦, 추천 1번) `Explosive spear lunge: a sharp sudden air-tearing crack at the very start, a fast rushing whoosh with a low punchy thump underneath, then a short bright steel spear tip shing and a tiny ringing tail. Tight, powerful, cinematic, dry, no echo.` 이전 소리는 `skill_dash_old_1~2.ogg`로 보관 | 0.5초, 1종 |
 | `skill_guard` | 검 무적 시작 | `bright protective ward activating, short shimmer and a soft metallic ring` | 0.5초, 1종 |

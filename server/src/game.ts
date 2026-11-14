@@ -582,6 +582,7 @@ export interface Merc extends Fighter {
   combatT?: number; // 마지막으로 피해를 주고받은 뒤 남은 "싸우는 중" 시간
   skCd?: [number, number]; // 액티브 스킬(2·4단계) 쿨다운 남은 시간
   skThink?: number; // 다음 발동 판단까지
+  thornFxT?: number; // 가시 방패 반사 이펙트를 마지막으로 보낸 시각
   stealthT?: number; // 은신 남은 시간(적이 노리지 못한다)
   stealthShot?: boolean; // 은신이 풀려 다음 화살이 강하다
   tauntT?: number; // 도발 결계 남은 시간(적이 이 용병을 먼저 노린다)
@@ -4510,7 +4511,12 @@ export class Game {
           }
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner); // 독 틱(dot, 병종 없음)은 보라색 숫자
           this.thorns(this.slots.get(m.owner), h, m);
-          return r.reflected + (m.type === SHIELD && skillOn(SHIELD, m.tier, 1) ? r.shield * SK.thorns : 0); // 가시 방패: 막은 피해 일부를 되돌린다
+          const thorn = m.type === SHIELD && skillOn(SHIELD, m.tier, 1) ? r.shield * SK.thorns : 0; // 가시 방패: 막은 피해 일부를 되돌린다
+          if (thorn > 0 && this.time - (m.thornFxT ?? -9) >= 0.6) {
+            m.thornFxT = this.time;
+            this.pushEvent(EVT_MERC_SKILL, m.x + Math.cos(m.face) * 18, m.y + Math.sin(m.face) * 18, 0, SHIELD * 10 + 1, m.owner); // 반사 불꽃(0.6초에 한 번만)
+          }
+          return r.reflected + thorn;
         },
       };
       list.push(fm);
