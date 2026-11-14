@@ -644,6 +644,7 @@ export class BossSystem {
   }
 
   private damageBarrier(h: Hazard, dmg: number, fx?: { x: number; owner: number }): void {
+    if (h.kind === HZ_GATE && this.g.phase !== "boss") return; // 성문은 공성전(보스군이 도착한 뒤)에만 부술 수 있다
     if (h.kind === HZ_GATE && fx && dmg > 0) this.gateHitFx(h, fx.x, dmg, fx.owner);
     if (h.kind === HZ_ICE) h.hp -= 1;
     else h.hp -= dmg;

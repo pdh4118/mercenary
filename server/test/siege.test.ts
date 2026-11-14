@@ -698,3 +698,47 @@ test("충돌형 적 기병은 부딪혀도 돌아서 빠지지 않고 속도를 
   assert.ok(e.momentum < 1 && e.momentum > 0.8, `속도를 조금만 잃는다(${e.momentum})`);
   assert.equal(e.ramT, 0, "돌아서 빠지지 않고 그대로 달린다");
 });
+
+test("공성전 시작 전(성장 단계)에는 성문을 부술 수 없다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  g.addPlayer("a");
+  (g as any).stage = 10;
+  (g as any).siegeEnsure(true);
+  const gate = (g as any).boss.hazards.find((h: any) => h.kind === HZ_GATE);
+  assert.ok(gate, "성문 장판이 있다");
+  const hp0 = gate.hp;
+  (g as any).boss.strikeBarriers(GATE_X, GATE_Y + 40, 80, 1e9);
+  assert.equal(gate.hp, hp0, "성장 단계에서는 피해가 들어가지 않는다");
+  assert.equal(g.info().siege!.open, false);
+});
+
+test("돌진·점프·점멸로 성벽과 닫힌 성문을 뚫고 성 안으로 들어갈 수 없다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  (g as any).stage = 10;
+  (g as any).siegeEnsure(true);
+  const sl = (g as any).slots.get(a);
+  const p = g.getPlayer(a)!;
+  p.invuln = 1e9;
+  // 주인공 창 돌진: 성벽(문이 아닌 곳)과 닫힌 성문 쪽으로 빠르게
+  for (const x of [250, GATE_X]) {
+    p.x = x;
+    p.y = GATE_Y + 70;
+    sl.dashT = 0.4;
+    sl.dashVx = 0;
+    sl.dashVy = -1500;
+    for (let i = 0; i < 20; i++) g.step();
+    assert.ok(p.y > GATE_Y, `주인공이 성 안으로 넘어갔다(x=${x}, y=${Math.round(p.y)})`);
+  }
+  // 용병 점프·돌진 찌르기: 성 안쪽 적을 향해
+  const id = g.addMerc(a, SPEAR, 250, GATE_Y + 90, 0, 0)!;
+  const m = (g as any).mercs.get(id);
+  m.tier = 4;
+  const e = g.spawnEnemyAt(250, GATE_Y - 200, 1);
+  (g.getEnemy(e) as any).hold = true;
+  for (let i = 0; i < 40; i++) g.step(); // 돌진 찌르기는 스킬 판단(stepActives)이 알아서 쓴다
+  assert.ok(m.skCd[1] > 0 || m.skCd[0] > 0, "스킬을 실제로 썼다");
+  assert.ok(m.y > GATE_Y, `용병이 성벽을 넘었다(y=${Math.round(m.y)})`);
+});

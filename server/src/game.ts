@@ -956,6 +956,21 @@ export class Game {
         if (wo.wall) [x, y] = clampToWallTop(x, y);
         if (wo.wall || rs !== 0) pass = this.terrain!.items.length + 7;
       }
+      if (pass === -1 && d > 24 && !t.lineClear(u.px, u.py, x, y, u.r)) {
+        // 한 틱에 멀리 움직인 몸(돌진·점프·점멸·넉백)은 성벽·바위를 뚫고 지나가지 못한다: 처음 막히는 자리 앞에서 멈춘다
+        let lo = 0;
+        let hi = 1;
+        for (let i = 0; i < 8; i++) {
+          const mid = (lo + hi) / 2;
+          if (t.lineClear(u.px, u.py, u.px + (x - u.px) * mid, u.py + (y - u.py) * mid, u.r)) lo = mid;
+          else hi = mid;
+        }
+        x = u.px + (x - u.px) * lo;
+        y = u.py + (y - u.py) * lo;
+      }
+      if (pass === -1 && this.siege && !this.siege.open && u.py >= GATE_Y + 30 - 1e-6 && y < GATE_Y + 30 - 1e-6 && Math.abs(x - GATE_X) < SIEGE.gateHalf + u.r && this.boss.hazards.some((h) => h.kind === HZ_GATE && h.t > 0)) {
+        y = GATE_Y + 30; // 닫힌 성문도 돌진으로 지나가지 못한다
+      }
       [x, y] = t.pushOut(x, y, u.r, pass);
       o.x = x;
       o.y = y;
@@ -4871,7 +4886,7 @@ export class Game {
     const all = fighting ? this.collectFriendlies() : [];
     const foeCache = new Map<number, Target[]>();
     const gateSiege = this.siege;
-    const gateAlive = !duel && !!gateSiege && !gateSiege.open && !gateSiege.hall && this.boss.hazards.some((h) => h.kind === HZ_GATE && h.t > 0);
+    const gateAlive = !duel && this.phase === "boss" && !!gateSiege && !gateSiege.open && !gateSiege.hall && this.boss.hazards.some((h) => h.kind === HZ_GATE && h.t > 0);
     const allyCache = new Map<number, Ally[]>();
 
     for (const m of this.mercs.values()) {
@@ -4913,6 +4928,10 @@ export class Game {
           m.cd = 0;
           m.x = ownerSlot?.state.x ?? 0;
           m.y = ownerSlot?.state.y ?? 0;
+          if (this.siege && !this.siege.open && Math.abs(m.x - SIEGE.cx) < RING.ex + 40 && m.y > RING.north - 40 && m.y < RING.south - 20) {
+            m.x = GATE_X + ((m.id % 5) - 2) * 40; // 성문이 닫힌 동안 성 안에서 되살아나지 않는다: 성문 앞 마당에서 일어난다
+            m.y = GATE_Y + 190;
+          }
         }
         continue;
       }
