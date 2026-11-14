@@ -1403,7 +1403,7 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, photo
 
 ### 13-7. 기마궁수 (스테이지 7 보스) 본체 2포즈 - `assets/units/boss7_gallop`, `boss7_shoot` (한 시트, 가로로 나란히)
 
-**쓰이는 곳**: 평소·도주 `gallop`(달리는 모습), 사격·궁지 상태 등 공격 `shoot`(활을 당김). 화면 배율 0.55. **분신 잔상**에도 같은 그림을 쓴다(`gallop`·`shoot` 둘 다).
+**쓰이는 곳**: 평소·도주 `gallop`(달리는 모습), 사격·궁지 상태 등 공격 `shoot`(활을 당김). 화면 배율 0.55. (분신 잔상은 창병 장군의 스킬이라 기마궁수와 관계없다).
 **크기 목표**: 이전(gallop 206x171, shoot 196x170)과 비슷하게, 받은 뒤 제가 맞춘다. 두 포즈의 몸 크기와 말발굽 높이는 같게.
 **얼굴**: 기수 얼굴을 단순하게. 활시위가 얼굴·모자를 가로지르지 않게(궁병 장군 때 제미나이가 반복한 문제).
 
@@ -1673,3 +1673,5 @@ Avoid: realistic horse legs, long thin legs, different rider poses between frame
 ```
 
 **13-7 다리 애니메이션 진행**: 달리기 4컷 + 사격 4컷 받음, 적용됨(베타 1.305). 기수·몸은 거의 같고 말 다리만 바뀌어 한 번에 맞게 나왔다. `assets/units/boss7_gallop_0~3`·`boss7_shoot_0~3`(189x172 같은 캔버스; 기수 모자 위치로 가로를 맞춰 몸이 흔들리지 않게 했다). 코드: `BossArt.run`이 있으면(`bossfx.ts`) `main.ts`가 이동 거리 14px마다 한 컷씩 돌린다(멈추면 첫 컷). 정지 그림은 프레임이 없을 때 대체.
+
+**정정**: 앞에서 기마궁수가 분신 잔상에 같은 그림을 쓴다고 적은 것은 틀렸다. 분신 돌진(`HZ_GHOST`)은 **창병 장군(스테이지 2)의 스킬**이고, 분신은 그 스테이지의 `boss2_thrust`(달리며 찌름)·`boss2_idle`(서 있음) 그림을 쓴다.
