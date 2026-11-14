@@ -1643,3 +1643,5 @@ The six skeleton soldiers of the necromancer, all facing right:
 
 Avoid: realistic proportions, tall lean skeleton, realistic anatomy, detailed ribs, long limbs, small head, photo, 3d render, gradients, glow blur, smoke, glossy highlights, painterly texture, thin or white outline, ground line, checkerboard pattern, detailed skull, detailed teeth, cropped or overlapping items, logo, watermark, any text other than the six captions.
 ```
+
+**13-12 진행**: 스켈레톤 6종 받음, 적용됨(베타 1.302). 큰 머리 치비 비율, 눈구멍 초록 점, 네크로맨서와 같은 뼈색·녹슨 갈색·진한 초록 색조, 기병의 말도 뼈 치비 말, 활시위가 두개골을 가로지르지 않고 로고도 없어 첫 시안을 그대로 썼다. `assets/units/skel_cavalry`(115x108)·`skel_spear`(99x91)·`skel_archer`(93x94)·`skel_sword`(71x93)·`skel_blunt`(97x100)·`skel_mage`(87x112), 이전 65~118px과 같은 크기(0.28배), 예전 그림은 `_old`로 보관. 마법사 로브는 보라에서 진한 초록·검정으로 바뀌었다(네크로맨서와 맞춤). **이제 사람·병사 그림은 모두 메인 화풍이다. 남은 것은 각 보스의 이펙트(`assets/fx/boss*_*`, 약 260장)와 네크로맨서 부속 이펙트다.**
