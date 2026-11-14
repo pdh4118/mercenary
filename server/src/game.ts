@@ -6724,7 +6724,10 @@ export class Game {
       }
       if ((m.stealthT ?? 0) > 0) {
         m.stealthT = Math.max(0, m.stealthT! - dt);
-        if (m.stealthT === 0) m.stealthShot = true;
+        if (m.stealthT === 0) {
+          m.stealthShot = true;
+          this.pushEvent(EVT_MERC_SKILL, m.x, m.y, 0, ARCHER * 10 + 5, m.owner); // 은신이 풀림(소리만, 번호 5는 스킬 표에 없는 '해제')
+        }
       }
       if ((m.tauntT ?? 0) > 0) m.tauntT = Math.max(0, m.tauntT! - dt);
       if ((m.dashT ?? 0) > 0) m.dashT = Math.max(0, m.dashT! - dt);
