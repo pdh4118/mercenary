@@ -6487,8 +6487,12 @@ export class Game {
         e.contrib.set(src.id, { d: (c?.d ?? 0) + amt, t: this.time });
       }
     }
-    if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
+    if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) {
+      if (src && skillOn(ARCHER, src.tier, 1) && !(e.poisonT && e.poisonT > 0)) this.pushEvent(EVT_MERC_SKILL, e.x, e.y, 0, ARCHER * 10 + 1, ownerId); // 독이 새로 묻은 순간
+      this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
+    }
     if (src?.type === ARCHER && skillOn(ARCHER, src.tier, 3) && hit.srcType === ARCHER && !hit.dot && r.body > 0 && e.hp > 0) {
+      if (!(e.slowT && e.slowT > 0)) this.pushEvent(EVT_MERC_SKILL, e.x, e.y, 0, ARCHER * 10 + 3, ownerId); // 새로 느려진 순간
       e.slowT = Math.max(e.slowT ?? 0, SK.iceSec); // 얼음 화살
       e.slowMult = Math.max(0.3, SK.iceMult - (owner ? mstat(owner.mods, ARCHER, "slow") : 0)); // 둔화 강화 카드
     }
@@ -6688,7 +6692,10 @@ export class Game {
       struck++;
       this.damageEnemy(e, { damage: damage * scale(d), charge: 0, srcType: MAGE, fromAngle: Math.atan2(y - e.y, x - e.x), crit, pierceGuard: true }, ownerId, src);
     }
-    if (src && skillOn(MAGE, src.tier, 3)) this.embers.push({ x, y, r: radius * 0.8, t: SK.emberSec, dps: damage * SK.emberDps, owner: ownerId, src });
+    if (src && skillOn(MAGE, src.tier, 3)) {
+      this.embers.push({ x, y, r: radius * 0.8, t: SK.emberSec, dps: damage * SK.emberDps, owner: ownerId, src });
+      this.pushEvent(EVT_MERC_SKILL, x, y, radius * 0.8, MAGE * 10 + 3, ownerId); // ang = 불이 타는 반경
+    }
     if (src && struck > 1) src.career.aoe += struck - 1; // 한 번에 여럿 맞힌 횟수(기록만. 피해는 각 적에게 준 만큼 이미 기여도에 들어간다)
   }
 

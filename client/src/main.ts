@@ -1314,7 +1314,38 @@ async function main() {
   };
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
-  const mercSkillFx: { g: Graphics; age: number; life: number }[] = []; // 용병 액티브 스킬 임시 효과(그림 에셋이 오기 전까지 도형)
+  // 용병 승급 스킬 이펙트(assets/fx/mskill_*): 컷을 life초 동안 한 번(또는 반복) 재생한다
+  const MSK_FRAMES: Record<string, number> = { jump: 4, blink: 4, stealth: 3, dash: 3, phantom: 3, spear_hit: 3, lunge: 3, bash: 3, thorn: 3, taunt: 4, leap: 4, quake: 4, ember: 4, ice: 3, poison: 3 };
+  const mskTex: Record<string, (Texture | null)[]> = {};
+  for (const [nm, cnt] of Object.entries(MSK_FRAMES)) mskTex[nm] = await Promise.all(Array.from({ length: cnt }, (_, i) => orNull(`assets/fx/mskill_${nm}_${i}.png`)));
+  /** 스킬 번호(병종*10 + 스킬 번호) → 이펙트. w = 화면에 그리는 가로(월드 px), ax = 가로 기준점(0 앞쪽 끝에서 뻗음, 0.5 가운데), ground = 유닛 아래 층 */
+  const MSK_DEF: Record<number, { fx: string; w: number; life: number; ax?: number; ground?: boolean; rot?: boolean; loop?: boolean; push?: number }> = {
+    22: { fx: "jump", w: 90, life: 0.45 },
+    52: { fx: "blink", w: 90, life: 0.4 },
+    24: { fx: "stealth", w: 110, life: 0.7 },
+    2: { fx: "dash", w: 140, life: 0.5, rot: true },
+    12: { fx: "spear_hit", w: 120, life: 0.36, rot: true },
+    14: { fx: "lunge", w: 240, life: 0.3, rot: true, ax: 0 },
+    32: { fx: "bash", w: 130, life: 0.36, rot: true, ax: 0, push: 24 },
+    34: { fx: "taunt", w: 660, life: 1.1, ground: true },
+    42: { fx: "leap", w: 320, life: 0.6, ground: true },
+    44: { fx: "quake", w: 680, life: 0.85, ground: true },
+    21: { fx: "poison", w: 70, life: 0.35 },
+    23: { fx: "ice", w: 70, life: 0.35 },
+  };
+  const mercSkillFx: { sp: Sprite; frames: (Texture | null)[]; age: number; life: number; loop: boolean; vx: number; vy: number }[] = [];
+  const playMsk = (fx: string, x: number, y: number, o: { w: number; life: number; ax?: number; ground?: boolean; rot?: number; loop?: boolean; vx?: number; vy?: number }) => {
+    const frames = mskTex[fx];
+    const t0 = frames?.[0];
+    if (!frames || !t0) return;
+    const sp = new Sprite(t0);
+    sp.anchor.set(o.ax ?? 0.5, 0.5);
+    sp.position.set(x, y);
+    sp.rotation = o.rot ?? 0;
+    sp.scale.set(o.w / t0.width);
+    (o.ground ? groundFx : skyLayer).addChild(sp);
+    mercSkillFx.push({ sp, frames, age: 0, life: o.life, loop: !!o.loop, vx: o.vx ?? 0, vy: o.vy ?? 0 });
+  };
   const slamFx: { sp: Sprite; age: number; r: number; kind: 0 | 1 }[] = []; // 충격파(0)·갈라진 자국(1)
   const maceHits: { sp: Sprite; age: number; r: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean; t0: number }[]>(); // 방벽 번호 -> 수정 조각들
@@ -1665,19 +1696,16 @@ async function main() {
             const type = Math.floor(val / 10);
             const n = val % 10;
             const info = MERC_SKILLS[type]?.[n - 1];
-            if (info && owner === myId) spawnFloat(info.name, x, y - 24, { fill: 0xffe27a, fontSize: 15, fontWeight: "800", stroke: { color: 0x3a2a00, width: 4 } }, 1.1, 0.4);
-            const gfx = new Graphics();
-            gfx.position.set(x, y);
-            if (type === 0 && n === 4) {
-              for (const off of [-45, 0, 45]) gfx.moveTo(0, off).lineTo(600, off);
-              gfx.rotation = ang;
-              gfx.stroke({ width: 10, color: 0xbfe3ff, alpha: 0.7 });
+            if (info && info.kind === "active" && owner === myId) spawnFloat(info.name, x, y - 24, { fill: 0xffe27a, fontSize: 15, fontWeight: "800", stroke: { color: 0x3a2a00, width: 4 } }, 1.1, 0.4);
+            if (val === 4) {
+              // 환영 기병대: 푸른 잔상 3줄이 앞으로 달려간다(월드 폭 140 안의 세 줄, 길이 600을 0.5초에)
+              for (const off of [-45, 0, 45]) playMsk("phantom", x - Math.sin(ang) * off, y + Math.cos(ang) * off, { w: 230, life: 0.5, rot: ang, ax: 0.2, loop: true, vx: Math.cos(ang) * 1200, vy: Math.sin(ang) * 1200 });
+            } else if (val === 53) {
+              playMsk("ember", x, y, { w: Math.max(80, ang * 2.3), life: 3, ground: true, loop: true }); // 불씨: ang = 반경(서버), 3초 동안 불꽃이 탄다
             } else {
-              const r = type === 4 && n === 4 ? 300 : type === 4 ? 140 : type === 3 && n === 4 ? 330 : 60;
-              gfx.circle(0, 0, r).stroke({ width: 6, color: 0xffe27a, alpha: 0.8 });
+              const d = MSK_DEF[val];
+              if (d) playMsk(d.fx, x + (d.push ? Math.cos(ang) * d.push : 0), y + (d.push ? Math.sin(ang) * d.push : 0), { w: d.w, life: d.life, ax: d.ax, ground: d.ground, rot: d.rot ? ang : 0, loop: d.loop });
             }
-            groundFx.addChild(gfx);
-            mercSkillFx.push({ g: gfx, age: 0, life: 0.5 });
           }
           else if (kind === EVT_QUIT) {
             const nm = UNIT_NAMES[val] ?? "용병";
@@ -3429,10 +3457,18 @@ async function main() {
     }
     for (let i = mercSkillFx.length - 1; i >= 0; i--) {
       const f = mercSkillFx[i]!;
-      f.age += ticker.deltaMS / 1000;
-      f.g.alpha = Math.max(0, 1 - f.age / f.life);
+      const dt = ticker.deltaMS / 1000;
+      f.age += dt;
+      f.sp.x += f.vx * dt;
+      f.sp.y += f.vy * dt;
+      const n = f.frames.length;
+      const idx = f.loop ? Math.floor(f.age * (n / 0.36)) % n : Math.min(n - 1, Math.floor((f.age / f.life) * n));
+      const t = f.frames[idx];
+      if (t) f.sp.texture = t;
+      const rest = f.life - f.age;
+      f.sp.alpha = rest < 0.25 ? Math.max(0, rest / 0.25) : 1;
       if (f.age >= f.life) {
-        f.g.destroy();
+        f.sp.destroy();
         mercSkillFx.splice(i, 1);
       }
     }
