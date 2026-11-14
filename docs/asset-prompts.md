@@ -1711,3 +1711,5 @@ Style: flat cel-shaded shapes in 2-3 tones with a thick dark orange-brown outlin
 
 Avoid: gradients, glow blur, realistic smoke, characters, horse, text other than the four captions, ground line, logo, watermark.
 ```
+
+**13-1 뒷발차기 포즈 진행**: ① 포즈 받음, 적용됨(베타 1.306). 앞발은 땅에, 뒷발을 뒤로 높이 걷어찬 모습이 첫 시안에서 맞았다. `assets/units/boss1_kick.png`(324x274, 서 있는 그림과 같은 배율로 줄이고 앞발 위치를 서 있는 그림에 맞춤). `BSK_KICK`일 때 이 그림을 쓴다(`bossfx.ts`). 남은 것: ② 발굽 호·충격 이펙트 4컷(`boss1_kick_fx_0~3`), 받으면 `BFX_KICK` 처리에 연결.

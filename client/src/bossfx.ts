@@ -30,6 +30,7 @@ import {
   BFX_SLASH,
   BOSS_SKILL_NAMES,
   BSK_ACCEL,
+  BSK_KICK,
   BSK_SCEPTER,
   BSK_EDICT,
   BSK_RALLY,
@@ -141,7 +142,7 @@ export interface BossFxDeps {
 }
 
 const BOSS_UNIT_TEX = [
-  "boss1_idle", "boss1_attack",
+  "boss1_idle", "boss1_attack", "boss1_kick",
   "boss2_idle", "boss2_guard", "boss2_thrust",
   "boss3_idle", "boss3_aim", "boss3_sky",
   "boss4_idle", "boss4_reflect", "boss4_charge",
@@ -267,7 +268,7 @@ export async function createBossFx(d: BossFxDeps) {
 
   /** 스테이지 1~8 장군 그림과 자세 */
   const art: BossArt[] = [
-    { get idle() { return u("boss1_idle"); }, scale: 0.5, pose: (sk, _fl, atk) => ((atk || sk > 0) && u("boss1_attack")) || u("boss1_idle") },
+    { get idle() { return u("boss1_idle"); }, scale: 0.5, pose: (sk, _fl, atk) => (sk === BSK_KICK && u("boss1_kick")) || ((atk || sk > 0) && u("boss1_attack")) || u("boss1_idle") }, // 뒷발차기 중에는 뒷발을 걷어찬 그림
     { get idle() { return u("boss2_idle"); }, scale: 0.6, pose: (sk, _fl, atk) => (sk === BSK_GUARD ? u("boss2_guard") : sk === BSK_CLONE || sk === BSK_TRIPLE || sk === BSK_THROW || atk ? u("boss2_thrust") : u("boss2_idle")) },
     { get idle() { return u("boss3_idle"); }, scale: 0.4, pose: (sk, _fl, atk) => (sk === BSK_RAIN ? u("boss3_sky") : sk === BSK_SNIPE || sk === BSK_ICEARROW || atk ? u("boss3_aim") : u("boss3_idle")) },
     { get idle() { return u("boss4_idle"); }, scale: 0.42, pose: (sk, fl) => (sk === BSK_REFLECT || fl & EF_GUARD ? u("boss4_reflect") : sk === BSK_SHIELDRUSH ? u("boss4_charge") : u("boss4_idle")) },
