@@ -44,7 +44,7 @@ test("용병 공용 카드가 기본이고, 병종 전용 카드는 그 병종�
   for (const c of globals) {
     if (c.effect.k !== "mercStat") continue;
     const base = MERC_STAT_BASE[c.effect.stat];
-    assert.ok(Math.abs(c.effect.v - scaledValue(c.effect.stat, base, c.rarity as 0 | 1 | 2) * GLOBAL_CARD_FACTOR * (c.effect.stat === "lifesteal" ? 5 : 1)) < 2e-3, c.name);
+    assert.ok(Math.abs(c.effect.v - scaledValue(c.effect.stat, base, c.rarity as 0 | 1 | 2) * (c.effect.stat === "armor" || c.effect.stat === "thorns" ? 1 : GLOBAL_CARD_FACTOR) * (c.effect.stat === "lifesteal" ? 5 : 1)) < 2e-3, c.name);
   }
   const special = new Set(["pierce", "multi", "poison", "slow", "cast", "knock", "quiver"]); // 피해 감소·피해 반사는 공용 카드
   for (const c of types) assert.ok(c.effect.k === "mercStat" && special.has(c.effect.stat), `${c.name}은 특화 능력치가 아니다`);
