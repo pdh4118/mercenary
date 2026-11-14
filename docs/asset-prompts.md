@@ -970,6 +970,10 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 | `mskill_leap` | 용병 둔기병 도약 내려찍기(받음·적용됨) | `a heavy armored jump, a whoosh and a huge crunching ground slam with rocks, no voice, 0.7 seconds` | 0.7초, 3종 |
 | `mskill_bash` | 용병 검방병 방패 밀치기(받음·적용됨) | `a wooden shield slamming into armor with a dull heavy thud and a small metal clank, no voice, 0.3 seconds` | 0.3초, 1종 |
 | `mskill_thorn` | 용병 검방병 가시 방패 반사(받음·적용됨) | `a short sharp metallic scrape and spark zing as spikes scratch a weapon, no voice, 0.25 seconds` | 0.25초, 1종 |
+| `mskill_blink` | 용병 마법사 점멸(받음·적용됨) | `a quick magical pop with a tiny glassy sparkle whoosh, no voice, 0.3 seconds` | 0.52초, 2종 |
+| `mskill_poison` | 용병 궁병 독 화살이 새로 묻을 때(받음·적용됨) | `a short wet bubbling splash with a soft sizzle, no voice, 0.3 seconds` | 0.5초, 1종 |
+| `mskill_ice` | 용병 궁병 얼음 화살이 새로 걸릴 때(받음·적용됨) | `a short crisp ice crack with a tiny glassy chime, no voice, 0.25 seconds` | 0.5초, 1종 |
+| `mskill_ember` | 용병 마법사 불씨(받음·적용됨, 3초 동안 세 번 이어 붙임) | `a soft crackling small fire loop with tiny pops, seamless loop, no voice, 1.0 seconds` | 1초, 1종 |
 | `skill_backstep` | 활 후퇴 | `quick backward skid on dirt, short scuff and a small cloth rustle` | 0.2초, 2종 |
 | `skill_dash` | 창 돌진 | (다시 만듦, 추천 1번) `Explosive spear lunge: a sharp sudden air-tearing crack at the very start, a fast rushing whoosh with a low punchy thump underneath, then a short bright steel spear tip shing and a tiny ringing tail. Tight, powerful, cinematic, dry, no echo.` 이전 소리는 `skill_dash_old_1~2.ogg`로 보관 | 0.5초, 1종 |
 | `skill_guard` | 검 무적 시작 | `bright protective ward activating, short shimmer and a soft metallic ring` | 0.5초, 1종 |
