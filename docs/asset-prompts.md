@@ -1573,7 +1573,7 @@ Faces: very simple like the units in Image 1. Helmeted soldiers have a closed bl
 Color theme for the whole army: black plate armor with gold trim, deep purple capes, plumes, sashes and cloth, so they clearly belong to the tyrant king (the final boss, black armor, dark purple, gold, crimson cape). Small gold details only, no realistic metal shine.
 
 Five castle wall defenders of the tyrant king, standing at attention in their idle poses, all facing right:
-1. "boss10_post_archer_idle": an archer in a black helmet and black leather armor with a purple cape, a bow held low in one hand, standing alert.
+1. "boss10_post_archer_idle": a LIGHT archer, not armored: a purple hood and a purple cloak over a plain black cloth and leather tunic with gold trim, no helmet, no plate armor, no metal armor at all, a quiver of arrows on his back, a bow held low in one hand, standing alert, a simple chibi face with two small solid black dot eyes and a short mouth line. He is the same type of archer as the royal guard archer in the earlier sheet.
 2. "boss10_post_mage_idle": a mage in a long black robe with purple and gold trim and a hood, holding a gold staff with a small purple gem upright in one hand.
 3. "boss10_post_spear_idle": a spearman in black plate armor with a purple plume and cape, a long spear held upright in the front hand.
 4. "boss10_post_sword_idle": a sword and shield soldier in black plate armor with a purple cape, a tall black shield held in front and the sword hanging down in the other hand.
@@ -1596,7 +1596,7 @@ Faces: very simple like the units in Image 1. Helmeted soldiers have a closed bl
 Color theme for the whole army: black plate armor with gold trim, deep purple capes, plumes, sashes and cloth, so they clearly belong to the tyrant king (the final boss, black armor, dark purple, gold, crimson cape). Small gold details only, no realistic metal shine.
 
 The attack poses, all facing right:
-1. "boss10_post_archer_aim": the archer drawing his bow to the right at chest height with an arrow nocked (the bowstring must not cross his face or helmet).
+1. "boss10_post_archer_aim": the same light hooded archer (purple hood and cloak, black cloth and leather tunic, no helmet, no plate armor) drawing his bow to the right at chest height with an arrow nocked (the bowstring must not cross his face or hood).
 2. "boss10_post_mage_cast": the mage with one arm raised high holding the staff, a small flat swirl of purple magic above the staff gem.
 3. "boss10_post_spear_atk": the spearman in a low lunge thrusting the long spear straight to the right.
 4. "boss10_post_sword_atk": the sword and shield soldier stepping forward, the shield up in front and the sword thrust forward to the right.
@@ -1606,3 +1606,5 @@ Avoid: realistic proportions, tall lean adult body, long legs, small head, photo
 ```
 
 **13-11 ① 근위대 진행**: 5종 받음, 적용됨(베타 1.299). 모두 치비 비율·단순한 얼굴·같은 색조(검정·보라·금), 기병은 말도 치비, 궁병 활시위가 얼굴을 가로지르지 않아 첫 시안을 그대로 썼다. `assets/units/boss10_guard_*.png`(궁 163x149, 기병 223x205, 마법 157x172, 창 141x209, 검방 170x172 정도로 이전 높이에 가깝게 0.48배), 예전 그림은 `_old`로 보관. 남은 것: ② 초소병 서 있는 5종, ③ 초소병 공격 5종.
+
+**13-11 ② 수정(궁수)**: 처음 ②에서 궁수 줄에 `black helmet and black leather armor`라고 적었더니 제미나이가 **투구와 갑옷을 입은 궁수**로 그렸다(같은 군대의 근위대 궁수는 두건에 가벼운 옷). 궁수 줄을 "투구·판금 갑옷 없는 두건 궁수(보라 두건·망토, 검정 천·가죽 옷, 화살통)"로 고쳤다(②의 1번, ③의 1번). 이미 뽑은 시트는 같은 대화에서 "궁수만 바꾸고 나머지 넷은 그대로"라고 말해 고친다.
