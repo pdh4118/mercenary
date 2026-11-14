@@ -1336,7 +1336,7 @@ async function main() {
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
   // 용병 승급 스킬 이펙트(assets/fx/mskill_*): 컷을 life초 동안 한 번(또는 반복) 재생한다
-  const MSK_FRAMES: Record<string, number> = { thrust: 3, sweep: 3, jump: 4, blink: 4, stealth: 3, dash: 3, phantom: 3, spear_hit: 3, lunge: 3, bash: 3, thorn: 3, taunt: 4, leap: 4, quake: 4, ember: 4, ice: 3, poison: 3 };
+  const MSK_FRAMES: Record<string, number> = { swing: 4, thrust: 3, sweep: 3, jump: 4, blink: 4, stealth: 3, dash: 3, phantom: 3, spear_hit: 3, lunge: 3, bash: 3, thorn: 3, taunt: 4, leap: 4, quake: 4, ember: 4, ice: 3, poison: 3 };
     const mskTex: Record<string, (Texture | null)[]> = {};
   for (const [nm, cnt] of Object.entries(MSK_FRAMES)) mskTex[nm] = await Promise.all(Array.from({ length: cnt }, (_, i) => orNull(`assets/fx/mskill_${nm}_${i}.png`)));
   /** 스킬 번호(병종*10 + 스킬 번호) → 이펙트. w = 화면에 그리는 가로(월드 px), ax = 가로 기준점(0 앞쪽 끝에서 뻗음, 0.5 가운데), ground = 유닛 아래 층 */
@@ -1347,7 +1347,7 @@ async function main() {
     2: { fx: "dash", w: 140, life: 0.5, rot: true },
     12: { fx: "sweep", w: 170, life: 0.4, rot: true, ax: 0.15, push: 18 }, // 수비 태세 시작: 화살을 쳐내는 쓸기
     16: { fx: "thrust", w: 300, life: 0.2, rot: true, ax: 0, push: 14 }, // 수비 태세 중 정면 찌르기
-    13: { fx: "bash", w: 230, life: 0.36, rot: true, ax: 0.1 }, // 휩쓸기
+    13: { fx: "swing", w: 270, life: 0.4, rot: true, ax: 0.12, push: 12 }, // 휩쓸기: 창을 크게 휘두르는 호
     14: { fx: "lunge", w: 240, life: 0.3, rot: true, ax: 0 },
     32: { fx: "bash", w: 130, life: 0.36, rot: true, ax: 0, push: 24 },
     34: { fx: "taunt", w: 660, life: 1.1, ground: true },

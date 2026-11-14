@@ -54,6 +54,7 @@ def main() -> None:
     ap.add_argument("--rows", required=True, help="줄이름:칸수, 위 줄부터 쉼표로")
     ap.add_argument("--scale", type=float, default=0.5)
     ap.add_argument("--anchor", default="", help="줄이름=right|left 쉼표로(기본 가운데)")
+    ap.add_argument("--cap-max-h", type=int, default=50, help="캡션 글자 줄의 최대 높이(px). 큰 시트는 키운다")
     ap.add_argument("--grow", type=int, default=0, help="조각을 한 덩어리로 묶는 거리(4px 단위)")
     args = ap.parse_args()
 
@@ -76,7 +77,7 @@ def main() -> None:
             s0 = int(y)
         p0 = int(y)
     bands.append((s0, p0))
-    bands = [b for b in bands if 22 <= b[1] - b[0] <= 50]
+    bands = [b for b in bands if 22 <= b[1] - b[0] <= args.cap_max_h]
     if len(bands) != len(rows):
         raise SystemExit(f"캡션 띠 {len(bands)}개, 요청한 줄 {len(rows)}개가 다릅니다: {bands}")
     # 효과 조각: 캡션 띠를 지운 마스크의 연결 성분

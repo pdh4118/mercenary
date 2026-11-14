@@ -270,3 +270,5 @@ Avoid: green or blue colors, gradients, glow blur, realistic smoke, characters, 
 ```
 
 **받은 뒤**: `tools/slice_fx_rows.py`(`--rows swing:4`)로 자르고, 클라이언트의 `MSK_FRAMES`에 `swing: 4`를 넣은 뒤 `MSK_DEF[13]`을 `swing`으로 바꾼다.
+
+**7 받음, 적용됨(베타 1.336)**: `assets/fx/mskill_swing_0~3`(306x264, 크림색 호 4컷). `MSK_DEF[13]`(휩쓸기)에 연결, 예전 임시(흰 반원)는 방패 밀치기에 계속 쓴다. 자르기 도구에 `--cap-max-h`(캡션 글자 줄 최대 높이) 옵션을 추가했다(큰 시트는 90).
