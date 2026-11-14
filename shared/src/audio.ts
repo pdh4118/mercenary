@@ -90,6 +90,7 @@ export const SOUNDS = {
   mskill_poison: d(2, 0.8, 200, 3),
   mskill_ice: d(1, 0.8, 200, 3),
   mskill_ember: d(1, 0.7, 800, 2),
+  mskill_quake: d(2, 1, 600, 2),
   skill_wall_up: d(1, 0.6, 300, 2),
   skill_wall_break: d(1, 0.45, 300, 2),
   skill_wall_hit: d(3, 0.5, 80, 4),

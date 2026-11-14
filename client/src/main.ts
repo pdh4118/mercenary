@@ -1698,7 +1698,7 @@ async function main() {
             const n = val % 10;
             const info = MERC_SKILLS[type]?.[n - 1];
             if (info && info.kind === "active" && owner === myId) spawnFloat(info.name, x, y - 24, { fill: 0xffe27a, fontSize: 15, fontWeight: "800", stroke: { color: 0x3a2a00, width: 4 } }, 1.1, 0.4);
-            const msSound = val === 22 ? "mskill_jump" : val === 24 ? "mskill_stealth" : val === 2 ? "mskill_gallop" : val === 4 ? "mskill_phantom" : val === 12 ? "mskill_spear_throw" : val === 42 ? "mskill_leap" : val === 32 ? "mskill_bash" : val === 31 ? "mskill_thorn" : val === 52 ? "mskill_blink" : val === 21 ? "mskill_poison" : val === 23 ? "mskill_ice" : null; // 소리는 받은 것부터 연결(나머지는 받는 대로)
+            const msSound = val === 22 ? "mskill_jump" : val === 24 ? "mskill_stealth" : val === 2 ? "mskill_gallop" : val === 4 ? "mskill_phantom" : val === 12 ? "mskill_spear_throw" : val === 42 ? "mskill_leap" : val === 32 ? "mskill_bash" : val === 31 ? "mskill_thorn" : val === 52 ? "mskill_blink" : val === 44 ? "mskill_quake" : val === 21 ? "mskill_poison" : val === 23 ? "mskill_ice" : null; // 소리는 받은 것부터 연결(나머지는 받는 대로)
             if (msSound) audio.play(msSound, { x, y });
             if (val === 53) for (const delay of [0, 1000, 2000]) setTimeout(() => audio.play("mskill_ember", { x, y }), delay); // 불씨 소리는 1초짜리라 불이 타는 3초 동안 세 번 이어 붙인다
             if (val === 4) {
