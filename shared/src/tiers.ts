@@ -56,6 +56,26 @@ export const promoLevel = (tier: number): number => TUNE.LV_PROMO_EVERY * (tier 
 /** 레벨 모드: 레벨이 주는 체력·공격력 배율 */
 export const levelHp = (lv: number): number => (1 + TUNE.LV_HP) ** lv;
 export const levelDmg = (lv: number): number => (1 + TUNE.LV_DMG) ** lv;
+/** 화면용 진행 정보: 단계제는 경험치/필요량, 레벨제는 레벨·현재 레벨 안의 진행·승급 가능 여부 */
+export interface MercProg {
+  level: number; // 레벨제의 레벨(단계제면 0)
+  frac: number; // 막대 채움 0~1
+  ready: boolean; // 승급(강화) 조건 충족
+  text: string; // 목록 오른쪽·막대 옆에 쓰는 짧은 글
+  hasBar: boolean; // 최고 단계면 막대 없음
+}
+export const mercProg = (tier: number, xp: number): MercProg => {
+  if (!TUNE.LV_MODE) {
+    const need = mercXpNeed(tier);
+    return { level: 0, frac: Number.isFinite(need) ? Math.min(1, xp / need) : 1, ready: xp >= need, text: Number.isFinite(need) ? `${Math.floor(xp)}/${need}` : "최고", hasBar: Number.isFinite(need) };
+  }
+  const level = mercLevel(xp);
+  let left = xp;
+  for (let l = 0; l < level; l++) left -= levelNeed(l);
+  const frac = level >= TUNE.LV_MAX ? 1 : Math.min(1, left / levelNeed(level));
+  const promo = tier < MAX_TIER ? promoLevel(tier) : Infinity;
+  return { level, frac, ready: level >= promo, text: tier < MAX_TIER ? `Lv ${level}/${promo}` : `Lv ${level}`, hasBar: true };
+};
 /** 단계 표의 능력치 배율(레벨 모드에서는 LV_TIER_KEEP 만큼만 남긴다) */
 export const tierHp = (tier: number): number => (TUNE.LV_MODE ? 1 + (TIER_HP[tier]! - 1) * TUNE.LV_TIER_KEEP : TIER_HP[tier]!);
 export const tierDmg = (tier: number): number => (TUNE.LV_MODE ? 1 + (TIER_DMG[tier]! - 1) * TUNE.LV_TIER_KEEP : TIER_DMG[tier]!);

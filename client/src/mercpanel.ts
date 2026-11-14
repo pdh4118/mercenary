@@ -1,4 +1,4 @@
-import { personalityOf, nextTierBonus, unitCost, mercName, mercXpNeed, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
+import { personalityOf, nextTierBonus, unitCost, mercName, mercProg, TUNE, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -15,7 +15,7 @@ export interface MercPanel {
 }
 
 /** 강화할 수 있는 상태인가: 경험치를 다 채웠고 최고 단계가 아니다 */
-export const isReady = (w: MercWire): boolean => w[8] <= 0 && w[15] < 4 && w[17] >= mercXpNeed(w[15]);
+export const isReady = (w: MercWire): boolean => w[8] <= 0 && w[15] < 4 && mercProg(w[15], w[17]).ready;
 
 /** 내 용병 목록과 한 명씩 강화하는 패널(U). 경험치를 채운 용병만 강화 버튼이 뜬다. 게임은 멈추지 않는다. */
 export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readonly number[]; notify(text: string): void }): MercPanel {
@@ -48,26 +48,26 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
     name.className = "grow";
     const nm = document.createElement("div");
     nm.className = "nm";
-    nm.textContent = `${w[22] ?? 0}번 ${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}`;
+    nm.textContent = `${w[22] ?? 0}번 ${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}${TUNE.LV_MODE ? ` · Lv ${mercProg(tier, xp).level}` : ""}`;
     const sub = document.createElement("div");
     sub.className = "stat";
     const sitRule = (w[24] ?? 0) !== 0 ? personalityOf(nameId).sit?.[Math.abs(w[24]!) - 1] : undefined;
     sub.textContent = respawn > 0 ? `쓰러짐 · 부활 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 기여 ${w[23] ?? 0}${(w[25] ?? 0) >= 30 ? ` · 연속 ${Math.floor((w[25] ?? 0) / 60)}:${String((w[25] ?? 0) % 60).padStart(2, "0")}` : ""}${sitRule ? ` · ${sitRule.label}` : ""}`;
     if (sitRule && respawn <= 0) sub.style.color = (w[24] ?? 0) > 0 ? "#8ff0a4" : "#ff9a8a";
     name.append(nm, sub);
-    const need = mercXpNeed(tier);
-    if (Number.isFinite(need)) {
+    const prog = mercProg(tier, xp);
+    if (prog.hasBar) {
       const bar = document.createElement("div");
       bar.className = "xpbar";
       const fill = document.createElement("div");
-      fill.style.width = `${Math.min(100, (100 * xp) / need)}%`;
-      if (xp >= need) fill.className = "full";
+      fill.style.width = `${100 * prog.frac}%`;
+      if (prog.ready) fill.className = "full";
       bar.append(fill);
       name.append(bar);
     }
     row.append(dot, name);
     const cost = upgradeCost(type, tier);
-    if (cost !== null && xp >= need) {
+    if (cost !== null && prog.ready) {
       const btn = document.createElement("button");
       btn.textContent = `강화 ${cost}G`;
       btn.className = "primary";
@@ -78,7 +78,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
     } else {
       const t = document.createElement("span");
       t.className = "stat";
-      t.textContent = cost === null ? "최고" : `${xp}/${need}`;
+      t.textContent = cost === null ? "최고" : prog.text;
       row.append(t);
     }
     return row;
@@ -149,7 +149,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
         const name = document.createElement("div");
         name.className = "grow";
         const nm = document.createElement("div");
-        nm.textContent = `${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}`;
+        nm.textContent = `${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}${TUNE.LV_MODE ? ` · Lv ${mercProg(tier, xp).level}` : ""}`;
         const sub = document.createElement("div");
         sub.className = "stat";
         sub.textContent = respawn > 0 ? `쓰러짐 · 부활까지 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${unitCost(type, tier)}`;
@@ -162,13 +162,13 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           pr.textContent = `성격 ${persona.name}: ${persona.short}`;
           name.append(pr);
         }
-        const need = mercXpNeed(tier);
-        if (Number.isFinite(need)) {
+        const prog = mercProg(tier, xp);
+        if (prog.hasBar) {
           const bar = document.createElement("div");
           bar.className = "xpbar";
           const fill = document.createElement("div");
-          fill.style.width = `${Math.min(100, (100 * xp) / need)}%`;
-          if (xp >= need) fill.className = "full";
+          fill.style.width = `${100 * prog.frac}%`;
+          if (prog.ready) fill.className = "full";
           bar.append(fill);
           name.append(bar);
         }
@@ -186,7 +186,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
           t.className = "stat";
           t.textContent = "최고 단계";
           row.append(t);
-        } else if (xp >= need) {
+        } else if (prog.ready) {
           const btn = document.createElement("button");
           const noLeader = freeLeadership < 1;
           btn.textContent = `${tierName(type, tier + 1)} ${cost}G`;
@@ -198,7 +198,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
         } else {
           const t = document.createElement("span");
           t.className = "stat";
-          t.textContent = `경험치 ${xp}/${need}`;
+          t.textContent = (prog.level > 0 || prog.text.startsWith("Lv") ? prog.text : `경험치 ${prog.text}`);
           row.append(t);
         }
         const dm = document.createElement("button");
