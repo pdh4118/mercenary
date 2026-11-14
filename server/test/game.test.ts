@@ -728,8 +728,9 @@ test("카드 효과: 주인공 최대 체력·고용 할인·전리품", () => {
   const lvHp = (TUNE.HERO_HP_PER_LEVEL) * (g.getPlayer(a)!.level - 1); // 레벨업마다 최대 체력이 오른다
   forceCard(g, a, "heroMaxHp");
   const lvHp2 = TUNE.HERO_HP_PER_LEVEL * (g.getPlayer(a)!.level - 1);
-  assert.equal(g.getPlayer(a)!.maxHp, TUNE.PLAYER_MAX_HP + 19 + lvHp2);
-  assert.equal(g.getPlayer(a)!.hp, TUNE.PLAYER_MAX_HP + 19 + lvHp2);
+  const hpAfter = Math.round((TUNE.PLAYER_MAX_HP + lvHp2) * 1.08); // 최대 체력 카드는 기본+레벨 체력에 합산되는 %
+  assert.equal(g.getPlayer(a)!.maxHp, hpAfter);
+  assert.equal(g.getPlayer(a)!.hp, hpAfter);
   void lvHp;
   forceCard(g, a, "priceMult");
   assert.ok(Math.abs(g.getPlayer(a)!.priceMult - 0.8) < 1e-9);

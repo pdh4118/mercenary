@@ -59,3 +59,19 @@ test("레벨 모드 급여: 레벨과 승급 단계가 오를수록 비싸다", 
     Object.assign(TUNE, saved);
   }
 });
+
+test("주인공 체력 카드: 기본+레벨 체력에 합산 %라서 레벨이 높을수록 한 장이 더 많이 늘린다", () => {
+  const gain = (level: number) => {
+    const g = new Game();
+    g.autoSpawn = false;
+    const a = g.addPlayer("t")!;
+    const p = g.getPlayer(a)!;
+    const s = (g as any).slots.get(a);
+    for (let i = 1; i < level; i++) g.giveXp(a, p.xpNeed);
+    const before = p.maxHp;
+    s.mods.heroHp += 0.08;
+    (g as any).recalcHeroHp(s);
+    return p.maxHp - before;
+  };
+  assert.ok(gain(30) > gain(10) * 2, `${gain(10)} → ${gain(30)}`);
+});

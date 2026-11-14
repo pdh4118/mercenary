@@ -270,7 +270,7 @@ const statCards = (): CardDef[] => {
 
 /** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용). 체력 재생·흡혈·근접 반사·피해 감소·관통·발사 수를 뺀 수치는 이전의 1.5배(용병 공용 카드 1명분의 약 1.8배). */
 export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "leadershipPct" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
-  { k: "heroMaxHp", label: "최대 체력", base: 18.75, weight: 8, fmt: "flat" },
+  { k: "heroMaxHp", label: "최대 체력", base: 0.08, weight: 8, fmt: "pct" }, // 기본+레벨 체력에 합산되는 %
   { k: "heroSpeed", label: "이동 속도", base: 0.09, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.14, weight: 8, fmt: "pct" },
   { k: "heroFireRate", label: "공격 속도", base: 0.2, weight: 6, fmt: "pct" },

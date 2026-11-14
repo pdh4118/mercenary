@@ -361,6 +361,7 @@ interface Mods {
   type: MercMods[];
   heroSpeed: number;
   heroDmg: number;
+  heroHp: number; // 최대 체력 카드의 합(기본+레벨 체력에 합산 %)
   heroDefense: number;
   heroDodge: number;
   heroRange: number;
@@ -394,6 +395,7 @@ const newMods = (): Mods => ({
   type: UNIT_TYPES.map(() => newMercMods()),
   heroSpeed: 1,
   heroDmg: 1,
+  heroHp: 0,
   heroDefense: 0,
   heroDodge: 0,
   heroRange: 1,
@@ -7183,6 +7185,17 @@ export class Game {
   }
 
   /** 경험치를 주고, 레벨업하면 선택 횟수를 쌓는다. 선택지는 한 번에 하나씩 뜬다. */
+  /** 주인공 최대 체력 = (기본 + 레벨당 증가) x (1 + 체력 카드 합). 늘어난 만큼 지금 체력도 올려 준다 */
+  private recalcHeroHp(s: Slot): void {
+    const p = s.state;
+    const base = TUNE.PLAYER_MAX_HP + TUNE.HERO_HP_PER_LEVEL * (p.level - 1);
+    const next = Math.round(base * (1 + s.mods.heroHp));
+    const delta = next - p.maxHp;
+    p.maxHp = next;
+    if (delta > 0) p.hp += delta;
+    else p.hp = Math.min(p.hp, p.maxHp);
+  }
+
   giveXp(playerId: number, amount: number): void {
     const s = this.slots.get(playerId);
     if (!s || amount <= 0) return;
@@ -7192,8 +7205,7 @@ export class Game {
     while (p.xp >= p.xpNeed) {
       p.xp -= p.xpNeed;
       p.level++;
-      p.maxHp += TUNE.HERO_HP_PER_LEVEL;
-      p.hp += TUNE.HERO_HP_PER_LEVEL;
+      this.recalcHeroHp(s);
       s.leadFlat += TUNE.LEADERSHIP_PER_LEVEL; // 레벨업마다 통솔력
       p.xpNeed = xpNeeded(p.level);
       p.pending++;
@@ -7353,8 +7365,8 @@ export class Game {
         }
         break;
       case "heroMaxHp":
-        p.maxHp += e.v;
-        p.hp += e.v;
+        m.heroHp += e.v;
+        this.recalcHeroHp(s);
         break;
       case "heroSpeed": m.heroSpeed += e.v; break;
       case "heroDmg": m.heroDmg += e.v; break;
