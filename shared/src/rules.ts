@@ -140,8 +140,8 @@ export const TUNE = {
   LV_MODE: 0, // 1이면 용병이 레벨로 큰다: 경험치는 쓰지 않고 쌓여 레벨이 되고(체력·공격력이 레벨마다 조금씩 오름), 승급은 정해진 레벨에서 금화만 내면 된다
   LV_HP: 0.0201, // 레벨마다 체력 +이 비율(복리)
   LV_DMG: 0.0155, // 레벨마다 공격력 +이 비율(복리)
-  LV_XP_BASE: 14, // 0→1레벨에 필요한 경험치(레벨 L→L+1은 BASE + STEP x L)
-  LV_XP_STEP: 1,
+  LV_XP_BASE: 24, // 0→1레벨에 필요한 경험치(레벨 L→L+1은 BASE + STEP x L)
+  LV_XP_STEP: 1.6,
   LV_MAX: 75, // 최고 레벨
   LV_PROMO_EVERY: 15, // 이 레벨마다 승급할 수 있다(승급 단계 n+1은 레벨 EVERY x (n+1))
   LV_TIER_KEEP: 0, // 레벨 모드에서 단계 표(TIER_HP·TIER_DMG)를 얼마나 남길까(0 = 능력치는 레벨로만, 1 = 지금과 같음)
