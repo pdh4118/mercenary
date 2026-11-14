@@ -293,6 +293,8 @@ import {
   TIER_COUNTER,
   tierDmg,
   tierHp,
+  skillOn,
+  SK,
   levelHp,
   levelDmg,
   levelXpCap,
@@ -542,6 +544,8 @@ export interface Enemy extends Fighter {
   poisonAcc?: number; // 아직 숫자로 띄우지 않은 독 피해
   venom?: boolean; // 독 화살을 쏘는 궁병(맞은 아군이 중독된다)
   stunT?: number; // 경직(움직이지도 공격하지도 못하는) 남은 시간
+  slowT?: number; // 둔화(얼음 화살) 남은 시간
+  slowMult?: number; // 둔화 중 이동 속도 배율
   supply?: number; // 군량병이 남은 시간(있으면 군량병)
   skel?: boolean; // 안개 속 시체에서 되살아난 스켈레톤
   bk?: BossKitState; // 장군의 스킬 상태
@@ -1424,6 +1428,7 @@ export class Game {
     }
     const friendlies = this.collectFriendlies();
     this.tickDuelPoison(dt, friendlies); // 토너먼트 독 화살과 독 궁병의 화살 모두 아군에게 독을 건다
+    this.stepEmbers(dt);
     this.stepMercs(dt);
     this.separateMercs(dt);
     if (!duel) {
@@ -4463,7 +4468,18 @@ export class Game {
             }
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
-          const taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner) * (1 + (m.sit?.taken ?? 0)); // 성격 상황 효과(받는 피해)
+          let taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner) * (1 + (m.sit?.taken ?? 0)); // 성격 상황 효과(받는 피해)
+          if (m.type === CAVALRY && skillOn(CAVALRY, m.tier, 3) && (m.momentum >= COUNTER_MOMENTUM || m.chargeSnap > 0)) taken *= 1 - SK.ironHorse; // 철갑마: 돌격 중에는 덜 아프다
+          if (!h.dot && taken > 0) {
+            // 수호: 곁의 검방병이 피해 일부를 대신 받는다
+            for (const g of this.mercs.values()) {
+              if (g === m || g.owner !== m.owner || g.respawn > 0 || g.type !== SHIELD || !skillOn(SHIELD, g.tier, 3) || Math.hypot(g.x - m.x, g.y - m.y) > SK.guardRange) continue;
+              const moved = taken * SK.guard;
+              taken -= moved;
+              this.hurtMerc(g, moved);
+              break;
+            }
+          }
           fm.lastBody = taken;
           if (h.by && this.phase === "tournament") this.creditMercHit(h.by, taken);
           this.hurtMerc(m, taken, h.by);
@@ -4483,7 +4499,7 @@ export class Game {
           }
           this.pushDamage(h.dot && h.srcType === -1 ? EVT_DMG_POISON_ALLY : EVT_DMG_ALLY, m.id, m.x, m.y, taken, m.owner); // 독 틱(dot, 병종 없음)은 보라색 숫자
           this.thorns(this.slots.get(m.owner), h, m);
-          return r.reflected;
+          return r.reflected + (m.type === SHIELD && skillOn(SHIELD, m.tier, 1) ? r.shield * SK.thorns : 0); // 가시 방패: 막은 피해 일부를 되돌린다
         },
       };
       list.push(fm);
@@ -6312,7 +6328,7 @@ export class Game {
           radius: 4,
           pierce: Math.round(mstat(mods, m.type, "pierce")),
           crit,
-          poison: mstat(mods, m.type, "poison"),
+          poison: mstat(mods, m.type, "poison") + (skillOn(ARCHER, m.tier, 1) ? SK.poisonMult : 0),
           hitIds: new Set(),
           merc: m,
         });
@@ -6369,9 +6385,26 @@ export class Game {
       reflected += this.damageEnemy(e, { damage: dmg, charge, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - e.y, m.x - e.x), crit }, m.owner, m);
     }
     if (st.splash > 0) this.splashEnemies(struck, st.splash, dmg * this.splashFactor(mods, m.type), m.type, m.x, m.y, m.owner, m);
+    if (struck.length > 0) this.meleeSkills(m, struck, dmg, charge, crit);
     if (reflected > 0) {
       this.pushDamage(EVT_REFLECT, m.id, m.x, m.y, reflected, m.owner);
       this.hurtMerc(m, reflected); // 창병에게 돌격하면 그 피해가 자신에게 돌아온다
+    }
+  }
+
+  /** 근접 패시브 스킬: 기병 돌파(다음 적 최대 2명에게 60%), 창병 연속 찌르기(확률로 한 번 더) */
+  private meleeSkills(m: Merc, struck: Enemy[], dmg: number, charge: number, crit: boolean): void {
+    if (m.type === CAVALRY && skillOn(CAVALRY, m.tier, 1) && charge > 0) {
+      const first = struck[0]!;
+      const near = [...this.enemies.values()]
+        .filter((o) => !struck.includes(o) && o.hp > 0 && Math.hypot(o.x - first.x, o.y - first.y) <= SK.breakRange)
+        .sort((a, b) => Math.hypot(a.x - first.x, a.y - first.y) - Math.hypot(b.x - first.x, b.y - first.y))
+        .slice(0, SK.breakCount);
+      for (const o of near) this.damageEnemy(o, { damage: (dmg + charge) * SK.breakFrac, charge: 0, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - o.y, m.x - o.x), crit }, m.owner, m);
+    }
+    if (m.type === SPEAR && skillOn(SPEAR, m.tier, 3) && this.rng() < SK.doubleChance) {
+      const t = struck[0]!;
+      if (t.hp > 0) this.damageEnemy(t, { damage: dmg * SK.doubleFrac, charge: 0, srcType: m.type, srcTier: m.tier, fromAngle: Math.atan2(m.y - t.y, m.x - t.x), crit }, m.owner, m);
     }
   }
 
@@ -6397,6 +6430,7 @@ export class Game {
     const has = (id: LegendId) => !!owner && hasLegend(owner.mods, id, scope);
     // 처형: 체력이 얼마 안 남은 적에게는 피해가 몇 배로 들어간다
     if (has("execute") && e.hp < e.maxHp * LEGEND_CONST.executeBelow) hit = { ...hit, damage: hit.damage * LEGEND_CONST.executeMult };
+    if (src?.type === BLUNT && skillOn(BLUNT, src.tier, 1) && e.shield > 0) hit = { ...hit, damage: hit.damage * (1 + SK.crush) }; // 분쇄: 방패 있는 적에게 더 세다
     const r = resolveHit({ type: e.type, shield: e.shield, face: e.face }, hit);
     this.applyShield(e, r.shield, r.shieldBroke);
     if (e.type === CAVALRY && hit.srcType === SPEAR && !hit.dot && !hit.pierceGuard) {
@@ -6432,6 +6466,10 @@ export class Game {
       }
     }
     if (hit.poison && hit.poison > 0 && r.body > 0 && e.hp > 0) this.poisonEnemy(e, hit.poison, ownerId, src); // 방패에 막힌 화살은 독이 묻지 않는다
+    if (src?.type === ARCHER && skillOn(ARCHER, src.tier, 3) && hit.srcType === ARCHER && !hit.dot && r.body > 0 && e.hp > 0) {
+      e.slowT = Math.max(e.slowT ?? 0, SK.iceSec); // 얼음 화살
+      e.slowMult = SK.iceMult;
+    }
     // 흡혈: 카드로 쌓은 비율 + 전설 피의 갈증(치명타는 2배). 때린 쪽(주인공 또는 그 병종)만 회복한다.
     const steal = (owner ? (src ? this.pstat(src, owner.mods, "lifesteal") : owner.mods.heroLifesteal) : 0) + (has("bloodthirst") ? LEGEND_CONST.bloodthirstFrac : 0);
     if (steal > 0 && dealt > 0) this.lifesteal(owner!, src, dealt * steal * (hit.crit && has("bloodthirst") ? 2 : 1));
@@ -6444,6 +6482,10 @@ export class Game {
       const sec = (TUNE.BLUNT_STAGGER_SEC + TUNE.BLUNT_STAGGER_PER_TIER * src.tier) * (e.boss ? TUNE.BLUNT_STAGGER_BOSS_FRAC : 1);
       if (sec > (e.stunT ?? 0)) e.stunT = sec;
       e.atkT = 0;
+      if (skillOn(BLUNT, src.tier, 3) && this.rng() < SK.shockChance) {
+        // 충격파: 경직이 곁의 적에게 번진다
+        for (const o of this.enemies.values()) if (o !== e && !o.boss && o.hp > 0 && Math.hypot(o.x - e.x, o.y - e.y) <= SK.shockRange && sec > (o.stunT ?? 0)) { o.stunT = sec; o.atkT = 0; }
+      }
       if (this.time - (e.staggerXpT ?? -9) >= 0.6) {
         e.staggerXpT = this.time;
         src.career.stagger++;
@@ -6458,7 +6500,7 @@ export class Game {
 
   /** 적의 현재 최대 이동 속도(보스·격노 반영) */
   private enemySpeed(e: Enemy): number {
-    return ENEMY_STATS[e.type]!.speed * (e.boss ? BOSS_SPEED_MULT : 1) * (e.skel ? BOSS_NECRO.skelSpeed : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0));
+    return ENEMY_STATS[e.type]!.speed * (e.boss ? BOSS_SPEED_MULT : 1) * (e.skel ? BOSS_NECRO.skelSpeed : 1) * TUNE.ENEMY_SPEED_MULT * (1 + TUNE.BOSS_RAGE_SPEED * (e.rage ?? 0)) * ((e.slowT ?? 0) > 0 ? (e.slowMult ?? 1) : 1);
   }
 
   /** 독: total만큼의 피해를 POISON_SEC초에 걸쳐 준다. 다시 맞으면 시간이 새로 시작하고 더 센 쪽을 따른다. */
@@ -6472,6 +6514,8 @@ export class Game {
 
   // --- 마법사: 운석 -------------------------------------------------------------
   /** 주문을 외우는 중인 운석. 키는 시전자(용병 번호, 주인공은 -번호). 진행도는 시전자의 준비 시간에서 구한다. */
+  /** 불씨(마법사 3단계): 운석이 떨어진 자리에 남아 지속 피해를 주는 불 */
+  private embers: { x: number; y: number; r: number; t: number; dps: number; owner: number; src?: Merc }[] = [];
   private casts = new Map<number, { x: number; y: number; total: number; radius: number; scanT?: number }>();
 
   /** 맵 바깥으로 나간 유닛(밀려남·도망·추격·진형 자리가 맵 밖일 때 등)을 안으로 되돌린다 */
@@ -6618,7 +6662,21 @@ export class Game {
       struck++;
       this.damageEnemy(e, { damage: damage * scale(d), charge: 0, srcType: MAGE, fromAngle: Math.atan2(y - e.y, x - e.x), crit, pierceGuard: true }, ownerId, src);
     }
+    if (src && skillOn(MAGE, src.tier, 3)) this.embers.push({ x, y, r: radius * 0.8, t: SK.emberSec, dps: damage * SK.emberDps, owner: ownerId, src });
     if (src && struck > 1) src.career.aoe += struck - 1; // 한 번에 여럿 맞힌 횟수(기록만. 피해는 각 적에게 준 만큼 이미 기여도에 들어간다)
+  }
+
+  /** 불씨: 남은 시간 동안 안의 적에게 초당 피해(방패 무시) */
+  private stepEmbers(dt: number): void {
+    if (this.embers.length === 0) return;
+    for (const f of this.embers) {
+      f.t -= dt;
+      for (const e of [...this.enemies.values()]) {
+        if (e.hp <= 0 || Math.hypot(e.x - f.x, e.y - f.y) > f.r + radiusOf(e)) continue;
+        this.damageEnemy(e, { damage: f.dps * dt, charge: 0, srcType: MAGE, fromAngle: 0, pierceGuard: true, dot: true }, f.owner, f.src);
+      }
+    }
+    this.embers = this.embers.filter((f) => f.t > 0);
   }
 
   /** 마법사: 궁병처럼 근접한 적에게서 거리를 벌리고, 사거리 안에서 적이 가장 많이 모인 곳에 운석을 떨어뜨린다. 주문을 외우는(3초) 동안은 움직이지 못한다. */
@@ -7067,11 +7125,11 @@ export class Game {
       hp: maxHp,
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
       damage: base.damage * this.pstat(m, mods, "dmg") * tierDmg(tier) * this.lvDmg(m) * power * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)) * (1 + (m.auraDmg ?? 0)),
-      windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier),
+      windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 - SK.focusCast : 1),
       cooldown: base.cooldown / quick / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick,
-      reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier), area * (1 + TIER_AREA[t]! * tier)),
-      splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier),
+      reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier) * (skillOn(t, tier, 1) && t === SPEAR ? SK.reachMult : 1), area * (1 + TIER_AREA[t]! * tier)),
+      splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 + SK.focusArea : 1),
       arc: meleeArc(t, base.arc, area),
     };
   }
@@ -7168,6 +7226,7 @@ export class Game {
           e.buffMult = undefined;
         }
       }
+      if (e.slowT && e.slowT > 0) e.slowT -= dt;
       if (e.stunT && e.stunT > 0) {
         e.stunT -= dt;
         continue; // 경직: 움직이지도 공격하지도 못한다

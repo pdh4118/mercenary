@@ -7,6 +7,7 @@ export * from "./cards.js";
 export * from "./formation.js";
 export * from "./bossskill.js";
 export * from "./tiers.js";
+export * from "./mercskill.js";
 export * from "./names.js";
 export * from "./personality.js";
 export * from "./audio.js";
