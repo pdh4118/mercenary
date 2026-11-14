@@ -1149,7 +1149,7 @@ async function main() {
     glyph.position.set(12 + ART / 2, 12 + ART / 2);
     const keyBg = new Graphics().circle(0, 0, 14).fill(0x11141b).stroke({ width: 2, color: 0xffd45d });
     keyBg.position.set(12, 12 + ART);
-    const key = new Text({ text: i < 3 ? "ZXC"[i]! : `+${"ZXC"[i - 3]}`, style: { fill: 0xffffff, fontSize: i < 3 ? 17 : 13, fontWeight: "bold" } });
+    const key = new Text({ text: "ZXC"[i % 3]!, style: { fill: 0xffffff, fontSize: 17, fontWeight: "bold" } });
     key.anchor.set(0.5);
     key.position.set(12, 12 + ART);
     const tag = new Text({ text: "", style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" } });
@@ -1178,7 +1178,7 @@ async function main() {
     const rowMode = offer.length === 6;
     cardPanel.scale.set(rowMode ? ROW_SCALE : 1);
     cardPanelW = rowMode ? (2 * CARD_W + COL_GAP) * ROW_SCALE : CARD_W;
-    cardHeader.text = offer.length > 0 ? `${box > 0 ? "보상 상자 카드!" : "LEVEL UP!"}${pending > 1 ? ` x${pending}` : ""}  ·  [R] 새로고침 ${rerolls}${rowMode ? "  ·  줄마다 하나씩 (Shift+ZXC = 용병)" : ""}` : "";
+    cardHeader.text = offer.length > 0 ? `${box > 0 ? "보상 상자 카드!" : "LEVEL UP!"}${pending > 1 ? ` x${pending}` : ""}  ·  [R] 새로고침 ${rerolls}${rowMode ? "  ·  Z/X/C: 주인공 줄 먼저, 그다음 용병 줄" : ""}` : "";
     const rowName = ["주인공·운영", "용병"];
     rowLabels.forEach((t, c) => {
       t.visible = rowMode;
@@ -1187,6 +1187,8 @@ async function main() {
     cardViews.forEach((v, i) => {
       const card = offer[i] !== undefined && offer[i]! >= 0 ? CARDS[offer[i]!] : undefined;
       v.node.visible = !!card;
+      const heroLeft = offer.slice(0, 3).some((v) => v >= 0); // 주인공 줄을 먼저 고르고, 그다음 용병 줄(Z/X/C 그대로)
+      v.node.alpha = rowMode && i >= 3 && heroLeft ? 0.5 : 1; // 아직 차례가 아닌 용병 줄은 흐리게
       v.node.position.set(rowMode ? Math.floor(i / 3) * (CARD_W + COL_GAP) : 0, (rowMode ? 54 : 32) + (i % 3) * (CARD_H + CARD_GAP));
       if (!card) return;
       const color = CATEGORY_COLORS[card.category]!;
@@ -1979,7 +1981,9 @@ async function main() {
     if (!e.repeat && k === "q") cycleWeapon(1);
     if (!e.repeat && (k === "z" || k === "x" || k === "c")) {
       const mineP = latest?.players.find((p) => p.id === myId);
-      const idx = "zxc".indexOf(k) + (e.shiftKey && (mineP?.offer.length ?? 0) === 6 ? 3 : 0); // 두 줄 선택에서는 Shift+Z/X/C가 용병 줄
+      const offerNow = mineP?.offer ?? [];
+      const heroLeft = offerNow.length === 6 && offerNow.slice(0, 3).some((v) => v >= 0);
+      const idx = "zxc".indexOf(k) + (offerNow.length === 6 && !heroLeft ? 3 : 0); // 두 줄 선택: Z/X/C는 주인공 줄부터, 그 줄을 고르면 용병 줄에 쓰인다
       const offered = mineP?.offer[idx];
       if (offered !== undefined && offered >= 0) audio.play(CARDS[offered]?.category === 3 ? "legend_card" : "card_pick");
       send({ t: "pick", index: idx });
