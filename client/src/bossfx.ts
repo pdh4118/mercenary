@@ -172,6 +172,7 @@ export async function createBossFx(d: BossFxDeps) {
   const SEQ = {
     impact: ["boss1_impact", [0, 1, 2, 3]],
     kickFx: ["boss1_kick_fx", [0, 1, 2, 3]],
+    caltrop: ["caltrop", [0, 1, 2]],
     thrust: ["boss2_thrust", [0, 1, 2]],
     dust: ["boss3_dust", [0, 1, 2, 3]],
     bashArc: ["fx_bash_arc", [0, 1, 2, 3]],
@@ -892,6 +893,8 @@ export async function createBossFx(d: BossFxDeps) {
   /** 마름쇠 장판(그림 없이 코드로 그린다): 깔리기 전에는 붉은 점선 원, 깔린 뒤에는 쇠못 세 개 */
   const caltropG = new Graphics();
   d.groundFx.addChild(caltropG);
+  const caltropSprites = new Map<number, Sprite>();
+  const caltropSeen = new Set<number>();
   const drawCaltrop = (id: number, x: number, y: number, r: number, left: number, state: number, now: number): void => {
     if (state === 0) {
       const pulse = 0.5 + 0.5 * Math.sin(now / 70 + id);
@@ -899,6 +902,24 @@ export async function createBossFx(d: BossFxDeps) {
       return;
     }
     const fade = Math.min(1, left / 10 / 0.8); // 사라지기 직전에 흐려진다
+    const ctex = pick(T.caltrop, ((Math.floor(id * 7.13) % 3) + 3) % 3);
+    if (ctex) {
+      // 그림이 있으면 그림으로: 번호로 무더기 3종 중 하나를 고르고 반지름에 맞춘다
+      let sp = caltropSprites.get(id);
+      if (!sp) {
+        sp = new Sprite(ctex);
+        sp.anchor.set(0.5, 0.5);
+        d.groundFx.addChild(sp);
+        caltropSprites.set(id, sp);
+      }
+      caltropSeen.add(id);
+      sp.texture = ctex;
+      sp.scale.set((r * 2.3) / Math.max(1, ctex.width));
+      sp.rotation = ((id * 1.37) % 1) * 0.5 - 0.25;
+      sp.position.set(x, y);
+      sp.alpha = fade;
+      return;
+    }
     caltropG.ellipse(x, y + 2, r * 1.05, r * 0.7).fill({ color: 0x14161b, alpha: 0.28 * fade }).stroke({ width: 1.5, color: 0xff8a5a, alpha: 0.35 * fade }); // 밟으면 안 되는 자리가 보이도록 바닥을 어둡게
     // 한 무더기에 못 세 개: 번호로 자리와 방향을 정해 매번 같은 모양이다
     for (let i = 0; i < 3; i++) {
@@ -1019,6 +1040,12 @@ export async function createBossFx(d: BossFxDeps) {
       oilSprites.delete(oid);
     }
     oilSeen.clear();
+    for (const [cid, csp] of caltropSprites) {
+      if (caltropSeen.has(cid)) continue;
+      csp.destroy();
+      caltropSprites.delete(cid);
+    }
+    caltropSeen.clear();
     edictNow = null;
     executeNow = null;
     for (const gw of guardWalls) drawCurvedWall(gw.x + Math.cos(gw.ang) * 48, gw.y + 8 + Math.sin(gw.ang) * 48 * 0.6, gw.ang + Math.PI / 2, gw.ang, 96, 44, 104, 0.95, 100, now);

@@ -1748,3 +1748,5 @@ Style: flat cel-shaded shapes in 2-3 tones with a thick dark brown-black outline
 
 Avoid: gradients, glow blur, realistic blood, smoke, characters, feet, text other than the three captions, ground line, logo, watermark.
 ```
+
+**13-13 ① 깔린 무더기 진행**: 3종 받음, 적용됨(베타 1.309). 강철 회색 4갈래 못이 굵은 외곽선으로 그려졌다(모양이 마름쇠보다 **표창(수리검)에 가깝다**: 납작한 별. 입체적인 가시 모양을 원하면 다시 요청). `assets/fx/caltrop_0~2`(150x150, 장판 반지름의 2.3배 크기로 표시), 번호로 한 종을 고르고 조금 기울여 놓는다(`bossfx.ts drawCaltrop`). 그림을 못 불러오면 예전 코드 도형으로 대체. 남은 것: ② 밟았을 때 3컷(`caltrop_hit_0~2`).
