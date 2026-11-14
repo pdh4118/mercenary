@@ -217,3 +217,16 @@ test("둔화 강화 카드: 얼음 화살의 둔화가 더 강해진다", () => 
     assert.ok(e.slowMult < SK.iceMult);
   });
 });
+
+test("분쇄: 둔기병은 승급해야 경직을 건다(0단계는 경직 없음, 1단계 0.5초)", () => {
+  withLevels(() => {
+    const stun = (tier: number) => {
+      const { g, m } = setup(BLUNT, tier);
+      const e = dummy(g, 500, 500);
+      (g as any).damageEnemy(e, { damage: 10, charge: 0, srcType: BLUNT, fromAngle: 0 }, m.owner, m);
+      return e.stunT ?? 0;
+    };
+    assert.equal(stun(0), 0);
+    assert.ok(Math.abs(stun(1) - SK.staggerSec) < 1e-9);
+  });
+});

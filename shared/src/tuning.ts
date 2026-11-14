@@ -178,6 +178,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   MXP_KILL_CAP: ["기여도: 처치 보너스 계산에 쓰는 적 체력 상한", G.xp, 50, 5000, 50],
   MXP_ASSIST_POOL: ["기여도: 어시스트 몫(처치 보너스 대비)", G.xp, 0, 1, 0.05],
   MXP_ASSIST_SEC: ["기여도: 어시스트로 치는 시간(초)", G.xp, 1, 20, 0.5],
+  MXP_BLUNT_T0: ["둔기병 경험치: 승급 전(0단계) 보정 배율(레벨 모드)", G.xp, 1, 5, 0.1],
   MXP_TIER_BONUS: ["용병 경험치: 단계마다 획득 보너스", G.xp, 0, 1, 0.01],
   LV_MODE: ["레벨 모드(1 = 용병이 레벨로 큰다)", G.merc, 0, 1, 1],
   LV_HP: ["레벨마다 체력 증가율", G.merc, 0, 0.2, 0.0001],

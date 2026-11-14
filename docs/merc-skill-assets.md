@@ -212,3 +212,19 @@ Avoid: gradients, glow blur, realistic fire, realistic smoke, characters, text o
 | 타격·방어 이펙트 | **받음, 적용됨(베타 1.313)**: `mskill_spear_fly`(아직 안 씀), `spear_hit_0~2`, `lunge_0~2`, `bash_0~2`, `thorn_0~2`(가시 반사는 연결 안 함), `taunt_0~3`(안쪽 회색 채움을 반투명으로 바꿈) |
 | 지면·마법·화살 이펙트 | **받음, 적용됨(베타 1.313)**: `mskill_leap_0~3`, `quake_0~3`, `ember_0~3`(반복), `ice_0~2`, `poison_0~2` |
 | 스킬 효과음 16종 | **모두 받음, 적용됨(베타 1.314~1.319)**: `mskill_jump_1~2`(뒤로 점프), `mskill_stealth_1~2`(은신), `mskill_gallop_1~2`(일제 질주), `mskill_phantom_1~2`(환영 기병대), `mskill_spear_throw_1~2`(창 던지기), `mskill_leap_1~3`(도약 내려찍기), `mskill_bash_1`(방패 밀치기), `mskill_thorn_1`(가시 반사), `mskill_blink_1~2`(점멸), `mskill_poison_1~2`, `mskill_ice_1`, `mskill_ember_1`(불씨), `mskill_quake_1~2`(지진, 다시 요청한 문구로 받음). `mskill_stealth_end_1`, `mskill_lunge_1~2`, `mskill_taunt_1~2`(2차 수정 문구로 받음). 연쇄 운석은 기존 운석 소리. |
+
+## 5. 철갑마 아이콘 재요청 (`assets/ui/mskill_cav_3`)
+
+**왜**: 처음 받은 그림이 말 가슴 갑옷 위에 긴 통이 솟아 대포처럼 보였다. 이번에는 **갑옷을 입은 말의 옆얼굴 + 목**으로 그린다. 첨부: `main_style_sheet.png`와 받아 둔 기병 아이콘 시트(`mskill_cav_1~4` 한 장, 같은 테두리·배경 느낌을 맞추려고). 받으면 `mskill_cav_3.png`만 교체한다.
+
+```
+Generate an image. I attached images: Image 1 is the art STYLE reference (copy its flat cel-shaded, thick-outlined cartoon style exactly). Image 2 is a sheet of four sibling skill icons: match their size, rounded-square badge shape, thick near-black outline, and SILVER-BLUE border ring exactly.
+
+Make ONE image with ONE square skill ICON, large, in the middle, with at least 40px of empty space around it, caption "mskill_cav_3" under it. Plain flat light-gray background, no logo or watermark.
+
+The icon is a rounded-square badge about 128x128 with a thick near-black outline about 3px, a dark navy flat-colored background and a SILVER-BLUE border ring (a PASSIVE skill). The symbol, drawn big in the middle: the HEAD AND NECK of a cute chibi warhorse seen from the side, facing right, fully covered in heavy steel horse armor: a steel face plate (chamfron) with a small spike on the forehead, overlapping steel neck plates with gold rivets and a gold trim, a short red plume on top of the head. The horse's eye is a small black dot, its ears are small. Dark steel gray plates with lighter gray highlights and gold details, flat cel-shaded colors in 2-3 tones, thick dark outline.
+
+Style: cute chibi cartoon like Image 1, flat cel-shaded colors, thick dark outline, no gradients, no glow blur, no realistic rendering, no text or letters inside the icon.
+
+Avoid: cannon, barrel, tube, gun, wheel, realistic horse, human rider, knight, gradients, glow blur, thin lines, tiny details, text inside the icon, cropped items, checkerboard pattern, logo, watermark, any text other than the caption.
+```

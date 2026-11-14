@@ -1134,7 +1134,9 @@ test("독 화살: 몸에 맞으면 시간에 걸쳐 피해가 들어가고, 방�
   assert.ok(!s2.poisonT || s2.poisonT <= 0, "방패에 맞으면 독 없음");
 });
 
-test("둔기병 경직: 맞은 적이 잠깐 멈추고, 단계가 오를수록 길다", () => {
+test("둔기병 경직: 맞은 적이 잠깐 멈추고, 단계가 오를수록 길다", (t) => {
+  TUNE.LV_MODE = 0; // 단계제(예전 방식) 검사
+  t.after(() => { TUNE.LV_MODE = 1; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);

@@ -3446,7 +3446,7 @@ export class Game {
   private xpMerc(m: Merc, raw: number): void {
     if (raw <= 0 || (!TUNE.LV_MODE && m.tier >= MAX_TIER)) return;
     const mods = this.slots.get(m.owner)?.mods;
-    const gain = raw * (mods ? this.pstat(m, mods, "xp") : 1) * (MERC_XP_TYPE_MULT[m.type] ?? 1) * (TUNE.LV_MODE ? 1 : 1 + TUNE.MXP_TIER_BONUS * m.tier) * this.streakMult(m) * (this.phase === "tournament" ? TUNE.MXP_TOURNAMENT : 1);
+    const gain = raw * (mods ? this.pstat(m, mods, "xp") : 1) * (MERC_XP_TYPE_MULT[m.type] ?? 1) * (TUNE.LV_MODE && m.type === BLUNT && m.tier === 0 ? TUNE.MXP_BLUNT_T0 : 1) * (TUNE.LV_MODE ? 1 : 1 + TUNE.MXP_TIER_BONUS * m.tier) * this.streakMult(m) * (this.phase === "tournament" ? TUNE.MXP_TOURNAMENT : 1);
     m.xp = Math.min(this.xpCap(m), m.xp + gain);
   }
 
@@ -6509,9 +6509,9 @@ export class Game {
     this.pushDamage(hit.crit ? EVT_DMG_ENEMY_CRIT : EVT_DMG_ENEMY, e.id, e.x, e.y, r.body, ownerId);
     this.pushDamage(EVT_DMG_SHIELD, e.id, e.x, e.y, r.shield, ownerId);
     if (r.backstab && r.body + r.shield > 0) this.pushEvent(EVT_BACKSTAB, e.x, e.y, hit.fromAngle + Math.PI);
-    if (e.hp > 0 && src?.type === BLUNT && r.body + r.shield > 0) {
+    if (e.hp > 0 && src?.type === BLUNT && r.body + r.shield > 0 && (!TUNE.LV_MODE || skillOn(BLUNT, src.tier, 1))) {
       // 둔기병의 타격은 맞은 적을 잠깐 경직시킨다(단계가 오를수록 길다, 보스는 덜 걸린다)
-      const sec = (TUNE.BLUNT_STAGGER_SEC + TUNE.BLUNT_STAGGER_PER_TIER * src.tier) * (e.boss ? TUNE.BLUNT_STAGGER_BOSS_FRAC : 1);
+      const sec = (TUNE.LV_MODE ? SK.staggerSec : TUNE.BLUNT_STAGGER_SEC + TUNE.BLUNT_STAGGER_PER_TIER * src.tier) * (e.boss ? TUNE.BLUNT_STAGGER_BOSS_FRAC : 1);
       if (sec > (e.stunT ?? 0)) e.stunT = sec;
       e.atkT = 0;
       if (skillOn(BLUNT, src.tier, 3) && this.rng() < SK.shockChance) {

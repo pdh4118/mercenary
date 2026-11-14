@@ -46,6 +46,7 @@ test("기여도: 검방병이 방패로 막은 피해, 창병이 되받아친 �
   assert.ok(shield.career.blocked > 0, `막은 피해가 기록된다(${shield.career.blocked})`);
   assert.ok(shield.career.score >= shield.career.blocked * TUNE.MXP_BLOCK * 0.99, "막은 피해가 기여도에 들어간다");
   const blunt = (g as any).mercs.get(g.addMerc(a, BLUNT, p.x + 60, p.y + 120));
+  blunt.tier = 1; // 경직은 1단계 승급 스킬(분쇄)이다
   const foe2 = g.spawnEnemyAt(blunt.x + 30, blunt.y, 4);
   (g.getEnemy(foe2) as any).hp = (g.getEnemy(foe2) as any).maxHp = 1e6;
   run(g, 8);

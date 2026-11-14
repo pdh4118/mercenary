@@ -35,7 +35,7 @@ export const MERC_SKILLS: Record<number, readonly MercSkill[]> = {
     { name: "도발 결계", kind: "active", desc: "주변 적을 모두 자신에게 끌어당기는 결계" },
   ],
   [BLUNT]: [
-    { name: "분쇄", kind: "passive", desc: "방패·갑옷이 있는 적에게 피해 +30%" },
+    { name: "분쇄", kind: "passive", desc: "타격이 적을 0.5초 경직시키고, 방패·갑옷이 있는 적에게는 피해 +30%" },
     { name: "도약 내려찍기", kind: "active", desc: "적 무리 속으로 뛰어올라 내려찍는다" },
     { name: "충격파", kind: "passive", desc: "경직시킨 적 주변으로 30% 확률로 경직이 번진다" },
     { name: "지진", kind: "active", desc: "땅을 내리쳐 넓은 범위를 경직시킨다" },
@@ -63,6 +63,7 @@ export const SK = {
   thorns: 0.25, // 가시 방패
   guard: 0.15, // 수호
   guardRange: 130,
+  staggerSec: 0.5, // 분쇄: 타격 경직 시간(옛 단계제 4단계는 0.7초였다. 경직은 이제 1단계 승급에서 생긴다)
   crush: 0.3, // 분쇄
   shockChance: 0.3, // 충격파
   shockRange: 110,
