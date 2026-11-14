@@ -1336,17 +1336,17 @@ async function main() {
   const boostEnds = new Map<number, { sp: Sprite; t0: number; ang: number }>(); // 가속이 풀린 자리의 마무리 이펙트
   const boostFx = new Map<number, { sp: Sprite; px: number; py: number; ang: number; burst?: Sprite; burstT?: number; burstDone?: boolean }>(); // 기마 가속 중인 주인공 뒤의 바람 궤적
   // 용병 승급 스킬 이펙트(assets/fx/mskill_*): 컷을 life초 동안 한 번(또는 반복) 재생한다
-  const MSK_FRAMES: Record<string, number> = { jump: 4, blink: 4, stealth: 3, dash: 3, phantom: 3, spear_hit: 3, lunge: 3, bash: 3, thorn: 3, taunt: 4, leap: 4, quake: 4, ember: 4, ice: 3, poison: 3 };
-  const mskTex: Record<string, (Texture | null)[]> = {};
+  const MSK_FRAMES: Record<string, number> = { thrust: 3, sweep: 3, jump: 4, blink: 4, stealth: 3, dash: 3, phantom: 3, spear_hit: 3, lunge: 3, bash: 3, thorn: 3, taunt: 4, leap: 4, quake: 4, ember: 4, ice: 3, poison: 3 };
+    const mskTex: Record<string, (Texture | null)[]> = {};
   for (const [nm, cnt] of Object.entries(MSK_FRAMES)) mskTex[nm] = await Promise.all(Array.from({ length: cnt }, (_, i) => orNull(`assets/fx/mskill_${nm}_${i}.png`)));
   /** 스킬 번호(병종*10 + 스킬 번호) → 이펙트. w = 화면에 그리는 가로(월드 px), ax = 가로 기준점(0 앞쪽 끝에서 뻗음, 0.5 가운데), ground = 유닛 아래 층 */
-  const MSK_DEF: Record<number, { fx: string; w: number; life: number; ax?: number; ground?: boolean; rot?: boolean; loop?: boolean; push?: number }> = {
+  const MSK_DEF: Record<number, { fx: string; w: number; life: number; ax?: number; ground?: boolean; rot?: boolean; loop?: boolean; push?: number; tint?: number }> = {
     22: { fx: "jump", w: 90, life: 0.45 },
     52: { fx: "blink", w: 90, life: 0.4 },
     24: { fx: "stealth", w: 110, life: 0.7 },
     2: { fx: "dash", w: 140, life: 0.5, rot: true },
-    12: { fx: "lunge", w: 200, life: 0.3, rot: true, ax: 0 }, // 수비 태세 시작
-    16: { fx: "lunge", w: 150, life: 0.2, rot: true, ax: 0 }, // 수비 태세 중 찌르기
+    12: { fx: "sweep", w: 170, life: 0.4, rot: true, ax: 0.15, push: 18 }, // 수비 태세 시작: 화살을 쳐내는 쓸기
+    16: { fx: "thrust", w: 300, life: 0.2, rot: true, ax: 0, push: 14 }, // 수비 태세 중 정면 찌르기
     13: { fx: "bash", w: 230, life: 0.36, rot: true, ax: 0.1 }, // 휩쓸기
     14: { fx: "lunge", w: 240, life: 0.3, rot: true, ax: 0 },
     32: { fx: "bash", w: 130, life: 0.36, rot: true, ax: 0, push: 24 },
@@ -1358,7 +1358,7 @@ async function main() {
     23: { fx: "ice", w: 70, life: 0.35 },
   };
   const mercSkillFx: { sp: Sprite; frames: (Texture | null)[]; age: number; life: number; loop: boolean; vx: number; vy: number }[] = [];
-  const playMsk = (fx: string, x: number, y: number, o: { w: number; life: number; ax?: number; ground?: boolean; rot?: number; loop?: boolean; vx?: number; vy?: number }) => {
+  const playMsk = (fx: string, x: number, y: number, o: { w: number; life: number; ax?: number; ground?: boolean; rot?: number; loop?: boolean; vx?: number; vy?: number; tint?: number }) => {
     const frames = mskTex[fx];
     const t0 = frames?.[0];
     if (!frames || !t0) return;
@@ -1367,6 +1367,7 @@ async function main() {
     sp.position.set(x, y);
     sp.rotation = o.rot ?? 0;
     sp.scale.set(o.w / t0.width);
+    if (o.tint !== undefined) sp.tint = o.tint;
     (o.ground ? groundFx : skyLayer).addChild(sp);
     mercSkillFx.push({ sp, frames, age: 0, life: o.life, loop: !!o.loop, vx: o.vx ?? 0, vy: o.vy ?? 0 });
   };
@@ -1737,7 +1738,7 @@ async function main() {
             const n = val % 10;
             const info = MERC_SKILLS[type]?.[n - 1];
             if (info && info.kind === "active" && owner === myId) spawnFloat(info.name, x, y - 24, { fill: 0xffe27a, fontSize: 15, fontWeight: "800", stroke: { color: 0x3a2a00, width: 4 } }, 1.1, 0.4);
-            const msSound = val === 22 ? "mskill_jump" : val === 24 ? "mskill_stealth" : val === 2 ? "mskill_gallop" : val === 4 ? "mskill_phantom" : val === 12 ? "mskill_lunge" : val === 42 ? "mskill_leap" : val === 32 ? "mskill_bash" : val === 31 ? "mskill_thorn" : val === 52 ? "mskill_blink" : val === 44 ? "mskill_quake" : val === 25 ? "mskill_stealth_end" : val === 14 ? "mskill_lunge" : val === 34 ? "mskill_taunt" : val === 21 ? "mskill_poison" : val === 23 ? "mskill_ice" : null; // 소리는 받은 것부터 연결(나머지는 받는 대로)
+            const msSound = val === 22 ? "mskill_jump" : val === 24 ? "mskill_stealth" : val === 2 ? "mskill_gallop" : val === 4 ? "mskill_phantom" : val === 12 ? "spear_thrust" : val === 42 ? "mskill_leap" : val === 32 ? "mskill_bash" : val === 31 ? "mskill_thorn" : val === 52 ? "mskill_blink" : val === 44 ? "mskill_quake" : val === 25 ? "mskill_stealth_end" : val === 14 ? "mskill_lunge" : val === 34 ? "mskill_taunt" : val === 21 ? "mskill_poison" : val === 23 ? "mskill_ice" : null; // 소리는 받은 것부터 연결(나머지는 받는 대로)
             if (msSound) audio.play(msSound, { x, y });
             if (val === 53) for (const delay of [0, 1000, 2000]) setTimeout(() => audio.play("mskill_ember", { x, y }), delay); // 불씨 소리는 1초짜리라 불이 타는 3초 동안 세 번 이어 붙인다
             if (val === 4) {
@@ -1747,7 +1748,7 @@ async function main() {
               playMsk("ember", x, y, { w: Math.max(80, ang * 2.3), life: 3, ground: true, loop: true }); // 불씨: ang = 반경(서버), 3초 동안 불꽃이 탄다
             } else {
               const d = MSK_DEF[val];
-              if (d) playMsk(d.fx, x + (d.push ? Math.cos(ang) * d.push : 0), y + (d.push ? Math.sin(ang) * d.push : 0), { w: d.w, life: d.life, ax: d.ax, ground: d.ground, rot: d.rot ? ang : 0, loop: d.loop });
+              if (d) playMsk(d.fx, x + (d.push ? Math.cos(ang) * d.push : 0), y + (d.push ? Math.sin(ang) * d.push : 0), { w: d.w, life: d.life, ax: d.ax, ground: d.ground, rot: d.rot ? ang : 0, loop: d.loop, tint: d.tint });
             }
           }
           else if (kind === EVT_QUIT) {
