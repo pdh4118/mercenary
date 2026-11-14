@@ -4667,15 +4667,25 @@ export class Game {
   }
 
   /** 용병 급여: 성장·보스 단계에서 PAY_INTERVAL초마다 살아 있는 용병 몫을 낸다. 못 내면 사기가 꺾여 공격력이 줄고, 계속 못 내면 높은 단계 용병부터 떠난다. */
+  /** 살아 있는 용병 한 명의 급여: 단계제는 통솔력 비용 x PAY_PER_COST, 레벨제는 비용 x PAY_LV_BASE x (1 + 레벨 x PAY_LV + 승급 단계 x PAY_TIER) */
+  private mercSalary(m: Merc): number {
+    if (!TUNE.LV_MODE) return unitCost(m.type, m.tier) * TUNE.PAY_PER_COST;
+    return unitCost(m.type, m.tier) * TUNE.PAY_LV_BASE * (1 + TUNE.PAY_LV * mercLevel(m.xp) + TUNE.PAY_TIER * m.tier);
+  }
+  /** 지금 주는 급여 총액(살아 있는 용병만) */
+  mercPayrollNow(ownerId: number): number {
+    let salary = 0;
+    for (const m of this.mercs.values()) if (m.owner === ownerId && m.respawn <= 0) salary += this.mercSalary(m);
+    return Math.ceil(salary - 1e-9);
+  }
   private stepPayroll(dt: number): void {
     const running = this.phase === "grow" || this.phase === "boss";
     for (const sl of this.slots.values()) {
       const st = sl.state;
       let salary = 0;
-      for (const m of this.mercs.values()) if (m.owner === st.id && m.respawn <= 0) salary += unitCost(m.type, m.tier) * TUNE.PAY_PER_COST;
-      salary = Math.ceil(salary - 1e-9);
+      salary = this.mercPayrollNow(st.id);
       st.salary = salary;
-      if (!running || TUNE.PAY_PER_COST <= 0 || this.countMercs(st.id) === 0) {
+      if (!running || (TUNE.LV_MODE ? TUNE.PAY_LV_BASE : TUNE.PAY_PER_COST) <= 0 || this.countMercs(st.id) === 0) {
         st.payT = 0;
         if (this.countMercs(st.id) === 0) st.unpaid = 0;
         continue;

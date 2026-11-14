@@ -39,3 +39,23 @@ test("레벨 모드: 레벨이 오르면 강해지고, 승급은 레벨+금화�
     Object.assign(TUNE, saved);
   }
 });
+
+test("레벨 모드 급여: 레벨과 승급 단계가 오를수록 비싸다", () => {
+  const saved = { ...TUNE };
+  TUNE.LV_MODE = 1;
+  try {
+    const g = new Game();
+    g.autoSpawn = false;
+    const a = g.addPlayer("t")!;
+    const p = g.getPlayer(a)!;
+    const id = g.addMerc(a, SPEAR, p.x + 40, p.y + 40, 0, 0)!;
+    const m = (g as any).mercs.get(id);
+    const low = (g as any).mercPayrollNow(a);
+    g.grantMercXpForTest(id, 1e9);
+    m.tier = 2;
+    const high = (g as any).mercPayrollNow(a);
+    assert.ok(high > low * 3, `${low} → ${high}`);
+  } finally {
+    Object.assign(TUNE, saved);
+  }
+});
