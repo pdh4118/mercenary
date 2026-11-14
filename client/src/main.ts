@@ -1697,7 +1697,7 @@ async function main() {
             const n = val % 10;
             const info = MERC_SKILLS[type]?.[n - 1];
             if (info && info.kind === "active" && owner === myId) spawnFloat(info.name, x, y - 24, { fill: 0xffe27a, fontSize: 15, fontWeight: "800", stroke: { color: 0x3a2a00, width: 4 } }, 1.1, 0.4);
-            const msSound = val === 22 ? "mskill_jump" : val === 24 ? "mskill_stealth" : val === 2 ? "mskill_gallop" : null; // 소리는 받은 것부터 연결(나머지는 받는 대로)
+            const msSound = val === 22 ? "mskill_jump" : val === 24 ? "mskill_stealth" : val === 2 ? "mskill_gallop" : val === 4 ? "mskill_phantom" : val === 12 ? "mskill_spear_throw" : null; // 소리는 받은 것부터 연결(나머지는 받는 대로)
             if (msSound) audio.play(msSound, { x, y });
             if (val === 4) {
               // 환영 기병대: 푸른 잔상 3줄이 앞으로 달려간다(월드 폭 140 안의 세 줄, 길이 600을 0.5초에)

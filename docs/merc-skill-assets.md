@@ -207,4 +207,4 @@ Avoid: gradients, glow blur, realistic fire, realistic smoke, characters, text o
 | 이동·은신 이펙트 | **받음, 적용됨(베타 1.313)**: `assets/fx/mskill_jump_0~3`, `blink_0~3`, `stealth_0~2`, `dash_0~2`, `phantom_0~2`. 환영 기병대는 푸른 잔상 3줄이 앞으로 달려가는 것으로만 표현(환영 기병 그림은 아직 안 씀) |
 | 타격·방어 이펙트 | **받음, 적용됨(베타 1.313)**: `mskill_spear_fly`(아직 안 씀), `spear_hit_0~2`, `lunge_0~2`, `bash_0~2`, `thorn_0~2`(가시 반사는 연결 안 함), `taunt_0~3`(안쪽 회색 채움을 반투명으로 바꿈) |
 | 지면·마법·화살 이펙트 | **받음, 적용됨(베타 1.313)**: `mskill_leap_0~3`, `quake_0~3`, `ember_0~3`(반복), `ice_0~2`, `poison_0~2` |
-| 스킬 효과음 16종 | **5개 받음, 적용됨(베타 1.314)**: `mskill_jump_1~2`(뒤로 점프), `mskill_stealth_1~2`(은신), `mskill_gallop_1`(일제 질주). 나머지 11종(`stealth_end`, `phantom`, `spear_throw`, `lunge`, `bash`, `thorn`, `taunt`, `leap`, `quake`, `blink`, `ember`, `ice`, `poison`) 아직 |
+| 스킬 효과음 16종 | **10개 받음, 적용됨(베타 1.314~1.315)**: `mskill_jump_1~2`(뒤로 점프), `mskill_stealth_1~2`(은신), `mskill_gallop_1~2`(일제 질주), `mskill_phantom_1~2`(환영 기병대), `mskill_spear_throw_1~2`(창 던지기). 나머지(`stealth_end`, `lunge`, `bash`, `thorn`, `taunt`, `leap`, `quake`, `blink`, `ember`, `ice`, `poison`) 아직 |

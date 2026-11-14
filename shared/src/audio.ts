@@ -80,7 +80,9 @@ export const SOUNDS = {
   // 용병 승급 스킬(docs/merc-skill-assets.md 3번)
   mskill_jump: d(2, 1, 300, 3),
   mskill_stealth: d(2, 1, 400, 2),
-  mskill_gallop: d(1, 1, 500, 2),
+  mskill_gallop: d(2, 1, 500, 2),
+  mskill_phantom: d(2, 1, 600, 2),
+  mskill_spear_throw: d(2, 1, 250, 3),
   skill_wall_up: d(1, 0.6, 300, 2),
   skill_wall_break: d(1, 0.45, 300, 2),
   skill_wall_hit: d(3, 0.5, 80, 4),
