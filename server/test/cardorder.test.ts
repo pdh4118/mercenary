@@ -10,3 +10,7 @@ test("생존 카드 순서: 체력 > 방어력 > 회피율(체력이 늘면 채�
   assert.ok(MERC_STAT_BASE.hp > MERC_STAT_BASE.defense, "용병: 체력 > 방어력");
   assert.ok(MERC_STAT_BASE.defense > MERC_STAT_BASE.dodge, "용병: 방어력 > 회피율");
 });
+
+test("공격력 카드는 방어력 카드보다 한 장의 효율이 낮다(공격은 공격 속도·치명타와 곱해져 시너지가 크기 때문)", () => {
+  assert.ok(heroBase("heroDefense") > heroBase("heroDmg"), "주인공 방어력 > 공격력");
+});

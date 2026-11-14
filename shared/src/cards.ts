@@ -270,7 +270,7 @@ const statCards = (): CardDef[] => {
 
 /** 주인공 능력치 카드(전체 용병이 아니라 주인공에게만 적용). 체력 재생·흡혈·근접 반사·피해 감소·관통·발사 수를 뺀 수치는 이전의 1.5배(용병 공용 카드 1명분의 약 1.8배). */
 export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "leadership" | "leadershipPct" | "priceMult" | "goldMult">; label: string; base: number; weight: number; minLevel?: number; fmt: "pct" | "flat" | "int" | "regen" | "shield" | "cut" }[] = [
-  { k: "heroMaxHp", label: "최대 체력", base: 0.15, weight: 8, fmt: "pct" }, // 기본+레벨 체력에 합산되는 %
+  { k: "heroMaxHp", label: "최대 체력", base: 0.1875, weight: 8, fmt: "pct" }, // 기본+레벨 체력에 합산되는 %
   { k: "heroSpeed", label: "이동 속도", base: 0.09, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.14, weight: 8, fmt: "pct" },
   { k: "heroFireRate", label: "공격 속도", base: 0.2, weight: 6, fmt: "pct" },
@@ -285,8 +285,8 @@ export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "
   { k: "heroArea", label: "범위", base: 0.1125, weight: 4, fmt: "pct" },
   { k: "heroKnock", label: "넉백", base: 22.5, weight: 5, fmt: "flat" },
   { k: "heroThorns", label: "근접 반사", base: 2, weight: 4, minLevel: 3, fmt: "int" },
-  { k: "heroDefense", label: "방어력", base: 0.12, weight: 7, fmt: "pct" },
-  { k: "heroDodge", label: "회피율", base: 0.09, weight: 5, fmt: "pct" },
+  { k: "heroDefense", label: "방어력", base: 0.15, weight: 7, fmt: "pct" },
+  { k: "heroDodge", label: "회피율", base: 0.1125, weight: 5, fmt: "pct" },
   { k: "heroRegen", label: "체력 재생", base: 0.12, weight: 9, fmt: "regen" },
   { k: "heroLifesteal", label: "흡혈", base: 0.003, weight: 9, fmt: "pct" },
   { k: "heroCast", label: "시전 속도", base: 0.03, weight: 4, fmt: "pct" },
