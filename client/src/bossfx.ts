@@ -171,6 +171,7 @@ export async function createBossFx(d: BossFxDeps) {
   // 한 장짜리(one)는 읽을 때 도착했는지 본다. 아직 도착하지 않은 그림은 null이라 그 효과만 잠깐 건너뛴다.
   const SEQ = {
     impact: ["boss1_impact", [0, 1, 2, 3]],
+    kickFx: ["boss1_kick_fx", [0, 1, 2, 3]],
     thrust: ["boss2_thrust", [0, 1, 2]],
     dust: ["boss3_dust", [0, 1, 2, 3]],
     bashArc: ["fx_bash_arc", [0, 1, 2, 3]],
@@ -422,9 +423,11 @@ export async function createBossFx(d: BossFxDeps) {
     } else if (val === BFX_SLAM) {
       playSeq(T.slam, x, y, 0.6, (len * 2) / 190, 0, 0.5, false, 0.9, 0xffffff, 0.64);
     } else if (val === BFX_KICK) {
-      // 뒷발차기: 걷어찬 자리의 충격과 소리. (발굽 호·뒷발 포즈 그림은 에셋을 받으면 여기에 연결한다: docs/asset-prompts.md 13-1 뒷발차기)
+      // 뒷발차기: 몸 뒤쪽으로 발굽 호가 그어지며 걷어찬 자리에 충격·먼지가 터진다(그림은 왼쪽으로 날아가는 모양이라 뒤쪽 방향 ang에서 PI를 뺀다)
       const reach = len > 0 ? len : 130;
-      playSeq(T.impact, x + Math.cos(ang) * reach * 0.85, y + Math.sin(ang) * reach * 0.85 - 10, 0.5, 0.8, 0);
+      const bx = x + Math.cos(ang) * reach * 0.5;
+      const by = y + Math.sin(ang) * reach * 0.5;
+      playSeq(T.kickFx, bx, by - 28, 0.42, Math.max(0.7, (reach * 1.3) / 201), ang - Math.PI, 0.5, false, 1);
       d.sound("skill_mace_hit", x, y, 0.55);
       d.sound("knockback", x, y);
     } else if (val === BFX_DRIFT) {
