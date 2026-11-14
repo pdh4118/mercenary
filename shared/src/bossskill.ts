@@ -526,9 +526,9 @@ export const BOSS_CHARIOT = {
   caltropWarn: 0.45, // 뿌린 뒤 깔리기 전 예고 시간
   caltropLife: 9, // 마름쇠가 남아 있는 시간
   caltropRadius: 32, // 마름쇠 한 무더기 반지름
-  caltropDmg: 2.5, // 밟았을 때 피해(배율)
-  caltropSlowSec: 2.5, // 둔화 시간
-  caltropSlowMult: 0.5, // 둔화 속도 배율
+  caltropDmg: 4, // 밟았을 때 피해(배율)
+  caltropSlowSec: 3.5, // 둔화 시간
+  caltropSlowMult: 0.4, // 둔화 속도 배율
   caltropRam: 2, // 달리는 몸에 닿았을 때 피해(배율)
   caltropRest: 0.6, // 다 달린 뒤 숨 고르는 시간
   caltropCd: 12,

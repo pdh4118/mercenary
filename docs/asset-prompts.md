@@ -1715,3 +1715,36 @@ Avoid: gradients, glow blur, realistic smoke, characters, horse, text other than
 **13-1 뒷발차기 포즈 진행**: ① 포즈 받음, 적용됨(베타 1.306). 앞발은 땅에, 뒷발을 뒤로 높이 걷어찬 모습이 첫 시안에서 맞았다. `assets/units/boss1_kick.png`(324x274, 서 있는 그림과 같은 배율로 줄이고 앞발 위치를 서 있는 그림에 맞춤). `BSK_KICK`일 때 이 그림을 쓴다(`bossfx.ts`). 남은 것: ② 발굽 호·충격 이펙트 4컷(`boss1_kick_fx_0~3`), 받으면 `BFX_KICK` 처리에 연결.
 
 **13-1 뒷발차기 이펙트 진행**: ② 이펙트 4컷 받음, 적용됨(베타 1.307). 호 두 줄 → 별 모양 충격과 먼지 → 먼지만 남는 흐름이 첫 시안에서 맞았다. `assets/fx/boss1_kick_fx_0~3`(201x130 같은 캔버스, 상자 가운데 정렬). 그림이 **왼쪽으로 날아가는 모양**이라 코드는 뒤쪽 방향(ang)에서 PI를 빼서 돌려 뒷발 쪽에 0.42초 재생한다(`bossfx.ts` `BFX_KICK`). 이로써 **기병 장군 뒷발차기 포즈와 이펙트가 모두 새 그림이다.**
+
+### 13-13. 마름쇠(전차 장군 "마름쇠 질주") - `assets/fx/caltrop_0~2`(깔린 무더기 3종) + `assets/fx/caltrop_hit_0~2`(밟았을 때 3컷)
+
+**쓰이는 곳**: 전차 장군(스테이지 8)이 달리며 뿌리는 마름쇠 장판(`HZ_CALTROP`). 지금은 **코드로 못 세 개를 그린 도형**이라 별로여서(사용자 의견) 그림으로 바꾼다. 깔리기 전 예고(빨간 원)는 그대로 두고, 깔린 뒤 무더기를 그림 3종 중 번호로 골라 놓는다. 밟으면 피해와 둔화(이동 속도 x0.4, 3.5초)가 걸린다.
+**크기**: 한 무더기 반지름 32px(지름 약 64px)에 맞춰 제가 줄인다.
+**첨부**: 두 요청 모두 `main_style_sheet.png` 한 장.
+**수치 변경(베타 1.308)**: 마름쇠 피해 2.5배 → 4배, 둔화 시간 2.5초 → 3.5초, 둔화 속도 0.5배 → 0.4배.
+
+#### ① 깔린 무더기 3종
+
+```
+Generate an image. I attached one image: Image 1 is the art STYLE reference (copy its flat cel-shaded, thick-outlined cartoon style).
+
+Make ONE sprite sheet image with three items side by side, each large and clearly separated, with at least 40px of empty space around every item, captions "caltrop_0", "caltrop_1", "caltrop_2". Plain flat light-gray background, no ground line, no floor, no shadow line, no logo or watermark.
+
+Each item is a small scattered pile of CALTROPS (iron road spikes, "makiri"), seen from a slightly raised three-quarter view as lying on the ground: three or four caltrops thrown loosely together, each a small four-pointed iron star with sharp cone-shaped spikes (one spike always pointing up), dark steel gray with a lighter gray highlight on each spike tip and a thick near-black outline about 2-3px, flat cel-shaded colors in 2-3 tones, no gradients, no glow blur, no motion lines. Each pile fits inside a rough circle of the same size (about 200px across), the three piles with a different arrangement of the spikes (so they can be mixed randomly in the game), no ground, no shadow, no dust.
+
+Avoid: realistic metal, gradients, glow blur, dust, ground line, shadows, checkerboard pattern, cropped or overlapping items, logo, watermark, any text other than the three captions.
+```
+
+#### ② 밟았을 때 3컷
+
+```
+Generate an image. I attached one image: Image 1 is the art STYLE reference (copy its flat cel-shaded, thick-outlined cartoon style). Draw a short VISUAL EFFECT animation, three frames in one row, on a plain flat light-gray background with at least 40px of empty space around each frame, captions "caltrop_hit_0", "caltrop_hit_1", "caltrop_hit_2". No characters, no ground line, no logo or watermark.
+
+The effect is the moment a foot steps on caltrops (iron road spikes) and gets stabbed, seen from a slightly raised three-quarter view:
+- frame 0: a small flat red-and-white starburst "stab" flash at the center with four tiny dark iron spikes poking out of it;
+- frame 1: the flash at its largest, a sharp flat jagged red burst with a white core, three or four small flat red drops flying outward;
+- frame 2: only a few tiny red drops and a faint small pale puff left, smaller and fading.
+Style: flat cel-shaded shapes in 2-3 tones with a thick dark brown-black outline about 2px, a muted dark red and white palette (not neon), no gradients, no glow blur, no realistic blood, no smoke. All three frames centered on the same point and the same canvas size, each about 160x160 in a 3x1 layout.
+
+Avoid: gradients, glow blur, realistic blood, smoke, characters, feet, text other than the three captions, ground line, logo, watermark.
+```
