@@ -291,8 +291,13 @@ import {
   TIER_CAST,
   TIER_CHARGE,
   TIER_COUNTER,
-  TIER_DMG,
-  TIER_HP,
+  tierDmg,
+  tierHp,
+  levelHp,
+  levelDmg,
+  levelXpCap,
+  mercLevel,
+  promoLevel,
   TIER_REACH,
   TIER_SHIELD,
   TIER_SPEED,
@@ -863,7 +868,7 @@ export class Game {
     const m = this.mercs.get(mercId);
     if (!m) return;
     const mods = this.slots.get(m.owner)?.mods;
-    m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + amount * (mods ? this.pstat(m, mods, "xp") : 1)); // 카드 보너스만 반영(병종·단계 보정 없이)
+    m.xp = Math.min(this.xpCap(m), m.xp + amount * (mods ? this.pstat(m, mods, "xp") : 1)); // 카드 보너스만 반영(병종·단계 보정 없이)
   }
 
   /** 테스트용: 카드가 반영된 용병 능력치 */
@@ -3017,7 +3022,7 @@ export class Game {
       }
     }
     if (!best) return undefined;
-    if (best.tier < MAX_TIER) best.xp = Math.min(mercXpNeed(best.tier) * MERC_XP_OVERFLOW, best.xp + TUNE.MXP_MVP);
+    if (TUNE.LV_MODE || best.tier < MAX_TIER) best.xp = Math.min(this.xpCap(best), best.xp + TUNE.MXP_MVP);
     const c = best.career;
     return { owner: best.owner, num: best.num, nameId: best.nameId, type: best.type, tier: best.tier, score: Math.round(bestScore), dealt: Math.round(c.dealt), blocked: Math.round(c.blocked), kills: c.kills, assists: c.assists, special: Math.round(c.counter + c.stagger * TUNE.MXP_STAGGER) };
   }
@@ -3405,12 +3410,27 @@ export class Game {
     return 1 + TUNE.MXP_STREAK_MAX * Math.min(1, (m.streakMerit ?? 0) / TUNE.MXP_STREAK_MERIT);
   }
 
+  /** 경험치를 쌓을 수 있는 한계(레벨 모드: 최고 레벨까지, 아니면 다음 단계 필요량의 일정 배수) */
+  private xpCap(m: Merc): number {
+    return TUNE.LV_MODE ? levelXpCap() : mercXpNeed(m.tier) * MERC_XP_OVERFLOW;
+  }
+  /** 레벨 모드의 레벨(아니면 0) */
+  lvOf(m: Merc): number {
+    return TUNE.LV_MODE ? mercLevel(m.xp) : 0;
+  }
+  private lvHp(m: Merc): number {
+    return TUNE.LV_MODE ? levelHp(mercLevel(m.xp)) : 1;
+  }
+  private lvDmg(m: Merc): number {
+    return TUNE.LV_MODE ? levelDmg(mercLevel(m.xp)) : 1;
+  }
+
   /** 용병이 경험치를 얻는다(카드·단계 보너스·토너먼트 비율 반영). 기여도에는 들어가지 않는다 */
   private xpMerc(m: Merc, raw: number): void {
-    if (raw <= 0 || m.tier >= MAX_TIER) return;
+    if (raw <= 0 || (!TUNE.LV_MODE && m.tier >= MAX_TIER)) return;
     const mods = this.slots.get(m.owner)?.mods;
-    const gain = raw * (mods ? this.pstat(m, mods, "xp") : 1) * (MERC_XP_TYPE_MULT[m.type] ?? 1) * (1 + TUNE.MXP_TIER_BONUS * m.tier) * this.streakMult(m) * (this.phase === "tournament" ? TUNE.MXP_TOURNAMENT : 1);
-    m.xp = Math.min(mercXpNeed(m.tier) * MERC_XP_OVERFLOW, m.xp + gain);
+    const gain = raw * (mods ? this.pstat(m, mods, "xp") : 1) * (MERC_XP_TYPE_MULT[m.type] ?? 1) * (TUNE.LV_MODE ? 1 : 1 + TUNE.MXP_TIER_BONUS * m.tier) * this.streakMult(m) * (this.phase === "tournament" ? TUNE.MXP_TOURNAMENT : 1);
+    m.xp = Math.min(this.xpCap(m), m.xp + gain);
   }
 
   /** 처치 보너스의 크기: 그 적(또는 쓰러뜨린 상대 용병) 체력의 일부 */
@@ -4535,7 +4555,7 @@ export class Game {
     m.career.deaths++;
     m.streak = 0; // 연속 생존이 끊긴다
     m.streakMerit = 0;
-    if (this.phase !== "tournament") m.xp *= 1 - TUNE.MXP_DEATH_LOSS; // 쓰러지면 모은 경험치 일부를 잃는다(토너먼트 제외)
+    if (this.phase !== "tournament" && !TUNE.LV_MODE) m.xp *= 1 - TUNE.MXP_DEATH_LOSS; // 쓰러지면 모은 경험치 일부를 잃는다(토너먼트 제외)
     if (by && this.phase === "tournament") {
       by.career.kills++; // 토너먼트: 상대 용병을 쓰러뜨렸다
       this.meritMerc(by, this.killMerit(this.mercStats(m).hp));
@@ -5773,7 +5793,7 @@ export class Game {
   /** 기병이 달리다 몸으로 부딪힌다: 속도를 일부 잃고, 잃은 속도만큼 대상에게 피해를 준다(창병도 똑같이 받는다) */
   /** 기병의 공격력 배율(공격력 카드·군세·급여 미지급 등. 단계 배율은 돌격 배수가 따로 있어 뺀다). 돌격·충돌 추가 피해에도 곱한다. */
   private cavAtkMult(m: Merc, st: UnitStats): number {
-    return st.damage / (MERC_STATS[CAVALRY]!.damage * TIER_DMG[m.tier]!);
+    return st.damage / (MERC_STATS[CAVALRY]!.damage * tierDmg(m.tier) * this.lvDmg(m));
   }
 
   /** 창에 먼저 찔린 용병 기병이 되돌려받는 카운터 피해: 쌓아 둔 돌격 피해 x 공격력 x 치명타 x 카운터 배율 x 찌른 창병의 단계 보너스 */
@@ -6768,7 +6788,7 @@ export class Game {
     if (flat <= 0) return;
     const attacker = h.src as Enemy;
     // 반사 피해도 공격력(%)·단계 배율을 받는다
-    const dmgMult = src ? this.pstat(src, owner.mods, "dmg") * TIER_DMG[src.tier]! : owner.mods.heroDmg;
+    const dmgMult = src ? this.pstat(src, owner.mods, "dmg") * tierDmg(src.tier) * this.lvDmg(src) : owner.mods.heroDmg;
     if (this.enemies.has(attacker.id)) this.reflectToEnemy(attacker, flat * dmgMult, owner.state.id, src);
   }
 
@@ -7037,7 +7057,7 @@ export class Game {
     const t = m.type;
     const tier = m.tier;
     const power = 1 + TUNE.MERC_TIER_POWER * tier; // 단계가 오를수록 더 강해지는 보너스(스노우볼)
-    const hpMult = this.pstat(m, mods, "hp") * TIER_HP[tier]! * power;
+    const hpMult = this.pstat(m, mods, "hp") * tierHp(tier) * this.lvHp(m) * power;
     const area = this.pstat(m, mods, "area");
     const pers = this.persona(m);
     const maxHp = Math.round(base.hp * hpMult);
@@ -7046,7 +7066,7 @@ export class Game {
       ...base,
       hp: maxHp,
       shield: Math.round(base.shield * hpMult * (1 + TIER_SHIELD[t]! * tier)),
-      damage: base.damage * this.pstat(m, mods, "dmg") * TIER_DMG[tier]! * power * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)) * (1 + (m.auraDmg ?? 0)),
+      damage: base.damage * this.pstat(m, mods, "dmg") * tierDmg(tier) * this.lvDmg(m) * power * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)) * (1 + (m.auraDmg ?? 0)),
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier),
       cooldown: base.cooldown / quick / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick,
@@ -7064,14 +7084,16 @@ export class Game {
     if (!m || m.owner !== playerId) return { ok: false, reason: "그 용병을 찾을 수 없습니다" };
     if (m.tier >= MAX_TIER) return { ok: false, reason: "이미 최고 단계입니다" };
     const need = mercXpNeed(m.tier);
-    if (m.xp < need) return { ok: false, reason: `경험치가 부족합니다 (${Math.floor(m.xp)}/${need})` };
+    if (TUNE.LV_MODE) {
+      if (mercLevel(m.xp) < promoLevel(m.tier)) return { ok: false, reason: `레벨이 부족합니다 (${mercLevel(m.xp)}/${promoLevel(m.tier)})` };
+    } else if (m.xp < need) return { ok: false, reason: `경험치가 부족합니다 (${Math.floor(m.xp)}/${need})` };
     if (this.leadershipUsed(playerId) + 1 > s.state.leadership) return { ok: false, reason: "통솔력이 부족합니다 (강화하면 통솔력 +1 필요)" };
     const cost = upgradeCost(m.type, m.tier)!;
     if (s.state.gold < cost) return { ok: false, reason: `금화가 부족합니다 (${cost}G 필요)` };
     const before = this.mercStats(m);
     s.state.gold -= cost;
     m.paid += cost;
-    m.xp = Math.max(0, m.xp - need);
+    if (!TUNE.LV_MODE) m.xp = Math.max(0, m.xp - need);
     m.tier++;
     const after = this.mercStats(m);
     if (m.respawn <= 0) {

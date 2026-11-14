@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 if (process.env.PERS !== "1") process.env.MERC_NO_PERSONALITY = "1"; // PERS=1이면 성격을 켠다
-import { MERC_XP_TYPE_MULT, TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, mercXpNeed } from "@mercenary/shared";
+import { MERC_XP_TYPE_MULT, TUNE, UNIT_NAMES, UNIT_TYPES, TICK_RATE, MAX_TIER, MERC_XP_NEED, mercXpNeed, mercLevel, promoLevel } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 TUNE.ENEMY_CAV_RAM_FRAC = 0;
 if (process.env.SM) TUNE.MXP_STREAK_MAX = Number(process.env.SM);
@@ -21,6 +21,7 @@ const stage = Number(process.env.STAGE ?? 3);
 const seeds = Number(process.env.SEEDS ?? 4);
 const secs = Number(process.env.SECS ?? 600);
 const per = Number(process.env.PER ?? 4);
+for (const k of ["LV_MODE", "LV_HP", "LV_DMG", "LV_XP_BASE", "LV_XP_STEP", "LV_MAX", "LV_PROMO_EVERY", "LV_TIER_KEEP"]) if (process.env[k] !== undefined) (TUNE as any)[k] = Number(process.env[k]);
 const bonus = Number(process.env.TB ?? TUNE.MXP_TIER_BONUS);
 TUNE.MXP_TIER_BONUS = bonus;
 TUNE.MERC_TIER_POWER = Number(process.env.TP ?? TUNE.MERC_TIER_POWER);
@@ -37,6 +38,7 @@ let tps = UNIT_TYPES.map(() => 0);
 let stg = UNIT_TYPES.map(() => 0);
 let blk = UNIT_TYPES.map(() => 0);
 let dps = UNIT_TYPES.map(() => 0);
+let lvs = UNIT_TYPES.map(() => 0);
 let totXp = UNIT_TYPES.map(() => 0);
 let aliveFr = UNIT_TYPES.map(() => 0);
 let dths = UNIT_TYPES.map(() => 0);
@@ -60,7 +62,7 @@ for (let sd = 1; sd <= seeds; sd++) {
     p.leadership = 1e9;
     if (i % TICK_RATE === 0) {
       for (const m of [...(g as any).mercs.values()].sort((x: any, y: any) => y.xp - x.xp)) {
-        if (m.respawn <= 0 && m.tier < MAX_TIER && m.xp >= mercXpNeed(m.tier)) {
+        if (m.respawn <= 0 && m.tier < MAX_TIER && (TUNE.LV_MODE ? mercLevel(m.xp) >= promoLevel(m.tier) : m.xp >= mercXpNeed(m.tier))) {
           g.upgrade(a, m.id);
           if (firstAt[m.type]! < 0) firstAt[m.type] = i / TICK_RATE;
         }
@@ -81,7 +83,8 @@ for (let sd = 1; sd <= seeds; sd++) {
     blk[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? (r.blocked + r.counter) / r.alive : 0), 0) / mine.length / seeds;
     dps[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.dealt / r.alive : 0), 0) / mine.length / seeds;
     const live = [...(g as any).mercs.values()].filter((m: any) => m.type === t);
-    totXp[t]! += live.reduce((x: number, m: any) => x + m.xp + MERC_XP_NEED.slice(0, m.tier).reduce((a, b) => a + b, 0), 0) / Math.max(1, live.length) / seeds;
+    totXp[t]! += live.reduce((x: number, m: any) => x + m.xp + (TUNE.LV_MODE ? 0 : MERC_XP_NEED.slice(0, m.tier).reduce((a, b) => a + b, 0)), 0) / Math.max(1, live.length) / seeds;
+    lvs[t]! += live.reduce((x: number, m: any) => x + mercLevel(m.xp), 0) / Math.max(1, live.length) / seeds;
     aliveFr[t]! += mine.reduce((x, r) => x + r.alive / secs, 0) / mine.length / seeds;
     dths[t]! += mine.reduce((x, r) => x + r.deaths, 0) / mine.length / seeds;
     sps[t]! += mine.reduce((x, r) => x + (r.alive > 0 ? r.score / r.alive : 0), 0) / mine.length / seeds;
@@ -102,6 +105,7 @@ console.log("초당 준피해", dps.map((x) => x.toFixed(1).padStart(5)).join(" 
 console.log("초당 받은 ", tps.map((x) => x.toFixed(1).padStart(5)).join(" "));
 console.log("초당 경직 ", stg.map((x) => x.toFixed(1).padStart(5)).join(" "));
 console.log("초당 방어+반격", blk.map((x) => x.toFixed(1).padStart(5)).join(" "));
+if (TUNE.LV_MODE) console.log("평균레벨", lvs.map((x) => x.toFixed(1).padStart(5)).join(" "));
 console.log("총경험치", totXp.map((x) => x.toFixed(0).padStart(5)).join(" "), " (강화에 쓴 것 포함)");
 console.log("생존비율", aliveFr.map((x) => x.toFixed(2).padStart(5)).join(" "));
 console.log("쓰러짐  ", dths.map((x) => x.toFixed(1).padStart(5)).join(" "));

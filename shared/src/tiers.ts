@@ -36,6 +36,30 @@ export const MERC_XP_OVERFLOW = 1.5; // 필요량의 이 배수까지는 쌓아 
 export const MERC_XP_TYPE_MULT = [1.17, 0.75, 1.33, 1.3, 0.55, 1.0] as const;
 export const mercXpNeed = (tier: number): number => MERC_XP_NEED[tier] ?? Infinity;
 
+/** 레벨 모드: 레벨 L→L+1에 필요한 경험치 */
+export const levelNeed = (lv: number): number => TUNE.LV_XP_BASE + TUNE.LV_XP_STEP * lv;
+/** 레벨 모드: 최고 레벨까지 쌓을 수 있는 경험치 총량 */
+export const levelXpCap = (): number => {
+  let t = 0;
+  for (let l = 0; l < TUNE.LV_MAX; l++) t += levelNeed(l);
+  return t;
+};
+/** 레벨 모드: 누적 경험치 → 레벨 */
+export const mercLevel = (xp: number): number => {
+  let lv = 0;
+  let left = xp;
+  while (lv < TUNE.LV_MAX && left >= levelNeed(lv)) left -= levelNeed(lv++);
+  return lv;
+};
+/** 레벨 모드: 승급 단계 tier → tier+1에 필요한 레벨 */
+export const promoLevel = (tier: number): number => TUNE.LV_PROMO_EVERY * (tier + 1);
+/** 레벨 모드: 레벨이 주는 체력·공격력 배율 */
+export const levelHp = (lv: number): number => (1 + TUNE.LV_HP) ** lv;
+export const levelDmg = (lv: number): number => (1 + TUNE.LV_DMG) ** lv;
+/** 단계 표의 능력치 배율(레벨 모드에서는 LV_TIER_KEEP 만큼만 남긴다) */
+export const tierHp = (tier: number): number => (TUNE.LV_MODE ? 1 + (TIER_HP[tier]! - 1) * TUNE.LV_TIER_KEEP : TIER_HP[tier]!);
+export const tierDmg = (tier: number): number => (TUNE.LV_MODE ? 1 + (TIER_DMG[tier]! - 1) * TUNE.LV_TIER_KEEP : TIER_DMG[tier]!);
+
 /** 통솔력: 병종 기본 비용에 단계마다 +1. 정예는 자리를 많이 차지하므로 숫자로 밀어붙이는 쪽이 통솔력당 더 강하다. */
 export const unitCost = (type: number, tier: number): number => (UNIT_COST[type] ?? 1) + tier;
 
