@@ -77,6 +77,10 @@ export const SOUNDS = {
   skill_mace_hit: d(2, 0.75, 150, 3),
   skill_slam_charge: d(1, 0.7, 300, 2), // 철퇴 충격파: 힘을 모으는 소리(1.2초)
   skill_slam_hit: d(2, 0.9, 150, 3), // 철퇴 충격파: 땅을 찍는 소리
+  // 용병 승급 스킬(docs/merc-skill-assets.md 3번)
+  mskill_jump: d(2, 1, 300, 3),
+  mskill_stealth: d(2, 1, 400, 2),
+  mskill_gallop: d(1, 1, 500, 2),
   skill_wall_up: d(1, 0.6, 300, 2),
   skill_wall_break: d(1, 0.45, 300, 2),
   skill_wall_hit: d(3, 0.5, 80, 4),

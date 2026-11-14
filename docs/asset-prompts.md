@@ -962,6 +962,9 @@ Captions: skill_icon_bow, skill_icon_spear, skill_icon_sword, skill_icon_mace, s
 
 | 파일 이름 | 언제 나는가 | 문구 (영어) | 길이·변형 |
 | --- | --- | --- | --- |
+| `mskill_jump` | 용병 궁병 뒤로 점프(승급 스킬, 받음·적용됨) | `a quick leather boot push-off with a short cloth whoosh and a soft thud landing, no voice, 0.4 seconds` | 0.52초, 2종 |
+| `mskill_stealth` | 용병 궁병 은신(받음·적용됨) | `a soft airy shimmer, a quiet cloth rustle fading into near silence, no voice, 0.6 seconds` | 0.63초, 2종 |
+| `mskill_gallop` | 용병 기병 일제 질주(받음·적용됨) | `several horse hooves breaking into a gallop with a short rising wind whoosh, no voice, 0.7 seconds` | 0.73초, 1종 |
 | `skill_backstep` | 활 후퇴 | `quick backward skid on dirt, short scuff and a small cloth rustle` | 0.2초, 2종 |
 | `skill_dash` | 창 돌진 | (다시 만듦, 추천 1번) `Explosive spear lunge: a sharp sudden air-tearing crack at the very start, a fast rushing whoosh with a low punchy thump underneath, then a short bright steel spear tip shing and a tiny ringing tail. Tight, powerful, cinematic, dry, no echo.` 이전 소리는 `skill_dash_old_1~2.ogg`로 보관 | 0.5초, 1종 |
 | `skill_guard` | 검 무적 시작 | `bright protective ward activating, short shimmer and a soft metallic ring` | 0.5초, 1종 |
