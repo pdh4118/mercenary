@@ -142,7 +142,7 @@ export const MERC_STAT_LABEL: Record<MercStat, string> = {
 };
 /** 병종 전용 일반 카드 한 장의 효과량(이전의 1.5배: 후반에는 용병술이 더 중요하도록). 관통·발사 수는 개수라 그대로다. 전체 용병 카드는 이것의 GLOBAL_CARD_FACTOR배. */
 export const MERC_STAT_BASE: Record<MercStat, number> = {
-  hp: 0.375, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.1125, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, slow: 0.06, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.04, quiver: 6,
+  hp: 0.1875, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.1125, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, slow: 0.06, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.04, quiver: 6,
 };
 /** 수치 조정 도구로 바꿀 수 있는 카드 설정 */
 export const CARD_TUNE = { globalFactor: 0.35, globalLifesteal: 5, globalWeight: 6, legendWeight: 0.6, bloodthirstWeight: 1.6, legendMinLevel: 6 };
