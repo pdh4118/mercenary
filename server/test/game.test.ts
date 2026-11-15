@@ -761,7 +761,9 @@ test("카드 효과: 주인공 이동 속도와 체력 재생", () => {
   assert.ok(Math.abs(g.getPlayer(a)!.hp - (50 + mx * 0.003 * 10)) < 0.01); // 초당 최대 체력의 0.3%
 });
 
-test("카드 효과: 용병 부활 시간 단축", () => {
+test("카드 효과: 용병 부활 시간 단축", (t) => {
+  TUNE.TURN_ATK_ARC = 0; // 이 시험은 적이 겹쳐 서서 방향과 상관없이 때리게 한다
+  t.after(() => { TUNE.TURN_ATK_ARC = 120; });
   const g = quiet();
   const a = g.addPlayer("a")!;
   const p = me(g, a);

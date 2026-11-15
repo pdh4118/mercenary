@@ -101,3 +101,26 @@ test("회전 속도 제한: 용병·적·주인공의 몸 방향은 병종별 �
   g.step();
   assert.ok(Math.abs(p.aim) < 1, `주인공 조준이 한 틱에 정반대를 향했다(${p.aim})`);
 });
+
+test("공격 각도 제한: 목표가 몸 앞쪽 120도 안에 있을 때만 공격을 시작한다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("t")!;
+  const p = g.getPlayer(a)!;
+  const m = (g as any).mercs.get(g.addMerc(a, SPEAR, p.x + 300, p.y))!;
+  const st = (g as any).mercStats(m);
+  m.faceSet = 0;
+  m.face = 0;
+  (g as any).startAttack(m, st, Math.PI); // 정반대는 못 친다
+  assert.equal(m.atkT, 0, "등 뒤 목표는 공격하지 않는다");
+  assert.equal(m.face, Math.PI, "대신 그쪽으로 돌기 시작한다");
+  m.faceSet = 0;
+  m.face = 0;
+  (g as any).startAttack(m, st, (Math.PI * 50) / 180); // 50도는 60도 안이라 친다
+  assert.ok(m.atkT > 0, "앞쪽 120도 안이면 공격한다");
+  m.atkT = 0;
+  m.faceSet = 0;
+  m.face = 0;
+  (g as any).startAttack(m, st, (Math.PI * 70) / 180); // 70도는 밖
+  assert.equal(m.atkT, 0);
+});

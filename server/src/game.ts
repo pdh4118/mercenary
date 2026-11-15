@@ -5237,7 +5237,17 @@ export class Game {
     m.face = Math.atan2(vy, vx);
   }
 
+  /** 몸이 바라보는 방향 앞쪽 TURN_ATK_ARC도 안에 목표가 있는가. 아니면 그쪽으로 돌도록 방향만 정해 두고 false(공격은 돈 뒤에) */
+  private inStrikeArc(o: { face: number; faceSet?: number; type: number }, ang: number): boolean {
+    if (!TUNE.TURN_LIMIT || TUNE.TURN_ATK_ARC <= 0 || o.type === MAGE) return true;
+    const body = o.faceSet ?? o.face;
+    if (Math.abs(angleDiff(ang, body)) <= (TUNE.TURN_ATK_ARC * Math.PI) / 360) return true;
+    o.face = ang; // 새 목표 방향: 제한된 속도로 돈다
+    return false;
+  }
+
   private startAttack(m: Merc, st: UnitStats, ang: number): void {
+    if (!this.inStrikeArc(m as Merc & { faceSet?: number }, ang)) return;
     m.atkT = st.windup;
     m.atkAng = ang;
     m.face = ang;
@@ -6030,7 +6040,7 @@ export class Game {
       const reachNow = st.reach + target.r;
       const d = Math.hypot(target.x - m.x, target.y - m.y);
       if (d <= reachNow) {
-        if (m.cd <= 0) {
+        if (m.cd <= 0 && this.inStrikeArc(m as Merc & { faceSet?: number }, Math.atan2(target.y - m.y, target.x - m.x))) {
           m.atkT = st.windup;
           m.atkAng = Math.atan2(target.y - m.y, target.x - m.x);
           m.face = m.atkAng;
@@ -7729,7 +7739,7 @@ export class Game {
       }
       const attackRange = st.ranged ? st.reach : st.reach + target.r * 0.5;
       if (targetDist <= attackRange) {
-        if (e.cd <= 0 && !(e.type === CAVALRY && e.evadeT > 0) && !e.ram) {
+        if (e.cd <= 0 && !(e.type === CAVALRY && e.evadeT > 0) && !e.ram && (e.boss || this.inStrikeArc(e as Enemy & { faceSet?: number }, Math.atan2(target.y - e.y, target.x - e.x)))) {
           e.atkT = st.windup;
           e.atkAng = Math.atan2(target.y - e.y, target.x - e.x);
           e.face = e.atkAng;

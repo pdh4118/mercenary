@@ -182,6 +182,7 @@ const SCALARS: Record<string, [string, string, number?, number?, number?]> = {
   MXP_TIER_BONUS: ["용병 경험치: 단계마다 획득 보너스", G.xp, 0, 1, 0.01],
   TURN_LIMIT: ["몸 회전 속도 제한(1 = 켬)", G.combat, 0, 1, 1],
   TURN_HERO: ["회전 속도 제한을 주인공 조준에도 적용(1 = 켬)", G.combat, 0, 1, 1],
+  TURN_ATK_ARC: ["공격 가능 각도: 몸 앞쪽 몇 도 안의 목표만 공격(0 = 제한 없음)", G.combat, 0, 360, 5],
   TURN_SLOW: ["최대 회전 속도: 검방병·둔기병(rad/s)", G.combat, 0.5, 30, 0.5],
   TURN_MID: ["최대 회전 속도: 창병·궁병·마법사(rad/s)", G.combat, 0.5, 30, 0.5],
   TURN_FAST: ["최대 회전 속도: 기병(rad/s)", G.combat, 0.5, 30, 0.5],
