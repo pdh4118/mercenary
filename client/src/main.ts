@@ -39,6 +39,7 @@ import {
   EVT_INVULN,
   EVT_QUIT,
   EVT_MERC_SKILL,
+  angleDiff,
   MERC_SKILLS,
   EVT_PAY,
   EVT_WALL_HIT,
@@ -1308,6 +1309,7 @@ async function main() {
   weaponBar.visible = false;
   hud.addChild(execG, hallFlashG, hudPanel, mini, statsPanel, stageText, edictText, execText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
 
+  const aimShown = new Map<number, number>(); // 주인공 조준 화살표의 화면에 그리는 방향(서버 값을 부드럽게 따라간다)
   const levelOf = new Map<number, number>();
   const rings: { x: number; y: number; age: number }[] = [];
   const wallSprites = new Map<number, Sprite>(); // 방벽 번호 -> 그림(평면 띠 시안)
@@ -3157,9 +3159,12 @@ async function main() {
       }
       v.aimMark.clear();
       if (!dead) {
-        // 조준 방향 표시: 몸 바깥의 작은 화살촉(무기 색)
-        const ca = Math.cos(p.aim);
-        const sa = Math.sin(p.aim);
+        // 조준 방향 표시: 몸 바깥의 작은 화살촉(무기 색). 서버 값(20Hz)을 매 프레임 부드럽게 따라가 끊기지 않게 한다
+        let shown = aimShown.get(p.id) ?? p.aim;
+        shown += angleDiff(p.aim, shown) * (1 - Math.exp(-ticker.deltaMS / 30));
+        aimShown.set(p.id, shown);
+        const ca = Math.cos(shown);
+        const sa = Math.sin(shown);
         const tip = 50;
         const base = 40;
         v.aimMark
