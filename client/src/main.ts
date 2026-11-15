@@ -2558,7 +2558,7 @@ async function main() {
           t.position.set(Math.max(offX + 24, Math.min(offX + S - 24, x)), Math.max(14, y - 8));
         }
       } else if (p.id === myId) {
-        const a = p.aim;
+        const a = aimShown.get(p.id) ?? p.aim;
         g.poly([x + Math.cos(a) * 6, y + Math.sin(a) * 6, x + Math.cos(a + 2.5) * 4.5, y + Math.sin(a + 2.5) * 4.5, x + Math.cos(a - 2.5) * 4.5, y + Math.sin(a - 2.5) * 4.5])
           .fill(color)
           .stroke({ width: 1.5, color: 0xffffff });
@@ -3126,7 +3126,11 @@ async function main() {
       let poseScale = 1;
       let anchorX = 0.5;
       let anchorY = SPRITE_ANCHOR_Y;
-      let faceSign = Math.cos(p.aim) >= 0 ? 1 : -1;
+      // 서버 조준(초당 20번)을 매 프레임 부드럽게 따라간 방향: 몸 좌우 반전·조준 화살표·창 범위 표시가 모두 이 값을 쓴다
+      let aimS = aimShown.get(p.id) ?? p.aim;
+      aimS += angleDiff(p.aim, aimS) * (1 - Math.exp(-ticker.deltaMS / 30));
+      aimShown.set(p.id, aimS);
+      let faceSign = Math.cos(aimS) >= 0 ? 1 : -1;
       if (WEAPONS[p.weapon]?.type === BLUNT_TYPE && !dead) {
         // 철퇴 충격파: 모으는 동안 머리 위로 쳐들고, 찍은 직후 잠깐 내려찍는 자세
         const pose = (p.sm ?? 0) > 0 ? "raised" : (slamPoseUntil.get(p.id) ?? 0) > performance.now() ? "slam" : null;
@@ -3160,11 +3164,8 @@ async function main() {
       v.aimMark.clear();
       if (!dead) {
         // 조준 방향 표시: 몸 바깥의 작은 화살촉(무기 색). 서버 값(20Hz)을 매 프레임 부드럽게 따라가 끊기지 않게 한다
-        let shown = aimShown.get(p.id) ?? p.aim;
-        shown += angleDiff(p.aim, shown) * (1 - Math.exp(-ticker.deltaMS / 30));
-        aimShown.set(p.id, shown);
-        const ca = Math.cos(shown);
-        const sa = Math.sin(shown);
+        const ca = Math.cos(aimS);
+        const sa = Math.sin(aimS);
         const tip = 50;
         const base = 40;
         v.aimMark
@@ -3704,6 +3705,7 @@ async function main() {
     for (const p of latest.players) {
       const w = WEAPONS[p.weapon]!;
       const v = players.views.get(p.id);
+      const aimS = aimShown.get(p.id) ?? p.aim; // 부드럽게 따라간 조준 방향(위 플레이어 그리기에서 갱신)
       // 기마 가속: 달리는 동안 몸 뒤로 바람 궤적이 흐른다. 오른쪽 끝의 빛 덩어리는 주인공 몸 아래에 가려지도록 깐다(groundFx는 유닛 아래).
       if (boostTex.every((t) => t !== null)) {
         let bf = boostFx.get(p.id);
@@ -3865,23 +3867,23 @@ async function main() {
         const prog = Math.max(0, Math.min(1, 1 - p.wind / w.windup));
         if (usesBox(w.type)) {
           // 창·기마는 부채꼴이 아니라 앞으로 뻗은 직사각형만 보인다
-          drawSpearBox(v.x, v.y, p.aim, reachNow * (0.4 + 0.6 * prog), p.hs?.[6] || 1, 0xffc27a, 0.12 + 0.3 * prog, w.type === 0);
+          drawSpearBox(v.x, v.y, aimS, reachNow * (0.4 + 0.6 * prog), p.hs?.[6] || 1, 0xffc27a, 0.12 + 0.3 * prog, w.type === 0);
         } else {
           fxLayer
             .moveTo(v.x, v.y)
-            .arc(v.x, v.y, reachNow * (0.4 + 0.6 * prog), p.aim - arcNow, p.aim + arcNow)
+            .arc(v.x, v.y, reachNow * (0.4 + 0.6 * prog), aimS - arcNow, aimS + arcNow)
             .closePath()
             .fill({ color: 0xffc27a, alpha: 0.12 + 0.3 * prog });
         }
       }
       if (!v || p.swing <= 0 || w.ranged || w.type === MAGE_TYPE) continue;
       if (usesBox(w.type)) {
-        drawSpearBox(v.x, v.y, p.aim, reachNow, p.hs?.[6] || 1, TYPE_COLORS[w.type]!, 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC), w.type === 0);
+        drawSpearBox(v.x, v.y, aimS, reachNow, p.hs?.[6] || 1, TYPE_COLORS[w.type]!, 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC), w.type === 0);
         continue;
       }
       fxLayer
         .moveTo(v.x, v.y)
-        .arc(v.x, v.y, reachNow, p.aim - arcNow, p.aim + arcNow)
+        .arc(v.x, v.y, reachNow, aimS - arcNow, aimS + arcNow)
         .closePath()
         .fill({ color: TYPE_COLORS[w.type]!, alpha: 0.55 * Math.min(1, p.swing / SWING_VISUAL_SEC) });
     }
