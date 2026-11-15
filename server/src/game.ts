@@ -421,6 +421,7 @@ const newMods = (): Mods => ({
 });
 
 export interface Slot {
+  aimSet?: number; // 회전 속도를 제한한 조준 방향(TURN_HERO)
   away: boolean; // 접속이 끊겨 돌아오기를 기다리는 중. 주인공은 제자리에 서고 적에게 노려지지 않는다.
   switchCd: number; // 무기를 바꾼 직후 공격할 수 없는 남은 시간
   mods: Mods;
@@ -1468,6 +1469,7 @@ export class Game {
       this.separateEnemies(dt);
       this.separateCross(dt);
     }
+    this.limitFaces(dt);
     this.terrainEnd();
     this.stepWalls(dt);
     this.flushHeals();
@@ -3629,6 +3631,7 @@ export class Game {
         s.fireCd = Math.max(0, s.fireCd - dt);
         s.dashT = 0;
         p.aim = s.input.aim;
+        s.aimSet = p.aim;
         continue;
       }
       p.invuln = Math.max(0, p.invuln - dt);
@@ -3709,7 +3712,7 @@ export class Game {
         }
       }
       if (mounted && !p.down && !frozen) this.heroBump(s, p.x - hx0, p.y - hy0); // 달리다 부딪히면 속도를 잃고 피해를 준다
-      p.aim = s.input.aim;
+      p.aim = this.heroAim(s, dt);
       const turn = FORMATION_TURN_RATE * dt;
       s.facing += Math.max(-turn, Math.min(turn, angleDiff(p.aim, s.facing)));
       s.switchCd = Math.max(0, s.switchCd - dt);
@@ -4814,6 +4817,42 @@ export class Game {
   }
 
   private auraT = 0;
+  /** 병종별 최대 회전 속도(rad/s): 방패·둔기는 느리고 기병은 빠르다 */
+  private turnRate(type: number): number {
+    return type === CAVALRY ? TUNE.TURN_FAST : type === SHIELD || type === BLUNT ? TUNE.TURN_SLOW : TUNE.TURN_MID;
+  }
+
+  /** 용병·적의 몸 방향(face)을 최대 회전 속도로 제한한다. AI가 정한 새 방향을 목표로 삼아 조금씩 따라간다(공격 방향은 따로라 그대로). 보스는 스킬이 방향을 정하므로 제외 */
+  private limitFaces(dt: number): void {
+    if (!TUNE.TURN_LIMIT) return;
+    const lim = (o: { face: number } & { faceSet?: number; faceGoal?: number }, rate: number) => {
+      if (o.faceSet === undefined || !Number.isFinite(o.face)) {
+        o.faceSet = o.face;
+        return;
+      }
+      if (o.face !== o.faceSet) o.faceGoal = o.face; // AI가 새 방향을 정했다
+      const goal = o.faceGoal ?? o.face;
+      const d = angleDiff(goal, o.faceSet);
+      const step = rate * dt;
+      const nf = Math.abs(d) <= step ? goal : o.faceSet + Math.sign(d) * step;
+      o.face = o.faceSet = Math.atan2(Math.sin(nf), Math.cos(nf));
+    };
+    for (const m of this.mercs.values()) if (m.respawn <= 0) lim(m, this.turnRate(m.type));
+    for (const e of this.enemies.values()) if (!e.boss) lim(e, this.turnRate(e.type));
+  }
+
+  /** 주인공 조준 방향: 마우스가 가리키는 쪽으로 최대 회전 속도로 돈다(TURN_HERO) */
+  private heroAim(s: Slot, dt: number): number {
+    const want = s.input.aim;
+    if (!TUNE.TURN_LIMIT || !TUNE.TURN_HERO || !Number.isFinite(want)) return want;
+    const cur = s.aimSet ?? s.state.aim;
+    const d = angleDiff(want, cur);
+    const step = this.turnRate(WEAPONS[s.state.weapon]!.type) * dt;
+    const nf = Math.abs(d) <= step ? want : cur + Math.sign(d) * step;
+    s.aimSet = Math.atan2(Math.sin(nf), Math.cos(nf));
+    return s.aimSet;
+  }
+
   private stepMercs(dt: number): void {
     const alive = new Map<number, number>();
     for (const m of this.mercs.values()) {

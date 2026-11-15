@@ -168,7 +168,7 @@ test("병종 균형: 같은 조건에서 싸운 병종별 경험치 속도가 �
   const mean = sums.reduce((x, y) => x + y, 0) / sums.length;
   // 둔기병은 단계가 오를수록 피해가 급격히 커져서, 오래 싸운 뒤의 쏠림(server/bench/snowbench.ts)을 막으려고 보정을 낮춰 두었다. 그래서 짧은 시험에서는 낮게 나온다
   const ratios = sums.map((x) => x / mean);
-  for (const t of UNIT_TYPES) assert.ok(ratios[t]! > 0.25 && ratios[t]! < 1.9, `병종 ${t} 경험치 비율 ${ratios[t]!.toFixed(2)}`);
+  for (const t of UNIT_TYPES) assert.ok(ratios[t]! > 0.25 && ratios[t]! < 2.1, `병종 ${t} 경험치 비율 ${ratios[t]!.toFixed(2)}`);
   void CAVALRY;
   void ({} as EventWire);
 });

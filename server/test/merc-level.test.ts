@@ -75,3 +75,29 @@ test("주인공 체력 카드: 기본+레벨 체력에 합산 %라서 레벨이 
   };
   assert.ok(gain(30) > gain(10) * 2, `${gain(10)} → ${gain(30)}`);
 });
+
+test("회전 속도 제한: 용병·적·주인공의 몸 방향은 병종별 최대 속도로만 돈다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("t")!;
+  const p = g.getPlayer(a)!;
+  const sh = (g as any).mercs.get(g.addMerc(a, 3, p.x + 300, p.y))!; // 검방병(느림)
+  const cv = (g as any).mercs.get(g.addMerc(a, 0, p.x + 300, p.y + 100))!; // 기병(빠름)
+  const dt = 1 / 20;
+  sh.face = 0;
+  cv.face = 0;
+  (g as any).limitFaces(dt); // 기준 방향 기록
+  sh.face = Math.PI; // AI가 정반대로 돌라고 해도
+  cv.face = Math.PI;
+  (g as any).limitFaces(dt);
+  assert.ok(Math.abs(sh.face) <= TUNE.TURN_SLOW * dt + 1e-6, `검방병이 한 틱에 ${sh.face} 돌았다`);
+  assert.ok(Math.abs(cv.face) > Math.abs(sh.face) * 1.5, "기병이 더 빨리 돈다");
+  for (let i = 0; i < 40; i++) (g as any).limitFaces(dt); // AI가 더 바꾸지 않아도 목표를 향해 계속 돈다
+  assert.ok(Math.abs(Math.abs(sh.face) - Math.PI) < 0.05, `시간이 지나면 목표를 본다(${sh.face})`);
+  // 주인공 조준
+  g.setInput(a, { dx: 0, dy: 0, aim: 0, fire: false });
+  for (let i = 0; i < 40; i++) g.step();
+  g.setInput(a, { dx: 0, dy: 0, aim: Math.PI, fire: false });
+  g.step();
+  assert.ok(Math.abs(p.aim) < 1, `주인공 조준이 한 틱에 정반대를 향했다(${p.aim})`);
+});

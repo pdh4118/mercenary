@@ -45,6 +45,11 @@ export const TUNE = {
   BACKSTAB_MULT: 1.5,
   SHIELD_REGEN_SEC: 8, // 방패가 깨진 뒤 재생될 때까지
   SPLASH_FACTOR: 0.5,
+  TURN_LIMIT: 1, // 1이면 몸이 도는 속도를 제한한다(용병·적·주인공). 0이면 예전처럼 즉시 돈다
+  TURN_HERO: 1, // 주인공(조준 방향)에도 적용
+  TURN_SLOW: 4, // 검방병·둔기병이 도는 최대 속도(rad/s). 360도에 약 1.6초
+  TURN_MID: 6, // 창병·궁병·마법사 (360도 약 1.0초)
+  TURN_FAST: 8, // 기병 (360도 약 0.8초)
   CAV_DAMAGE_PER_SPEED: 0.055, // 현재 속도(px/s) 1당 돌격 추가 피해
   ENEMY_CAV_RAM_FRAC: 0.2, // 적 기병 중 창으로 찌르지 않고 몸으로 부딪혀 밀고 들어가는(충돌) 기병의 비율
   CAV_COUNTER_MULT: 1.5, // 창에 먼저 찔린 기병이 되돌려받는 카운터 피해 배율(쌓아 둔 돌격 피해 x 공격력·치명타 x 이 값 x 창병 단계)

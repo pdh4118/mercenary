@@ -164,6 +164,7 @@ test("고지대에서 쏜 화살은 더 세고, 아래에서 고지대를 쏘면
     e.cd = 999;
     e.atkT = 999;
     const aim = Math.atan2(e.y - p.y, e.x - p.x);
+    p.aim = aim; // 회전 속도 제한 때문에 처음부터 그쪽을 보고 있게 한다
     g.setInput(a, { dx: 0, dy: 0, aim, fire: true });
     run(g, 0.05); // 한 발만 쏜다
     g.setInput(a, { dx: 0, dy: 0, aim, fire: false });
