@@ -4,7 +4,7 @@
 256px 렌더를 그대로 넣으면 두 배쯤 크고 발 위치가 어긋난다. 그래서 키가 약 90px이 되게 줄이고, 발 기준점이 (0.46W, 0.95H)에 오게 놓는다.
 그림을 고치는 것이 아니라 줄이고 자리만 옮긴다.
 
-실행: python tools/blender/pack_units3d.py <256px 폴더> <출력 폴더> [배율 0.536] [캔버스 너비 160] [캔버스 높이 140]
+실행: python tools/blender/pack_units3d.py <256px 폴더> <출력 폴더> [배율 0.616] [캔버스 너비 208] [캔버스 높이 240]
 """
 import glob
 import os
@@ -13,10 +13,10 @@ import sys
 from PIL import Image
 
 SRC, OUT = sys.argv[1], sys.argv[2]
-S = float(sys.argv[3]) if len(sys.argv) > 3 else 0.536
-W = int(sys.argv[4]) if len(sys.argv) > 4 else 160
-H = int(sys.argv[5]) if len(sys.argv) > 5 else 140
-AX, AY = 94.7, 218.0  # 256px 렌더에서 발 기준점(몸 중심선, 발바닥 바로 아래). 카메라가 고정이라 모든 컷에서 같다.
+S = float(sys.argv[3]) if len(sys.argv) > 3 else 0.616
+W = int(sys.argv[4]) if len(sys.argv) > 4 else 208
+H = int(sys.argv[5]) if len(sys.argv) > 5 else 240
+AX, AY = 84.5, 206.3  # 256px 렌더에서 발 기준점(몸 중심선, 발바닥 바로 아래). 카메라가 고정이라 모든 컷에서 같다.
 os.makedirs(OUT, exist_ok=True)
 clipped = []
 for f in sorted(glob.glob(os.path.join(SRC, "*.png"))):

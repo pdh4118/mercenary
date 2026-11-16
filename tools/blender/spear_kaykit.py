@@ -136,7 +136,7 @@ def toonify(m, flat=None):
     ao = n.new("ShaderNodeAmbientOcclusion")
     ao.samples = 16
     ao.inputs["Distance"].default_value = AO_DIST
-    occ = remap(math_("POWER", ao.outputs["AO"], 1.5), 0.3, 1.0)
+    occ = remap(math_("POWER", ao.outputs["AO"], 1.5), float(arg("--ao_min", 0.55)), 1.0)
     tc = n.new("ShaderNodeTexCoord")
     n1 = n.new("ShaderNodeTexNoise")
     n1.inputs["Scale"].default_value = 4.5
@@ -334,6 +334,13 @@ def clean_face(ob):
             for l in f.loops:
                 l[uvk].uv = skin_uv
         print("FACE: patch added")
+    # 볼살: 눈 아래 양 볼을 머리 중심에서 바깥쪽으로 부풀린다
+    puff = float(arg("--cheek", 0.07))
+    center = Vector((0, 0.0, eye_z - 0.05))
+    for v in {v for f in bm.faces if f[fmark] for v in f.verts}:
+        for sx in (1, -1):
+            d = (v.co - Vector((0.2 * sx, -0.40, eye_z - 0.15))).length
+            v.co += (v.co - center).normalized() * puff * math.exp(-(d / 0.15) ** 2)
     # 얼굴 살색 면은 실제 면 방향 대신 머리 중심에서 뻗는 공 모양 방향으로 명암을 넣는다(덧댄 판과 이음매가 보이지 않게)
     skin_mat = me.materials[src.material_index].copy() if src else None
     if skin_mat:
@@ -497,7 +504,7 @@ def part(me, color, smooth=True):
     return ob
 
 
-K = float(arg("--spear", 0.85))  # 창 크기 배율. 창은 +Z로 뻗는다(손잡이 중심이 원점)
+K = float(arg("--spear", 1.05))  # 창 크기 배율. 창은 +Z로 뻗는다(손잡이 중심이 원점)
 part(tube([(0, 0, -0.95 * K), (0, 0, 1.1 * K)], [0.06 * K] * 2, [0.06 * K] * 2, 10, "z"), "#6e4a28")
 part(tube([(0, 0, 1.0 * K), (0, 0, 1.08 * K), (0, 0, 1.18 * K)], [0.07 * K, 0.09 * K, 0.065 * K], [0.07 * K, 0.09 * K, 0.065 * K], 12, "z"), TRIM)
 part(tube([(0, 0, 1.15 * K), (0, 0, 1.34 * K), (0, 0, 1.8 * K)], [0.05 * K, 0.19 * K, 0.0], [0.03 * K, 0.05 * K, 0.0], 4, "z"), "#8f99a8", smooth=False)
@@ -540,14 +547,14 @@ bpy.context.view_layer.update()
 zs = [(o.matrix_world @ Vector(c)).z for o in bpy.data.objects if o.type == "MESH" and o.parent == arm for c in o.bound_box]
 H = max(zs) - min(zs)
 print("캐릭터 키:", round(H, 3))
-ORTHO = float(arg("--ortho", 0)) or H * 1.58
+ORTHO = float(arg("--ortho", 0)) or H * 1.82
 bpy.ops.object.camera_add()
 cam = bpy.context.active_object
 cam.data.type = "ORTHO"
 cam.data.ortho_scale = ORTHO
 elev = math.radians(24)
 dist = 14
-cam.location = (ORTHO * 0.13, -dist * math.cos(elev), H * 0.5 + dist * math.sin(elev))
+cam.location = (ORTHO * 0.17, -dist * math.cos(elev), H * 0.5 + dist * math.sin(elev))
 cam.rotation_euler = (math.radians(90) - elev, 0, 0)
 sc.camera = cam
 
@@ -574,8 +581,8 @@ def lineset(name, thick, **sel):
 
 
 lineset("outer", LINE * 0.5, external_contour=True)  # 바깥 윤곽: 굵게
-lineset("inner", LINE * 0.26, silhouette=True)  # 안쪽 선: 가늘게
-ls = lineset("crease", LINE * 0.26, border=True, crease=True)  # 꺾임 선: 얼굴 면끼리 만나는 곳은 뺀다
+lineset("inner", LINE * float(arg("--line_in", 0.15)), silhouette=True)  # 안쪽 선: 가늘게
+ls = lineset("crease", LINE * float(arg("--line_crease", 0.09)), border=True, crease=True)  # 꺾임 선: 얼굴 면끼리 만나는 곳은 뺀다
 ls.select_by_face_marks = True
 ls.face_mark_negation = "EXCLUSIVE"
 ls.face_mark_condition = "ONE"
@@ -613,7 +620,9 @@ head_back = 0.35
 
 
 # 공격 때 발을 땅에 붙여 두는 장치: 발목 자리를 정해 두면 다리가 따라 굽는다(평소에는 꺼 둔다)
-ANKLE = {s_: arm.data.bones["foot." + s_].head_local.copy() for s_ in "lr"}
+LEG = float(arg("--leg", 1.45))  # 다리(허벅지 아래 전부) 배율. 원래 모델은 다리가 아주 짧아 종종걸음처럼 보인다
+HIP_Z = arm.data.bones["upperleg.l"].head_local.z
+ANKLE = {s_: Vector((arm.data.bones["foot." + s_].head_local.x, arm.data.bones["foot." + s_].head_local.y * LEG, arm.data.bones["foot." + s_].head_local.z * LEG)) for s_ in "lr"}
 feet, leg_ik = {}, {}
 for s_ in "lr":
     t = bpy.data.objects.new("foot_" + s_, None)
@@ -635,7 +644,9 @@ def apply(pose, thrust=0.0, ext=None):
     pb = arm.pose.bones
     for b in pb:
         b.location, b.rotation_quaternion, b.scale = pose[b.name]
+    pb["hips"].location.y += HIP_Z * (LEG - 1)  # 다리가 길어진 만큼 엉덩이를 올린다(뼈가 위를 향해 있어 y가 위쪽)
     for s_ in "lr":
+        pb["upperleg." + s_].scale = (LEG, LEG, LEG)
         leg_ik[s_].influence = 1.0 if ext else 0.0
         feet[s_].location = ANKLE[s_]
     if GRIP == "two":
@@ -643,9 +654,9 @@ def apply(pose, thrust=0.0, ext=None):
         pb["head"].rotation_quaternion = pb["head"].rotation_quaternion @ Quaternion((0, 1, 0), -TWIST * head_back)
         bpy.context.view_layer.update()
         if ext:  # 뼈대 좌표: 앞 -Y
-            feet["l"].location = ANKLE["l"] + Vector((0, ext["front"], 0))
-            feet["r"].location = ANKLE["r"] + Vector((0, ext["rear"], 0))
-            pb["hips"].matrix = Matrix.Translation((0, ext["hip"][0], ext["hip"][1])) @ pb["hips"].matrix
+            feet["l"].location = ANKLE["l"] + Vector((0, ext["front"] * LEG, 0))
+            feet["r"].location = ANKLE["r"] + Vector((0, ext["rear"] * LEG, 0))
+            pb["hips"].matrix = Matrix.Translation((0, ext["hip"][0], ext["hip"][1] * LEG)) @ pb["hips"].matrix
             bpy.context.view_layer.update()
             piv = pb["spine"].head.copy()
             lean = Matrix.Rotation(math.radians(ext["lean"]), 4, "X")
@@ -656,7 +667,7 @@ def apply(pose, thrust=0.0, ext=None):
             pb["head"].matrix = Matrix.Translation(piv) @ back @ Matrix.Translation(-piv) @ pb["head"].matrix
             bpy.context.view_layer.update()
             for s_ in "lr":  # 발바닥은 땅과 나란히 둔다(정강이를 따라 꺾이지 않게)
-                m = arm.data.bones["foot." + s_].matrix_local.copy()
+                m = (arm.data.bones["foot." + s_].matrix_local.to_3x3() * LEG).to_4x4()
                 m.translation = pb["foot." + s_].matrix.translation
                 pb["foot." + s_].matrix = m
             bpy.context.view_layer.update()
@@ -673,7 +684,7 @@ ATT_T = [float(v) for v in arg("--attack_t", "0.125,0.3,0.68,0.9").split(",")]
 hold = sample(IDLE, 0.0)
 # 공격 4컷(준비 → 타격 → 유지 → 복귀): 뒷발은 땅에 두고 앞발을 내디디며 엉덩이를 낮추고 윗몸을 숙여 창을 내지른다
 LUNGE = [
-    dict(thrust=-0.20, hip=(0.06, -0.03), lean=-10, front=-0.05, rear=0.06),
+    dict(thrust=-0.14, hip=(0.06, -0.03), lean=-10, front=-0.05, rear=0.06),
     dict(thrust=0.14, hip=(-0.18, -0.12), lean=30, front=-0.36, rear=0.06),
     dict(thrust=0.10, hip=(-0.14, -0.09), lean=20, front=-0.36, rear=0.06),
     dict(thrust=0.0, hip=(-0.03, -0.02), lean=4, front=-0.12, rear=0.06),
