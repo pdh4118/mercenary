@@ -4,7 +4,7 @@
 256px 렌더를 그대로 넣으면 두 배쯤 크고 발 위치가 어긋난다. 그래서 키가 약 90px이 되게 줄이고, 발 기준점이 (0.46W, 0.95H)에 오게 놓는다.
 그림을 고치는 것이 아니라 줄이고 자리만 옮긴다.
 
-실행: python tools/blender/pack_units3d.py <256px 폴더> <출력 폴더> [배율 0.616] [캔버스 너비 208] [캔버스 높이 240]
+실행: python tools/blender/pack_units3d.py <256px 폴더> <출력 폴더> [배율 0.616] [캔버스 너비 208] [캔버스 높이 240] [기준점 x] [기준점 y] [파일 이름 앞부분]
 """
 import glob
 import os
@@ -16,10 +16,14 @@ SRC, OUT = sys.argv[1], sys.argv[2]
 S = float(sys.argv[3]) if len(sys.argv) > 3 else 0.616
 W = int(sys.argv[4]) if len(sys.argv) > 4 else 208
 H = int(sys.argv[5]) if len(sys.argv) > 5 else 240
-AX, AY = 84.5, 206.3  # 256px 렌더에서 발 기준점(몸 중심선, 발바닥 바로 아래). 카메라가 고정이라 모든 컷에서 같다.
+# 256px 렌더에서 발 기준점(몸 중심선, 발바닥 바로 아래). 카메라가 고정이라 한 병종의 모든 컷에서 같다.
+# 기본값은 창병(spear_kaykit.py). 궁병(archer_kaykit.py)은 "0.575 176 340 107.5 210.8 archer_"를 넘긴다.
+AX = float(sys.argv[6]) if len(sys.argv) > 6 else 84.5
+AY = float(sys.argv[7]) if len(sys.argv) > 7 else 206.3
+PREFIX = sys.argv[8] if len(sys.argv) > 8 else ""  # 이 이름으로 시작하는 파일만 옮긴다(예: archer_)
 os.makedirs(OUT, exist_ok=True)
 clipped = []
-for f in sorted(glob.glob(os.path.join(SRC, "*.png"))):
+for f in sorted(glob.glob(os.path.join(SRC, PREFIX + "*.png"))):
     im = Image.open(f).convert("RGBA")
     n = round(im.width * S)
     small = im.resize((n, n), Image.LANCZOS)
@@ -29,4 +33,4 @@ for f in sorted(glob.glob(os.path.join(SRC, "*.png"))):
     if b[0] <= 0 or b[1] <= 0 or b[2] >= W or b[3] >= H:
         clipped.append(os.path.basename(f))
     canvas.save(os.path.join(OUT, os.path.basename(f)))
-print("packed", len(glob.glob(os.path.join(OUT, "*.png"))), "clipped", clipped)
+print("packed", len(glob.glob(os.path.join(OUT, PREFIX + "*.png"))), "clipped", clipped)

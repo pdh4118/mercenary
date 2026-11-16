@@ -621,6 +621,7 @@ head_back = 0.35
 
 # 공격 때 발을 땅에 붙여 두는 장치: 발목 자리를 정해 두면 다리가 따라 굽는다(평소에는 꺼 둔다)
 LEG = float(arg("--leg", 1.45))  # 다리(허벅지 아래 전부) 배율. 원래 모델은 다리가 아주 짧아 종종걸음처럼 보인다
+ARM = float(arg("--arm", 1.3))  # 팔(어깨 아래 전부) 배율. 원래 모델은 팔이 가늘고 짧다
 HIP_Z = arm.data.bones["upperleg.l"].head_local.z
 ANKLE = {s_: Vector((arm.data.bones["foot." + s_].head_local.x, arm.data.bones["foot." + s_].head_local.y * LEG, arm.data.bones["foot." + s_].head_local.z * LEG)) for s_ in "lr"}
 feet, leg_ik = {}, {}
@@ -647,6 +648,7 @@ def apply(pose, thrust=0.0, ext=None):
     pb["hips"].location.y += HIP_Z * (LEG - 1)  # 다리가 길어진 만큼 엉덩이를 올린다(뼈가 위를 향해 있어 y가 위쪽)
     for s_ in "lr":
         pb["upperleg." + s_].scale = (LEG, LEG, LEG)
+        pb["upperarm." + s_].scale = (ARM, ARM, ARM)
         leg_ik[s_].influence = 1.0 if ext else 0.0
         feet[s_].location = ANKLE[s_]
     if GRIP == "two":
@@ -654,8 +656,8 @@ def apply(pose, thrust=0.0, ext=None):
         pb["head"].rotation_quaternion = pb["head"].rotation_quaternion @ Quaternion((0, 1, 0), -TWIST * head_back)
         bpy.context.view_layer.update()
         if ext:  # 뼈대 좌표: 앞 -Y
-            feet["l"].location = ANKLE["l"] + Vector((0, ext["front"] * LEG, 0))
-            feet["r"].location = ANKLE["r"] + Vector((0, ext["rear"] * LEG, 0))
+            feet["l"].location = ANKLE["l"] + Vector((0, ext["front"] * LEG, ext.get("lift_l", 0) * LEG))
+            feet["r"].location = ANKLE["r"] + Vector((0, ext["rear"] * LEG, ext.get("lift_r", 0) * LEG))
             pb["hips"].matrix = Matrix.Translation((0, ext["hip"][0], ext["hip"][1] * LEG)) @ pb["hips"].matrix
             bpy.context.view_layer.update()
             piv = pb["spine"].head.copy()
@@ -667,7 +669,8 @@ def apply(pose, thrust=0.0, ext=None):
             pb["head"].matrix = Matrix.Translation(piv) @ back @ Matrix.Translation(-piv) @ pb["head"].matrix
             bpy.context.view_layer.update()
             for s_ in "lr":  # 발바닥은 땅과 나란히 둔다(정강이를 따라 꺾이지 않게)
-                m = (arm.data.bones["foot." + s_].matrix_local.to_3x3() * LEG).to_4x4()
+                tilt = Matrix.Rotation(math.radians(ext.get("pitch_" + s_, 0)), 3, "X")  # 음수: 발끝이 들린다, 양수: 뒤꿈치가 들린다
+                m = (tilt @ arm.data.bones["foot." + s_].matrix_local.to_3x3() * LEG).to_4x4()
                 m.translation = pb["foot." + s_].matrix.translation
                 pb["foot." + s_].matrix = m
             bpy.context.view_layer.update()
@@ -689,10 +692,19 @@ LUNGE = [
     dict(thrust=0.10, hip=(-0.14, -0.09), lean=20, front=-0.36, rear=0.06),
     dict(thrust=0.0, hip=(-0.03, -0.02), lean=4, front=-0.12, rear=0.06),
 ]
+# 걷기 4컷(왼발 디딤 → 오른발 넘김 → 오른발 디딤 → 왼발 넘김): 발이 땅을 길게 디디게 직접 놓는다.
+# 동작 팩의 걷기는 무릎을 들었다 놓는 모양이라 게임의 이동 속도에 얹으면 제자리걸음처럼 보인다.
+STRIDE = float(arg("--stride", 0.18))
+STEP = [
+    dict(hip=(0, -0.05), lean=0, front=-STRIDE, rear=STRIDE, pitch_l=-15, pitch_r=22),
+    dict(hip=(0, -0.01), lean=0, front=0.02, rear=-0.04, lift_r=0.07, pitch_r=10),
+    dict(hip=(0, -0.05), lean=0, front=STRIDE, rear=-STRIDE, pitch_l=22, pitch_r=-15),
+    dict(hip=(0, -0.01), lean=0, front=-0.04, rear=0.02, lift_l=0.07, pitch_l=10),
+]
 if GRIP == "two":
     FRAMES = {
         "idle": [(hold, 0.0, None)],
-        "walk": [(mix(sample(WALK, t), hold), 0.0, None) for t in (0.0, 0.25, 0.5, 0.75)],  # 다리는 걷기, 윗몸은 창을 든 자세
+        "walk": [(hold, 0.0, e) for e in STEP],
         "attack": [(hold, e["thrust"], e) for e in LUNGE],
     }
 else:

@@ -278,10 +278,14 @@ async function main() {
   };
   const CLOTH_BAR = { x: 38.7, y: 6.3 }; // 깃발 천 그림에서 가로대 가운데
   // 기병은 8방위(0=북,1=북동,2=동,…) 기본 자세·찌르기 자세 그림을 쓴다. 아군은 주인 색, 적은 어두운 붉은색으로 칠한다.
-  // 3D로 렌더한 방향별 그림(실험): 주소에 ?dir3d=1을 붙이면 창병이 8방향·동작별 그림으로 그려진다(없으면 옛 그림)
+  // 3D로 렌더한 방향별 그림(실험): 주소에 ?dir3d=1을 붙이면 창병·궁병이 8방향·동작별 그림으로 그려진다(없으면 옛 그림)
   const USE_DIR3D = new URLSearchParams(location.search).has("dir3d") || localStorage.getItem("dir3d") === "1";
   const dirSets: Record<string, DirSet | null> = {};
-  if (USE_DIR3D) for (const team of ["ally", "enemy"] as const) dirSets[`spear/${team}`] = await loadDirSet("spear", team, { x: 0.46, y: 0.95 });
+  const DIR_UNITS: Record<number, string> = { 1: "spear", 2: "archer" }; // 병종 번호 -> 그림 이름
+  if (USE_DIR3D)
+    for (const name of Object.values(DIR_UNITS))
+      for (const team of ["ally", "enemy"] as const) dirSets[`${name}/${team}`] = await loadDirSet(name, team, { x: 0.46, y: 0.95 });
+  const dirSetOf = (type: number, team: "ally" | "enemy"): DirSet | null => (DIR_UNITS[type] ? dirSets[`${DIR_UNITS[type]}/${team}`] ?? null : null);
   const DIR_SCALE = 0.46; // 3D 그림은 기존 그림(높이 88, 배율 0.5)과 비슷한 키가 되도록
   const applyDir = (v: Tracked & { sprite: Sprite }, ds: DirSet, faceAng: number, atkProg: number, mul: number) => {
     const dv = v as unknown as { d8?: number; px?: number; py?: number; walkPh?: number };
@@ -2687,7 +2691,7 @@ async function main() {
           else v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
         }
         v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
-        const dse = w[4] === 1 && w[11] !== 1 ? dirSets["spear/enemy"] : null;
+        const dse = w[11] !== 1 ? dirSetOf(w[4], "enemy") : null;
         if (dse) applyDir(v, dse, w[8] ?? 0, w[5], size);
       }
       v.sprite.zIndex = v.y;
@@ -2980,7 +2984,7 @@ async function main() {
         faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
         v.sprite.texture = recolored(`u${w[4]}`, allyTex[w[4]]!, UNIT_RULES[w[4]]!, col);
         v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
-        const dsa = w[4] === 1 ? dirSets["spear/ally"] : null;
+        const dsa = dirSetOf(w[4], "ally");
         if (dsa) applyDir(v, dsa, w[12] ?? 0, w[6], grow); // 방향별 그림(실험): 서버가 제한한 몸 방향 w[12]로 고른다
       }
       v.node.zIndex = v.y;
