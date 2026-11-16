@@ -103,6 +103,7 @@
         <button id="save" class="primary" disabled>저장하고 적용</button>
         <button id="revert" disabled>변경 취소</button>
         <button id="resetAll" class="danger">전체를 기본값으로</button>
+        <button id="kickAll" class="danger" title="지금 접속 중인 모든 사람의 연결을 끊습니다">접속자 모두 내보내기</button>
         <span id="status" class="status"></span>
       </div>
       <div id="tabs" class="tabs"></div>
@@ -737,6 +738,15 @@
         try {
           load(await api("/api/tuning/reset", {}));
           setStatus("모두 기본값으로 되돌렸습니다", "ok");
+        } catch (e) {
+          setStatus(e.message, "err");
+        }
+      };
+      $("kickAll").onclick = async () => {
+        if (!confirm("지금 접속 중인 모든 사람을 내보낼까요? (진행 중인 판도 끊기고, 각자 페이지를 새로 고쳐야 다시 들어올 수 있습니다)")) return;
+        try {
+          const r = await api("/api/kick-all", {});
+          setStatus(`접속자 ${r.kicked}명을 내보냈습니다`, "ok");
         } catch (e) {
           setStatus(e.message, "err");
         }

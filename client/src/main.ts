@@ -1511,6 +1511,7 @@ async function main() {
   });
   let retries = 0;
   let idleKicked = false;
+  let kickMsg = "오래 아무 조작이 없어 연결이 끊겼습니다. 다시 하려면 페이지를 새로 고쳐 주세요";
   let autoStarted = false;
   const connect = () => {
     ws = new WebSocket(serverUrl);
@@ -1537,7 +1538,7 @@ async function main() {
         // 자리를 비워 서버가 끊었다: 자동으로 다시 접속하지 않는다(그래야 서버가 업데이트될 수 있다)
         lobby.clearToken();
         statusEl.textContent = "";
-        lobby.showLobby("오래 아무 조작이 없어 연결이 끊겼습니다. 다시 하려면 페이지를 새로 고쳐 주세요");
+        lobby.showLobby(kickMsg);
         return;
       }
       if (lobby.token() && retries < 15) {
@@ -1586,7 +1587,10 @@ async function main() {
         });
         return;
       }
-      if (msg.t === "left" && msg.reason.includes("아무 조작이 없어")) idleKicked = true;
+      if (msg.t === "left" && (msg.reason.includes("아무 조작이 없어") || msg.reason.includes("관리자"))) {
+        idleKicked = true;
+        kickMsg = msg.reason.includes("관리자") ? "관리자가 접속을 종료했습니다. 다시 하려면 페이지를 새로 고쳐 주세요" : kickMsg;
+      }
       if (lobby.handle(msg)) return;
       if (msg.t === "cards") {
         renderCards(msg.picks);

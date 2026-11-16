@@ -6,7 +6,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { TICK_RATE, tuneOverrides, voiceOverrides, type ClientMsg, type ServerMsg } from "@mercenary/shared";
 import { RoomManager, type Conn } from "./rooms.js";
 import { serveStatic } from "./static.js";
-import { handleTuningApi, handleVoiceApi, loadTuning, TUNING_FILE } from "./tuning-store.js";
+import { handleTuningApi, handleVoiceApi, loadTuning, tuningAllowed, TUNING_FILE } from "./tuning-store.js";
 import { appendMatch, handleStatsApi, STATS_FILE } from "./stats-store.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -41,6 +41,23 @@ const hasClient = existsSync(STATIC_DIR);
 const http = createServer((req, res) => {
   if (req.url === "/healthz") {
     res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true, rooms: manager.roomCount(), connections: metas.size }));
+    return;
+  }
+  if (req.url?.startsWith("/api/kick-all")) {
+    // 접속자 전원 내보내기: 수치 조정 도구와 같은 권한(이 컴퓨터 또는 관리자 토큰)만, POST만 허용
+    if (req.method !== "POST") {
+      res.writeHead(405, { Allow: "POST" }).end();
+    } else if (!tuningAllowed(req)) {
+      res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" }).end(JSON.stringify({ ok: false, error: "권한이 없습니다" }));
+    } else {
+      const n = metas.size;
+      for (const [ws, m] of metas) {
+        m.conn.send({ t: "left", reason: "관리자가 접속을 종료했습니다" }); // 클라이언트가 자동 재접속하지 않게 알린다
+        ws.close(4000, "관리자가 접속을 종료했습니다");
+      }
+      console.log(`[mercenary] 관리자 요청으로 접속자 ${n}명을 내보냈습니다`);
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify({ ok: true, kicked: n }));
+    }
     return;
   }
   if (req.url?.startsWith("/api/stats")) {
