@@ -9,7 +9,6 @@ import { createCastle, type Castle } from "./castle.js";
 import { createHall, HALL_OUTER, HALL_TEXTURES, type Hall } from "./hall.js";
 import { bindAudioUi, createAudio } from "./audio.js";
 import { createMercPanel, isReady } from "./mercpanel.js";
-import { loadDirSet, nextSector, pickDir, type DirAnim, type DirSet } from "./dirsprite.js";
 import {
   CARDS,
   CARD_CATEGORY_NAMES,
@@ -278,36 +277,6 @@ async function main() {
   };
   const CLOTH_BAR = { x: 38.7, y: 6.3 }; // 깃발 천 그림에서 가로대 가운데
   // 기병은 8방위(0=북,1=북동,2=동,…) 기본 자세·찌르기 자세 그림을 쓴다. 아군은 주인 색, 적은 어두운 붉은색으로 칠한다.
-  // 3D로 렌더한 방향별 그림(실험): 주소에 ?dir3d=1을 붙이면 창병·궁병이 8방향·동작별 그림으로 그려진다(없으면 옛 그림)
-  const USE_DIR3D = new URLSearchParams(location.search).has("dir3d") || localStorage.getItem("dir3d") === "1";
-  const dirSets: Record<string, DirSet | null> = {};
-  const DIR_UNITS: Record<number, string> = { 1: "spear", 2: "archer" }; // 병종 번호 -> 그림 이름
-  if (USE_DIR3D)
-    for (const name of Object.values(DIR_UNITS))
-      for (const team of ["ally", "enemy"] as const) dirSets[`${name}/${team}`] = await loadDirSet(name, team, { x: 0.46, y: 0.95 });
-  const dirSetOf = (type: number, team: "ally" | "enemy"): DirSet | null => (DIR_UNITS[type] ? dirSets[`${DIR_UNITS[type]}/${team}`] ?? null : null);
-  const DIR_SCALE = 0.46; // 3D 그림은 기존 그림(높이 88, 배율 0.5)과 비슷한 키가 되도록
-  const applyDir = (v: Tracked & { sprite: Sprite }, ds: DirSet, faceAng: number, atkProg: number, mul: number) => {
-    const dv = v as unknown as { d8?: number; px?: number; py?: number; walkPh?: number };
-    dv.d8 = nextSector(dv.d8 ?? 0, faceAng); // 서버가 제한한 몸 방향을 8구간으로(경계 근처에서는 깜빡이지 않게)
-    const moved = Math.hypot(v.x - (dv.px ?? v.x), v.y - (dv.py ?? v.y));
-    dv.px = v.x;
-    dv.py = v.y;
-    dv.walkPh = (dv.walkPh ?? 0) + moved * 0.09;
-    let anim: DirAnim = "idle";
-    let fr = 0;
-    if (atkProg > 0) {
-      anim = "attack";
-      fr = Math.min(3, Math.floor(atkProg * 4)); // 공격 예비 동작 진행도로 4컷을 고른다
-    } else if (moved > 0.25) {
-      anim = "walk";
-      fr = Math.floor(dv.walkPh) % 4;
-    }
-    const { tex, flip } = pickDir(ds, dv.d8, anim, fr);
-    v.sprite.texture = tex;
-    v.sprite.anchor.set(ds.anchorX, ds.anchorY);
-    v.sprite.scale.set(DIR_SCALE * mul * (flip ? -1 : 1), DIR_SCALE * mul);
-  };
   const cavRaw = await Promise.all((["idle", "thrust"] as const).map((pose) => Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((d) => Assets.load<Texture>(`assets/units/cav_${pose}_${d}.png`)))));
   // 달리기 4프레임(방향 × 프레임). 기본 자세를 변형해서 만든 그림이다.
   const cavRunRaw = await Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((d) => Promise.all([0, 1, 2, 3].map((k) => Assets.load<Texture>(`assets/units/cav_run_${d}_${k}.png`)))));
@@ -2691,8 +2660,6 @@ async function main() {
           else v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
         }
         v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
-        const dse = w[11] !== 1 ? dirSetOf(w[4], "enemy") : null;
-        if (dse) applyDir(v, dse, w[8] ?? 0, w[5], size);
       }
       v.sprite.zIndex = v.y;
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
@@ -2984,8 +2951,6 @@ async function main() {
         faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
         v.sprite.texture = recolored(`u${w[4]}`, allyTex[w[4]]!, UNIT_RULES[w[4]]!, col);
         v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
-        const dsa = dirSetOf(w[4], "ally");
-        if (dsa) applyDir(v, dsa, w[12] ?? 0, w[6], grow); // 방향별 그림(실험): 서버가 제한한 몸 방향 w[12]로 고른다
       }
       v.node.zIndex = v.y;
       setPoison(v.sprite, w[18] === 1);
