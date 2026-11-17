@@ -194,7 +194,7 @@ export const TUNE = {
   SKILL_SLAM_DAMAGE: 2.5, // 충격파 피해(철퇴 피해 대비). 범위 안의 모든 적에게 들어가고 스킬 효과 카드로는 늘지 않는다(범위만 늘어난다)
   SKILL_SLAM_MOVE: 0.3, // 힘을 모으는 동안 이동 속도 배율
   SKILL_SLAM_KNOCK: 150, // 충격파 넉백 거리(px)
-  SKILL_WALL_LEN: 170, // 방벽 전체 길이(px)
+  SKILL_WALL_LEN: 221, // (옛 170에서 30% 늘림) 방벽 전체 길이(px)
   SKILL_WALL_THICK: 22, // 방벽 두께(px)
   SKILL_WALL_SEC: 5, // 방벽이 남아 있는 시간(초). 쿨타임 10초의 절반이라 계속 세워 둘 수는 없다
   BOW_FIRE_SLOW: 0, // 활을 쏘는 동안(공격 키를 누르고 있는 동안) 줄어드는 이동 속도 비율(예전 0.15, 지금은 느려지지 않는다)

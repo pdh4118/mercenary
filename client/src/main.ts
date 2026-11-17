@@ -1747,12 +1747,12 @@ async function main() {
             if (info && info.kind === "active" && owner === myId) spawnFloat(info.name, x, y - 24, { fill: 0xffe27a, fontSize: 15, fontWeight: "800", stroke: { color: 0x3a2a00, width: 4 } }, 1.1, 0.4);
             const msSound = val === 22 ? "mskill_jump" : val === 24 ? "mskill_stealth" : val === 2 ? "mskill_gallop" : val === 4 ? "mskill_phantom" : val === 12 ? "spear_thrust" : val === 42 ? "mskill_leap" : val === 32 ? "mskill_bash" : val === 31 ? "mskill_thorn" : val === 52 ? "mskill_blink" : val === 44 ? "mskill_quake" : val === 25 ? "mskill_stealth_end" : val === 14 ? "mskill_lunge" : val === 34 ? "mskill_taunt" : val === 21 ? "mskill_poison" : val === 23 ? "mskill_ice" : null; // 소리는 받은 것부터 연결(나머지는 받는 대로)
             if (msSound) audio.play(msSound, { x, y });
-            if (val === 53) for (const delay of [0, 1000, 2000, 3000]) setTimeout(() => audio.play("mskill_ember", { x, y }), delay); // 불씨 소리는 1초짜리라 불이 타는 3.9초 동안 네 번 이어 붙인다
+            if (val === 53) for (const delay of [0, 1000, 2000]) setTimeout(() => audio.play("mskill_ember", { x, y }), delay); // 불씨 소리는 1초짜리라 불이 타는 3초 동안 세 번 이어 붙인다
             if (val === 4) {
               // 환영 기병대: 푸른 잔상 3줄이 앞으로 달려간다(월드 폭 140 안의 세 줄, 길이 600을 0.5초에)
               for (const off of [-45, 0, 45]) playMsk("phantom", x - Math.sin(ang) * off, y + Math.cos(ang) * off, { w: 230, life: 0.5, rot: ang, ax: 0.2, loop: true, vx: Math.cos(ang) * 1200, vy: Math.sin(ang) * 1200 });
             } else if (val === 53) {
-              playMsk("ember", x, y, { w: Math.max(80, ang * 2.3), life: SK.emberSec, ground: true, loop: true }); // 불씨: ang = 반경(서버), 3.9초 동안 불꽃이 탄다
+              playMsk("ember", x, y, { w: Math.max(80, ang * 2.3), life: SK.emberSec, ground: true, loop: true }); // 불씨: ang = 반경(서버), 3초 동안 불꽃이 탄다
             } else {
               const d = MSK_DEF[val];
               if (d) playMsk(d.fx, x + (d.push ? Math.cos(ang) * d.push : 0), y + (d.push ? Math.sin(ang) * d.push : 0), { w: d.w, life: d.life, ax: d.ax, ground: d.ground, rot: d.rot ? ang : 0, loop: d.loop, tint: d.tint });
