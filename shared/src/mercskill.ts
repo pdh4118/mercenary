@@ -43,7 +43,7 @@ export const MERC_SKILLS: Record<number, readonly MercSkill[]> = {
   [MAGE]: [
     { name: "마력 집중", kind: "passive", desc: "시전 시간 15% 감소, 폭발 반경 10% 증가" },
     { name: "점멸", kind: "active", desc: "위험하면 순간이동으로 빠져나간다" },
-    { name: "불씨", kind: "passive", desc: "운석이 떨어진 자리에 3초간 불이 남아 피해를 준다" },
+    { name: "불씨", kind: "passive", desc: "운석이 떨어진 자리에 3.9초간 불이 남아 피해를 준다" },
     { name: "연쇄 운석", kind: "active", desc: "운석 3발을 연달아 떨어뜨린다" },
   ],
 };
@@ -73,7 +73,7 @@ export const SK = {
   shockFrac: 0.5, // 번진 경직 길이(원래 대비)
   focusCast: 0.15, // 마력 집중: 시전 시간 감소
   focusArea: 0.1,
-  emberSec: 3, // 불씨
+  emberSec: 3.9, // 불씨(옛 3초에서 30% 늘림)
   emberDps: 0.35, // 운석 피해 대비 초당
   stealthSec: 3, // 은신
   stealthBonus: 1.8,
