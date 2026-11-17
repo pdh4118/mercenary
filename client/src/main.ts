@@ -266,6 +266,24 @@ async function main() {
   // 병종 스프라이트(기병, 창병, 궁병, 검방병, 둔기병 순). 적은 수백 마리가 되므로 텍스처 하나를 모두가 공유한다.
   const loadUnits = (side: "ally" | "enemy") => Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/units/${side}_${f}.png`)));
   const [allyTex, enemyTex] = await Promise.all([loadUnits("ally"), loadUnits("enemy")]);
+  // 아군 창병 공격 모션: 8방향(5장 + 좌우 반전) x 준비·찌르기. 없으면(null) 옛 그림 하나로 그린다. 복귀는 기본 자세를 쓴다.
+  const spearAtk = await Promise.all(["windup", "strike"].map((pose) => Promise.all([0, 1, 2, 3, 4].map((d) => Assets.load<Texture>(`assets/units/ally_spear_atk_${pose}_${d}.png`).catch(() => null)))));
+  const SPEAR_ATK_OK = spearAtk.every((row) => row.every((t) => t !== null));
+  const ATK_SCALE = (SPRITE_SCALE * 88) / 187; // 공격 그림은 원본 시트 크기 그대로라서, 기존 창병(높이 88)과 같은 키가 되게 줄여 그린다
+  const SECTOR_DIR: readonly (readonly [number, boolean])[] = [[2, false], [3, false], [4, false], [3, true], [2, true], [1, true], [0, false], [1, false]]; // 동·남동·남·남서·서·북서·북·북동 → [그림 방향(0 뒤, 1 뒤 비스듬, 2 옆, 3 앞 비스듬, 4 앞), 좌우 반전]
+  /** 창병 공격 그림: 공격 방향(8구간)과 준비 진행도(앞 60% 준비, 뒤 40% 찌르기)로 고른다. 발 위치는 기존 그림과 같은 높이로 맞춘다. */
+  const applySpearAtk = (sprite: Sprite, ang: number, prog: number, col: number, grow: number): boolean => {
+    if (!SPEAR_ATK_OK) return false;
+    const sec = ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8;
+    const [d, flip] = SECTOR_DIR[sec]!;
+    const pose = prog < 0.6 ? 0 : 1;
+    const t = spearAtk[pose]![d]!;
+    sprite.texture = recolored(`satk${pose}${d}`, t, UNIT_RULES[1]!, col);
+    const sc = ATK_SCALE * grow;
+    sprite.anchor.set(0.5, (t.height - (SPRITE_SCALE * 88 * (1 - SPRITE_ANCHOR_Y)) / sc) / t.height); // 발이 기존 그림의 발과 같은 높이
+    sprite.scale.set(flip ? -sc : sc, sc);
+    return true;
+  };
   // 군주의 명령(진군령·포위령·집결령): 깃발병 그림(검방병형·창병형), 깃발 천 3프레임, 대열 발밑 고리 2프레임
   const orNull = (p: string) => Assets.load<Texture>(p).catch(() => null);
   const flagTex: Record<number, Texture | null> = { 3: await orNull("assets/units/enemy_flag_sword.png"), 1: await orNull("assets/units/enemy_flag_spear.png") };
@@ -2956,6 +2974,8 @@ async function main() {
         faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
         v.sprite.texture = recolored(`u${w[4]}`, allyTex[w[4]]!, UNIT_RULES[w[4]]!, col);
         v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
+        v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
+        if (w[4] === 1 && w[6] > 0) applySpearAtk(v.sprite, w[7], w[6], col, grow); // 창병 공격 모션(방향별)
       }
       v.node.zIndex = v.y;
       setPoison(v.sprite, w[18] === 1);
