@@ -267,18 +267,23 @@ async function main() {
   const loadUnits = (side: "ally" | "enemy") => Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/units/${side}_${f}.png`)));
   const [allyTex, enemyTex] = await Promise.all([loadUnits("ally"), loadUnits("enemy")]);
   // 아군 창병 공격 모션: 8방향(5장 + 좌우 반전) x 준비·찌르기. 없으면(null) 옛 그림 하나로 그린다. 복귀는 기본 자세를 쓴다.
-  const spearAtk = await Promise.all(["windup", "strike"].map((pose) => Promise.all([0, 1, 2, 3, 4].map((d) => Assets.load<Texture>(`assets/units/ally_spear_atk_${pose}_${d}.png`).catch(() => null)))));
-  const SPEAR_ATK_OK = spearAtk.every((row) => row.every((t) => t !== null));
+  const loadSpearAtk = (side: "ally" | "enemy") => Promise.all(["windup", "strike"].map((pose) => Promise.all([0, 1, 2, 3, 4].map((d) => Assets.load<Texture>(`assets/units/${side}_spear_atk_${pose}_${d}.png`).catch(() => null)))));
+  const spearAtk = await loadSpearAtk("ally");
+  const enemySpearAtk = await loadSpearAtk("enemy"); // 적 창병은 같은 컷을 어둡고 붉은 팔레트로 바꾼 그림
+  const spearAtkOk = (set: (Texture | null)[][]) => set.every((row) => row.every((t) => t !== null));
+  const SPEAR_ATK_OK = spearAtkOk(spearAtk);
+  const ENEMY_SPEAR_ATK_OK = spearAtkOk(enemySpearAtk);
   const ATK_SCALE = (SPRITE_SCALE * 88) / 187; // 공격 그림은 원본 시트 크기 그대로라서, 기존 창병(높이 88)과 같은 키가 되게 줄여 그린다
   const SECTOR_DIR: readonly (readonly [number, boolean])[] = [[2, false], [3, false], [4, false], [3, true], [2, true], [1, true], [0, false], [1, false]]; // 동·남동·남·남서·서·북서·북·북동 → [그림 방향(0 뒤, 1 뒤 비스듬, 2 옆, 3 앞 비스듬, 4 앞), 좌우 반전]
   /** 창병 공격 그림: 공격 방향(8구간)과 준비 진행도(앞 60% 준비, 뒤 40% 찌르기)로 고른다. 발 위치는 기존 그림과 같은 높이로 맞춘다. */
-  const applySpearAtk = (sprite: Sprite, ang: number, prog: number, col: number, grow: number): boolean => {
-    if (!SPEAR_ATK_OK) return false;
+  const applySpearAtk = (sprite: Sprite, ang: number, prog: number, col: number | null, grow: number): boolean => {
+    const set = col === null ? enemySpearAtk : spearAtk; // col이 null이면 적 창병(팀 색을 입히지 않는다)
+    if (!(col === null ? ENEMY_SPEAR_ATK_OK : SPEAR_ATK_OK)) return false;
     const sec = ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8;
     const [d, flip] = SECTOR_DIR[sec]!;
     const pose = prog < 0.6 ? 0 : 1;
-    const t = spearAtk[pose]![d]!;
-    sprite.texture = recolored(`satk${pose}${d}`, t, UNIT_RULES[1]!, col);
+    const t = set[pose]![d]!;
+    sprite.texture = col === null ? t : recolored(`satk${pose}${d}`, t, UNIT_RULES[1]!, col);
     const sc = ATK_SCALE * grow;
     sprite.anchor.set(0.5, (t.height - (SPRITE_SCALE * 88 * (1 - SPRITE_ANCHOR_Y)) / sc) / t.height); // 발이 기존 그림의 발과 같은 높이
     sprite.scale.set(flip ? -sc : sc, sc);
@@ -2683,6 +2688,7 @@ async function main() {
           else v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
         }
         v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
+        if (w[4] === 1 && w[11] !== 1 && ft === null && w[5] > 0) applySpearAtk(v.sprite, w[6], w[5], null, size); // 적 창병 공격 모션(방향별)
       }
       v.sprite.zIndex = v.y;
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
