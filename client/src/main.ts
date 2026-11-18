@@ -271,10 +271,11 @@ async function main() {
   const spearAtk = await loadSpearAtk("ally");
   const enemySpearAtk = await loadSpearAtk("enemy"); // 적 창병은 같은 컷을 어둡고 붉은 팔레트로 바꾼 그림
   // 창병 걷기 4컷(옆모습 오른쪽을 봄, 왼쪽은 좌우 반전). 없으면 걷기 그림 없이 기본 자세로 그린다.
-  const loadSpearWalk = (side: "ally" | "enemy") => Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/units/${side}_spear_walk_${i}.png`).catch(() => null)));
+  const WALK_N = 12; // 걷기 그림 컷 수(생성한 걷기 시트 36컷에서 3컷 간격으로 골랐다. 시간 순서대로 한 바퀴)
+  const loadSpearWalk = (side: "ally" | "enemy") => Promise.all(Array.from({ length: WALK_N }, (_, i) => Assets.load<Texture>(`assets/units/${side}_spear_walk_${i}.png`).catch(() => null)));
   const spearWalk = await loadSpearWalk("ally");
   const enemySpearWalk = await loadSpearWalk("enemy");
-  const WALK_STRIDE = 7; // 이 거리(px)만큼 움직일 때마다 걷기 그림이 한 컷 넘어간다(4컷 한 바퀴 = 28px)
+  const WALK_STRIDE = 7; // 이 거리(px)만큼 움직일 때마다 걷기 그림이 한 컷 넘어간다(12컷 한 바퀴 = 84px)
   const spearAtkOk = (set: (Texture | null)[][]) => set.every((row) => row.every((t) => t !== null));
   const SPEAR_ATK_OK = spearAtkOk(spearAtk);
   const ENEMY_SPEAR_ATK_OK = spearAtkOk(enemySpearAtk);
@@ -289,7 +290,7 @@ async function main() {
     if (prog <= 0 && (sv.sHold ?? 0) <= 0) {
       // 걷기: 움직이는 동안 거리에 맞춰 4컷을 돌린다(멈추면 기본 자세)
       if (moved > 0.25) {
-        sv.wph = ((sv.wph ?? 0) + moved / WALK_STRIDE) % 4;
+        sv.wph = ((sv.wph ?? 0) + moved / WALK_STRIDE) % WALK_N;
         const set = col === null ? enemySpearWalk : spearWalk;
         const t = set[Math.floor(sv.wph)];
         if (t && set.every((x) => x !== null)) {
