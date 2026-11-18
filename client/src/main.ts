@@ -270,14 +270,37 @@ async function main() {
   const loadSpearAtk = (side: "ally" | "enemy") => Promise.all(["windup", "strike"].map((pose) => Promise.all([0, 1, 2, 3, 4].map((d) => Assets.load<Texture>(`assets/units/${side}_spear_atk_${pose}_${d}.png`).catch(() => null)))));
   const spearAtk = await loadSpearAtk("ally");
   const enemySpearAtk = await loadSpearAtk("enemy"); // 적 창병은 같은 컷을 어둡고 붉은 팔레트로 바꾼 그림
+  // 창병 걷기 4컷(옆모습 오른쪽을 봄, 왼쪽은 좌우 반전). 없으면 걷기 그림 없이 기본 자세로 그린다.
+  const loadSpearWalk = (side: "ally" | "enemy") => Promise.all([0, 1, 2, 3].map((i) => Assets.load<Texture>(`assets/units/${side}_spear_walk_${i}.png`).catch(() => null)));
+  const spearWalk = await loadSpearWalk("ally");
+  const enemySpearWalk = await loadSpearWalk("enemy");
+  const WALK_STRIDE = 7; // 이 거리(px)만큼 움직일 때마다 걷기 그림이 한 컷 넘어간다(4컷 한 바퀴 = 28px)
   const spearAtkOk = (set: (Texture | null)[][]) => set.every((row) => row.every((t) => t !== null));
   const SPEAR_ATK_OK = spearAtkOk(spearAtk);
   const ENEMY_SPEAR_ATK_OK = spearAtkOk(enemySpearAtk);
   const ATK_SCALE = (SPRITE_SCALE * 88) / 187; // 공격 그림은 원본 시트 크기 그대로라서, 기존 창병(높이 88)과 같은 키가 되게 줄여 그린다
   const SECTOR_DIR: readonly (readonly [number, boolean])[] = [[2, false], [3, false], [4, false], [3, true], [2, true], [1, true], [0, false], [1, false]]; // 동·남동·남·남서·서·북서·북·북동 → [그림 방향(0 뒤, 1 뒤 비스듬, 2 옆, 3 앞 비스듬, 4 앞), 좌우 반전]
   /** 창병 공격 모션: 준비 동안은 창을 뒤로 뺀 그림, 맞는 순간(준비가 끝나는 때)부터 0.3초는 찌른 그림을 유지한 뒤 기본 자세로 돌아간다. */
-  const spearAtkMotion = (v: { sprite: Sprite }, ang: number, prog: number, col: number | null, grow: number, dtMs: number) => {
-    const sv = v as unknown as { sAng?: number; sHold?: number };
+  const spearAtkMotion = (v: { sprite: Sprite; x: number; y: number; face: 1 | -1 }, ang: number, prog: number, col: number | null, grow: number, dtMs: number) => {
+    const sv = v as unknown as { sAng?: number; sHold?: number; wx?: number; wy?: number; wph?: number };
+    const moved = Math.hypot(v.x - (sv.wx ?? v.x), v.y - (sv.wy ?? v.y));
+    sv.wx = v.x;
+    sv.wy = v.y;
+    if (prog <= 0 && (sv.sHold ?? 0) <= 0) {
+      // 걷기: 움직이는 동안 거리에 맞춰 4컷을 돌린다(멈추면 기본 자세)
+      if (moved > 0.25) {
+        sv.wph = ((sv.wph ?? 0) + moved / WALK_STRIDE) % 4;
+        const set = col === null ? enemySpearWalk : spearWalk;
+        const t = set[Math.floor(sv.wph)];
+        if (t && set.every((x) => x !== null)) {
+          v.sprite.texture = col === null ? t : recolored(`swalk${Math.floor(sv.wph)}`, t, UNIT_RULES[1]!, col);
+          const sc = ATK_SCALE * grow;
+          v.sprite.anchor.set(0.5, (t.height - (SPRITE_SCALE * 88 * (1 - SPRITE_ANCHOR_Y)) / sc) / t.height);
+          v.sprite.scale.set(v.face < 0 ? -sc : sc, sc);
+        }
+      } else sv.wph = 0;
+      return;
+    }
     if (prog > 0) {
       sv.sAng = ang;
       sv.sHold = 0.3;
