@@ -1,6 +1,6 @@
 import { prefetch, warmAssets } from "./assets.js";
 import { createMurmur } from "./murmur.js";
-import { Application, Assets, Container, Graphics, Sprite, Text, TilingSprite, type Texture, type TextStyleOptions } from "pixi.js";
+import { Application, Assets, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite, type TextStyleOptions } from "pixi.js";
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
@@ -266,63 +266,76 @@ async function main() {
   // 병종 스프라이트(기병, 창병, 궁병, 검방병, 둔기병 순). 적은 수백 마리가 되므로 텍스처 하나를 모두가 공유한다.
   const loadUnits = (side: "ally" | "enemy") => Promise.all(UNIT_FILES.map((f) => Assets.load<Texture>(`assets/units/${side}_${f}.png`)));
   const [allyTex, enemyTex] = await Promise.all([loadUnits("ally"), loadUnits("enemy")]);
-  // 아군 창병 공격 모션: 8방향(5장 + 좌우 반전) x 준비·찌르기. 없으면(null) 옛 그림 하나로 그린다. 복귀는 기본 자세를 쓴다.
-  const loadSpearAtk = (side: "ally" | "enemy") => Promise.all(["windup", "strike"].map((pose) => Promise.all([0, 1, 2, 3, 4].map((d) => Assets.load<Texture>(`assets/units/${side}_spear_atk_${pose}_${d}.png`).catch(() => null)))));
-  const spearAtk = await loadSpearAtk("ally");
-  const enemySpearAtk = await loadSpearAtk("enemy"); // 적 창병은 같은 컷을 어둡고 붉은 팔레트로 바꾼 그림
-  // 창병 걷기 4컷(옆모습 오른쪽을 봄, 왼쪽은 좌우 반전). 없으면 걷기 그림 없이 기본 자세로 그린다.
+  // 창병 걷기 12컷·공격(준비·찌르기 x 5방향) 그림. 그림마다 텍스처가 따로면 적이 많을 때 그리기 호출이 크게 늘어 렉이 나므로 한 장의 아틀라스로 묶어 쓴다
+  // (tools/pack_spear_atlas.py). 아군은 아틀라스 전체를 팀 색으로 한 번 칠한 뒤 조각을 잘라 쓴다. 없으면 옛 그림 하나로 그린다.
+  interface AtlasFrame { x: number; y: number; w: number; h: number; ax: number }
+  const loadSpearAtlas = async (side: "ally" | "enemy") => {
+    try {
+      const tex = await Assets.load<Texture>(`assets/units/${side}_spear_atlas.png`);
+      const json = (await (await fetch(`assets/units/${side}_spear_atlas.json`)).json()) as Record<string, AtlasFrame>;
+      return { tex, json };
+    } catch {
+      return null;
+    }
+  };
+  const spearAtlas = { ally: await loadSpearAtlas("ally"), enemy: await loadSpearAtlas("enemy") };
+  const atlasCache = new Map<string, Record<string, { tex: Texture; w: number; h: number; ax: number }>>();
+  /** 아틀라스 조각 하나: col이 null이면 적 창병(색을 입히지 않음), 숫자면 그 팀 색으로 칠한 아군 아틀라스 */
+  const atlasFrame = (col: number | null, name: string) => {
+    const side = col === null ? "enemy" : "ally";
+    const at = spearAtlas[side];
+    if (!at) return null;
+    const key = `${side}/${col}`;
+    let set = atlasCache.get(key);
+    if (!set) {
+      const src = col === null ? at.tex : recolored("satlas", at.tex, UNIT_RULES[1]!, col);
+      set = {};
+      for (const [n, f] of Object.entries(at.json)) set[n] = { tex: new Texture({ source: src.source, frame: new Rectangle(f.x, f.y, f.w, f.h) }), w: f.w, h: f.h, ax: f.ax };
+      atlasCache.set(key, set);
+    }
+    return set[name] ?? null;
+  };
   const WALK_N = 12; // 걷기 그림 컷 수(생성한 걷기 시트 36컷에서 3컷 간격으로 골랐다. 시간 순서대로 한 바퀴)
-  const loadSpearWalk = (side: "ally" | "enemy") => Promise.all(Array.from({ length: WALK_N }, (_, i) => Assets.load<Texture>(`assets/units/${side}_spear_walk_${i}.png`).catch(() => null)));
-  const spearWalk = await loadSpearWalk("ally");
-  const enemySpearWalk = await loadSpearWalk("enemy");
   const WALK_STRIDE = 7; // 이 거리(px)만큼 움직일 때마다 걷기 그림이 한 컷 넘어간다(12컷 한 바퀴 = 84px)
-  const spearAtkOk = (set: (Texture | null)[][]) => set.every((row) => row.every((t) => t !== null));
-  const SPEAR_ATK_OK = spearAtkOk(spearAtk);
-  const ENEMY_SPEAR_ATK_OK = spearAtkOk(enemySpearAtk);
-  const ATK_SCALE = (SPRITE_SCALE * 88) / 187; // 공격 그림은 원본 시트 크기 그대로라서, 기존 창병(높이 88)과 같은 키가 되게 줄여 그린다
-  const SECTOR_DIR: readonly (readonly [number, boolean])[] = [[2, false], [3, false], [4, false], [3, true], [2, true], [1, true], [0, false], [1, false]]; // 동·남동·남·남서·서·북서·북·북동 → [그림 방향(0 뒤, 1 뒤 비스듬, 2 옆, 3 앞 비스듬, 4 앞), 좌우 반전]
-  /** 창병 공격 모션: 준비 동안은 창을 뒤로 뺀 그림, 맞는 순간(준비가 끝나는 때)부터 0.3초는 찌른 그림을 유지한 뒤 기본 자세로 돌아간다. */
-  const spearAtkMotion = (v: { sprite: Sprite; x: number; y: number; face: 1 | -1 }, ang: number, prog: number, col: number | null, grow: number, dtMs: number) => {
+  const ATK_SCALE = (SPRITE_SCALE * 88) / 187; // 이 그림들은 원본 시트 크기 그대로라서, 기존 창병(높이 88)과 같은 키가 되게 줄여 그린다
+  const SECTOR_DIR: readonly (readonly [number, boolean])[] = [[2, false], [3, false], [4, false], [3, true], [2, true], [1, true], [0, false], [1, false]]; // 동·남동·남·남서·서·북서·북·북동
+  /** 조각 하나를 그린다. 발이 기존 그림의 발과 같은 높이·같은 가로 위치가 되게 앵커를 맞춘다. */
+  const putFrame = (sprite: Sprite, col: number | null, name: string, flip: boolean, grow: number): boolean => {
+    const f = atlasFrame(col, name);
+    if (!f) return false;
+    sprite.texture = f.tex;
+    const sc = ATK_SCALE * grow;
+    sprite.anchor.set(f.ax / f.w, (f.h - (SPRITE_SCALE * 88 * (1 - SPRITE_ANCHOR_Y)) / sc) / f.h);
+    sprite.scale.set(flip ? -sc : sc, sc);
+    return true;
+  };
+  /** 창병 모션: 공격(준비 → 찌르기, 맞은 뒤 0.3초 유지) > 걷기(움직인 거리에 맞춰 12컷) > 기본 자세. 그림을 바꿨으면 true. */
+  const spearMotion = (v: { sprite: Sprite; x: number; y: number; face: 1 | -1 }, ang: number, prog: number, col: number | null, grow: number, dtMs: number): boolean => {
     const sv = v as unknown as { sAng?: number; sHold?: number; wx?: number; wy?: number; wph?: number };
     const moved = Math.hypot(v.x - (sv.wx ?? v.x), v.y - (sv.wy ?? v.y));
     sv.wx = v.x;
     sv.wy = v.y;
-    if (prog <= 0 && (sv.sHold ?? 0) <= 0) {
-      // 걷기: 움직이는 동안 거리에 맞춰 4컷을 돌린다(멈추면 기본 자세)
-      if (moved > 0.25) {
-        sv.wph = ((sv.wph ?? 0) + moved / WALK_STRIDE) % WALK_N;
-        const set = col === null ? enemySpearWalk : spearWalk;
-        const t = set[Math.floor(sv.wph)];
-        if (t && set.every((x) => x !== null)) {
-          v.sprite.texture = col === null ? t : recolored(`swalk${Math.floor(sv.wph)}`, t, UNIT_RULES[1]!, col);
-          const sc = ATK_SCALE * grow;
-          v.sprite.anchor.set(0.5, (t.height - (SPRITE_SCALE * 88 * (1 - SPRITE_ANCHOR_Y)) / sc) / t.height);
-          v.sprite.scale.set(v.face < 0 ? -sc : sc, sc);
-        }
-      } else sv.wph = 0;
-      return;
-    }
+    let a = prog > 0 ? ang : null;
+    let pose = prog < 0.85 ? 0 : 1;
     if (prog > 0) {
       sv.sAng = ang;
       sv.sHold = 0.3;
-      applySpearAtk(v.sprite, ang, prog, col, grow);
     } else if ((sv.sHold ?? 0) > 0) {
       sv.sHold = (sv.sHold ?? 0) - dtMs / 1000;
-      applySpearAtk(v.sprite, sv.sAng ?? 0, 1, col, grow, 1);
+      a = sv.sAng ?? 0;
+      pose = 1;
     }
-  };
-  /** 창병 공격 그림: 공격 방향(8구간)과 준비 진행도(앞 85% 준비, 뒤 15% 찌르기)로 고른다. 발 위치는 기존 그림과 같은 높이로 맞춘다. */
-  const applySpearAtk = (sprite: Sprite, ang: number, prog: number, col: number | null, grow: number, pose = prog < 0.85 ? 0 : 1): boolean => {
-    const set = col === null ? enemySpearAtk : spearAtk; // col이 null이면 적 창병(팀 색을 입히지 않는다)
-    if (!(col === null ? ENEMY_SPEAR_ATK_OK : SPEAR_ATK_OK)) return false;
-    const sec = ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8;
-    const [d, flip] = SECTOR_DIR[sec]!;
-    const t = set[pose]![d]!;
-    sprite.texture = col === null ? t : recolored(`satk${pose}${d}`, t, UNIT_RULES[1]!, col);
-    const sc = ATK_SCALE * grow;
-    sprite.anchor.set(0.5, (t.height - (SPRITE_SCALE * 88 * (1 - SPRITE_ANCHOR_Y)) / sc) / t.height); // 발이 기존 그림의 발과 같은 높이
-    sprite.scale.set(flip ? -sc : sc, sc);
-    return true;
+    if (a !== null) {
+      const sec = ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
+      const [d, flip] = SECTOR_DIR[sec]!;
+      return putFrame(v.sprite, col, `atk_${pose === 0 ? "windup" : "strike"}_${d}`, flip, grow);
+    }
+    if (moved > 0.25) {
+      sv.wph = ((sv.wph ?? 0) + moved / WALK_STRIDE) % WALK_N;
+      return putFrame(v.sprite, col, `walk_${Math.floor(sv.wph)}`, v.face < 0, grow);
+    }
+    sv.wph = 0;
+    return false;
   };
   // 군주의 명령(진군령·포위령·집결령): 깃발병 그림(검방병형·창병형), 깃발 천 3프레임, 대열 발밑 고리 2프레임
   const orNull = (p: string) => Assets.load<Texture>(p).catch(() => null);
@@ -2716,14 +2729,16 @@ async function main() {
         // 진군령 대열의 깃발병은 전용 그림(깃대를 멘 모습)으로 바꿔 그린다. 깃발병이 아니게 되면 원래 그림으로 돌린다.
         const ft = ((w[14] ?? 0) & EF_FLAG) !== 0 ? flagTex[w[4]] ?? null : null;
         const want = ft ?? enemyTex[w[4]]!;
-        if (v.sprite.texture !== want) {
-          v.sprite.texture = want;
-          const g = FLAG_GEO[w[4]];
-          if (ft && g) v.sprite.anchor.set(g.bodyX / g.w, (g.feetY - 0.35 * 90) / g.h); // 발이 일반 졸개와 같은 높이에 오게(일반 그림은 높이 90에 앵커 0.65)
-          else v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
+        // 창병(장군·깃발병 제외)이 공격·걷기 그림으로 그려지면 기본 그림 지정은 건너뛴다(같은 프레임에 텍스처를 두 번 바꾸지 않게)
+        if (!(w[4] === 1 && w[11] !== 1 && ft === null && spearMotion(v, w[6], w[5], null, size, ticker.deltaMS))) {
+          if (v.sprite.texture !== want) {
+            v.sprite.texture = want;
+            const g = FLAG_GEO[w[4]];
+            if (ft && g) v.sprite.anchor.set(g.bodyX / g.w, (g.feetY - 0.35 * 90) / g.h); // 발이 일반 졸개와 같은 높이에 오게(일반 그림은 높이 90에 앵커 0.65)
+            else v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
+          }
+          v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
         }
-        v.sprite.scale.set(SPRITE_SCALE * size * v.face, SPRITE_SCALE * size);
-        if (w[4] === 1 && w[11] !== 1 && ft === null) spearAtkMotion(v, w[6], w[5], null, size, ticker.deltaMS); // 적 창병 공격 모션(방향별)
       }
       v.sprite.zIndex = v.y;
       v.sprite.alpha = 0.7 + 0.3 * Math.min(1, w[3] / 100);
@@ -3013,10 +3028,12 @@ async function main() {
         v.lastY = v.y;
       } else {
         faceFrom(v, v.x, w[6] > 0 ? w[7] : null);
-        v.sprite.texture = recolored(`u${w[4]}`, allyTex[w[4]]!, UNIT_RULES[w[4]]!, col);
-        v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
-        v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
-        if (w[4] === 1) spearAtkMotion(v, w[7], w[6], col, grow, ticker.deltaMS); // 창병 공격 모션(방향별)
+        if (!(w[4] === 1 && spearMotion(v, w[7], w[6], col, grow, ticker.deltaMS))) {
+          // 창병이 공격·걷기 그림으로 그려지지 않을 때(또는 다른 병종)만 기본 그림을 지정한다
+          v.sprite.texture = recolored(`u${w[4]}`, allyTex[w[4]]!, UNIT_RULES[w[4]]!, col);
+          v.sprite.scale.set(SPRITE_SCALE * grow * v.face, SPRITE_SCALE * grow);
+          v.sprite.anchor.set(0.5, SPRITE_ANCHOR_Y);
+        }
       }
       v.node.zIndex = v.y;
       setPoison(v.sprite, w[18] === 1);
