@@ -76,13 +76,18 @@ const silCache = new WeakMap<Texture, Texture>();
 export function silhouette(src: Texture): Texture {
   const hit = silCache.get(src);
   if (hit) return hit;
-  const w = src.source.pixelWidth;
-  const h = src.source.pixelHeight;
+  // 아틀라스 조각처럼 원본 이미지의 일부만 쓰는 텍스처는 그 조각(frame)만 하얗게 만든다(전체를 만들면 아틀라스 통째로 흰 그림이 뜬다)
+  const fr = src.frame;
+  const sw = src.source.resolution || 1;
+  const fx = Math.round(fr.x * sw);
+  const fy = Math.round(fr.y * sw);
+  const w = Math.max(1, Math.round(fr.width * sw));
+  const h = Math.max(1, Math.round(fr.height * sw));
   const cv = document.createElement("canvas");
   cv.width = w;
   cv.height = h;
   const ctx = cv.getContext("2d", { willReadFrequently: true })!;
-  ctx.drawImage(src.source.resource as CanvasImageSource, 0, 0);
+  ctx.drawImage(src.source.resource as CanvasImageSource, fx, fy, w, h, 0, 0, w, h);
   const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
