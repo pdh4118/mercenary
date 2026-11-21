@@ -2139,8 +2139,8 @@ async function main() {
   const CMD_COLOR: Record<CmdKind, number> = { move: 0xffe08a, attack: 0xff6a5a, hold: 0x7ec8ff, break: 0xff9a3c, encircle: 0xc99aff };
   const CMD_NAME: Record<CmdKind, string> = { move: "이동", attack: "공격", hold: "수비", break: "돌파", encircle: "포위" };
   let markerTourSeen = false; // 지난 프레임에 토너먼트 중이었다
-  const cmdWheel = createWheel(92);
-  const buyWheel = createWheel(104);
+  const cmdWheel = createWheel(125);
+  const buyWheel = createWheel(150);
   let orderMarks: { x: number; y: number; kind: CmdKind; t0: number }[] = []; // 내가 내린 명령 지점(연속 명령이면 순서대로 이어서 그린다)
   const markG = new Graphics();
   const MARK_MAX = 8;
@@ -2208,7 +2208,7 @@ async function main() {
         color: on ? (ok ? "#e0c05d" : "#c0645a") : undefined,
       };
     });
-    buyWheel.show(clientX, clientY, items);
+    buyWheel.show(clientX, clientY, items, { label: "취소", sub: "가운데에서 떼기" });
   };
   const closeBuyWheel = () => {
     if (!buyWheel.isOpen()) return;

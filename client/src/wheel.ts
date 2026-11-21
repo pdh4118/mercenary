@@ -25,20 +25,25 @@ export interface Wheel {
   hide(): string | null;
 }
 
+const SVG = "http://www.w3.org/2000/svg";
 const CSS = `
 .wheel { position: fixed; z-index: 30; width: 0; height: 0; pointer-events: none; display: none; }
 .wheel.open { display: block; }
-.wheel .ring { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,.14); background: rgba(8,10,16,.55); box-shadow: 0 0 0 1px rgba(0,0,0,.5) inset; }
-.wheel .cell { position: absolute; width: 74px; height: 74px; margin: -37px 0 0 -37px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: rgba(16,19,28,.92); border: 2px solid #3a4052; color: #e6e9f0; font-size: 14px; font-weight: 700; text-align: center; line-height: 1.15; transition: transform .06s, border-color .06s, background .06s; }
-.wheel .cell small { font-size: 10px; font-weight: 500; color: #aab2c2; margin-top: 2px; max-width: 68px; }
-.wheel .cell.off { opacity: .38; filter: grayscale(.8); border-style: dashed; }
-.wheel .cell.on { transform: scale(1.14); background: rgba(52,44,18,.96); border-color: #ffe08a; color: #fff; }
-.wheel .cell.on small { color: #ffe9b0; }
-.wheel .cell.mid { width: 64px; height: 64px; margin: -32px 0 0 -32px; }
+.wheel svg { position: absolute; overflow: visible; filter: drop-shadow(0 4px 10px rgba(0,0,0,.55)); }
+.wheel .sec { fill: rgba(16,19,28,.9); stroke: #0b0d12; stroke-width: 3; transition: fill .06s; }
+.wheel .sec.off { fill: rgba(16,19,28,.55); }
+.wheel .sec.on { fill: rgba(70,58,22,.97); }
+.wheel .rim { fill: none; stroke-width: 4; opacity: .85; }
+.wheel .sec.off + .rim { opacity: .25; }
+.wheel .sec.on + .rim { opacity: 1; stroke-width: 6; }
+.wheel text { fill: #e6e9f0; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(0,0,0,.6); stroke-width: 3px; }
+.wheel text.sub { font-size: 12px; font-weight: 600; fill: #aab2c2; }
+.wheel .off text { fill: #7d8597; }
+.wheel .on text { fill: #fff; }
+.wheel .on text.sub { fill: #ffe9b0; }
 `;
 
-export function createWheel(radius = 92): Wheel {
+export function createWheel(radius = 120): Wheel {
   if (!document.getElementById("wheelCss")) {
     const st = document.createElement("style");
     st.id = "wheelCss";
@@ -48,8 +53,9 @@ export function createWheel(radius = 92): Wheel {
   const root = document.createElement("div");
   root.className = "wheel";
   document.body.append(root);
+  const R_IN = 44; // 가운데 원 반지름
   let items: WheelItem[] = [];
-  let cells = new Map<string, HTMLElement>();
+  let groups = new Map<string, SVGGElement>();
   let hasCenter = false;
   let cx = 0;
   let cy = 0;
@@ -57,49 +63,86 @@ export function createWheel(radius = 92): Wheel {
   let open = false;
   const setCur = (k: string | null) => {
     if (k === cur) return;
-    if (cur) cells.get(cur)?.classList.remove("on");
+    if (cur) groups.get(cur)?.querySelector(".sec")?.classList.remove("on");
+    if (cur) groups.get(cur)?.classList.remove("on");
     cur = k;
-    if (cur) cells.get(cur)?.classList.add("on");
+    if (cur) {
+      groups.get(cur)?.querySelector(".sec")?.classList.add("on");
+      groups.get(cur)?.classList.add("on");
+    }
+  };
+  /** 위 0도·시계 방향 각도(도)와 반지름의 점 */
+  const pt = (deg: number, r: number): [number, number] => {
+    const a = (deg * Math.PI) / 180;
+    return [Math.sin(a) * r, -Math.cos(a) * r];
+  };
+  const slicePath = (a0: number, a1: number, r0: number, r1: number): string => {
+    const [x0, y0] = pt(a0, r1);
+    const [x1, y1] = pt(a1, r1);
+    const [x2, y2] = pt(a1, r0);
+    const [x3, y3] = pt(a0, r0);
+    const large = a1 - a0 > 180 ? 1 : 0;
+    return `M${x0} ${y0}A${r1} ${r1} 0 ${large} 1 ${x1} ${y1}L${x2} ${y2}A${r0} ${r0} 0 ${large} 0 ${x3} ${y3}Z`;
+  };
+  const arcPath = (a0: number, a1: number, r: number): string => {
+    const [x0, y0] = pt(a0, r);
+    const [x1, y1] = pt(a1, r);
+    return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+  };
+  const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>, parent?: Element) => {
+    const e = document.createElementNS(SVG, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+    parent?.append(e);
+    return e;
   };
   return {
     isOpen: () => open,
     show(x, y, its, center) {
-      items = its;
+      items = [...its].sort((p, q) => p.angle - q.angle);
       hasCenter = !!center;
-      // 화면 밖으로 나가지 않게 가장자리에서 밀어 넣는다
-      const m = radius + 44;
+      const m = radius + 12;
       cx = Math.max(m, Math.min(window.innerWidth - m, x));
       cy = Math.max(m, Math.min(window.innerHeight - m, y));
       root.style.left = `${cx}px`;
       root.style.top = `${cy}px`;
       root.replaceChildren();
-      cells = new Map();
-      const ring = document.createElement("div");
-      ring.className = "ring";
-      const rr = radius + 40;
-      ring.style.cssText = `left:${-rr}px;top:${-rr}px;width:${rr * 2}px;height:${rr * 2}px`;
-      root.append(ring);
-      const mk = (key: string, label: string, sub: string | undefined, px: number, py: number, enabled: boolean, mid: boolean, color?: string) => {
-        const c = document.createElement("div");
-        c.className = `cell${enabled ? "" : " off"}${mid ? " mid" : ""}`;
-        c.style.left = `${px}px`;
-        c.style.top = `${py}px`;
-        if (color) c.style.borderColor = color;
-        const t = document.createElement("span");
-        t.textContent = label;
-        c.append(t);
-        if (sub) {
-          const s = document.createElement("small");
-          s.textContent = sub;
-          c.append(s);
+      groups = new Map();
+      const svg = el("svg", { width: radius * 2, height: radius * 2, viewBox: `${-radius} ${-radius} ${radius * 2} ${radius * 2}` });
+      svg.style.left = `${-radius}px`;
+      svg.style.top = `${-radius}px`;
+      root.append(svg);
+      const n = items.length;
+      // 조각: 이웃 항목과의 가운데 각도까지가 한 조각의 경계(피자처럼 빈틈 없이 나눈다)
+      items.forEach((it, i) => {
+        const prev = items[(i + n - 1) % n]!;
+        const next = items[(i + 1) % n]!;
+        const gapPrev = (((it.angle - prev.angle) % 360) + 360) % 360 || 360;
+        const gapNext = (((next.angle - it.angle) % 360) + 360) % 360 || 360;
+        const a0 = it.angle - gapPrev / 2;
+        const a1 = it.angle + gapNext / 2;
+        const g = el("g", {}, svg) as SVGGElement;
+        el("path", { class: `sec${it.enabled ? "" : " off"}`, d: slicePath(a0 + 0.6, a1 - 0.6, R_IN + 3, radius) }, g);
+        el("path", { class: "rim", d: arcPath(a0 + 2, a1 - 2, radius - 3), stroke: it.color ?? "#3a4052" }, g);
+        const mid = (R_IN + radius) / 2 + 4;
+        const [tx, ty] = pt(it.angle, mid);
+        const t = el("text", { x: tx, y: it.sub ? ty - 4 : ty + 5, "font-size": 16 }, g);
+        t.textContent = it.label;
+        if (it.sub) {
+          const s2 = el("text", { class: "sub", x: tx, y: ty + 14 }, g);
+          s2.textContent = it.sub;
         }
-        root.append(c);
-        cells.set(key, c);
-      };
-      if (center) mk(WHEEL_CENTER, center.label, center.sub, 0, 0, true, true);
-      for (const it of items) {
-        const a = (it.angle * Math.PI) / 180;
-        mk(it.key, it.label, it.sub, Math.sin(a) * radius, -Math.cos(a) * radius, it.enabled, false, it.color);
+        groups.set(it.key, g);
+      });
+      if (center) {
+        const g = el("g", {}, svg) as SVGGElement;
+        el("circle", { class: "sec", r: R_IN, cx: 0, cy: 0 }, g);
+        const t = el("text", { x: 0, y: center.sub ? -2 : 5, "font-size": 15 }, g);
+        t.textContent = center.label;
+        if (center.sub) {
+          const s2 = el("text", { class: "sub", x: 0, y: 14, "font-size": 11 }, g);
+          s2.textContent = center.sub;
+        }
+        groups.set(WHEEL_CENTER, g);
       }
       root.classList.add("open");
       open = true;
@@ -111,7 +154,7 @@ export function createWheel(radius = 92): Wheel {
       const dx = mx - cx;
       const dy = my - cy;
       const d = Math.hypot(dx, dy);
-      if (d < 34) {
+      if (d < R_IN) {
         setCur(hasCenter ? WHEEL_CENTER : null);
         return cur;
       }
@@ -126,8 +169,7 @@ export function createWheel(radius = 92): Wheel {
           best = it;
         }
       }
-      // 가장 가까운 방향의 항목(비활성이면 고르지 않는다)
-      setCur(best && best.enabled ? best.key : null);
+      setCur(best && best.enabled ? best.key : null); // 비활성 조각은 고르지 않는다
       return cur;
     },
     hide() {
