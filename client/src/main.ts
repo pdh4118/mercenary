@@ -1018,6 +1018,7 @@ async function main() {
     const key = new Text({ text: String(i + 1), style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold" } });
     key.anchor.set(0.5);
     key.position.set(26, 14);
+    key.style.fontSize = 14;
     const name = new Text({ text: "", style: { fill: 0xffffff, fontSize: 22, fontWeight: "bold" } });
     name.position.set(68, 8);
     const sub = new Text({ text: "", style: { fill: 0xb8bdc9, fontSize: 14 } });
@@ -1028,7 +1029,8 @@ async function main() {
     const lead = new Text({ text: "", style: { fill: 0x9fd0ff, fontSize: 16 } });
     lead.anchor.set(1, 0);
     lead.position.set(CAMP_W - 28 - 20, 38);
-    node.addChild(bg, icon, key, name, sub, price, lead);
+    const keyBg = new Graphics().roundRect(17, 5, 18, 18, 4).fill({ color: 0x000000, alpha: 0.6 }).stroke({ width: 1.5, color: 0xcfd3dc }); // 번호는 네모 안에
+    node.addChild(bg, icon, keyBg, key, name, sub, price, lead);
     campPanel.addChild(node);
     return { bg, icon, key, name, sub, price, lead };
   });
@@ -1043,25 +1045,37 @@ async function main() {
   const legendBg = new Graphics();
   legend.addChild(legendBg);
   let lx = 12;
-  // 병종 선택 키: 1 = 모든 병종, 2~7 = 병종마다 고정(캠프에서 고용 키이기도 하다). 선택한 것은 노랗게 표시한다.
+  // 병종 선택 키: ` = 모든 병종, 1~6 = 병종마다 고정(캠프에서 고용 키이기도 하다). 선택한 것은 노랗게 표시한다.
   const legendLabels: { label: Text; mask: number }[] = [];
   {
-    const all = new Text({ text: "1 전체", style: { fill: 0xcfd3dc, fontSize: 12 } });
-    all.position.set(lx, 6);
+    const badge = (n: string, x: number) => {
+      const g = new Graphics().roundRect(x, 5, 16, 16, 4).fill({ color: 0x000000, alpha: 0.55 }).stroke({ width: 1.5, color: 0xcfd3dc });
+      const t = new Text({ text: n, style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
+      t.anchor.set(0.5);
+      t.position.set(x + 8, 13);
+      legend.addChild(g, t);
+    };
+    badge("`", lx);
+    const all = new Text({ text: "전체", style: { fill: 0xcfd3dc, fontSize: 12 } });
+    all.position.set(lx + 22, 6);
     legend.addChild(all);
     legendLabels.push({ label: all, mask: (1 << UNIT_TYPES.length) - 1 });
-    lx += all.width + 14;
+    lx += 22 + all.width + 14;
   }
   for (const t of UNIT_TYPES) {
     const icon = new Sprite(allyTex[t]!);
     icon.anchor.set(0.5);
     icon.scale.set(22 / icon.texture.height);
     icon.position.set(lx + 14, 14);
-    const label = new Text({ text: `${t + 2} ${UNIT_NAMES[t]}`, style: { fill: 0xcfd3dc, fontSize: 12 } });
-    label.position.set(lx + 32, 6);
-    legend.addChild(icon, label);
+    const bg = new Graphics().roundRect(lx + 28, 5, 16, 16, 4).fill({ color: 0x000000, alpha: 0.55 }).stroke({ width: 1.5, color: 0xcfd3dc });
+    const bn = new Text({ text: String(t + 1), style: { fill: 0xffffff, fontSize: 11, fontWeight: "bold" } });
+    bn.anchor.set(0.5);
+    bn.position.set(lx + 36, 13);
+    const label = new Text({ text: UNIT_NAMES[t]!, style: { fill: 0xcfd3dc, fontSize: 12 } });
+    label.position.set(lx + 50, 6);
+    legend.addChild(icon, bg, bn, label);
     legendLabels.push({ label, mask: 1 << t });
-    lx += 32 + label.width + 12;
+    lx += 50 + label.width + 12;
   }
   const legendText = new Text({
     text: "검방병: 정면만 방패 방어(화살 25%·창 60%) · 둔기병: 방패 파괴 · 기병: 속도 비례 돌격, 창에 먼저 맞으면 속도를 잃고 카운터 · 마법사: 3초 주문 후 운석(방패 무시)",
@@ -1070,7 +1084,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 이동 · 우클릭을 끌면 명령 휠(가운데 이동, 위 공격·오른쪽 돌파·아래 수비·왼쪽 포위) · Alt를 누른 채 명령하면 연속 명령 · E 이동 · Y 공격 · H 수비(마우스 위치) · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · Tab 누르고 있으면 고른 카드 표 · O 혼잣말 끄고 켜기 · 캠프 곁에서 F를 누른 채 방향을 골라 떼면 고용",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · ` 전체·1~6 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 이동 · 우클릭을 끌면 명령 휠(가운데 이동, 위 공격·오른쪽 돌파·아래 수비·왼쪽 포위) · Alt를 누른 채 명령하면 연속 명령 · E 이동 · Y 공격 · H 수비(마우스 위치) · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · Tab 누르고 있으면 고른 카드 표 · O 혼잣말 끄고 켜기 · 캠프 곁에서 F를 누른 채 방향을 골라 떼면 고용",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1535,7 +1549,7 @@ async function main() {
   let nearCampPrices: number[] = []; // 위 용병들의 가격
   let nearCampOk: boolean[] = []; // 지금 살 수 있는가(금화·통솔력)
   let nearCampWhy: string[] = []; // 못 사는 이유(휠에 표시)
-  // 병종 선택: 1 = 모든 병종, 2~7 = 기병·창병·궁병·검방병·둔기병·마법사. 우클릭 지시와 F1~F3 진형이 선택한 병종에 적용된다.
+  // 병종 선택: ` = 모든 병종, 1~6 = 기병·창병·궁병·검방병·둔기병·마법사. 우클릭 지시와 F1~F3 진형이 선택한 병종에 적용된다.
   const ALL_MASK = (1 << UNIT_TYPES.length) - 1;
   let selMask = ALL_MASK;
   const typesField = () => (selMask === ALL_MASK ? undefined : selMask);
@@ -2114,18 +2128,20 @@ async function main() {
       send({ t: "pick", index: idx });
     }
     if (k === "m" && !e.repeat) audio.toggleMute();
-    // 숫자 키: 병종마다 고정 번호(2 기병·3 창병·4 궁병·5 검방병·6 둔기병·7 마법사). 캠프 곁에서는 그 병종을 고용하고, 아니면 그 병종을 선택한다. 1은 모든 병종.
-    const dig = /^Digit([1-7])$/.exec(e.code);
-    if (dig && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      const d = Number(dig[1]);
+    // 숫자 키: 병종마다 고정 번호(1 기병·2 창병·3 궁병·4 검방병·5 둔기병·6 마법사). 캠프 곁에서는 그 병종을 고용하고, 아니면 그 병종을 선택한다. `은 모든 병종.
+    // (고정 번호는 고용 휠의 번호와 같다: 1 기병 · 2 창병 · 3 궁병 · 4 검방병 · 5 둔기병 · 6 마법사, ` = 모든 병종)
+    const dig = /^Digit([1-6])$/.exec(e.code);
+    const allKey = e.code === "Backquote";
+    if ((dig || allKey) && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      const ty = dig ? Number(dig[1]) - 1 : -1; // 병종 번호(전체는 -1)
       if (e.shiftKey) {
-        if (nearCampId >= 0 && d >= 2) send({ t: "dismiss", type: d - 2 });
+        if (nearCampId >= 0 && ty >= 0) send({ t: "dismiss", type: ty });
       } else {
-        const slot = nearCampId >= 0 && d >= 2 ? nearCampOffers.findIndex((code) => decodeOffer(code).type === d - 2) : -1;
+        const slot = nearCampId >= 0 && ty >= 0 ? nearCampOffers.findIndex((code) => decodeOffer(code).type === ty) : -1;
         if (slot >= 0) send({ t: "buy", camp: nearCampId, slot });
         else {
-          selMask = d === 1 ? ALL_MASK : 1 << (d - 2);
-          toast.text = `선택: ${d === 1 ? "모든 병종" : UNIT_NAMES[d - 2]} (우클릭 지시 · F1~F5 진형)`;
+          selMask = ty < 0 ? ALL_MASK : 1 << ty;
+          toast.text = `선택: ${ty < 0 ? "모든 병종" : UNIT_NAMES[ty]} (우클릭 지시 · F1~F5 진형)`;
           toastLeft = 1.6;
         }
       }
@@ -2202,6 +2218,7 @@ async function main() {
       return {
         key: on ? String(slot) : `off${t}`,
         label: UNIT_NAMES[t]!,
+        badge: String(t + 1),
         sub: on ? `${tier > 0 ? "★".repeat(tier) + " " : ""}${nearCampPrices[slot]}G${ok ? "" : ` ${nearCampWhy[slot] ?? "부족"}`}` : "없음",
         angle: i * 60,
         enabled: on,
@@ -4361,7 +4378,7 @@ async function main() {
           row.icon.texture = allyTex[t]!;
           row.icon.scale.set(44 / row.icon.texture.height);
           row.icon.alpha = ok ? 1 : 0.45;
-          row.key.text = String(t + 2); // 병종마다 고정 번호
+          row.key.text = String(t + 1); // 병종마다 고정 번호(고용 휠·선택 키와 같다)
           row.name.text = `${tierName(t, tier)}${tier > 0 ? " " + "★".repeat(tier) : ""}`;
           row.name.style.fill = ok ? 0xffffff : 0x8d96a8;
           row.sub.text = `${persona.name} · ${persona.short}`; // 성격은 고용하기 전에 보인다(고용: 병종 번호 키)
@@ -4378,7 +4395,7 @@ async function main() {
         });
         const counts = UNIT_TYPES.map((t) => mine.filter((w) => w[4] === t).length);
         const dismiss = counts.some((c) => c > 0)
-          ? ["해고 (Shift+숫자, 낸 금화의 절반 환급)", ...UNIT_TYPES.filter((t) => counts[t]! > 0).map((t) => `[Shift+${t + 2}] ${UNIT_NAMES[t]} x${counts[t]}`)]
+          ? ["해고 (Shift+숫자, 낸 금화의 절반 환급)", ...UNIT_TYPES.filter((t) => counts[t]! > 0).map((t) => `[Shift+${t + 1}] ${UNIT_NAMES[t]} x${counts[t]}`)]
           : [];
         campDismiss.text = dismiss.join("   ").replace("   [", "\n[");
         const rowsEnd = 52 + 3 * (CAMP_ROW_H + 8);
