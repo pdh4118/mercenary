@@ -9,6 +9,10 @@ export const TUNE = {
   START_LEADERSHIP: 5,
   MERC_PRICE_GROWTH: 0.3, // 이미 가진 용병 1명당 가격 +30%
   DISMISS_REFUND: 0.5, // 해고하면 지불한 금화의 이 비율을 돌려받는다
+  REVIVE_PAY: 1, // 1이면 쓰러진 용병은 저절로 일어나지 않고, 금화를 내야 일어난다(0이면 옛 방식: 시간이 지나면 자동 부활). 토너먼트는 해당 없음
+  REVIVE_COST_RATIO: 0.8, // 부활 비용 = 병종 기본 가격 x 이 값 x (1 + 승급 단계 x REVIVE_COST_TIER) x (1 + 레벨 x REVIVE_COST_LV)
+  REVIVE_COST_TIER: 0.6,
+  REVIVE_COST_LV: 0.015,
   START_GOLD: 100,
   CAMP_LIFETIME_SEC: 60,
   CAMP_SPAWN_INTERVAL_SEC: 18,

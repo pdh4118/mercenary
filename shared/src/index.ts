@@ -426,6 +426,7 @@ export type ClientMsg =
   | { t: "pick"; index: number } // 레벨업 카드 선택(0..2, 두 줄 선택이면 0..5: 0~2 주인공·운영 줄, 3~5 용병 줄)
   | { t: "reroll" } // 지금 제시된 카드를 새로 뽑는다(새로고침 1회 소모)
   | { t: "upgrade"; merc: number } // 용병 한 명을 다음 단계로 강화
+  | { t: "revive"; merc: number } // 쓰러진 용병 한 명을 금화를 내고 부활시킨다(TUNE.REVIVE_PAY)
   | { t: "dismiss"; type: number; merc?: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number } // 기병 돌격 지시(월드 좌표)
   | { t: "stance"; v: number; types?: number } // 용병 진형 모드(0 기본, 1 돌격, 2 수비, 3 호위, 4 산개). types는 병종 비트마스크(생략하면 전체)

@@ -45,6 +45,8 @@ import {
   KNOCK_STUN_SEC,
   defenseTakenMult,
   respawnTimeMult,
+  REVIVE_HOLD,
+  reviveCost,
   DEFAULT_DIFFICULTY,
   DIFFICULTY_REDUCTION,
   dodgeChanceOf,
@@ -1211,6 +1213,38 @@ export class Game {
     s.state.gold -= price;
     s.detail.hired[type] = (s.detail.hired[type] ?? 0) + 1;
     this.addMerc(playerId, type, s.state.x, s.state.y, price, tier, offerName);
+    return { ok: true };
+  }
+
+  /** 쓰러진 용병을 온전한 체력으로 주인공 곁에 세운다(시간이 다 됐거나 금화를 냈을 때) */
+  private reviveMerc(m: Merc, ownerSlot: Slot | undefined): void {
+    const st = this.mercStats(m);
+    m.respawn = 0;
+    m.hp = st.hp;
+    m.shield = st.shield;
+    m.regenT = 0;
+    m.momentum = 0;
+    m.cd = 0;
+    m.x = ownerSlot?.state.x ?? 0;
+    m.y = ownerSlot?.state.y ?? 0;
+    if (this.siege && !this.siege.open && Math.abs(m.x - SIEGE.cx) < RING.ex + 40 && m.y > RING.north - 40 && m.y < RING.south - 20) {
+      m.x = GATE_X + ((m.id % 5) - 2) * 40; // 성문이 닫힌 동안 성 안에서 되살아나지 않는다: 성문 앞 마당에서 일어난다
+      m.y = GATE_Y + 190;
+    }
+  }
+
+  /** 금화를 내고 쓰러진 용병 한 명을 일으킨다(TUNE.REVIVE_PAY). 비용은 reviveCost(병종·승급 단계·레벨). */
+  revive(playerId: number, mercId: unknown): BuyResult {
+    const s = this.slots.get(playerId);
+    if (!s) return { ok: false, reason: "지금은 부활시킬 수 없습니다" };
+    const m = typeof mercId === "number" ? this.mercs.get(mercId) : undefined;
+    if (!m || m.owner !== playerId) return { ok: false, reason: "그런 용병이 없습니다" };
+    if (m.respawn <= 0) return { ok: false, reason: "쓰러진 용병이 아닙니다" };
+    if (this.phase === "tournament") return { ok: false, reason: "경기 중에는 저절로 일어납니다" };
+    const cost = reviveCost(m.type, m.tier, m.xp);
+    if (s.state.gold < cost) return { ok: false, reason: `금화가 부족합니다 (부활 ${cost}G 필요)` };
+    s.state.gold -= cost;
+    this.reviveMerc(m, s);
     return { ok: true };
   }
 
@@ -4620,6 +4654,7 @@ export class Game {
     m.ammo = this.mercQuiver(m); // 쓰러졌다 돌아오면 전통이 가득 찬다
     m.reloadT = 0;
     m.respawn = MERC_RESPAWN_SEC[m.type]! * (1 + TIER_RESPAWN_EXTRA * m.tier) * respawnTimeMult(owner ? mstat(owner.mods, m.type, "respawn") : 0) * (this.phase === "tournament" ? TUNE.TOURNAMENT_RESPAWN_MULT : 1);
+    if (TUNE.REVIVE_PAY && this.phase !== "tournament") m.respawn = REVIVE_HOLD; // 저절로 일어나지 않는다: 금화를 내면 일어난다(revive)
     if (owner) {
       owner.stats.mercDeaths++;
       if (this.phase !== "tournament") {
@@ -4946,7 +4981,9 @@ export class Game {
           m.y = tent.y;
         }
         m.atkT = 0;
-        if (m.respawn > 0) {
+        if (m.respawn >= REVIVE_HOLD) {
+          // 금화를 내야 일어나는 용병은 텐트에서도 기다린다
+        } else if (m.respawn > 0) {
           m.respawn = Math.max(0, m.respawn - dt * TENT.respawnBoost);
           if (m.respawn === 0) {
             m.hp = st.hp;
@@ -4963,21 +5000,10 @@ export class Game {
         continue;
       }
       if (m.respawn > 0) {
+        if (m.respawn >= REVIVE_HOLD) continue; // 금화를 내야 일어난다(revive)
         // 토너먼트에서도 쓰러진 용병은 되살아난다(경기 중에는 부활 시간이 TOURNAMENT_RESPAWN_MULT배로 짧다)
         m.respawn = Math.max(0, m.respawn - dt);
-        if (m.respawn === 0) {
-          m.hp = st.hp;
-          m.shield = st.shield;
-          m.regenT = 0;
-          m.momentum = 0;
-          m.cd = 0;
-          m.x = ownerSlot?.state.x ?? 0;
-          m.y = ownerSlot?.state.y ?? 0;
-          if (this.siege && !this.siege.open && Math.abs(m.x - SIEGE.cx) < RING.ex + 40 && m.y > RING.north - 40 && m.y < RING.south - 20) {
-            m.x = GATE_X + ((m.id % 5) - 2) * 40; // 성문이 닫힌 동안 성 안에서 되살아나지 않는다: 성문 앞 마당에서 일어난다
-            m.y = GATE_Y + 190;
-          }
-        }
+        if (m.respawn === 0) this.reviveMerc(m, ownerSlot);
         continue;
       }
       const tmode = duel ? this.tourMode() : null;
@@ -5134,9 +5160,9 @@ export class Game {
         this.aiOrdered(c, ordNow); // 우클릭 지시는 어떤 병종 AI(아군 지키기·물러나기·진형 복귀)보다 앞선다
       } else if (gateFree) {
         this.aiGate(c); // 성문 앞으로 가서 성문을 친다
-      } else if (m.type !== CAVALRY && trueAssault && !duel) {
+      } else if (m.type !== CAVALRY && (trueAssault || (duel && (m.type === ARCHER || m.type === MAGE)))) {
         c.ordered = true;
-        this.aiAssault(c); // 돌격 진형: 주인공과의 거리와 상관없이 가장 가까운 적에게 곧장 달려가 친다
+        this.aiAssault(c); // 돌격 진형: 주인공과의 거리와 상관없이 가장 가까운 적에게 곧장 달려가 친다. 용병전(토너먼트)에서도 모든 용병이 이렇게 싸운다(궁병·마법사가 주인공 곁에서 안 떠나고 물러나기만 하던 문제)
       } else if (m.type !== CAVALRY && m.type !== MAGE && this.autoStrike(c)) {
         // 사거리 안에 적이 있으면 진형·지키기 동작보다 먼저 때린다
       } else {

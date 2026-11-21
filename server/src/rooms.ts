@@ -209,6 +209,11 @@ export class RoomManager {
       case "reroll":
         room.game.reroll(id);
         return;
+      case "revive": {
+        const r = room.game.revive(id, msg.merc);
+        if (!r.ok) conn.send({ t: "notice", text: r.reason });
+        return;
+      }
       case "upgrade": {
         const r = room.game.upgrade(id, msg.merc);
         if (!r.ok) conn.send({ t: "notice", text: r.reason });

@@ -150,3 +150,11 @@ export function nextTierBonus(type: number, tier: number): string[] {
   }
   return out;
 }
+
+/** 금화를 내야 부활하는 방식(TUNE.REVIVE_PAY)에서 쓰러진 용병이 기다리는 상태를 나타내는 부활 시간 값(초). 이 값이면 "금화를 내면 일어난다". */
+export const REVIVE_HOLD = 9999;
+/** 쓰러진 용병 한 명의 부활 비용(금화): 병종 기본 가격 x 비율 x (1 + 승급 단계 x 단계 증가율) x (1 + 레벨 x 레벨 증가율) */
+export function reviveCost(type: number, tier: number, xp: number): number {
+  const lv = TUNE.LV_MODE ? mercLevel(xp) : 0;
+  return Math.max(1, Math.round((MERC_BASE_PRICE[type] ?? 0) * TUNE.REVIVE_COST_RATIO * (1 + TUNE.REVIVE_COST_TIER * tier) * (1 + TUNE.REVIVE_COST_LV * lv)));
+}

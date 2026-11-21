@@ -1,4 +1,4 @@
-import { personalityOf, nextTierBonus, unitCost, mercName, mercProg, MERC_SKILLS, TUNE, tierName, upgradeCost, type ClientMsg, type MercWire } from "@mercenary/shared";
+import { personalityOf, nextTierBonus, unitCost, mercName, mercProg, MERC_SKILLS, TUNE, tierName, upgradeCost, reviveCost, REVIVE_HOLD, type ClientMsg, type MercWire } from "@mercenary/shared";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -74,7 +74,9 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
     const sub = document.createElement("div");
     sub.className = "stat";
     const sitRule = (w[24] ?? 0) !== 0 ? personalityOf(nameId).sit?.[Math.abs(w[24]!) - 1] : undefined;
-    sub.textContent = respawn > 0 ? `쓰러짐 · 부활 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 기여 ${w[23] ?? 0}${(w[25] ?? 0) >= 30 ? ` · 연속 ${Math.floor((w[25] ?? 0) / 60)}:${String((w[25] ?? 0) % 60).padStart(2, "0")}` : ""}${sitRule ? ` · ${sitRule.label}` : ""}`;
+    const waitPay = respawn >= REVIVE_HOLD; // 금화를 내야 일어난다
+    const rcost = waitPay ? reviveCost(type, tier, xp) : 0;
+    sub.textContent = waitPay ? `쓰러짐 · 부활 ${rcost}G 필요` : respawn > 0 ? `쓰러짐 · 부활 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 기여 ${w[23] ?? 0}${(w[25] ?? 0) >= 30 ? ` · 연속 ${Math.floor((w[25] ?? 0) / 60)}:${String((w[25] ?? 0) % 60).padStart(2, "0")}` : ""}${sitRule ? ` · ${sitRule.label}` : ""}`;
     if (sitRule && respawn <= 0) sub.style.color = (w[24] ?? 0) > 0 ? "#8ff0a4" : "#ff9a8a";
     name.append(nm, sub);
     const prog = mercProg(tier, xp);
@@ -89,7 +91,18 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
     }
     row.append(dot, name);
     const cost = upgradeCost(type, tier);
-    if (cost !== null && prog.ready) {
+    if (waitPay) {
+      const btn = document.createElement("button");
+      btn.textContent = `부활 ${rcost}G`;
+      btn.className = "primary";
+      btn.disabled = gold < rcost;
+      btn.title = gold < rcost ? `금화가 부족합니다 (${rcost}G 필요)` : "금화를 내고 일으킵니다";
+      btn.onpointerdown = (ev) => {
+        ev.preventDefault();
+        opts.send({ t: "revive", merc: id });
+      };
+      row.append(btn);
+    } else if (cost !== null && prog.ready) {
       const btn = document.createElement("button");
       btn.textContent = `강화 ${cost}G`;
       btn.className = "primary";
@@ -143,7 +156,7 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
       const bigOpen = panel.classList.contains("open");
       if (!bigOpen && !docked) return;
       mine.sort((a, b) => Number(isReady(b)) - Number(isReady(a)) || a[4] - b[4] || b[15] - a[15] || a[0] - b[0]);
-      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil((20 * w[3]) / Math.max(1, w[9]))}:${Math.ceil(w[8])}:${progKey(w)}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}:${Math.round((w[23] ?? 0) / 10)}:${w[24] ?? 0}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}${bigOpen ? 1 : 0}${docked ? 1 : 0}`;
+      const next = mine.map((w) => `${w[0]}:${w[15]}:${Math.ceil((20 * w[3]) / Math.max(1, w[9]))}:${Math.ceil(w[8])}:${progKey(w)}:${freeLeadership >= 1 ? 1 : 0}:${gold >= (upgradeCost(w[4], w[15]) ?? Infinity) ? 1 : 0}:${Math.round((w[23] ?? 0) / 10)}:${w[24] ?? 0}:${w[8] >= REVIVE_HOLD ? (gold >= reviveCost(w[4], w[15], w[17]) ? 2 : 1) : 0}`).join("|") + `#${nearCamp ? 1 : 0}${confirm}${bigOpen ? 1 : 0}${docked ? 1 : 0}`;
       if (confirm >= 0 && performance.now() - confirmT > 2500) confirm = -1;
       if (next === sig) return;
       sig = next;
@@ -177,7 +190,9 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
         nm.textContent = `${mercName(nameId)} · ${tierName(type, tier)} ${"★".repeat(tier)}${TUNE.LV_MODE ? ` · Lv ${mercProg(tier, xp).level}` : ""}`;
         const sub = document.createElement("div");
         sub.className = "stat";
-        sub.textContent = respawn > 0 ? `쓰러짐 · 부활까지 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${unitCost(type, tier)}`;
+        const waitPay = respawn >= REVIVE_HOLD;
+        const rcost = waitPay ? reviveCost(type, tier, xp) : 0;
+        sub.textContent = waitPay ? `쓰러짐 · 부활 ${rcost}G 필요` : respawn > 0 ? `쓰러짐 · 부활까지 ${Math.ceil(respawn)}초` : `HP ${Math.ceil(hp)}/${maxHp} · 통솔 ${unitCost(type, tier)}`;
         name.append(nm, sub);
         const persona = personalityOf(nameId);
         if (persona.name) {
@@ -208,7 +223,18 @@ export function createMercPanel(opts: { send(m: ClientMsg): void; colors: readon
         }
         row.append(dot, name);
         const cost = upgradeCost(type, tier);
-        if (cost === null) {
+        if (waitPay) {
+          const btn = document.createElement("button");
+          btn.textContent = `부활 ${rcost}G`;
+          btn.className = "primary";
+          btn.disabled = gold < rcost;
+          btn.title = gold < rcost ? `금화가 부족합니다 (${rcost}G 필요)` : "금화를 내고 일으킵니다";
+          btn.onpointerdown = (ev) => {
+            ev.preventDefault();
+            opts.send({ t: "revive", merc: id });
+          };
+          row.append(btn);
+        } else if (cost === null) {
           const t = document.createElement("span");
           t.className = "stat";
           t.textContent = "최고 단계";
