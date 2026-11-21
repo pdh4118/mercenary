@@ -45,6 +45,7 @@ import {
   KNOCK_STUN_SEC,
   defenseTakenMult,
   respawnTimeMult,
+  extraArrowDamage,
   REVIVE_HOLD,
   reviveCost,
   DEFAULT_DIFFICULTY,
@@ -3992,7 +3993,7 @@ export class Game {
           vy: Math.sin(ang) * BULLET_SPEED,
           left: reach,
           hostile: false,
-          damage: i === 0 ? damage : damage * TUNE.MULTISHOT_DAMAGE,
+          damage: i === 0 ? damage : damage * extraArrowDamage(n),
           srcType: w.type,
           owner: p.id,
           radius: BULLET_RADIUS,
@@ -4473,7 +4474,7 @@ export class Game {
             s.shieldDelay = p.shield <= 0 ? TUNE.HERO_SHIELD_BROKEN_DELAY : TUNE.HERO_SHIELD_REGEN_DELAY;
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(-p.id, h.poison); // 토너먼트: 몸에 맞은 독 화살
-          const taken = this.armorCut(r.body, s.mods.heroArmor) * defenseTakenMult(s.mods.heroDefense) * this.damageTakenMult(p.id); // 고정 감소가 먼저, 방어력(%)은 그다음
+          const taken = this.armorCut(r.body * defenseTakenMult(s.mods.heroDefense), s.mods.heroArmor) * this.damageTakenMult(p.id); // 방어력(%)이 먼저, 고정 피해 감소는 그다음(후반의 큰 피해와 독 같은 잔 피해 모두에 고정 감소가 더 잘 듣는다)
           fr.lastBody = taken;
           if (h.by && this.phase === "tournament") this.creditMercHit(h.by, taken);
           p.hp -= taken;
@@ -4537,7 +4538,7 @@ export class Game {
             }
           }
           if (h.poison && h.poison > 0 && r.body > 0) this.poisonFriendly(m.id, h.poison);
-          let taken = this.armorCut(r.body, mods ? mstat(mods, m.type, "armor") : 0) * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0) * this.damageTakenMult(m.owner) * (1 + (m.sit?.taken ?? 0)); // 성격 상황 효과(받는 피해)
+          let taken = this.armorCut(r.body * defenseTakenMult(mods ? mstat(mods, m.type, "defense") : 0), mods ? mstat(mods, m.type, "armor") : 0) * this.damageTakenMult(m.owner) * (1 + (m.sit?.taken ?? 0)); // 성격 상황 효과(받는 피해)
           if ((m.guardT ?? 0) > 0) taken *= 1 - SK.stanceTake; // 수비 태세 중에는 덜 맞는다
           if (m.type === CAVALRY && skillOn(CAVALRY, m.tier, 3) && (m.momentum >= COUNTER_MOMENTUM || m.chargeSnap > 0)) taken *= 1 - SK.ironHorse; // 철갑마: 돌격 중에는 덜 아프다
           if (!h.dot && taken > 0) {
@@ -6450,7 +6451,7 @@ export class Game {
           vy: Math.sin(ang) * MERC_ARROW_SPEED,
           left: st.reach * MERC_ARROW_RANGE_FACTOR,
           hostile: false,
-          damage: i === 0 ? dmg : dmg * TUNE.MULTISHOT_DAMAGE,
+          damage: i === 0 ? dmg : dmg * extraArrowDamage(n),
           srcType: m.type,
           owner: m.owner,
           radius: 4,
@@ -7565,7 +7566,7 @@ export class Game {
       damage: base.damage * this.pstat(m, mods, "dmg") * tierDmg(tier) * this.lvDmg(m) * power * (1 + (slot?.state.swarm ?? 0)) * (1 - TUNE.UNPAID_DMG * Math.min(slot?.state.unpaid ?? 0, TUNE.UNPAID_MAX)) * (1 + (m.auraDmg ?? 0)),
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 - SK.focusCast : 1),
       cooldown: base.cooldown / quick / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
-      speed: base.speed * this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick * ((m.dashT ?? 0) > 0 ? SK.dashSpeed : 1),
+      speed: base.speed * Math.min(TUNE.MERC_SPEED_CAP, this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick * ((m.dashT ?? 0) > 0 ? SK.dashSpeed : 1)), // 속도 카드·질주·날쌘 성격이 겹쳐도 상한을 넘지 않는다
       reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier) , area * (1 + TIER_AREA[t]! * tier)),
       splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 + SK.focusArea : 1),
       arc: meleeArc(t, base.arc, area),

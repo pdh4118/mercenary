@@ -62,3 +62,29 @@ test("금화 부활: REVIVE_PAY가 0이면 옛 방식(시간이 지나면 자동
   run(g, 120);
   assert.equal(m.respawn, 0);
 });
+
+test("용병 이동 속도: 속도 카드와 일제 질주가 겹쳐도 상한(MERC_SPEED_CAP)을 넘지 않는다", () => {
+  const g = new Game();
+  g.autoSpawn = false;
+  const a = g.addPlayer("a")!;
+  const id = g.addMerc(a, CAVALRY, 0, 0)!;
+  const m = (g as any).mercs.get(id);
+  const slot = (g as any).slots.get(a);
+  const base = (g as any).mercStats(m).speed;
+  slot.mods.type[CAVALRY].speed = 3; // 속도 카드를 잔뜩 쌓은 상태
+  m.dashT = 3; // 일제 질주 중
+  const fast = (g as any).mercStats(m).speed;
+  assert.ok(fast <= base * TUNE.MERC_SPEED_CAP * 1.0001 + 1e-6, `${Math.round(fast)} > ${Math.round(base * TUNE.MERC_SPEED_CAP)}`);
+  assert.ok(fast > base, "그래도 빨라지긴 한다");
+});
+
+import { extraArrowDamage } from "@mercenary/shared";
+test("발사 수: 화살이 많아질수록 한 발이 약해지지만 총 피해는 계속 는다", () => {
+  const total = (n: number) => 1 + (n - 1) * extraArrowDamage(n);
+  assert.equal(extraArrowDamage(1), 1);
+  assert.equal(extraArrowDamage(2), TUNE.MULTISHOT_DAMAGE);
+  for (let n = 3; n <= 12; n++) {
+    assert.ok(extraArrowDamage(n) < extraArrowDamage(n - 1), `${n}발: 한 발이 약해져야 한다`);
+    assert.ok(total(n) > total(n - 1), `${n}발: 총 피해는 늘어야 한다(메리트가 남는다)`);
+  }
+});

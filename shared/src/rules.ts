@@ -9,6 +9,7 @@ export const TUNE = {
   START_LEADERSHIP: 5,
   MERC_PRICE_GROWTH: 0.3, // 이미 가진 용병 1명당 가격 +30%
   DISMISS_REFUND: 0.5, // 해고하면 지불한 금화의 이 비율을 돌려받는다
+  MERC_SPEED_CAP: 1.8, // 용병 이동 속도 상한(기본 속도의 배수): 속도 카드·승급·질주·날쌘 성격이 겹쳐도 이 배수를 넘지 못한다(기병의 돌격 피해는 속도에 비례해서 같이 폭주하던 것을 막는다)
   REVIVE_PAY: 1, // 1이면 쓰러진 용병은 저절로 일어나지 않고, 금화를 내야 일어난다(0이면 옛 방식: 시간이 지나면 자동 부활). 토너먼트는 해당 없음
   REVIVE_COST_RATIO: 0.8, // 부활 비용 = 병종 기본 가격 x 이 값 x (1 + 승급 단계 x REVIVE_COST_TIER) x (1 + 레벨 x REVIVE_COST_LV)
   REVIVE_COST_TIER: 0.6,
@@ -128,7 +129,8 @@ export const TUNE = {
   BLUNT_STAGGER_PER_TIER: 0.1, // 강화 단계마다 늘어나는 경직 시간
   BLUNT_STAGGER_BOSS_FRAC: 0.3, // 보스는 이 비율만큼만 경직된다
   ARMOR_MIN_DAMAGE: 0, // 피해 감소(고정치)를 쌓은 뒤 한 번 맞을 때 최소로 들어가는 피해. 0이면 피해가 아예 안 들어올 수 있다(독 같은 약한 피해도 막는다)
-  MULTISHOT_DAMAGE: 0.7, // 발사 수 카드로 늘어난 화살의 피해 비율
+  MULTISHOT_DAMAGE: 0.7, // 발사 수 카드로 늘어난 화살(둘째 발)의 피해 비율. 화살이 3발 이상이면 MULTISHOT_FALLOFF가 한 발 늘 때마다 곱해진다
+  MULTISHOT_FALLOFF: 0.92, // 화살 수가 한 발 늘 때마다 늘어난 화살의 피해 비율에 곱하는 값(1이면 감소 없음). 많이 쏠수록 한 발 한 발이 약해진다
   MULTISHOT_SPREAD: 0.14, // 화살 사이 각도(라디안)
   SPEAR_HALF_WIDTH_NEAR: 15, // 몸 바로 앞의 반폭(px)
   SPEAR_HALF_WIDTH_FAR: 15, // 사거리 끝의 반폭(px)
@@ -150,8 +152,8 @@ export const TUNE = {
   MXP_TIER_BONUS: 0.3, // 단계가 오를수록 경험치를 더 받는다(단계마다 +30%): 앞서가는 용병이 더 빨리 큰다
   CARD_ROWS: 1, // 1이면 레벨업마다 주인공·운영 카드 3장과 용병 카드 3장을 한 번에 보여 주고 각 줄에서 하나씩 고른다(0이면 예전처럼 3장 중 하나)
   LV_MODE: 1, // 1이면 용병이 레벨로 큰다: 경험치는 쓰지 않고 쌓여 레벨이 되고(체력·공격력이 레벨마다 조금씩 오름), 승급은 정해진 레벨에서 금화만 내면 된다
-  LV_HP: 0.034, // 레벨마다 기본 체력 +기본값의 이 비율(합산, 복리 아님. 카드 퍼센트는 그 위에 곱해진다)
-  LV_DMG: 0.0225, // 레벨마다 기본 공격력 +기본값의 이 비율(합산)
+  LV_HP: 0.02, // 레벨마다 기본 체력 +기본값의 이 비율(합산, 복리 아님. 카드 퍼센트는 그 위에 곱해진다)
+  LV_DMG: 0.0125, // 레벨마다 기본 공격력 +기본값의 이 비율(합산)
   LV_XP_BASE: 43, // 0→1레벨에 필요한 경험치(레벨 L→L+1은 BASE + STEP x L)
   LV_XP_STEP: 2.9,
   LV_MAX: 75, // 최고 레벨
@@ -576,3 +578,6 @@ export function spacingBetween(typeA: number, mercA: boolean, typeB: number, mer
   const one = (t: number, merc: boolean) => (SPACING_BY_TYPE[t] ?? 1.2) * (merc ? TUNE.SPACING_SIDE_MERC : TUNE.SPACING_SIDE_ENEMY);
   return Math.max(1, (one(typeA, mercA) + one(typeB, mercB)) / 2);
 }
+
+/** 발사 수 카드로 늘어난 화살 한 발의 피해 비율(첫 발은 100%): 총 n발이면 MULTISHOT_DAMAGE x MULTISHOT_FALLOFF^(n-2). 화살이 많아질수록 한 발이 약해진다. */
+export const extraArrowDamage = (n: number): number => (n <= 1 ? 1 : TUNE.MULTISHOT_DAMAGE * Math.pow(TUNE.MULTISHOT_FALLOFF, Math.max(0, n - 2)));

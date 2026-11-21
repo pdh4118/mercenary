@@ -1,6 +1,6 @@
 import { prefetch, warmAssets } from "./assets.js";
 import { createMurmur } from "./murmur.js";
-import { Application, Assets, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite, type TextStyleOptions } from "pixi.js";
+import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite, type TextStyleOptions } from "pixi.js";
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
 import { createFormationUi } from "./formation.js";
@@ -1445,6 +1445,31 @@ async function main() {
     (o.ground ? groundFx : skyLayer).addChild(sp);
     mercSkillFx.push({ sp, frames, age: 0, life: o.life, loop: !!o.loop, vx: o.vx ?? 0, vy: o.vy ?? 0 });
   };
+  // 환영 기병대: 반투명한 흑백 기마(찌르는 자세)가 앞으로 달려 나간다. 한 줄에 말 하나와 뒤따르는 옅은 잔상 몇 장.
+  const ghostFilter = new ColorMatrixFilter();
+  ghostFilter.desaturate();
+  const ghostCavs: { root: Container; age: number; life: number; vx: number; vy: number }[] = [];
+  const GHOST_CAV_LIFE = 0.6;
+  const spawnGhostCavalry = (x: number, y: number, ang: number) => {
+    const dir = Math.round((Math.atan2(Math.sin(ang), Math.cos(ang)) / (Math.PI / 4) + 2 + 8) % 8) % 8; // cavDir와 같은 방위 번호(0=북)
+    const tex = cavRaw[1]![dir]!;
+    const root = new Container();
+    root.filters = [ghostFilter];
+    for (const off of [-45, 0, 45]) {
+      const bx = x - Math.sin(ang) * off;
+      const by = y + Math.cos(ang) * off;
+      for (let k = 3; k >= 0; k--) {
+        const sp = new Sprite(tex);
+        sp.anchor.set(...CAV_ANCHOR);
+        sp.scale.set(CAV_SCALE * 1.05);
+        sp.position.set(bx - Math.cos(ang) * k * 34, by - Math.sin(ang) * k * 34); // 뒤에 남는 옅은 잔상
+        sp.alpha = k === 0 ? 0.62 : 0.3 - k * 0.07;
+        root.addChild(sp);
+      }
+    }
+    skyLayer.addChild(root);
+    ghostCavs.push({ root, age: 0, life: GHOST_CAV_LIFE, vx: Math.cos(ang) * 1000, vy: Math.sin(ang) * 1000 });
+  };
   const slamFx: { sp: Sprite; age: number; r: number; kind: 0 | 1 }[] = []; // 충격파(0)·갈라진 자국(1)
   const maceHits: { sp: Sprite; age: number; r: number }[] = []; // 던진 철퇴 적중 충격
   const wallPieces = new Map<number, { sp: Sprite; high: boolean; t0: number }[]>(); // 방벽 번호 -> 수정 조각들
@@ -1821,7 +1846,7 @@ async function main() {
             if (val === 53) for (const delay of [0, 1000, 2000]) setTimeout(() => audio.play("mskill_ember", { x, y }), delay); // 불씨 소리는 1초짜리라 불이 타는 3초 동안 세 번 이어 붙인다
             if (val === 4) {
               // 환영 기병대: 푸른 잔상 3줄이 앞으로 달려간다(월드 폭 140 안의 세 줄, 길이 600을 0.5초에)
-              for (const off of [-45, 0, 45]) playMsk("phantom", x - Math.sin(ang) * off, y + Math.cos(ang) * off, { w: 230, life: 0.5, rot: ang, ax: 0.2, loop: true, vx: Math.cos(ang) * 1200, vy: Math.sin(ang) * 1200 });
+              spawnGhostCavalry(x, y, ang);
             } else if (val === 53) {
               playMsk("ember", x, y, { w: Math.max(80, ang * 2.3), life: SK.emberSec, ground: true, loop: true }); // 불씨: ang = 반경(서버), 3초 동안 불꽃이 탄다
             } else {
@@ -3591,6 +3616,19 @@ async function main() {
       if (g.age >= DASH_GHOST_LIFE) {
         g.sp.destroy();
         dashGhosts.splice(i, 1);
+      }
+    }
+    for (let i = ghostCavs.length - 1; i >= 0; i--) {
+      const g = ghostCavs[i]!;
+      const dt = ticker.deltaMS / 1000;
+      g.age += dt;
+      g.root.x += g.vx * dt;
+      g.root.y += g.vy * dt;
+      const u = g.age / g.life;
+      g.root.alpha = u < 0.15 ? u / 0.15 : Math.max(0, 1 - (u - 0.15) / 0.85); // 서서히 나타났다가 흩어진다
+      if (g.age >= g.life) {
+        g.root.destroy({ children: true });
+        ghostCavs.splice(i, 1);
       }
     }
     for (let i = mercSkillFx.length - 1; i >= 0; i--) {

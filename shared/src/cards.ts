@@ -279,7 +279,7 @@ export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "
   { k: "heroMulti", label: "발사 수", base: 1, weight: 3, minLevel: 3, fmt: "int" },
   { k: "heroQuiver", label: "화살통", base: 10, weight: 5, fmt: "flat" },
   { k: "heroPoison", label: "독 화살", base: 0.375, weight: 3, minLevel: 3, fmt: "pct" },
-  { k: "heroArmor", label: "피해 감소", base: 1, weight: 2.5, minLevel: 4, fmt: "int" },
+  { k: "heroArmor", label: "피해 감소", base: 3, weight: 2.5, minLevel: 4, fmt: "int" },
   { k: "heroCrit", label: "치명타 확률", base: 0.12, weight: 6, fmt: "pct" },
   { k: "heroCritMult", label: "치명타 피해", base: 0.15, weight: 4, minLevel: 3, fmt: "pct" },
   { k: "heroArea", label: "범위", base: 0.1125, weight: 4, fmt: "pct" },
