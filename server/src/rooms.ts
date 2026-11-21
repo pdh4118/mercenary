@@ -170,13 +170,13 @@ export class RoomManager {
         room.game.setStance(id, msg.v, msg.types);
         return;
       case "hold":
-        room.game.setHold(id, msg.x, msg.y, msg.types);
+        room.game.setHold(id, msg.x, msg.y, msg.types, msg.queue);
         return;
       case "cavOrder":
-        room.game.cavOrder(id, msg.mode, msg.x, msg.y);
+        room.game.cavOrder(id, msg.mode, msg.x, msg.y, msg.queue);
         return;
       case "order":
-        room.game.order(id, msg.x, msg.y, msg.types, msg.kind);
+        room.game.order(id, msg.x, msg.y, msg.types, msg.kind, msg.queue);
         return;
       case "cards":
         conn.send({ t: "cards", picks: room.game.getPicks(id) });

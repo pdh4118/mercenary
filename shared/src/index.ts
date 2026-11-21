@@ -12,7 +12,6 @@ export * from "./names.js";
 export * from "./personality.js";
 export * from "./audio.js";
 export * from "./terrain.js";
-export * from "./voice.js";
 export * from "./cardsummary.js";
 export * from "./ghost.js";
 export * from "./siege.js";
@@ -430,9 +429,9 @@ export type ClientMsg =
   | { t: "dismiss"; type: number; merc?: number } // 캠프 근처에서 해당 병종 용병 1명을 해고
   | { t: "charge"; x: number; y: number } // 기병 돌격 지시(월드 좌표)
   | { t: "stance"; v: number; types?: number } // 용병 진형 모드(0 기본, 1 돌격, 2 수비, 3 호위, 4 산개). types는 병종 비트마스크(생략하면 전체)
-  | { t: "hold"; x: number; y: number; types?: number } // 이 지점을 지키도록 지시(지점 방어 모드로 바꾼다)
-  | { t: "cavOrder"; mode: "sweep" | "rear"; x: number; y: number } // 기병 전술 지시: sweep = 진형 파괴(적 진형의 옆을 쓸고 지나가며 충돌 피해), rear = 후방 공격(진형 뒤로 돌아 들어가 등 뒤를 친다)
-  | { t: "order"; x: number; y: number; types?: number; kind?: "move" | "attack" } // kind를 주면 그대로(이동: 적 근처여도 이동, 공격: 지점 둘레 적에게), 생략하면 적 근처 여부로 자동 // 병종 비트마스크(생략하면 전체)에 이동/공격 지시. 적 근처를 찍으면 공격, 빈 땅이면 이동
+  | { t: "hold"; x: number; y: number; types?: number; queue?: boolean } // 이 지점을 지키도록 지시(지점 방어 모드로 바꾼다)
+  | { t: "cavOrder"; mode: "sweep" | "rear"; x: number; y: number; queue?: boolean } // 기병 전술 지시: sweep = 진형 파괴(적 진형의 옆을 쓸고 지나가며 충돌 피해), rear = 후방 공격(진형 뒤로 돌아 들어가 등 뒤를 친다)
+  | { t: "order"; x: number; y: number; types?: number; kind?: "move" | "attack"; queue?: boolean } // kind를 주면 그대로(이동: 적 근처여도 이동, 공격: 지점 둘레 적에게), 생략하면 적 근처 여부로 자동 // 병종 비트마스크(생략하면 전체)에 이동/공격 지시. 적 근처를 찍으면 공격, 빈 땅이면 이동
   | { t: "cards" } // 지금까지 고른 카드 목록 요청(Tab 표)
   | { t: "debug"; on: boolean } // 개발용: AI 표시(목표·길·위험 구역)를 상태에 실어 달라는 요청(F9)
   | { t: "mercCmd"; ids: number[]; kind: "mark" | "move" | "attack" | "clear"; type?: number; x?: number; y?: number } // 이름으로 고른 용병 개인에게 주는 명령(마크: 그 병종 적을 따라붙어 공격, 이동·공격: 지점, 해제)
@@ -442,7 +441,6 @@ export type ServerMsg =
   | { t: "ver"; ver: string } // 서버가 서비스 중인 클라이언트 버전(changelog 맨 위 버전). 접속하면 제일 먼저 온다. 열어 둔 화면이 옛 버전이면 새로 고친다
   | { t: "rooms"; rooms: RoomInfo[] } // 로비에 있는 동안 방 목록이 바뀔 때마다 온다
   | { t: "terrain"; items: [number, number, number, number, number][] } // 이번 판의 지형(스프라이트 번호, x, y, 배율, 뒤집기). 비면 평지
-  | { t: "voice"; words: Record<string, string[]> } // 음성 명령 단어(기본과 다른 묶음만). 받으면 기본 단어로 되돌린 뒤 적용한다
   | { t: "tuning"; values: Record<string, number> } // 수치 조정 값(기본값과 다른 것만). 받으면 기본값으로 되돌린 뒤 적용한다
   | { t: "welcome"; id: number; tick: number; code: string; token: string } // token은 재접속에 쓴다
   | { t: "room"; code: string; name: string; hostId: number; phase: RoomPhase; private: boolean; ranked: boolean; players: RoomMember[] } // 방 구성이 바뀔 때마다

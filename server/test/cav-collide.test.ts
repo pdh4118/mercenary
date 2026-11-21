@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CAVALRY, MERC_STATS, SPACING_BY_TYPE, TICK_RATE, TUNE, parseVoice, parseVoiceMulti, spacingBetween } from "@mercenary/shared";
+import { CAVALRY, MERC_STATS, SPACING_BY_TYPE, TICK_RATE, TUNE, spacingBetween } from "@mercenary/shared";
 import { Game } from "../src/game.js";
 
 const run = (g: Game, sec: number) => {
@@ -106,17 +106,6 @@ test("기병 후방 공격: 진형을 돌아 뒤에서 가로지른다", () => {
   assert.ok(maxX > p.x + 400 + 80, `진형 뒤(동쪽)까지 갔다 ${maxX - p.x}`);
   const dealt = foes.reduce((t, f) => t + (5000 - f.hp), 0);
   assert.ok(dealt > 0, "후방에서 피해를 줬다");
-});
-
-test("음성: 진형파괴·후방 공격은 기병 전술 명령이 되고 이어 말할 수 있다", () => {
-  assert.deepEqual(parseVoice("기병 진형파괴")?.kind, "cav");
-  assert.equal((parseVoice("진형 파괴해") as any)?.mode, "sweep");
-  assert.equal((parseVoice("옆구리로 휩쓸어") as any)?.mode, "sweep");
-  assert.equal((parseVoice("후방 공격") as any)?.mode, "rear");
-  assert.equal((parseVoice("뒤를 쳐") as any)?.mode, "rear");
-  const r = parseVoiceMulti(["궁병 산개하고 진형파괴"])!;
-  assert.equal(r.steps.length, 2);
-  assert.equal(r.steps[1]!.cmd.kind, "cav");
 });
 
 import { SHIELD, SPEAR, BLUNT, TOUR_MERCS } from "@mercenary/shared";

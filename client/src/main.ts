@@ -1,5 +1,6 @@
 import { prefetch, warmAssets } from "./assets.js";
 import { createMurmur } from "./murmur.js";
+import { createWheel, WHEEL_CENTER, type WheelItem } from "./wheel.js";
 import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite, type TextStyleOptions } from "pixi.js";
 import { CAV8_RULE, UNIT_RULES, recolored, silhouette } from "./recolor.js";
 import { createLobby } from "./lobby.js";
@@ -118,9 +119,6 @@ import {
   SUMMARY_COLUMNS,
   personalityOf,
   intentLine,
-  parseVoiceMulti,
-  applyVoiceWords,
-  type VoiceCmd,
   UNIT_TYPES,
   WORLD_SIZE,
   mercPrice,
@@ -1072,7 +1070,7 @@ async function main() {
   legendText.position.set(12, 26);
   legend.addChild(legendText);
   const helpText = new Text({
-    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 위치 지정 → E 이동 · Y 공격 · H 수비 · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · Tab 누르고 있으면 고른 카드 표 · O 혼잣말 끄고 켜기 · F 누른 채 말하기(음성 지시: 기병 돌격·궁병 수비·카일 기병 마크해 등)",
+    text: "WASD 이동 · 좌클릭 사격 · 스페이스 무기 스킬 · 1 전체·2~7 병종 선택(캠프 곁에서는 그 병종 고용, Shift+번호 해고) · 우클릭 이동 · 우클릭을 끌면 명령 휠(가운데 이동, 위 공격·오른쪽 돌파·아래 수비·왼쪽 포위) · Alt를 누른 채 명령하면 연속 명령 · E 이동 · Y 공격 · H 수비(마우스 위치) · F1 기본 · F2 수비 · F3 돌격 · F4 호위 · F5 산개(선택한 병종에) · U 용병 강화 · V 명령 순환 · T 마우스 위치 지키기 · G 미니맵 · N 이름 · R 카드 새로고침 · Tab 누르고 있으면 고른 카드 표 · O 혼잣말 끄고 켜기 · 캠프 곁에서 F를 누른 채 방향을 골라 떼면 고용",
     style: { fill: 0x9aa1b0, fontSize: 12 },
   });
   helpText.position.set(12, 44);
@@ -1534,6 +1532,9 @@ async function main() {
   let lastLevel = 0;
   let nearCampId = -1;
   let nearCampOffers: number[] = []; // 가까운 캠프가 파는 용병(병종·단계 코드)
+  let nearCampPrices: number[] = []; // 위 용병들의 가격
+  let nearCampOk: boolean[] = []; // 지금 살 수 있는가(금화·통솔력)
+  let nearCampWhy: string[] = []; // 못 사는 이유(휠에 표시)
   // 병종 선택: 1 = 모든 병종, 2~7 = 기병·창병·궁병·검방병·둔기병·마법사. 우클릭 지시와 F1~F3 진형이 선택한 병종에 적용된다.
   const ALL_MASK = (1 << UNIT_TYPES.length) - 1;
   let selMask = ALL_MASK;
@@ -1664,10 +1665,6 @@ async function main() {
             setTimeout(() => location.reload(), 1200);
           }
         }
-        return;
-      }
-      if (msg.t === "voice") {
-        applyVoiceWords(msg.words, true); // 서버에서 고친 음성 명령 단어를 같이 쓴다
         return;
       }
       if (msg.t === "tuning") {
@@ -1998,7 +1995,10 @@ async function main() {
   let specCount = 0; // 지금 구경할 수 있는 살아 있는 동료 수(관전 중에 매 프레임 갱신)
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (marker && !pickingHold && !formations.isOpen()) clearMarker();
+      if (cmdWheel.isOpen() || buyWheel.isOpen() || rmb) {
+        cancelRmb();
+        if (buyWheel.isOpen()) buyWheel.hide();
+      } else if (orderMarks.length > 0 && !pickingHold && !formations.isOpen()) clearMarks();
       else if (pickingHold) endPickHold();
       else if (formations.isOpen()) formations.close();
       else lobby.toggleRoomPanel();
@@ -2133,42 +2133,109 @@ async function main() {
     keys.add(k);
     pushInput();
   });
-  // 지정 위치: 우클릭으로 찍어 두고, 이동·공격·수비 명령을 그 위치에 내린다(음성 지시와 이름으로 부른 개인 명령도 이 위치를 쓴다)
-  let marker: { x: number; y: number } | null = null;
+  // 명령: 우클릭 = 이동. 우클릭을 끌면 명령 휠(가운데 이동 · 위 공격 · 오른쪽 돌파 · 아래 수비 · 왼쪽 포위)이 뜨고, 떼면 고른 명령이 내려간다.
+  // Alt를 누른 채 내리면 연속 명령(진행 중인 지시가 끝난 뒤 이어서 실행). 선택한 병종(1~7)에게만 내린다.
+  type CmdKind = "move" | "attack" | "hold" | "break" | "encircle";
+  const CMD_COLOR: Record<CmdKind, number> = { move: 0xffe08a, attack: 0xff6a5a, hold: 0x7ec8ff, break: 0xff9a3c, encircle: 0xc99aff };
+  const CMD_NAME: Record<CmdKind, string> = { move: "이동", attack: "공격", hold: "수비", break: "돌파", encircle: "포위" };
   let markerTourSeen = false; // 지난 프레임에 토너먼트 중이었다
-  const pointBar = document.getElementById("pointBar")!;
+  const cmdWheel = createWheel(92);
+  const buyWheel = createWheel(104);
+  let orderMarks: { x: number; y: number; kind: CmdKind; t0: number }[] = []; // 내가 내린 명령 지점(연속 명령이면 순서대로 이어서 그린다)
   const markG = new Graphics();
-  const markLabel = new Text({ text: "지정 위치", style: { fill: 0xffe08a, fontSize: 12, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
-  markLabel.anchor.set(0.5, 1);
-  markG.visible = markLabel.visible = false;
-  world.addChild(markG, markLabel);
-  const setMarker = (x: number, y: number) => {
-    marker = { x, y };
-    pointBar.classList.add("open");
-    markG.visible = markLabel.visible = true;
-    toast.text = "위치 지정: E 이동 · Y 공격 · H 수비 (Esc 해제)";
-    toastLeft = 2.5;
+  const MARK_MAX = 8;
+  const markLabels = Array.from({ length: MARK_MAX }, () => {
+    const t = new Text({ text: "", style: { fill: 0xffffff, fontSize: 13, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
+    t.anchor.set(0.5, 1);
+    t.visible = false;
+    return t;
+  });
+  world.addChild(markG, ...markLabels);
+  const clearMarks = () => {
+    orderMarks = [];
+    markG.clear();
+    for (const t of markLabels) t.visible = false;
   };
-  const clearMarker = () => {
-    marker = null;
-    pointBar.classList.remove("open");
-    markG.visible = markLabel.visible = false;
-  };
-  /** 명령을 낼 위치: 지정해 둔 위치가 있으면 그곳, 없으면 마우스가 가리키는 곳 */
-  const targetPoint = (): { x: number; y: number } => marker ?? { x: mouseX - world.x, y: mouseY - world.y };
-  const issueAtMarker = (kind: "move" | "attack" | "hold") => {
-    const me = latest?.players.find((p) => p.id === myId);
-    if (!me || !marker) return;
-    if (kind === "hold") send({ t: "hold", x: marker.x, y: marker.y, types: typesField() });
+  /** 지금 화면에서 가리킨 월드 좌표(카메라가 어디를 보든 관전 중에도) */
+  const worldAt = (): { x: number; y: number } => ({ x: mouseX - world.x, y: mouseY - world.y });
+  const issueCmd = (kind: CmdKind, wx: number, wy: number, queue: boolean) => {
+    if (!latest?.players.some((p) => p.id === myId)) return;
+    const tf = typesField();
+    const mask = selMask;
+    const q = queue || undefined;
+    if (kind === "move" || kind === "attack") {
+      if ((mask & 1) !== 0) audio.play("cavalry_charge");
+      send({ t: "order", x: wx, y: wy, types: tf, kind, queue: q });
+    } else if (kind === "hold") send({ t: "hold", x: wx, y: wy, types: tf, queue: q });
     else {
-      if ((selMask & 1) !== 0) audio.play("cavalry_charge");
-      send({ t: "order", x: marker.x, y: marker.y, types: typesField(), kind });
+      // 돌파(기병: 진형 파괴) · 포위(기병: 후방 공격). 기병이 아닌 병종은 그 지점 둘레의 적을 공격한다
+      if ((mask & 1) !== 0) {
+        audio.play("cavalry_charge");
+        send({ t: "cavOrder", mode: kind === "break" ? "sweep" : "rear", x: wx, y: wy, queue: q });
+      }
+      const rest = mask & ~1;
+      if (rest) send({ t: "order", x: wx, y: wy, types: rest, kind: "attack", queue: q });
     }
+    if (!queue) orderMarks = [];
+    if (orderMarks.length >= MARK_MAX) orderMarks.shift();
+    orderMarks.push({ x: wx, y: wy, kind, t0: performance.now() });
+    toast.text = `${queue ? "연속 " : ""}${CMD_NAME[kind]}${queue ? ` (${orderMarks.length}번째)` : ""}`;
+    toastLeft = 1.4;
   };
-  document.getElementById("ptMove")!.onclick = () => issueAtMarker("move");
-  document.getElementById("ptAttack")!.onclick = () => issueAtMarker("attack");
-  document.getElementById("ptHold")!.onclick = () => issueAtMarker("hold");
-  document.getElementById("ptClear")!.onclick = clearMarker;
+  const issueAtMouse = (kind: CmdKind, queue = false) => {
+    const w = worldAt();
+    issueCmd(kind, w.x, w.y, queue);
+  };
+  // 용병 고용 휠: 캠프 곁에서 F를 누른 채 마우스를 방향으로 끌고 떼면 고용(기병·창병·궁병·검방병·둔기병·마법사가 위에서 시계 방향). 캠프가 파는 3종은 켜지고 나머지 3종은 꺼진다.
+  const openBuyWheel = () => {
+    if (buyWheel.isOpen()) return;
+    if (nearCampId < 0) {
+      toast.text = "캠프 곁에서만 고용할 수 있습니다";
+      toastLeft = 1.6;
+      return;
+    }
+    const items: WheelItem[] = UNIT_TYPES.map((t, i) => {
+      const slot = nearCampOffers.findIndex((code) => decodeOffer(code).type === t);
+      const on = slot >= 0;
+      const ok = on && !!nearCampOk[slot];
+      const tier = on ? decodeOffer(nearCampOffers[slot]!).tier : 0;
+      return {
+        key: on ? String(slot) : `off${t}`,
+        label: UNIT_NAMES[t]!,
+        sub: on ? `${tier > 0 ? "★".repeat(tier) + " " : ""}${nearCampPrices[slot]}G${ok ? "" : ` ${nearCampWhy[slot] ?? "부족"}`}` : "없음",
+        angle: i * 60,
+        enabled: on,
+        color: on ? (ok ? "#e0c05d" : "#c0645a") : undefined,
+      };
+    });
+    buyWheel.show(clientX, clientY, items);
+  };
+  const closeBuyWheel = () => {
+    if (!buyWheel.isOpen()) return;
+    const k = buyWheel.hide();
+    if (k !== null && /^\d+$/.test(k) && nearCampId >= 0) send({ t: "buy", camp: nearCampId, slot: Number(k) });
+  };
+  window.addEventListener("keyup", (e) => {
+    if (e.key.toLowerCase() === "f" || e.code === "KeyF") closeBuyWheel(); // 한글 입력 상태에서는 e.key가 ㄹ로 와서 물리 키(KeyF)도 본다
+  });
+  window.addEventListener("blur", () => {
+    if (buyWheel.isOpen()) buyWheel.hide();
+    cancelRmb();
+  });
+  const CMD_WHEEL: WheelItem[] = [
+    { key: "attack", label: "공격", sub: "적 무리", angle: 0, enabled: true, color: "#ff6a5a" },
+    { key: "break", label: "돌파", sub: "진형 파괴", angle: 90, enabled: true, color: "#ff9a3c" },
+    { key: "hold", label: "수비", sub: "지점 방어", angle: 180, enabled: true, color: "#7ec8ff" },
+    { key: "encircle", label: "포위", sub: "후방 공격", angle: 270, enabled: true, color: "#c99aff" },
+  ];
+  let rmb: { cx: number; cy: number; wx: number; wy: number } | null = null; // 우클릭을 누른 자리(화면 CSS 좌표, 월드 좌표)
+  let clientX = 0;
+  let clientY = 0;
+  const RMB_DRAG_PX = 16;
+  const cancelRmb = () => {
+    rmb = null;
+    if (cmdWheel.isOpen()) cmdWheel.hide();
+  };
   window.addEventListener("keydown", (e) => {
     const tag = (document.activeElement as HTMLElement | null)?.tagName;
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || myId < 0 || lobby.blocksGameInput() || formations.isOpen()) return;
@@ -2177,9 +2244,10 @@ async function main() {
       murmurOn = !murmurOn;
       toast.text = murmurOn ? "용병 혼잣말 켬 (O)" : "용병 혼잣말 끔 (O)";
       toastLeft = 1.8;
-    } else if (k === "e") issueAtMarker("move");
-    else if (k === "y") issueAtMarker("attack");
-    else if (k === "h") issueAtMarker("hold");
+    } else if (k === "f" || e.code === "KeyF") openBuyWheel();
+    else if (k === "e") issueAtMouse("move");
+    else if (k === "y") issueAtMouse("attack");
+    else if (k === "h") issueAtMouse("hold");
   });
   // Tab: 누르고 있는 동안 지금까지 고른 카드를 영웅 · 병종별 표로 보여 준다
   const cardTable = document.getElementById("cardTable")!;
@@ -2271,131 +2339,26 @@ async function main() {
     if (e.key === "Tab") closeCardTab();
   });
   window.addEventListener("blur", closeCardTab);
-  // 음성 지시: F를 누르고 있는 동안 듣고, 떼면 알아들은 말을 우클릭·진형 키와 같은 명령으로 보낸다(Chrome·Edge의 음성 인식 사용)
-  const SpeechRec = (window as unknown as { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => any }).webkitSpeechRecognition; // eslint-disable-line @typescript-eslint/no-explicit-any
-  let voiceRec: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
-  let voiceText = "";
-  let voiceAlts: string[] = []; // 인식기가 준 후보 문장들(가장 그럴듯한 순)
-  let voiceOn = false;
   const say = (text: string, sec = 2.5) => {
     toast.text = text;
     toastLeft = sec;
   };
-  const runVoice = (alts: string[]) => {
-    const roster = (latest?.mercs ?? []).filter((w) => w[5] === myId).map((w) => ({ id: w[0], name: mercName(w[16]), num: w[22] }));
-    const best = parseVoiceMulti(alts, roster);
-    const text = best?.text ?? alts[0] ?? "";
-    if (!best) return say(`못 알아들었어요: "${text}"  (예: 기병 돌격 · 궁병 수비 · 전원 호위 · 3번 기병 마크해 · 카일 저기 공격 · 기병 돌격하고 궁병 산개)`, 4);
-    // 명령 하나를 보내고 화면에 보일 이름을 돌려준다
-    const exec = (cmd: VoiceCmd, fuzzy: boolean): string | null => {
-      const fz = fuzzy ? " (비슷한 소리)" : "";
-      if (cmd.kind === "merc") {
-        const { x: wx, y: wy } = targetPoint();
-        if (cmd.action === "stay") {
-          for (const w of latest?.mercs ?? []) if (cmd.ids.includes(w[0])) send({ t: "mercCmd", ids: [w[0]], kind: "move", x: w[1], y: w[2] });
-        } else send({ t: "mercCmd", ids: cmd.ids, kind: cmd.action, type: cmd.markType, x: wx, y: wy });
-        return cmd.label + fz;
-      }
-      if (cmd.kind === "cav") {
-        const tp0 = targetPoint();
-        send({ t: "cavOrder", mode: cmd.mode, x: tp0.x, y: tp0.y });
-        return cmd.label + fz;
-      }
-      const tf = cmd.types === null ? typesField() : cmd.types === ALL_MASK ? undefined : cmd.types;
-      const me = latest?.players.find((p) => p.id === myId);
-      const who = cmd.types === null ? (selMask === ALL_MASK ? "전체" : "선택한 병종") : cmd.types === ALL_MASK ? "전체" : UNIT_TYPES.filter((t) => cmd.types! & (1 << t)).map((t) => UNIT_NAMES[t]).join("·");
-      const tp = targetPoint();
-      if (cmd.kind === "stance") send({ t: "stance", v: cmd.v, types: tf });
-      else if (cmd.kind === "hold") {
-        if (!me) return null;
-        send({ t: "hold", x: cmd.at === "mouse" ? tp.x : me.x, y: cmd.at === "mouse" ? tp.y : me.y, types: tf });
-      } else if (me) send({ t: "order", x: tp.x, y: tp.y, types: tf, kind: cmd.label.startsWith("이동") ? "move" : "attack" });
-      return `${who} ${cmd.label}${fz}`;
-    };
-    const done: string[] = [];
-    for (const st of best.steps) {
-      const label = exec(st.cmd, st.fuzzy);
-      if (label) done.push(label);
-    }
-    if (done.length === 0) return;
-    say(`🎤 "${text}" → ${done.join(" → ")}${best.skipped ? `  (못 알아들은 ${best.skipped}개 건너뜀)` : ""}`, done.length > 1 ? 4.5 : 3);
-  };
-  const startVoice = () => {
-    if (voiceOn) return;
-    if (!SpeechRec) return say("이 브라우저는 음성 인식을 지원하지 않습니다 (Chrome·Edge 필요)", 4);
-    if (!window.isSecureContext) return say("음성 인식은 https 또는 localhost 주소에서만 쓸 수 있습니다", 4);
-    const rec = new SpeechRec();
-    voiceRec = rec;
-    rec.lang = "ko-KR";
-    rec.interimResults = true;
-    rec.maxAlternatives = 5;
-    rec.continuous = true;
-    rec.onresult = (ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
-      // 후보는 인식 결과 조각마다 같은 순번끼리 이어 붙여 만든다(없는 순번은 첫 후보로 채운다)
-      const alts: string[] = [];
-      for (let k = 0; k < 5; k++) {
-        let t = "";
-        for (let i = 0; i < ev.results.length; i++) t += (ev.results[i]![k] ?? ev.results[i]![0]!).transcript;
-        if (!alts.includes(t)) alts.push(t);
-      }
-      voiceAlts = alts;
-      voiceText = alts[0] ?? "";
-      say(`🎤 "${voiceText}"`, 8);
-    };
-    rec.onerror = (ev: { error: string }) => {
-      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") say("마이크 권한이 필요합니다 (주소창 왼쪽 자물쇠에서 허용)", 4);
-      else if (ev.error !== "no-speech" && ev.error !== "aborted") say(`음성 인식 오류: ${ev.error}`, 3);
-    };
-    rec.onend = () => {
-      voiceOn = false;
-      const t = voiceText.trim();
-      const alts = voiceAlts.filter((a) => a.trim());
-      voiceText = "";
-      voiceAlts = [];
-      if (t) runVoice(alts.length > 0 ? alts : [t]);
-      else if (toast.text.startsWith("🎤 듣는")) say("");
-    };
-    voiceText = "";
-    voiceAlts = [];
-    voiceOn = true;
-    try {
-      rec.start();
-      say("🎤 듣는 중... F를 누른 채 말하고, 손을 떼면 실행합니다", 15);
-    } catch {
-      voiceOn = false;
-    }
-  };
-  // 키를 뗀 뒤에도 잠깐(0.4초) 더 들어, 끝 음절이 잘려 인식이 틀리는 일을 줄인다
-  let voiceStopTimer = 0;
-  const stopVoice = () => {
-    if (!voiceOn || voiceStopTimer) return;
-    voiceStopTimer = window.setTimeout(() => {
-      voiceStopTimer = 0;
-      try {
-        voiceRec?.stop();
-      } catch {
-        /* 이미 멈춤 */
-      }
-    }, 400);
-  };
-  window.addEventListener("keydown", (e) => {
-    const tag = (document.activeElement as HTMLElement | null)?.tagName;
-    if ((e.key.toLowerCase() !== "f" && e.code !== "KeyF") || e.repeat || e.ctrlKey || e.metaKey || e.altKey || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || myId < 0) return;
-    startVoice();
-  });
-  window.addEventListener("keyup", (e) => {
-    if (e.key.toLowerCase() === "f" || e.code === "KeyF") stopVoice(); // 한글 입력 상태에서는 e.key가 ㄹ로 와서 물리 키(KeyF)도 본다
-  });
-  window.addEventListener("blur", stopVoice);
   window.addEventListener("keyup", (e) => (keys.delete(e.key.toLowerCase()), pushInput()));
   window.addEventListener("blur", () => ((keys.clear(), (firing = false)), pushInput()));
   app.canvas.addEventListener("pointermove", (e) => ((mouseX = e.offsetX), (mouseY = e.offsetY), pushInput()));
+  window.addEventListener("pointermove", (e) => {
+    clientX = e.clientX;
+    clientY = e.clientY;
+    if (rmb && !cmdWheel.isOpen() && Math.hypot(clientX - rmb.cx, clientY - rmb.cy) > RMB_DRAG_PX) cmdWheel.show(rmb.cx, rmb.cy, CMD_WHEEL, { label: "이동", sub: "우클릭" }); // 조금이라도 끌면 명령 휠이 뜬다
+    if (cmdWheel.isOpen()) cmdWheel.point(clientX, clientY);
+    if (buyWheel.isOpen()) buyWheel.point(clientX, clientY);
+  });
   app.canvas.addEventListener("pointerdown", (e) => {
     mouseX = e.offsetX;
     mouseY = e.offsetY;
     if (e.button === 2) {
-      // 우클릭: 위치를 지정한다(바로 명령하지 않는다). 지정한 위치에 E 이동 · Y 공격 · H 수비(또는 아래 버튼·음성)로 명령한다.
-      if (latest?.players.some((p) => p.id === myId)) setMarker(mouseX - world.x, mouseY - world.y); // 카메라가 어디를 보든(관전 중에도) 화면에서 가리킨 월드 좌표
+      // 우클릭: 그냥 떼면 그 지점으로 이동. 끌면 명령 휠이 뜨고 떼는 방향의 명령(가운데 이동 · 위 공격 · 오른쪽 돌파 · 아래 수비 · 왼쪽 포위)을 내린다.
+      if (latest?.players.some((p) => p.id === myId)) rmb = { cx: e.clientX, cy: e.clientY, wx: mouseX - world.x, wy: mouseY - world.y };
       return;
     }
     if (pickingHold) {
@@ -2406,7 +2369,21 @@ async function main() {
     firing = true;
     pushInput();
   });
-  window.addEventListener("pointerup", () => ((firing = false), pushInput()));
+  window.addEventListener("pointerup", (e) => {
+    if (e.button === 2 && rmb) {
+      const pick = cmdWheel.isOpen() ? cmdWheel.hide() : WHEEL_CENTER; // 끌지 않았으면 이동
+      const r = rmb;
+      rmb = null;
+      if (pick && pick !== "") issueCmd(pick === WHEEL_CENTER ? "move" : (pick as CmdKind), r.wx, r.wy, e.altKey);
+      return;
+    }
+    firing = false;
+    pushInput();
+  });
+  // Alt를 눌렀다 떼면 브라우저 메뉴가 잡히는 일이 있어, 게임 중에는 Alt 단독 입력을 막는다
+  window.addEventListener("keyup", (e) => {
+    if (e.key === "Alt" && myId >= 0 && !lobby.blocksGameInput()) e.preventDefault();
+  });
   app.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   app.canvas.addEventListener(
     "wheel",
@@ -4019,26 +3996,36 @@ async function main() {
       fxLayer.circle(r.x, r.y, LEVELUP_PUSH_RADIUS * (0.25 + 0.75 * k2)).stroke({ width: 5 * (1 - k2) + 1, color: 0xffe08a, alpha: 0.8 * (1 - k2) });
     }
 
-    if (marker) {
-      // 지정 위치 표시: 천천히 뛰는 고리와 십자, 깃발
-      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
-      markG
-        .clear()
-        .circle(marker.x, marker.y, 26 + 4 * pulse)
-        .stroke({ width: 3, color: 0xffe08a, alpha: 0.55 + 0.35 * pulse })
-        .circle(marker.x, marker.y, 4)
-        .fill({ color: 0xffe08a, alpha: 0.95 })
-        .moveTo(marker.x - 14, marker.y)
-        .lineTo(marker.x + 14, marker.y)
-        .moveTo(marker.x, marker.y - 14)
-        .lineTo(marker.x, marker.y + 14)
-        .stroke({ width: 2, color: 0xffe08a, alpha: 0.8 })
-        .moveTo(marker.x, marker.y - 14)
-        .lineTo(marker.x, marker.y - 48)
-        .stroke({ width: 3, color: 0xe8e8e8, alpha: 0.95 })
-        .poly([marker.x, marker.y - 48, marker.x + 24, marker.y - 40, marker.x, marker.y - 32])
-        .fill({ color: 0xffe08a, alpha: 0.95 });
-      markLabel.position.set(marker.x, marker.y - 52);
+    {
+      // 내가 내린 명령 지점: 종류별 색의 고리와 깃발. 연속 명령이면 지점을 선으로 이어 번호를 붙인다. 오래되면 사라진다
+      const nowMs = performance.now();
+      orderMarks = orderMarks.filter((m) => nowMs - m.t0 < 40000);
+      markG.clear();
+      const pulse = 0.5 + 0.5 * Math.sin(nowMs / 260);
+      const meP = latest.players.find((p) => p.id === myId);
+      let px = meP?.x ?? 0;
+      let py = meP?.y ?? 0;
+      orderMarks.forEach((m, i) => {
+        const col = CMD_COLOR[m.kind];
+        if (orderMarks.length > 1 || i > 0) markG.moveTo(px, py).lineTo(m.x, m.y).stroke({ width: 2, color: col, alpha: 0.4 });
+        px = m.x;
+        py = m.y;
+        markG
+          .circle(m.x, m.y, 20 + 3 * pulse)
+          .stroke({ width: 3, color: col, alpha: 0.5 + 0.35 * pulse })
+          .circle(m.x, m.y, 4)
+          .fill({ color: col, alpha: 0.95 })
+          .moveTo(m.x, m.y - 12)
+          .lineTo(m.x, m.y - 40)
+          .stroke({ width: 3, color: 0xe8e8e8, alpha: 0.95 })
+          .poly([m.x, m.y - 40, m.x + 20, m.y - 33, m.x, m.y - 26])
+          .fill({ color: col, alpha: 0.95 });
+        const lab = markLabels[i]!;
+        lab.visible = true;
+        lab.text = orderMarks.length > 1 ? `${i + 1} ${CMD_NAME[m.kind]}` : CMD_NAME[m.kind];
+        lab.position.set(m.x, m.y - 42);
+      });
+      for (let i = orderMarks.length; i < MARK_MAX; i++) markLabels[i]!.visible = false;
     }
     if (dbgOn) {
       dbgG.clear();
@@ -4160,7 +4147,7 @@ async function main() {
       chargeLabel.position.set(meState.chargeX, meState.chargeY - 32);
     }
     const tourNow = latest.g?.phase === "tournament" ? latest.g.tour : null;
-    if (!tourNow && markerTourSeen) clearMarker(); // 토너먼트가 끝나면 우클릭으로 찍어 둔 지정 위치도 풀린다
+    if (!tourNow && markerTourSeen) clearMarks(); // 토너먼트가 끝나면 내려 둔 명령 표시도 지운다
     markerTourSeen = !!tourNow;
     const duelSpec = !!tourNow && myId !== tourNow.a && myId !== tourNow.b; // 토너먼트 구경꾼
     if (!meState?.down && !duelSpec) spectating = false; // 일어나면(또는 토너먼트가 끝나면) 관전 끝
@@ -4367,6 +4354,9 @@ async function main() {
           const noLeader = used + need > meState.leadership;
           const noGold = meState.gold < price;
           const ok = !noLeader && !noGold;
+          nearCampPrices[i] = price;
+          nearCampOk[i] = ok;
+          nearCampWhy[i] = noLeader ? "통솔 부족" : noGold ? "금화 부족" : "";
           const row = campRows[i]!;
           row.icon.texture = allyTex[t]!;
           row.icon.scale.set(44 / row.icon.texture.height);

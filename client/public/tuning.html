@@ -209,7 +209,6 @@
         tabs = [...new Set(defs.map((d) => d.tab))];
         const order = ["용병", "적", "주인공", "카드", "보스", "스테이지·규칙", "AI·진형", "전투·난이도"];
         tabs.sort((a, b) => order.indexOf(a) - order.indexOf(b));
-        tabs.push(VOICE_TAB);
         if (!tabs.includes(curTab)) curTab = tabs[0];
         saved = { ...data.values };
         draft = { ...data.values };

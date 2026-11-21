@@ -342,6 +342,14 @@ const DOT_RESULT = (damage: number): HitResult => ({ body: damage, shield: 0, re
 
 const hasLegend = (mods: Mods, id: LegendId, scope: LegendScope): boolean => mods.legends.has(legendKey(id, scope));
 
+/** 연속 명령(Alt) 한 칸: 이동·공격·지점 방어와 기병 전술(진형 파괴 sweep·후방 공격 rear) */
+interface QueuedCmd {
+  kind: "move" | "attack" | "auto" | "hold" | "sweep" | "rear";
+  x: number;
+  y: number;
+}
+const QUEUE_MAX = 8; // 병종마다 줄 세울 수 있는 명령 수
+
 /** 용병 능력치 강화 묶음(전체용 하나, 병종별 다섯). 배율 계열은 1에서, 가산 계열은 0에서 시작한다. */
 type MercMods = Record<MercStat, number>;
 const MULT_STATS: readonly MercStat[] = ["hp", "dmg", "atkSpeed", "speed", "range", "area", "xp"];
@@ -464,6 +472,7 @@ export interface Slot {
   holdSets: boolean[]; // 병종별로 지점을 한 번이라도 지정했다
   holdFacings: number[]; // 병종별 지점 방어 진형이 바라보는 방향
   orders: ({ kind: number; x: number; y: number; left: number; targetId: number; seq: number } | null)[]; // 병종별 이동(1)/공격(0) 지시
+  queue: QueuedCmd[][]; // 병종별 연속 명령(Alt): 진행 중인 지시가 끝나면 차례로 이어서 실행한다
   deaths: number[]; // 최근 용병이 쓰러진 시각(사기 저하 판정)
   shakenGrace: number; // 사기 저하가 다시 걸리지 않는 남은 시간
   leadFlat: number; // 카드로 얻은 통솔력(고정)
@@ -1149,6 +1158,7 @@ export class Game {
       holdSets: UNIT_TYPES.map(() => false),
       holdFacings: UNIT_TYPES.map(() => 0),
       orders: UNIT_TYPES.map(() => null),
+      queue: UNIT_TYPES.map(() => []),
       deaths: [],
       shakenGrace: 0,
       leadFlat: 0,
@@ -1271,10 +1281,60 @@ export class Game {
    * 병종(types 비트마스크, 생략하면 전체)에 이동·공격을 지시한다. 주인공 가까운 곳으로 제한하고, 일정 시간 뒤 자동으로 해제된다.
    * 적 근처(ORDER_ATTACK_PICK, 넉넉하게)를 찍으면 가장 가까운 그 적을 쫓아 공격하고, 빈 땅을 찍으면 그곳으로 이동해 자리를 지킨다.
    */
-  order(playerId: number, x: unknown, y: unknown, types?: unknown, kind?: unknown): void {
+  order(playerId: number, x: unknown, y: unknown, types?: unknown, kind?: unknown, queue?: unknown): void {
     const s = this.slots.get(playerId);
     if (!s || typeof x !== "number" || typeof y !== "number") return; // 쓰러져 있어도 지시할 수 있다(쓰러진 자리 기준)
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const k: QueuedCmd["kind"] = kind === "move" ? "move" : kind === "attack" ? "attack" : "auto";
+    const run = this.queueSplit(s, this.typeMask(types), { kind: k, x, y }, queue === true);
+    if (run) this.runOrder(playerId, x, y, run, kind);
+  }
+
+  /**
+   * 연속 명령(Alt): queue가 아니면 병종마다 줄을 비우고 전부 지금 실행한다. queue이면 진행 중인 지시가 있는 병종은 줄 뒤에 붙이고,
+   * 쉬고 있는 병종만 지금 실행한다. 지금 실행할 병종 비트마스크를 돌려준다.
+   */
+  private queueSplit(s: Slot, mask: number, cmd: QueuedCmd, queue: boolean): number {
+    let now = 0;
+    for (const t of UNIT_TYPES) {
+      if (!(mask & (1 << t))) continue;
+      if (!queue) {
+        s.queue[t] = [];
+        now |= 1 << t;
+      } else if (s.orders[t] === null && s.queue[t]!.length === 0) now |= 1 << t;
+      else if (s.queue[t]!.length < QUEUE_MAX) s.queue[t]!.push({ ...cmd });
+    }
+    return now;
+  }
+
+  /** 병종의 지시가 끝났다: 줄에 다음 명령이 있으면 이어서 실행한다 */
+  private advanceQueue(s: Slot, t: number): void {
+    const next = s.queue[t]!.shift();
+    if (!next) return;
+    const mask = 1 << t;
+    const id = s.state.id;
+    if (next.kind === "hold") this.holdNow(id, next.x, next.y, mask);
+    else if (next.kind === "sweep" || next.kind === "rear") this.cavNow(id, next.kind, next.x, next.y);
+    else this.runOrder(id, next.x, next.y, mask, next.kind === "auto" ? undefined : next.kind);
+  }
+
+  /** 지금 병종 지시가 끝났는지(이동: 모두 지점 근처에 도착, 기병 전술: 경로를 마쳤다) */
+  private orderDone(s: Slot, t: number): boolean {
+    const o = s.orders[t];
+    if (!o) return true;
+    let n = 0;
+    for (const m of this.mercs.values()) {
+      if (m.owner !== s.state.id || m.type !== t || m.respawn > 0) continue;
+      n++;
+      if (o.kind === 1 && Math.hypot(m.x - o.x, m.y - o.y) > 110) return false;
+      if ((o.kind === 2 || o.kind === 3) && !(m.cv && m.cv.seq === o.seq && m.cv.done)) return false;
+    }
+    return n === 0 || o.kind === 1 || o.kind === 2 || o.kind === 3;
+  }
+
+  private runOrder(playerId: number, x: number, y: number, mask: number, kind?: unknown): void {
+    const s = this.slots.get(playerId);
+    if (!s) return;
     // 지시 지점은 화면에서 가리킨 절대 좌표다(주인공과의 거리 제한 없음. 쓰러져서 관전 중일 때도 보이는 곳을 가리킬 수 있다)
     const ox = clampToWorld(x, 20);
     const oy = clampToWorld(y, 20);
@@ -1312,7 +1372,6 @@ export class Game {
         ay = sy / n;
       }
     }
-    const mask = this.typeMask(types);
     this.clearMercCmds(playerId, mask);
     for (const t of UNIT_TYPES) if (mask & (1 << t)) s.orders[t] = { kind: pick ? 0 : 1, x: ax, y: ay, left, targetId: 0, seq: ++this.orderSeq };
     // 화면 표시용(마지막 지시 지점)
@@ -3185,6 +3244,7 @@ export class Game {
       s.state.invuln = 2;
       // 토너먼트 중에 내린 지시(이동·공격·지점 방어)는 끝나면 모두 풀린다
       s.orders = UNIT_TYPES.map(() => null);
+      s.queue = UNIT_TYPES.map(() => []);
       this.clearMercCmds(s.state.id, (1 << UNIT_TYPES.length) - 1);
       for (const t of UNIT_TYPES) {
         if (s.stances[t] === STANCE_HOLD) s.stances[t] = STANCE_DEFEND;
@@ -3589,10 +3649,16 @@ export class Game {
   }
 
   /** 지점 방어: 이 지점에 진형을 펴고 지키도록 지시한다(types로 병종을 고를 수 있다) */
-  setHold(playerId: number, x: unknown, y: unknown, types?: unknown): boolean {
+  setHold(playerId: number, x: unknown, y: unknown, types?: unknown, queue?: unknown): boolean {
     const sl = this.slots.get(playerId);
     if (!sl || typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return false;
-    const mask = this.typeMask(types);
+    const run = this.queueSplit(sl, this.typeMask(types), { kind: "hold", x, y }, queue === true);
+    return run ? this.holdNow(playerId, x, y, run) : true;
+  }
+
+  private holdNow(playerId: number, x: number, y: number, mask: number): boolean {
+    const sl = this.slots.get(playerId);
+    if (!sl) return false;
     const hx = clampToWorld(x, 60);
     const hy = clampToWorld(y, 60);
     const d = Math.hypot(hx - sl.state.x, hy - sl.state.y);
@@ -4936,8 +5002,9 @@ export class Game {
         const o = sl.orders[t];
         if (!o) continue;
         o.left -= dt;
-        if (o.left <= 0) {
+        if (o.left <= 0 || (sl.queue[t]!.length > 0 && this.orderDone(sl, t))) {
           sl.orders[t] = null;
+          this.advanceQueue(sl, t); // 연속 명령: 이 지시가 끝났으면 다음 명령을 이어서
           continue;
         }
         if (o.kind === 0 && this.phase !== "tournament") {
@@ -5783,9 +5850,16 @@ export class Game {
    * 기병 전술 지시: sweep(진형 파괴) = 적 진형의 옆구리를 길이 방향으로 쓸고 지나간다, rear(후방 공격) = 진형을 크게 돌아 뒤로 들어가 등 뒤를 가로지른다.
    * 적 진형은 마우스가 가리킨 적 둘레의 무리(토너먼트에서는 상대 전체)다.
    */
-  cavOrder(playerId: number, mode: unknown, x: unknown, y: unknown): void {
+  cavOrder(playerId: number, mode: unknown, x: unknown, y: unknown, queue?: unknown): void {
     const s = this.slots.get(playerId);
     if (!s || (mode !== "sweep" && mode !== "rear") || typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    const run = this.queueSplit(s, 1 << CAVALRY, { kind: mode, x, y }, queue === true);
+    if (run) this.cavNow(playerId, mode, x, y);
+  }
+
+  private cavNow(playerId: number, mode: "sweep" | "rear", x: number, y: number): void {
+    const s = this.slots.get(playerId);
+    if (!s) return;
     let pts: { x: number; y: number }[];
     if (this.phase === "tournament") {
       const foes = this.duelFoes(playerId);

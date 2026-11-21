@@ -3,10 +3,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
-import { TICK_RATE, tuneOverrides, voiceOverrides, type ClientMsg, type ServerMsg } from "@mercenary/shared";
+import { TICK_RATE, tuneOverrides, type ClientMsg, type ServerMsg } from "@mercenary/shared";
 import { RoomManager, type Conn } from "./rooms.js";
 import { serveStatic } from "./static.js";
-import { handleTuningApi, handleVoiceApi, loadTuning, tuningAllowed, TUNING_FILE } from "./tuning-store.js";
+import { handleTuningApi, loadTuning, tuningAllowed, TUNING_FILE } from "./tuning-store.js";
 import { appendMatch, handleStatsApi, STATS_FILE } from "./stats-store.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -62,12 +62,6 @@ const http = createServer((req, res) => {
   }
   if (req.url?.startsWith("/api/stats")) {
     handleStatsApi(req, res);
-    return;
-  }
-  if (req.url?.startsWith("/api/voice")) {
-    void handleVoiceApi(req, res, (words) => {
-      for (const m of metas.values()) m.conn.send({ t: "voice", words });
-    });
     return;
   }
   if (req.url?.startsWith("/api/tuning")) {
@@ -134,8 +128,6 @@ wss.on("connection", (ws, req) => {
   manager.connect(conn);
   if (BUILD_VER) conn.send({ t: "ver", ver: BUILD_VER }); // 열어 둔 화면이 옛 버전이면 클라이언트가 스스로 새로 고친다
   const tuned = tuneOverrides();
-  const voiceTuned = voiceOverrides();
-  if (Object.keys(voiceTuned).length > 0) conn.send({ t: "voice", words: voiceTuned });
   if (Object.keys(tuned).length > 0) conn.send({ t: "tuning", values: tuned }); // 조정된 수치가 있으면 클라이언트도 같은 값을 쓰게 한다
 
   ws.on("pong", () => (meta.alive = true));
