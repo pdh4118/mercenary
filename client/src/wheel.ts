@@ -40,7 +40,7 @@ const CSS = `
 .wheel .sec.on + .rim { opacity: 1; stroke-width: 6; }
 .wheel text { fill: #e6e9f0; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(0,0,0,.6); stroke-width: 3px; }
 .wheel text.sub { font-size: 12px; font-weight: 600; fill: #aab2c2; }
-.wheel .badge { fill: rgba(0,0,0,.55); stroke: #cfd3dc; stroke-width: 2; }
+.wheel .badge { fill: rgba(0,0,0,.55); stroke: #cfd3dc; stroke-width: 1.5; }
 .wheel .off .badge { stroke: #5a6172; }
 .wheel .on .badge { stroke: #ffe08a; }
 .wheel text.badgeNum { stroke: none; paint-order: normal; fill: #fff; }
@@ -138,9 +138,9 @@ export function createWheel(radius = 120): Wheel {
         t.textContent = it.label;
         if (it.badge) {
           const w = it.label.length * 16; // 이름의 대략적인 폭(한글 16px)
-          const bx = tx - w / 2 - 1;
-          el("rect", { class: "badge", x: bx - 11, y: ty0 - 15, width: 22, height: 22, rx: 5 }, g);
-          const bt = el("text", { class: "badgeNum", x: bx, y: ty0 + 2, "font-size": 15 }, g);
+          const bx = tx - w / 2 - 3; // 네모(18px) 가운데. 이름과는 6px 띄운다
+          el("rect", { class: "badge", x: bx - 9, y: ty0 - 14, width: 18, height: 18, rx: 4 }, g);
+          const bt = el("text", { class: "badgeNum", x: bx, y: ty0 - 0.5, "font-size": 13 }, g);
           bt.textContent = it.badge;
         }
         if (it.sub) {
