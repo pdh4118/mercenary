@@ -160,6 +160,8 @@ TEST_SEED=7 npm test -w server   # 다른 시드로(난수에 기대는 약한 �
 
 서버를 켜 둔 컴퓨터에서 `서버시작.bat`을 더블클릭하거나 `npm run serve`를 실행하면, 시작할 때 최신 버전을 받아 빌드한 뒤 서버를 켜고 **1분마다 GitHub에 새 버전이 올라왔는지 확인**한다. 새 버전이 있으면 접속자가 한 명도 없을 때 스스로 `git pull` → (패키지가 바뀌었으면 `npm install`) → `npm run build` → 서버 재시작을 한다. 접속자가 있으면 기다리고(`--force-after 30`을 주면 30분 기다린 뒤에는 접속자가 있어도 한다), 서버가 죽으면 5초 뒤 다시 켠다. 확인 간격은 `--interval 초`, 브랜치는 `--branch 이름`으로 바꾼다. 이 컴퓨터에서 직접 고친 파일이 있어 `git pull`이 안 되면 업데이트를 건너뛰고 지금 버전으로 계속한다(`tuning.json`은 저장소에 올라가지 않으므로 영향이 없다). Cloudflare 터널(`cloudflared`)은 따로 켜 두면 된다. 터널을 켜는 창과 이 창은 서로 독립이다.
 
+**친구들을 인터넷으로 초대**: `친구초대.bat`을 더블클릭하면 서버(위와 같이 자동 업데이트)와 Cloudflare 임시 터널을 함께 켜고, 친구들에게 알려 줄 `https://….trycloudflare.com` 주소를 화면에 보여 주며 클립보드에 복사한다. 처음 한 번 `winget install --id Cloudflare.cloudflared`로 cloudflared를 설치해야 한다. 주소는 켤 때마다 바뀐다(Windows에서 직접 시험하지는 못했다).
+
 ## 배포
 
 `npm run build && npm start` 하나로 서버가 화면과 접속(`/ws`)을 같은 포트에서 제공한다. 메시지는 압축되어 약 1/3로 전송된다. 호스팅 선택(개인 서버 + Cloudflare Tunnel 추천 / 포트포워딩 / VPS), 필요한 대역폭 실측, Docker·systemd 예시는 [`docs/deploy.md`](docs/deploy.md).
