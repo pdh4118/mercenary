@@ -1312,7 +1312,7 @@ async function main() {
       v.bg
         .clear()
         .roundRect(0, 0, CARD_W, CARD_H, 10)
-        .fill({ color: 0x1b1f2a, alpha: 0.6 }) // 크게 키운 대신 배경을 더 투명하게
+        .fill({ color: 0x1b1f2a, alpha: rowMode && i >= 3 && heroLeft ? 0.6 : 0.78 }) // 지금 골라야 하는 카드는 덜 투명하게, 아직 차례가 아닌 줄은 더 투명하게
         .stroke({ width: 3, color: 0x050608, alpha: 0.85 })
         .roundRect(2.5, 2.5, CARD_W - 5, CARD_H - 5, 8)
         .stroke({ width: card.rarity > 0 ? 2.5 : 1.5, color: card.rarity > 0 ? RARITY_COLORS[card.rarity]! : 0x59627a })
