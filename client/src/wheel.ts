@@ -13,6 +13,8 @@ export interface WheelItem {
   color?: string;
   /** 이름 앞에 네모 안에 넣어 보여 줄 번호(단축키) */
   badge?: string;
+  /** 맨 아래 작게 보여 줄 부가 설명(용병 성격 등) */
+  note?: string;
 }
 
 export const WHEEL_CENTER = "center";
@@ -48,6 +50,7 @@ const CSS = `
 .wheel .sec.on + .rim { opacity: 1; stroke-width: 6; }
 .wheel text { fill: #e6e9f0; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(0,0,0,.6); stroke-width: 3px; }
 .wheel text.sub { font-size: 12px; font-weight: 600; fill: #aab2c2; }
+.wheel text.note { font-size: 11px; font-weight: 500; fill: #c9b8ff; }
 .wheel .badge { fill: rgba(0,0,0,.55); stroke: #cfd3dc; stroke-width: 1.5; }
 .wheel .off .badge { stroke: #5a6172; }
 .wheel .on .badge { stroke: #ffe08a; }
@@ -140,7 +143,7 @@ export function createWheel(radius = 120): Wheel {
         el("path", { class: "rim", d: arcPath(a0 + 2, a1 - 2, radius - 3), stroke: it.color ?? "#3a4052" }, g);
         const mid = (R_IN + radius) / 2 + 4;
         const [tx, ty] = pt(it.angle, mid);
-        const ty0 = it.sub ? ty - 4 : ty + 5;
+        const ty0 = it.note ? ty - 10 : it.sub ? ty - 4 : ty + 5;
         const shift = it.badge ? 12 : 0; // 번호 네모가 이름 앞에 들어갈 자리만큼 이름을 오른쪽으로 민다
         const t = el("text", { x: tx + shift, y: ty0, "font-size": 16 }, g);
         t.textContent = it.label;
@@ -152,8 +155,12 @@ export function createWheel(radius = 120): Wheel {
           bt.textContent = it.badge;
         }
         if (it.sub) {
-          const s2 = el("text", { class: "sub", x: tx, y: ty + 14 }, g);
+          const s2 = el("text", { class: "sub", x: tx, y: ty0 + 18 }, g);
           s2.textContent = it.sub;
+        }
+        if (it.note) {
+          const s3 = el("text", { class: "sub note", x: tx, y: ty0 + 32 }, g);
+          s3.textContent = it.note;
         }
         groups.set(it.key, g);
       });

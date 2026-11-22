@@ -1391,7 +1391,7 @@ async function main() {
     weaponHint.text = WEAPONS[active]!.note;
   };
   weaponBar.visible = false;
-  hud.addChild(execG, hallFlashG, hudPanel, mini, statsPanel, stageText, edictText, execText, bossBar, weaponBar, deadText, campPanel, toast, levelToast, cardPanel, legend);
+  hud.addChild(execG, hallFlashG, hudPanel, mini, statsPanel, stageText, edictText, execText, bossBar, weaponBar, deadText, toast, levelToast, cardPanel, legend);
 
   const aimShown = new Map<number, number>(); // 주인공 조준 화살표의 화면에 그리는 방향(서버 값을 부드럽게 따라간다)
   const levelOf = new Map<number, number>();
@@ -1549,6 +1549,7 @@ async function main() {
   let nearCampPrices: number[] = []; // 위 용병들의 가격
   let nearCampOk: boolean[] = []; // 지금 살 수 있는가(금화·통솔력)
   let nearCampWhy: string[] = []; // 못 사는 이유(휠에 표시)
+  let nearCampNote: string[] = []; // 용병 성격 이름(휠에 표시)
   // 병종 선택: ` = 모든 병종, 1~6 = 기병·창병·궁병·검방병·둔기병·마법사. 우클릭 지시와 F1~F3 진형이 선택한 병종에 적용된다.
   const ALL_MASK = (1 << UNIT_TYPES.length) - 1;
   let selMask = ALL_MASK;
@@ -2223,6 +2224,7 @@ async function main() {
         angle: i * 60,
         enabled: on,
         color: on ? (ok ? "#e0c05d" : "#c0645a") : undefined,
+        note: on ? nearCampNote[slot] : undefined,
       };
     });
   /** 주인공이 화면에서 있는 자리(휠의 중심) */
@@ -4391,7 +4393,11 @@ async function main() {
         }
       }
       if (best && !meState.down) {
-        if (snd.near < 0) audio.play("camp_open"); // 방금 범위에 들어왔다
+        if (snd.near < 0) {
+          audio.play("camp_open"); // 방금 범위에 들어왔다
+          toast.text = "캠프: 번호 1~6 고용 · F를 누른 채 방향으로 고르기 · Shift+번호 해고";
+          toastLeft = 3.5;
+        }
         nearCampId = best[0];
         nearCampOffers = [best[4], best[5], best[6]];
         const campNames = [best[7] ?? 0, best[8] ?? 0, best[9] ?? 0];
@@ -4408,6 +4414,7 @@ async function main() {
           nearCampPrices[i] = price;
           nearCampOk[i] = ok;
           nearCampWhy[i] = noLeader ? "통솔 부족" : noGold ? "금화 부족" : "";
+          nearCampNote[i] = persona.name;
           const row = campRows[i]!;
           row.icon.texture = allyTex[t]!;
           row.icon.scale.set(44 / row.icon.texture.height);
@@ -4512,7 +4519,7 @@ async function main() {
     levelToast.position.set(app.screen.width / 2, 100);
     weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 118);
     // 캠프 고용창은 오른쪽 위에 뜨고, 레벨업 카드가 함께 떠 있으면 카드를 그 아래로 내린다
-    const campBottom = campPanel.visible ? 52 + campPanel.height + 10 : 0;
+    const campBottom = 0; // 옛 캠프 고용 목록은 없앴다(고용 휠이 대신한다)
     cardPanel.position.set(app.screen.width - cardPanelW - 12, Math.max(90, campBottom, app.screen.height / 2 - 230));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
