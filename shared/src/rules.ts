@@ -537,6 +537,11 @@ export const KNOCK_STUN_SEC = 0.4; // 밀려난 적이 공격하지 못하는 �
 const lengthensOnArea = (type: number): boolean => type === BLUNT || type === SHIELD;
 export const meleeArc = (type: number, baseArc: number, area: number): number => (lengthensOnArea(type) ? baseArc : Math.min(AREA_ARC_MAX, baseArc * area));
 export const meleeReach = (type: number, reach: number, area: number): number => (lengthensOnArea(type) ? reach * area : reach);
+/** 사거리 카드가 듣는 병종(무기)과 범위 카드가 듣는 병종(무기): 사거리는 기병·창병·궁병(활·창·기마), 범위는 검방병·둔기병·마법사(검·철퇴·지팡이)에만 적용된다. */
+export const RANGE_TYPES: readonly number[] = [CAVALRY, SPEAR, ARCHER];
+export const AREA_TYPES: readonly number[] = [SHIELD, BLUNT, MAGE];
+export const rangeMultFor = (type: number, mult: number): number => (RANGE_TYPES.includes(type) ? mult : 1);
+export const areaMultFor = (type: number, mult: number): number => (AREA_TYPES.includes(type) ? mult : 1);
 export const AREA_ARC_MAX = 2.4; // 범위 증가로 넓어지는 근접 부채꼴 반각 상한(라디안)
 
 /** 휴식 텐트: 가까이에서 스페이스를 누르면 주인공과 용병이 들어가 쉬고(체력 회복), 적에게는 아무도 없는 것처럼 보인다. 다시 누르면 나온다. */

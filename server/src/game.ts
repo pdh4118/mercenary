@@ -45,6 +45,8 @@ import {
   KNOCK_STUN_SEC,
   defenseTakenMult,
   respawnTimeMult,
+  rangeMultFor,
+  areaMultFor,
   extraArrowDamage,
   REVIVE_HOLD,
   reviveCost,
@@ -1598,11 +1600,11 @@ export class Game {
     return [
       r2(w.damage * m.heroDmg),
       r2(rate / (w.cooldown + w.windup)),
-      Math.round(meleeReach(w.type, w.reach * m.heroRange, m.heroArea)),
+      Math.round(meleeReach(w.type, w.reach * rangeMultFor(w.type, m.heroRange), areaMultFor(w.type, m.heroArea))),
       r2(Math.max(0, m.heroCrit)),
       r2(m.heroCritMult),
       m.heroPierce,
-      r2(m.heroArea),
+      r2(areaMultFor(w.type, m.heroArea)),
       Math.round(m.heroKnock),
       r2(1 - defenseTakenMult(m.heroDefense)), // 화면에는 실제로 줄어드는 비율로 보여 준다
       r2(dodgeChanceOf(m.heroDodge)),
@@ -3969,7 +3971,7 @@ export class Game {
       p.wind = s.windT;
       s.fireCd = s.windT + w.cooldown / rate;
       const [x, y] = this.heroSpot(s, w);
-      this.casts.set(-p.id, { x, y, total: s.windT, radius: w.splash * mageAreaMult(s.mods.heroArea) });
+      this.casts.set(-p.id, { x, y, total: s.windT, radius: w.splash * mageAreaMult(areaMultFor(w.type, s.mods.heroArea)) });
       return;
     }
     this.strikeHero(s);
@@ -4034,7 +4036,8 @@ export class Game {
     const w = WEAPONS[p.weapon]!;
     const crit = this.rollCrit(s.mods.heroCrit);
     const damage = w.damage * power * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1);
-    const reach = meleeReach(w.type, w.reach * s.mods.heroRange, s.mods.heroArea);
+    const heroArea = areaMultFor(w.type, s.mods.heroArea); // 범위 카드는 검·철퇴·지팡이에만 듣는다
+    const reach = meleeReach(w.type, w.reach * rangeMultFor(w.type, s.mods.heroRange), heroArea);
     if (w.windup <= 0 || w.ranged) s.fireCd = w.cooldown / (s.mods.heroFireRate * (1 + LEGEND_CONST.warcryStep * (s.haste.hero ?? 0)));
     // 폭풍 연사: 치명타면 곧바로 다음 공격. 치명타 확률에 상한이 없으므로 연속으로 이어지지는 않는다(두 번에 한 번).
     if (crit && hasLegend(s.mods, "stormfire", "hero") && !s.stormBurst) {
@@ -4074,7 +4077,7 @@ export class Game {
     p.swing = SWING_VISUAL_SEC;
     this.meleeFx(p.x, p.y, p.aim, reach, w.type, MELEE_TEAM_ALLY);
     this.boss.strikeBarriers(p.x, p.y, reach, damage, p.id);
-    const arc = meleeArc(w.type, w.arc, s.mods.heroArea);
+    const arc = meleeArc(w.type, w.arc, heroArea);
     // 기마: 지금 속도에 비례한 돌격 피해가 붙고, 공격하면 속도를 잃는다
     const charge = w.type === CAVALRY ? TUNE.CAV_DAMAGE_PER_SPEED * this.heroSpeedNow(s) * s.mods.heroDmg * (crit ? critDamageMult(s.mods.heroCrit, s.mods.heroCritMult) : 1) : 0; // 공격력 카드가 돌격 추가 피해에도 곱해진다
     if (w.type === CAVALRY) {
@@ -4089,7 +4092,7 @@ export class Game {
       const hitFoes: Friendly[] = [];
       for (const f of foes) {
         if (usesBox(w.type)) {
-          if (!inBox(w.type, p.x, p.y, p.aim, f.x, f.y, f.radius, reach, s.mods.heroArea)) continue;
+          if (!inBox(w.type, p.x, p.y, p.aim, f.x, f.y, f.radius, reach, heroArea)) continue;
         } else {
           if (Math.hypot(f.x - p.x, f.y - p.y) > reach + f.radius) continue;
           if (Math.abs(angleDiff(Math.atan2(f.y - p.y, f.x - p.x), p.aim)) > arc) continue;
@@ -4098,7 +4101,7 @@ export class Game {
       }
       for (const f of hitFoes) reflected += f.hit({ damage, charge, srcType: w.type, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit });
       if (w.splash > 0) {
-        const radius = w.splash * s.mods.heroArea;
+        const radius = w.splash * heroArea;
         for (const f of foes) {
           if (hitFoes.includes(f) || !hitFoes.some((h) => Math.hypot(f.x - h.x, f.y - h.y) <= radius + f.radius)) continue;
           f.hit({ damage: damage * this.splashFactor(s.mods, "hero"), charge: 0, srcType: w.type, fromAngle: Math.atan2(p.y - f.y, p.x - f.x), crit });
@@ -4111,7 +4114,7 @@ export class Game {
     for (const e of this.enemies.values()) {
       if (usesBox(w.type)) {
         // 창·기마: 앞으로 뻗은 직사각형(전체 폭 30). 범위 카드는 폭을 넓힌다.
-        if (!inBox(w.type, p.x, p.y, p.aim, e.x, e.y, radiusOf(e), reach, s.mods.heroArea)) continue;
+        if (!inBox(w.type, p.x, p.y, p.aim, e.x, e.y, radiusOf(e), reach, heroArea)) continue;
       } else {
         if (Math.hypot(e.x - p.x, e.y - p.y) > reach + radiusOf(e)) continue;
         if (Math.abs(angleDiff(Math.atan2(e.y - p.y, e.x - p.x), p.aim)) > arc) continue;
@@ -4119,7 +4122,7 @@ export class Game {
       struck.push(e);
     }
     for (const e of struck) reflected += this.damageEnemy(e, { damage, charge, srcType: w.type, fromAngle: Math.atan2(p.y - e.y, p.x - e.x), crit }, p.id);
-    if (w.splash > 0) this.splashEnemies(struck, w.splash * s.mods.heroArea, damage * this.splashFactor(s.mods, "hero"), w.type, p.x, p.y, p.id);
+    if (w.splash > 0) this.splashEnemies(struck, w.splash * heroArea, damage * this.splashFactor(s.mods, "hero"), w.type, p.x, p.y, p.id);
     this.hurtHeroReflect(s, reflected);
   }
 
@@ -6786,9 +6789,9 @@ export class Game {
   }
 
   /** 주인공이 마우스로 가리킨 낙하 지점(사거리 안으로 제한) */
-  private heroSpot(s: Slot, w: { reach: number }): [number, number] {
+  private heroSpot(s: Slot, w: { reach: number; type: number }): [number, number] {
     const p = s.state;
-    const maxD = w.reach * s.mods.heroRange;
+    const maxD = w.reach * rangeMultFor(w.type, s.mods.heroRange);
     const d = Math.max(40, Math.min(maxD, s.input.dist && s.input.dist > 0 ? s.input.dist : maxD * 0.7));
     return [clampToWorld(p.x + Math.cos(p.aim) * d, 10), clampToWorld(p.y + Math.sin(p.aim) * d, 10)];
   }
@@ -7629,7 +7632,7 @@ export class Game {
     const tier = m.tier;
     const power = 1 + TUNE.MERC_TIER_POWER * tier; // 단계가 오를수록 더 강해지는 보너스(스노우볼)
     const hpMult = this.pstat(m, mods, "hp") * tierHp(tier) * this.lvHp(m) * power;
-    const area = this.pstat(m, mods, "area");
+    const area = areaMultFor(t, this.pstat(m, mods, "area")); // 범위 카드는 검방병·둔기병·마법사에게만 듣는다
     const pers = this.persona(m);
     const maxHp = Math.round(base.hp * hpMult);
     const quick = (m.hasteT ?? 0) > 0 ? 1 + (pers.killHaste ?? 0) : 1; // 날쌘: 처치 뒤 잠깐 빨라진다
@@ -7641,7 +7644,7 @@ export class Game {
       windup: base.windup * castTimeMult(mstat(mods, t, "cast") + TIER_CAST[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 - SK.focusCast : 1),
       cooldown: base.cooldown / quick / (this.pstat(m, mods, "atkSpeed") * (1 + LEGEND_CONST.warcryStep * (this.slots.get(m.owner)?.haste[String(t)] ?? 0))),
       speed: base.speed * Math.min(TUNE.MERC_SPEED_CAP, this.pstat(m, mods, "speed") * (1 + TIER_SPEED[t]! * tier) * quick * ((m.dashT ?? 0) > 0 ? SK.dashSpeed : 1)), // 속도 카드·질주·날쌘 성격이 겹쳐도 상한을 넘지 않는다
-      reach: meleeReach(t, base.reach * this.pstat(m, mods, "range") * (1 + TIER_REACH[t]! * tier) , area * (1 + TIER_AREA[t]! * tier)),
+      reach: meleeReach(t, base.reach * rangeMultFor(t, this.pstat(m, mods, "range")) * (1 + TIER_REACH[t]! * tier) , area * (1 + TIER_AREA[t]! * tier)),
       splash: base.splash * (t === MAGE ? mageAreaMult(area) : area) * (1 + TIER_AREA[t]! * tier) * (skillOn(t, tier, 1) && t === MAGE ? 1 + SK.focusArea : 1),
       arc: meleeArc(t, base.arc, area),
     };

@@ -169,12 +169,12 @@ export const GLOBAL_LIFESTEAL_BOOST = 5; // 기본값
 export const GLOBAL_CARD_FACTOR = 0.35; // 기본값(수치 조정 도구가 바꾸는 실제 값은 CARD_TUNE) // 병종 전용 카드가 없어지고 용병 공용 카드가 그 자리를 대신하므로 예전(0.2)보다 올렸다
 /** 병종마다 키울 수 있는 능력치(그 병종의 역할에 맞춘 목록). 공격 속도와 범위는 쓸모가 있는 병종에 모두 있다. */
 export const MERC_TYPE_FOCUS: readonly (readonly MercStat[])[] = [
-  ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "area", "xp"], // 기병
-  ["hp", "dmg", "range", "defense", "armor", "thorns", "lifesteal", "atkSpeed", "area", "knock", "xp"], // 창병
+  ["hp", "dmg", "speed", "crit", "dodge", "armor", "lifesteal", "atkSpeed", "range", "xp"], // 기병
+  ["hp", "dmg", "range", "defense", "armor", "thorns", "lifesteal", "atkSpeed", "knock", "xp"], // 창병
   ["hp", "dmg", "range", "atkSpeed", "crit", "pierce", "multi", "poison", "slow", "quiver", "armor", "knock", "xp"], // 궁병(화살이라 범위는 없다. 거리를 유지하는 병종이라 넉백을 쓴다)
   ["hp", "defense", "armor", "thorns", "regen", "lifesteal", "dmg", "respawn", "atkSpeed", "area", "xp"], // 검방병
   ["dmg", "area", "hp", "armor", "thorns", "lifesteal", "critMult", "atkSpeed", "xp"], // 둔기병
-  ["dmg", "area", "range", "atkSpeed", "cast", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
+  ["dmg", "area", "atkSpeed", "cast", "hp", "crit", "critMult", "xp"], // 마법사(주문이 느리지만 한 방이 크고 넓다)
 ];
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -199,6 +199,8 @@ export function describeStat(stat: MercStat, v: number): string {
 
 /** 방어력·회피율·부활 속도: 몇 장을 쌓아도 한 장의 효율이 같다(체력 증가로 환산) */
 const EFFICIENCY_NOTE: Partial<Record<string, string>> = {
+  range: " (기병·창병·궁병에게만 적용)",
+  area: " (검방병·둔기병·마법사에게만 적용)",
   defense: " (받는 피해가 1/(1+합)배 — 쌓아도 체력 증가와 같은 효율, 상한 없음)",
   dodge: " (회피 확률 합/(1+합) — 쌓아도 체력 증가와 같은 효율, 상한 없음)",
   respawn: " (부활 시간 1/(1+합)배 — 상한 없음)",
@@ -274,7 +276,7 @@ export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "
   { k: "heroSpeed", label: "이동 속도", base: 0.09, weight: 6, fmt: "pct" },
   { k: "heroDmg", label: "공격력", base: 0.14, weight: 8, fmt: "pct" },
   { k: "heroFireRate", label: "공격 속도", base: 0.2, weight: 6, fmt: "pct" },
-  { k: "heroRange", label: "사거리", base: 0.09, weight: 6, fmt: "pct" },
+  { k: "heroRange", label: "사거리(활·창·기마)", base: 0.09, weight: 6, fmt: "pct" },
   { k: "heroPierce", label: "관통", base: 1, weight: 4, minLevel: 3, fmt: "int" },
   { k: "heroMulti", label: "발사 수", base: 1, weight: 3, minLevel: 3, fmt: "int" },
   { k: "heroQuiver", label: "화살통", base: 10, weight: 5, fmt: "flat" },
@@ -282,7 +284,7 @@ export const HERO_STATS: { k: Exclude<CardEffect["k"], "mercStat" | "legend" | "
   { k: "heroArmor", label: "피해 감소", base: 3, weight: 2.5, minLevel: 4, fmt: "int" },
   { k: "heroCrit", label: "치명타 확률", base: 0.12, weight: 6, fmt: "pct" },
   { k: "heroCritMult", label: "치명타 피해", base: 0.15, weight: 4, minLevel: 3, fmt: "pct" },
-  { k: "heroArea", label: "범위", base: 0.1125, weight: 4, fmt: "pct" },
+  { k: "heroArea", label: "범위(검·철퇴·지팡이)", base: 0.1125, weight: 4, fmt: "pct" },
   { k: "heroKnock", label: "넉백", base: 22.5, weight: 5, fmt: "flat" },
   { k: "heroThorns", label: "근접 반사", base: 2, weight: 4, minLevel: 3, fmt: "int" },
   { k: "heroDefense", label: "방어력", base: 0.15, weight: 7, fmt: "pct" },
