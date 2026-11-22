@@ -1211,9 +1211,11 @@ async function main() {
   const cardPanel = new Container();
   const cardHeader = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 18, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
   cardPanel.addChild(cardHeader);
-  const ROW_SCALE = 0.78; // 두 줄 선택(카드 6장)일 때 패널을 줄여서 화면을 덜 가린다
+  const ROW_SCALE = 0.92; // 두 줄 선택(카드 6장)일 때의 크기(카드 배경을 옅게 해서 화면을 가리는 것을 줄였다)
+  const SINGLE_SCALE = 1.12; // 한 줄 선택(카드 3장)일 때의 크기
   const COL_GAP = 14;
   let cardPanelW = CARD_W; // 패널이 차지하는 가로(화면 배치용)
+  let cardPanelH = 3 * (CARD_H + CARD_GAP); // 세로
   let lastCardPickAt = -1e9; // 마지막으로 카드를 고른 시각(ms)
   const rowLabels = [0, 1].map((c) => {
     const t = new Text({ text: "", style: { fill: 0xffe08a, fontSize: 16, fontWeight: "bold", stroke: { color: 0x000000, width: 3 } } });
@@ -1262,8 +1264,9 @@ async function main() {
     shownOffer = key;
     cardPanel.visible = offer.length > 0;
     const rowMode = offer.length === 6;
-    cardPanel.scale.set(rowMode ? ROW_SCALE : 1);
-    cardPanelW = rowMode ? (2 * CARD_W + COL_GAP) * ROW_SCALE : CARD_W;
+    cardPanel.scale.set(rowMode ? ROW_SCALE : SINGLE_SCALE);
+    cardPanelW = rowMode ? (2 * CARD_W + COL_GAP) * ROW_SCALE : CARD_W * SINGLE_SCALE;
+    cardPanelH = rowMode ? (54 + 3 * (CARD_H + CARD_GAP)) * ROW_SCALE : (32 + 3 * (CARD_H + CARD_GAP)) * SINGLE_SCALE;
     cardHeader.text = offer.length > 0 ? `${box > 0 ? "보상 상자 카드!" : "LEVEL UP!"}${pending > 1 ? ` x${pending}` : ""}  ·  [R] 새로고침 ${rerolls}${rowMode ? "  ·  Z/X/C: 주인공 줄 먼저, 그다음 용병 줄" : ""}` : "";
     const rowName = ["주인공·운영", "용병"];
     rowLabels.forEach((t, c) => {
@@ -1309,8 +1312,8 @@ async function main() {
       v.bg
         .clear()
         .roundRect(0, 0, CARD_W, CARD_H, 10)
-        .fill({ color: 0x1b1f2a, alpha: 0.86 })
-        .stroke({ width: 3, color: 0x050608 })
+        .fill({ color: 0x1b1f2a, alpha: 0.6 }) // 크게 키운 대신 배경을 더 투명하게
+        .stroke({ width: 3, color: 0x050608, alpha: 0.85 })
         .roundRect(2.5, 2.5, CARD_W - 5, CARD_H - 5, 8)
         .stroke({ width: card.rarity > 0 ? 2.5 : 1.5, color: card.rarity > 0 ? RARITY_COLORS[card.rarity]! : 0x59627a })
         .roundRect(8, 8, ART + 8, ART + 8, 10) // 일러스트 창 바탕
@@ -4520,7 +4523,7 @@ async function main() {
     weaponBar.position.set(app.screen.width - (WEAPONS.length * (SLOT_W + 4) - 4) - 12, app.screen.height - 118);
     // 캠프 고용창은 오른쪽 위에 뜨고, 레벨업 카드가 함께 떠 있으면 카드를 그 아래로 내린다
     const campBottom = 0; // 옛 캠프 고용 목록은 없앴다(고용 휠이 대신한다)
-    cardPanel.position.set(app.screen.width - cardPanelW - 12, Math.max(90, campBottom, app.screen.height / 2 - 230));
+    cardPanel.position.set(app.screen.width - cardPanelW - 12, Math.max(80, campBottom, Math.min(app.screen.height / 2 - cardPanelH / 2, app.screen.height - cardPanelH - 150)));
     toastLeft = Math.max(0, toastLeft - ticker.deltaMS / 1000);
     toast.visible = toastLeft > 0;
     deadText.position.set(app.screen.width / 2, app.screen.height / 2 - 120);
