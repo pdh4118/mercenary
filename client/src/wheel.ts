@@ -25,6 +25,14 @@ export interface Wheel {
   point(mx: number, my: number): string | null;
   /** 닫고 마지막으로 가리킨 항목 key를 돌려준다 */
   hide(): string | null;
+  /** 지금 강조된 항목 key(없으면 null) */
+  current(): string | null;
+  /** 강조를 지운다 */
+  clear(): void;
+  /** 열어 둔 채로 중심을 옮긴다(화면 좌표) */
+  moveTo(cx: number, cy: number): void;
+  /** 투명도와 크기(1이 원래 크기): 평소에는 옅고 작게, 고르는 동안에는 선명하고 크게 */
+  setLook(alpha: number, scale: number): void;
 }
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -187,6 +195,21 @@ export function createWheel(radius = 120): Wheel {
       }
       setCur(best && best.enabled ? best.key : null); // 비활성 조각은 고르지 않는다
       return cur;
+    },
+    current: () => cur,
+    clear() {
+      setCur(null);
+    },
+    moveTo(x, y) {
+      const m = radius + 12;
+      cx = Math.max(m, Math.min(window.innerWidth - m, x));
+      cy = Math.max(m, Math.min(window.innerHeight - m, y));
+      root.style.left = `${cx}px`;
+      root.style.top = `${cy}px`;
+    },
+    setLook(alpha, scale) {
+      root.style.opacity = String(alpha);
+      root.style.transform = `scale(${scale})`;
     },
     hide() {
       const k = cur;

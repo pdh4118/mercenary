@@ -2009,9 +2009,9 @@ async function main() {
   let specCount = 0; // 지금 구경할 수 있는 살아 있는 동료 수(관전 중에 매 프레임 갱신)
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if (cmdWheel.isOpen() || buyWheel.isOpen() || rmb) {
+      if (cmdWheel.isOpen() || buyHeld || rmb) {
         cancelRmb();
-        if (buyWheel.isOpen()) buyWheel.hide();
+        buyHeld = false;
       } else if (orderMarks.length > 0 && !pickingHold && !formations.isOpen()) clearMarks();
       else if (pickingHold) endPickHold();
       else if (formations.isOpen()) formations.close();
@@ -2202,15 +2202,15 @@ async function main() {
     const w = worldAt();
     issueCmd(kind, w.x, w.y, queue);
   };
-  // 용병 고용 휠: 캠프 곁에서 F를 누른 채 마우스를 방향으로 끌고 떼면 고용(기병·창병·궁병·검방병·둔기병·마법사가 위에서 시계 방향). 캠프가 파는 3종은 켜지고 나머지 3종은 꺼진다.
-  const openBuyWheel = () => {
-    if (buyWheel.isOpen()) return;
-    if (nearCampId < 0) {
-      toast.text = "캠프 곁에서만 고용할 수 있습니다";
-      toastLeft = 1.6;
-      return;
-    }
-    const items: WheelItem[] = UNIT_TYPES.map((t, i) => {
+  // 용병 고용 휠: 캠프 곁에 가면 주인공 둘레에 옅고 작게 떠 있다(번호 키 1~6으로 바로 고용할 수 있다). F를 누르고 있는 동안에는 선명해지고,
+  // 마우스를 주인공에서 본 방향으로 두었다가 F를 떼면 그 조각의 병종을 고용한다(가운데에서 떼면 취소). 기병·창병·궁병·검방병·둔기병·마법사가 위에서 시계 방향.
+  // 캠프가 파는 3종은 켜지고 나머지 3종은 꺼진다.
+  const BUY_IDLE_ALPHA = 0.3; // 평소(고르지 않을 때) 투명도: 화면을 가리지 않게 옅고 작게 보여 준다
+  const BUY_IDLE_SCALE = 0.62;
+  let buyHeld = false; // F를 누르고 있다
+  let buySig = "";
+  const buyItems = (): WheelItem[] =>
+    UNIT_TYPES.map((t, i) => {
       const slot = nearCampOffers.findIndex((code) => decodeOffer(code).type === t);
       const on = slot >= 0;
       const ok = on && !!nearCampOk[slot];
@@ -2225,18 +2225,52 @@ async function main() {
         color: on ? (ok ? "#e0c05d" : "#c0645a") : undefined,
       };
     });
-    buyWheel.show(clientX, clientY, items, { label: "취소", sub: "가운데에서 떼기" });
+  /** 주인공이 화면에서 있는 자리(휠의 중심) */
+  const heroScreen = (): { x: number; y: number } => {
+    const r = app.canvas.getBoundingClientRect();
+    const me = latest?.players.find((p) => p.id === myId);
+    return { x: r.left + (me ? me.x + world.x : r.width / 2), y: r.top + (me ? me.y + world.y : r.height / 2) };
+  };
+  /** 매 프레임: 캠프 곁이면 휠을 주인공 둘레에 띄우고(내용이 바뀔 때만 다시 그린다), 멀어지면 닫는다 */
+  const syncBuyWheel = () => {
+    if (nearCampId < 0 || nearCampOffers.length === 0) {
+      if (buyWheel.isOpen()) buyWheel.hide();
+      buyHeld = false;
+      buySig = "";
+      return;
+    }
+    const items = buyItems();
+    const sig = items.map((i) => `${i.key}|${i.sub}|${i.enabled}`).join(",");
+    const pos = heroScreen();
+    if (!buyWheel.isOpen() || sig !== buySig) {
+      buyWheel.show(pos.x, pos.y, items, { label: "취소", sub: "가운데에서 떼기" });
+      buySig = sig;
+    } else buyWheel.moveTo(pos.x, pos.y);
+    buyWheel.setLook(buyHeld ? 1 : BUY_IDLE_ALPHA, buyHeld ? 1 : BUY_IDLE_SCALE);
+    if (!buyHeld) buyWheel.clear();
+  };
+  const openBuyWheel = () => {
+    if (buyHeld) return;
+    if (nearCampId < 0) {
+      toast.text = "캠프 곁에서만 고용할 수 있습니다";
+      toastLeft = 1.6;
+      return;
+    }
+    buyHeld = true;
+    buyWheel.point(clientX, clientY);
   };
   const closeBuyWheel = () => {
-    if (!buyWheel.isOpen()) return;
-    const k = buyWheel.hide();
+    if (!buyHeld) return;
+    const k = buyWheel.current();
+    buyHeld = false;
+    buyWheel.clear();
     if (k !== null && /^\d+$/.test(k) && nearCampId >= 0) send({ t: "buy", camp: nearCampId, slot: Number(k) });
   };
   window.addEventListener("keyup", (e) => {
     if (e.key.toLowerCase() === "f" || e.code === "KeyF") closeBuyWheel(); // 한글 입력 상태에서는 e.key가 ㄹ로 와서 물리 키(KeyF)도 본다
   });
   window.addEventListener("blur", () => {
-    if (buyWheel.isOpen()) buyWheel.hide();
+    buyHeld = false;
     cancelRmb();
   });
   const CMD_WHEEL: WheelItem[] = [
@@ -2368,7 +2402,7 @@ async function main() {
     clientY = e.clientY;
     if (rmb && !cmdWheel.isOpen() && Math.hypot(clientX - rmb.cx, clientY - rmb.cy) > RMB_DRAG_PX) cmdWheel.show(rmb.cx, rmb.cy, CMD_WHEEL, { label: "이동", sub: "우클릭" }); // 조금이라도 끌면 명령 휠이 뜬다
     if (cmdWheel.isOpen()) cmdWheel.point(clientX, clientY);
-    if (buyWheel.isOpen()) buyWheel.point(clientX, clientY);
+    if (buyHeld) buyWheel.point(clientX, clientY);
   });
   app.canvas.addEventListener("pointerdown", (e) => {
     mouseX = e.offsetX;
@@ -4408,6 +4442,7 @@ async function main() {
         nearCampOffers = [];
       }
     }
+    syncBuyWheel();
     const gi = latest.g;
     if (gi && gi.status !== "playing") deadText.text = ""; // 결과 화면이 뜨면 안내 문구는 숨긴다
     if (gi) {
