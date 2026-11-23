@@ -47,7 +47,7 @@ test("강화에는 통솔력 +1이 필요하다", () => {
   p.gold = 100000;
   p.leadership = 1;
   const m = g.addMerc(a, SPEAR, 0, 0);
-  g.grantMercXpForTest(m, 1000);
+  g.grantMercXpForTest(m, 1e5);
   const r = g.upgrade(a, m);
   assert.ok(!r.ok && r.reason.includes("통솔력"));
   p.leadership = 2;

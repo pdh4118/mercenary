@@ -153,7 +153,7 @@ test("용병 강화: 남의 용병이나 없는 용병은 강화할 수 없고, 
   assert.equal(g.upgrade(a, 99999).ok, false);
   assert.equal(g.upgrade(a, "x").ok, false);
   g.getPlayer(a)!.gold = 1000;
-  g.grantMercXpForTest(m, 1000);
+  g.grantMercXpForTest(m, 1e5);
   g.upgrade(a, m);
   const cost = upgradeCost(SHIELD, 0)!;
   const camp = g.spawnCampAt(g.getPlayer(a)!.x, g.getPlayer(a)!.y, [0, 1, 2]);
@@ -171,8 +171,8 @@ test("둔기병 강화는 범위가, 검방병 강화는 방패가 커진다", (
   const sh = g.addMerc(a, SHIELD, 0, 0);
   const s0 = g.mercStatsForTest(mace).splash;
   const sh0 = g.mercStatsForTest(sh).shield;
-  g.grantMercXpForTest(mace, 1000);
-  g.grantMercXpForTest(sh, 1000);
+  g.grantMercXpForTest(mace, 1e5);
+  g.grantMercXpForTest(sh, 1e5);
   g.upgrade(a, mace);
   g.upgrade(a, sh);
   assert.ok(g.mercStatsForTest(mace).splash > s0);
