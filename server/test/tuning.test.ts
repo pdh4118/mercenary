@@ -128,7 +128,7 @@ test("카드 수치를 조정하면 카드 이름·설명·가중치가 다시 �
   const find = (prefix: string) => CARDS.find((c) => c.name.startsWith(prefix))!;
   const before = { name: find("용병 공격력").name, weight: find("용병 공격력").weight, legend: find("[전설] 주인공 피의 갈증").desc, len: CARDS.length };
   try {
-    applyTuning({ "CARD_TUNE.globalFactor": 0.7, "CARD_TUNE.globalWeight": 12, "LEGEND_CONST.bloodthirstFrac": 0.02 });
+    applyTuning({ "CARD_TUNE.globalFactor": 0.7, "CARD_TUNE.globalVsHero": 1, "CARD_TUNE.globalWeight": 12, "LEGEND_CONST.bloodthirstFrac": 0.02 });
     assert.notEqual(find("용병 공격력").name, before.name, "이름에 들어 있는 효과 수치가 바뀐다");
     assert.equal(find("용병 공격력").weight, before.weight * 2, "가중치도 바뀐다");
     assert.ok(find("[전설] 주인공 피의 갈증").desc.includes("2%"), find("[전설] 주인공 피의 갈증").desc);

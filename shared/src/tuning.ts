@@ -447,6 +447,7 @@ function build(): Map<string, Entry> {
   const ct = CARD_TUNE as Record<string, number>;
   const cardList: [string, string, number, number, number, string?, number?][] = [
     ["globalFactor", "용병 공용 카드 효율(전용 카드 대비)", 0.05, 2, 0.01, "%", 100],
+    ["globalVsHero", "용병 공용 카드 상한(주인공 같은 카드 대비)", 0.05, 2, 0.01, "%", 100],
     ["globalLifesteal", "공용 흡혈 카드 추가 배수", 1, 20, 0.5, "배"],
     ["globalWeight", "공용 카드가 나올 가중치(일반 등급)", 0, 50, 0.5],
     ["legendWeight", "전설 카드가 나올 가중치", 0, 10, 0.05],

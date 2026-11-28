@@ -47,3 +47,15 @@ test("주인공 무기: 사거리는 활·창·기마, 범위는 검·철퇴·�
   assert.equal(areaMultFor(ARCHER, 1.4), 1);
   assert.equal(areaMultFor(CAVALRY, 1.4), 1);
 });
+
+import { CARDS, HERO_STATS, CARD_TUNE } from "@mercenary/shared";
+test("용병 공용 카드는 같은 능력치의 주인공 카드의 40%를 넘지 않는다", () => {
+  const hero: Record<string, string> = { hp: "heroMaxHp", dmg: "heroDmg", atkSpeed: "heroFireRate", speed: "heroSpeed", range: "heroRange", area: "heroArea", crit: "heroCrit", critMult: "heroCritMult", defense: "heroDefense", dodge: "heroDodge" };
+  for (const c of CARDS) {
+    if (c.effect.k !== "mercStat" || c.effect.type !== undefined || c.rarity !== 0) continue;
+    const hk = hero[c.effect.stat];
+    if (!hk) continue;
+    const ref = HERO_STATS.find((h) => h.k === hk)!.base; // 일반 등급 주인공 카드
+    assert.ok(c.effect.v <= ref * CARD_TUNE.globalVsHero + 1e-3, `${c.name}: ${c.effect.v} > 주인공 ${ref} x ${CARD_TUNE.globalVsHero}`);
+  }
+});

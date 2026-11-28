@@ -145,7 +145,7 @@ export const MERC_STAT_BASE: Record<MercStat, number> = {
   hp: 0.1875, dmg: 0.3, atkSpeed: 0.43, speed: 0.18, range: 0.225, area: 0.3, crit: 0.15, critMult: 0.3, defense: 0.15, dodge: 0.1125, regen: 0.0075, lifesteal: 0.0045, pierce: 1, multi: 1, poison: 0.75, slow: 0.06, armor: 3, respawn: 0.25, knock: 45, thorns: 3, xp: 0.45, cast: 0.04, quiver: 6,
 };
 /** 수치 조정 도구로 바꿀 수 있는 카드 설정 */
-export const CARD_TUNE = { globalFactor: 0.35, globalLifesteal: 5, globalWeight: 6, legendWeight: 0.6, bloodthirstWeight: 1.6, legendMinLevel: 6 };
+export const CARD_TUNE = { globalFactor: 0.35, globalVsHero: 0.4, globalLifesteal: 5, globalWeight: 6, legendWeight: 0.6, bloodthirstWeight: 1.6, legendMinLevel: 6 };
 /** 규모 카드(통솔력·고용 비용·경험치·행운·보상금·전리품): base는 일반 등급 효과량, weight는 일반 등급 뽑힐 가중치 */
 export const SCALE_CARD = {
   leadWeight: 40,
@@ -228,6 +228,20 @@ const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 
 /** 병종 전용 카드로만 나오는 능력치(그 병종의 특화): 관통·발사 수·독은 궁병, 방어구·가시는 몸으로 싸우는 병종, 시전 시간은 마법사, 넉백은 창병·궁병 */
 const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "slow", "cast", "knock", "quiver"]); // 피해 감소·피해 반사는 용병 공용 카드로 나온다
 
+/** 주인공 카드와 같은 능력치를 가진 용병 공용 카드: 공용 카드 한 장은 주인공 카드의 CARD_TUNE.globalVsHero(기본 40%)를 넘지 못한다(주인공이 운영 카드에 선택을 나눠 쓰는 만큼 용병 카드가 더 강해지지 않게). */
+const HERO_STAT_OF: Partial<Record<MercStat, string>> = {
+  hp: "heroMaxHp", speed: "heroSpeed", dmg: "heroDmg", atkSpeed: "heroFireRate", range: "heroRange", crit: "heroCrit", critMult: "heroCritMult", area: "heroArea", defense: "heroDefense", dodge: "heroDodge",
+};
+/** 용병 공용 카드의 일반 등급 기본 효과량(희귀도 배율을 곱하기 전)과 주인공 카드 대비 비율(주인공 카드가 없는 능력치는 null) */
+const globalBase = (stat: MercStat): { factor: number; ratio: number | null } => {
+  const heroK = HERO_STAT_OF[stat];
+  const ref = heroK ? HERO_STATS.find((h) => h.k === heroK)?.base : undefined;
+  if (ref === undefined) return { factor: CARD_TUNE.globalFactor, ratio: null };
+  const factor = Math.min(CARD_TUNE.globalFactor, (ref * CARD_TUNE.globalVsHero) / MERC_STAT_BASE[stat]); // 상한이 안 걸리면 globalFactor 그대로
+  return { factor, ratio: (factor * MERC_STAT_BASE[stat]) / ref };
+};
+export const globalCardFactor = (stat: MercStat): number => (stat === "armor" || stat === "thorns" ? 1 : globalBase(stat).factor);
+
 const statCards = (): CardDef[] => {
   const out: CardDef[] = [];
   for (const t of UNIT_TYPES) {
@@ -254,10 +268,11 @@ const statCards = (): CardDef[] => {
     if (stat === "pierce" || stat === "multi" || stat === "poison" || stat === "slow" || stat === "cast" || stat === "knock" || stat === "quiver") continue; // 시전 시간은 마법사만, 관통·발사 수는 화살을 쏘는 궁병만, 넉백은 창병·궁병 전용이라 전체 용병 카드가 없다
     for (let r = stat === "armor" ? 1 : 0; r < 3; r++) { // 피해 감소는 희귀부터(일반은 0이다)
       const flat = stat === "armor" || stat === "thorns"; // 피해 감소·피해 반사는 공용 카드라도 병종 전용 때 수치 그대로(깎지 않는다)
-      const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * (flat ? 1 : CARD_TUNE.globalFactor) * (stat === "lifesteal" ? CARD_TUNE.globalLifesteal : 1));
+      const gb = flat ? null : globalBase(stat);
+      const v = round3(scaledValue(stat, MERC_STAT_BASE[stat], r) * globalCardFactor(stat) * (stat === "lifesteal" ? CARD_TUNE.globalLifesteal : 1));
       out.push({
         name: `용병 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}`,
-        desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""}${flat ? "" : ` (병종 전용 카드의 ${Math.round(CARD_TUNE.globalFactor * 100)}%)`}`,
+        desc: `모든 용병의 ${MERC_STAT_LABEL[stat]} ${describeStat(stat, v)}${EFFICIENCY_NOTE[stat] ?? ""}${flat ? "" : gb && gb.ratio !== null ? ` (주인공 카드의 ${Math.round(gb.ratio * 100)}%)` : ""}`,
         category: 1,
         rarity: r as 0 | 1 | 2,
         weight: (STAT_WEIGHT[stat] ?? (stat === "armor" ? CARD_TUNE.globalWeight * 0.5 : stat === "thorns" ? CARD_TUNE.globalWeight * 0.7 : CARD_TUNE.globalWeight)) * RARITY[r]!.weight, // 병종 전용 카드가 줄어든 만큼 공용 카드가 더 자주 나온다(방어구·가시는 덜 자주)
