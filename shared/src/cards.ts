@@ -228,7 +228,7 @@ const STAT_WEIGHT: Partial<Record<MercStat, number>> = { regen: 9, lifesteal: 9 
 /** 병종 전용 카드로만 나오는 능력치(그 병종의 특화): 관통·발사 수·독은 궁병, 방어구·가시는 몸으로 싸우는 병종, 시전 시간은 마법사, 넉백은 창병·궁병 */
 const TYPE_ONLY_STATS: ReadonlySet<MercStat> = new Set(["pierce", "multi", "poison", "slow", "cast", "knock", "quiver"]); // 피해 감소·피해 반사는 용병 공용 카드로 나온다
 
-/** 주인공 카드와 같은 능력치를 가진 용병 공용 카드: 공용 카드 한 장은 주인공 카드의 CARD_TUNE.globalVsHero(기본 40%)를 넘지 못한다(주인공이 운영 카드에 선택을 나눠 쓰는 만큼 용병 카드가 더 강해지지 않게). */
+/** 주인공 카드와 같은 능력치를 가진 용병 공용 카드: 공용 카드 한 장은 주인공 카드의 CARD_TUNE.globalVsHero(기본 40%)로 맞춘다(주인공이 운영 카드에 선택을 나눠 쓰는 만큼 용병 카드가 더 강해지지 않게). */
 const HERO_STAT_OF: Partial<Record<MercStat, string>> = {
   hp: "heroMaxHp", speed: "heroSpeed", dmg: "heroDmg", atkSpeed: "heroFireRate", range: "heroRange", crit: "heroCrit", critMult: "heroCritMult", area: "heroArea", defense: "heroDefense", dodge: "heroDodge",
 };
@@ -237,7 +237,7 @@ const globalBase = (stat: MercStat): { factor: number; ratio: number | null } =>
   const heroK = HERO_STAT_OF[stat];
   const ref = heroK ? HERO_STATS.find((h) => h.k === heroK)?.base : undefined;
   if (ref === undefined) return { factor: CARD_TUNE.globalFactor, ratio: null };
-  const factor = Math.min(CARD_TUNE.globalFactor, (ref * CARD_TUNE.globalVsHero) / MERC_STAT_BASE[stat]); // 상한이 안 걸리면 globalFactor 그대로
+  const factor = (ref * CARD_TUNE.globalVsHero) / MERC_STAT_BASE[stat]; // 주인공 카드가 있는 능력치는 그 카드의 정확히 globalVsHero(40%)
   return { factor, ratio: (factor * MERC_STAT_BASE[stat]) / ref };
 };
 export const globalCardFactor = (stat: MercStat): number => (stat === "armor" || stat === "thorns" ? 1 : globalBase(stat).factor);

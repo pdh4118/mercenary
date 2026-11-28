@@ -704,7 +704,7 @@ test("카드 효과: 용병 체력 강화는 이미 있는 용병의 체력도 �
   const m = g.addMerc(a, SHIELD, 0, 0);
   const before = MERC_STATS[SHIELD]!.hp;
   forceCard(g, a, "mercStat", (e) => e.stat === "hp" && e.type === undefined);
-  const k = 1 + Math.round(MERC_STAT_BASE.hp * GLOBAL_CARD_FACTOR * 1000) / 1000; // 일반 등급 용병 공용 체력 카드
+  const k = 1 + Math.round(MERC_STAT_BASE.hp * globalCardFactor("hp") * 1000) / 1000; // 일반 등급 용병 공용 체력 카드(주인공 카드의 40%)
   assert.equal(g.getMerc(m)!.hp, Math.round(before * k));
   const wire = g.snapshotMercs().find((w) => w[0] === m)!;
   assert.equal(wire[9], Math.round(before * k)); // 최대 체력
@@ -1276,6 +1276,7 @@ test("배후 공격: 등 뒤에서 용병이 찌르면 같은 공격이 1.5배 �
 
 // --- 피해 숫자 이벤트 ---------------------------------------------------------
 
+import { globalCardFactor } from "@mercenary/shared";
 import { EVT_DMG_ALLY, EVT_DMG_ENEMY, EVT_DMG_ENEMY_CRIT, EVT_DMG_SHIELD } from "@mercenary/shared";
 
 test("피해 숫자: 내가 적에게 준 피해와 적이 방패로 막은 피해, 내가 입은 피해가 따로 나온다", () => {
